@@ -244,9 +244,9 @@ const WorktreeCard = React.memo(function WorktreeCard({
       ? getHostedReviewCacheKey(repo.path, branch, settings, repo.id, repo.connectionId)
       : ''
   const issueCacheKey = repo && worktree.linkedIssue ? `${repo.id}::${worktree.linkedIssue}` : ''
-  const linearIssueCacheKey = worktree.linkedLinearIssue
-    ? `selected::${worktree.linkedLinearIssue}`
-    : ''
+  // Why: use 'all' to fetch from all Linear workspaces. The issue might belong
+  // to a different workspace than the currently selected one.
+  const linearIssueCacheKey = worktree.linkedLinearIssue ? `all::${worktree.linkedLinearIssue}` : ''
 
   // Subscribe to ONLY the specific cache entry, not entire review/issue caches.
   const hostedReviewEntry = useAppStore((s) =>
@@ -280,9 +280,51 @@ const WorktreeCard = React.memo(function WorktreeCard({
           title: issue === null ? 'Issue details unavailable' : 'Loading issue...'
         }
       : null)
+  const linearStatus = useAppStore((s) => s.linearStatus)
   const linearIssue: LinearIssue | null | undefined = worktree.linkedLinearIssue
     ? (linearIssueEntry?.data ?? linearIssueFallbackEntry?.data)
     : null
+
+  // Why: construct a Linear URL from the organizationUrlKey and identifier
+  // when the API hasn't returned the full issue data yet, so the user can
+  // still navigate to the issue even while it's loading.
+  // Use the issue's workspaceId if available to get the correct organizationUrlKey,
+  // otherwise fall back to the currently selected workspace.
+  const linearOrgUrlKey = linearStatus?.viewer?.organizationUrlKey
+  const linearWorkspaceUrlKeys = linearStatus?.workspaces?.map((ws) => ({
+    id: ws.id,
+    organizationUrlKey: ws.organizationUrlKey
+  }))
+  const linearIssueUrlFallback = React.useMemo(() => {
+    if (!worktree.linkedLinearIssue || linearIssue?.url) {
+      return undefined
+    }
+
+    // Try to get the orgUrlKey from the issue's workspace if we have workspaceId
+    let orgUrlKey: string | undefined
+    if (linearIssue?.workspaceId && linearWorkspaceUrlKeys) {
+      const issueWorkspace = linearWorkspaceUrlKeys.find((ws) => ws.id === linearIssue.workspaceId)
+      orgUrlKey = issueWorkspace?.organizationUrlKey
+    }
+
+    // Fall back to current viewer's org if no workspace match
+    if (!orgUrlKey) {
+      orgUrlKey = linearOrgUrlKey
+    }
+
+    if (!orgUrlKey) {
+      return undefined
+    }
+
+    return `https://linear.app/${encodeURIComponent(orgUrlKey)}/issue/${encodeURIComponent(worktree.linkedLinearIssue)}`
+  }, [
+    worktree.linkedLinearIssue,
+    linearIssue?.url,
+    linearIssue?.workspaceId,
+    linearOrgUrlKey,
+    linearWorkspaceUrlKeys
+  ])
+
   const linearIssueDisplay = worktree.linkedLinearIssue
     ? linearIssue
       ? {
@@ -297,7 +339,8 @@ const WorktreeCard = React.memo(function WorktreeCard({
           title:
             linearIssueEntry || linearIssueFallbackEntry
               ? 'Linear issue details unavailable'
-              : 'Loading Linear issue...'
+              : 'Loading Linear issue...',
+          url: linearIssueUrlFallback
         }
     : null
   const isDeleting = deleteState?.isDeleting ?? false
@@ -398,7 +441,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
       if (!isWindowVisible()) {
         return
       }
-      void fetchLinearIssue(linearIssueId)
+      void fetchLinearIssue(linearIssueId, 'all')
     }
     refreshLinearIssueIfVisible()
     window.addEventListener('focus', refreshLinearIssueIfVisible)
