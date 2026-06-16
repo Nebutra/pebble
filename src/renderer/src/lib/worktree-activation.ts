@@ -100,6 +100,7 @@ type WorktreeActivationStore = Partial<WorktreeRuntimeOwnerState> & {
       command: string
       env?: Record<string, string>
       initialAgentStatus?: { agent: TuiAgent; prompt: string }
+      showSessionRestoredBanner?: boolean
       telemetry?: AgentStartedTelemetry
     }
   ) => void

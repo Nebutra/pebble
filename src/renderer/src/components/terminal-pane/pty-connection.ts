@@ -125,6 +125,7 @@ const INACTIVE_FOREGROUND_IMMEDIATE_BUDGET_CHARS = 32 * 1024
 // terminal state is unavailable, so the user has an explicit loss signal.
 const HIDDEN_OUTPUT_RESTORE_UNAVAILABLE_WARNING =
   '\x18\x1b[0m\r\n[Orca skipped hidden terminal output because main recovery was unavailable.]\r\n'
+const SESSION_RESTORED_BANNER = '\r\n\x1b[2m--- session restored ---\x1b[0m\r\n\r\n'
 
 type E2eTerminalPtyDataInjectionApi = {
   inject: (paneKey: string, data: string, meta?: PtyDataMeta) => boolean
@@ -1960,13 +1961,30 @@ export function connectPanePty(
     // stay renderer-delivered so xterm can apply bracketed-paste semantics.
     let pendingStartupCommand =
       shouldDeliverStartupViaTerminalPaste || connectionId ? (paneStartup?.command ?? null) : null
+    let sessionRestoredBannerWritten = false
+    const writeSessionRestoredBanner = (writeBanner?: (data: string) => void): void => {
+      if (sessionRestoredBannerWritten) {
+        return
+      }
+      sessionRestoredBannerWritten = true
+      if (writeBanner) {
+        writeBanner(SESSION_RESTORED_BANNER)
+        return
+      }
+      writeTerminalOutput(pane.terminal, SESSION_RESTORED_BANNER, {
+        foreground: true,
+        beforeWrite: beforeTerminalOutputWrite
+      })
+    }
     const getColdRestoreAgentResumePlatform = (): NodeJS.Platform => {
       if (connectionId || (worktree?.path && isWslUncPath(worktree.path))) {
         return 'linux'
       }
       return CLIENT_PLATFORM
     }
-    const prepareColdRestoreAgentResumeCommand = (): boolean => {
+    const prepareColdRestoreAgentResumeCommand = (
+      writeBanner?: (data: string) => void
+    ): boolean => {
       if (pendingStartupCommand) {
         return false
       }
@@ -1998,6 +2016,9 @@ export function connectPanePty(
       // Why: cold restore means the PTY process is gone but the agent provider
       // session is still resumable, so the replacement shell must launch it.
       pendingStartupCommand = startupPlan.launchCommand
+      if (sleepingRecord) {
+        writeSessionRestoredBanner(writeBanner)
+      }
       if (!useLiveEntry && sleepingRecord) {
         state.clearSleepingAgentSession(cacheKey)
       }
@@ -3097,7 +3118,7 @@ export function connectPanePty(
         // land in the new shell's stdin. See replay-guard.ts.
         writeReplayData('\x1b[2J\x1b[3J\x1b[H')
         writeReplayData(connectResult.coldRestore.scrollback)
-        writeReplayData('\r\n\x1b[2m--- session restored ---\x1b[0m\r\n\r\n')
+        const didPrepareResume = prepareColdRestoreAgentResumeCommand(writeReplayData)
         // Cold-restore means the daemon lost the session and spawned a
         // fresh shell — no TUI is consuming the mode-setting bytes that a
         // crashed TUI (e.g. Claude's \e[?1004h) left in the scrollback, so
@@ -3106,7 +3127,7 @@ export function connectPanePty(
         if (!isRemoteRuntimePtyId(ptyId)) {
           window.api.pty.ackColdRestore(ptyId)
         }
-        if (prepareColdRestoreAgentResumeCommand()) {
+        if (didPrepareResume) {
           schedulePendingStartupCommandDelivery()
         }
       }

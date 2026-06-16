@@ -40,6 +40,8 @@ import { TerminalErrorToast } from './TerminalErrorToast'
 import { TerminalSessionStateSaveFailureDialog } from './TerminalSessionStateSaveFailureDialog'
 import TerminalContextMenu from './TerminalContextMenu'
 import { TerminalAgentSessionForkDialog } from './TerminalAgentSessionForkDialog'
+import { SessionRestoredBanner } from './SessionRestoredBanner'
+import { useSessionRestoredBannerDismiss } from './useSessionRestoredBannerDismiss'
 import { useSystemPrefersDark } from './use-system-prefers-dark'
 import { useTerminalPaneGlobalEffects } from './use-terminal-pane-global-effects'
 import { useTerminalPaneLifecycle } from './use-terminal-pane-lifecycle'
@@ -413,6 +415,9 @@ export default function TerminalPane({
   // xterm may not know multi-line text needs bracketed-paste protection.
   const forceBracketedMultilineTextPaste = isWindowsUserAgent()
   const [startup] = useState(() => useAppStore.getState().pendingStartupByTabId[tabId])
+  const [showSessionRestoredBanner, setShowSessionRestoredBanner] = useState(
+    () => startup?.showSessionRestoredBanner === true
+  )
   const shouldMeasureHiddenStartup = startup !== undefined && !isVisible
   const consumeTabStartupCommand = useAppStore((store) => store.consumeTabStartupCommand)
   const [setupSplit] = useState(() => useAppStore.getState().pendingSetupSplitByTabId[tabId])
@@ -426,6 +431,15 @@ export default function TerminalPane({
       consumeTabStartupCommand(tabId)
     }
   }, [startup, tabId, consumeTabStartupCommand])
+
+  const dismissSessionRestoredBanner = useCallback((): void => {
+    setShowSessionRestoredBanner(false)
+  }, [])
+  useSessionRestoredBannerDismiss(
+    showSessionRestoredBanner,
+    containerRef,
+    dismissSessionRestoredBanner
+  )
 
   const openDiskSpaceAnalyzer = useCallback(() => {
     setSessionStateSaveFailureOpen(false)
@@ -1467,13 +1481,14 @@ export default function TerminalPane({
     }
     let needsFit = false
     for (const pane of manager.getPanes()) {
-      // Show the title bar space when the pane has a title OR is being
-      // inline-edited (so the input appears even for untitled panes).
+      // Show the title bar space when the pane has a title, is being
+      // inline-edited, or has transient startup chrome.
       // Unread activity does NOT reserve title-bar space — the bell is
       // rendered as an absolutely-positioned overlay in the pane's top-right
       // corner so it can appear and disappear without shifting terminal
       // content, avoiding the jarring reflow on bell toggles.
-      const shouldShow = !!paneTitles[pane.id] || renamingPaneId === pane.id
+      const shouldShow =
+        !!paneTitles[pane.id] || renamingPaneId === pane.id || showSessionRestoredBanner
       const hadTitle = pane.container.hasAttribute('data-has-title')
       if (shouldShow && !hadTitle) {
         pane.container.setAttribute('data-has-title', '')
@@ -1486,7 +1501,7 @@ export default function TerminalPane({
     if (needsFit) {
       fitPanes(manager)
     }
-  }, [paneTitles, renamingPaneId])
+  }, [paneCount, paneTitles, renamingPaneId, showSessionRestoredBanner])
 
   // Register a capture callback for shutdown. The beforeunload handler in
   // App.tsx calls all registered callbacks to serialize terminal buffers.
@@ -1966,6 +1981,15 @@ export default function TerminalPane({
             searchStateRef={searchStateRef}
           />,
           activePane.container
+        )}
+      {showSessionRestoredBanner &&
+        activePane?.container &&
+        createPortal(
+          // Why: resumed Codex TUIs repaint xterm immediately, so the wake marker
+          // must live in the pane chrome instead of the PTY byte stream.
+          <SessionRestoredBanner visible />,
+          activePane.container,
+          'session-restored-banner'
         )}
       <TerminalContextMenu
         open={contextMenu.open}
