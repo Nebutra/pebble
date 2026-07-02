@@ -7,7 +7,7 @@ export const DEFAULT_EXPECTED_SIGNER =
 
 const POWERSHELL_SIGNATURE_SCRIPT = String.raw`
 $ErrorActionPreference = 'Stop'
-$signature = Get-AuthenticodeSignature -FilePath $args[0]
+$signature = Get-AuthenticodeSignature -FilePath $env:ORCA_WINDOWS_INNER_EXECUTABLE
 $certificate = $signature.SignerCertificate
 [pscustomobject]@{
   status = $signature.Status.ToString()
@@ -130,6 +130,7 @@ export function validateExecutablePath(executablePath) {
 }
 
 export function getPowerShellSignatureJson(executablePath, spawnSyncImpl = spawnSync) {
+  // Why: pwsh -Command does not reliably expose trailing process args to string commands.
   const result = spawnSyncImpl(
     'pwsh',
     [
@@ -139,10 +140,15 @@ export function getPowerShellSignatureJson(executablePath, spawnSyncImpl = spawn
       '-ExecutionPolicy',
       'Bypass',
       '-Command',
-      POWERSHELL_SIGNATURE_SCRIPT,
-      executablePath
+      POWERSHELL_SIGNATURE_SCRIPT
     ],
-    { encoding: 'utf8' }
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        ORCA_WINDOWS_INNER_EXECUTABLE: executablePath
+      }
+    }
   )
 
   if (result.error) {

@@ -172,8 +172,15 @@ describe('verify-windows-inner-signature', () => {
     )
     expect(calls[0].command).toBe('pwsh')
     expect(calls[0].args).toContain('-Command')
-    expect(calls[0].args.at(-1)).toBe('C:\\Path With Spaces\\Orca.exe')
-    expect(calls[0].options).toEqual({ encoding: 'utf8' })
+    expect(calls[0].args.at(-1)).not.toBe('C:\\Path With Spaces\\Orca.exe')
+    expect(calls[0].options).toEqual(
+      expect.objectContaining({
+        encoding: 'utf8',
+        env: expect.objectContaining({
+          ORCA_WINDOWS_INNER_EXECUTABLE: 'C:\\Path With Spaces\\Orca.exe'
+        })
+      })
+    )
 
     expect(() =>
       getPowerShellSignatureJson('Orca.exe', () => ({ status: 0, stdout: '{}', stderr: 'warning' }))
