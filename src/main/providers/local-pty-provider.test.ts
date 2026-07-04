@@ -98,6 +98,7 @@ describe('LocalPtyProvider', () => {
   let exitCb: ((info: { exitCode: number }) => void) | undefined
   let origShell: string | undefined
   let origPowerlevelWizardDisable: string | undefined
+  let origHistFile: string | undefined
   let origPlatform: PropertyDescriptor | undefined
 
   beforeEach(() => {
@@ -105,8 +106,11 @@ describe('LocalPtyProvider', () => {
     Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
     origShell = process.env.SHELL
     origPowerlevelWizardDisable = process.env.POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD
+    origHistFile = process.env.HISTFILE
     process.env.SHELL = '/bin/zsh'
     delete process.env.POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD
+    // injectHistoryEnv preserves an inherited HISTFILE, so clear it for hermetic history assertions.
+    delete process.env.HISTFILE
 
     existsSyncMock.mockReturnValue(true)
     statSyncMock.mockReturnValue({ isDirectory: () => true, mode: 0o755 })
@@ -157,6 +161,11 @@ describe('LocalPtyProvider', () => {
       delete process.env.POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD
     } else {
       process.env.POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD = origPowerlevelWizardDisable
+    }
+    if (origHistFile === undefined) {
+      delete process.env.HISTFILE
+    } else {
+      process.env.HISTFILE = origHistFile
     }
   })
 
