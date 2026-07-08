@@ -7,7 +7,7 @@ function makeRepo(overrides: Partial<Repo> = {}): Repo {
   return {
     id: 'repo-1',
     path: '/repo',
-    displayName: 'orca',
+    displayName: 'pebble',
     badgeColor: '#999999',
     addedAt: 1,
     ...overrides
@@ -19,13 +19,13 @@ describe('repo header create state', () => {
     expect(
       getRepoHeaderCreateState({
         repo: makeRepo(),
-        label: 'orca',
+        label: 'pebble',
         sshStatus: null
       })
     ).toEqual({
       disabled: false,
-      tooltip: 'Create new worktree for orca',
-      ariaLabel: 'Create new worktree for orca',
+      tooltip: 'Create new worktree for pebble',
+      ariaLabel: 'Create new worktree for pebble',
       requiresSshReconnect: false
     })
   })

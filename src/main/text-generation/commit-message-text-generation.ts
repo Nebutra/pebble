@@ -183,7 +183,7 @@ function sanitizeAgentFailureDetail(detail: string | null): string | null {
 }
 
 function userFacingUnsafeWindowsBatchArgs(label: string): string {
-  return `${label} cannot be run as a Windows batch command with the prompt in argv. Remove {prompt} so Orca sends the prompt on stdin.`
+  return `${label} cannot be run as a Windows batch command with the prompt in argv. Remove {prompt} so Pebble sends the prompt on stdin.`
 }
 
 function toModelDiscoveryCapability(

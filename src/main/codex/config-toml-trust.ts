@@ -496,7 +496,7 @@ type TrustBlockRange = {
 }
 
 // Why: separator and casing drift between Codex-written keys (raw backslash,
-// potentially lowercased) and Orca-built keys (forward-slash, realpathSync.native
+// potentially lowercased) and Pebble-built keys (forward-slash, realpathSync.native
 // casing) must not prevent findTrustBlockRanges from matching an existing block.
 export function normalizeHookTrustKeyForLookup(key: string): string {
   const parsed = parseTrustKey(key)

@@ -15,11 +15,11 @@ function repo(id: string, path = `/repos/${id}`): Repo {
 function setup(overrides: Partial<ProjectHostSetup> = {}): ProjectHostSetup {
   return {
     id: 'setup-builder',
-    projectId: 'github:stablyai/orca',
+    projectId: 'github:nebutra/pebble',
     hostId: 'ssh:builder',
     repoId: 'repo-builder',
-    path: '/remote/orca',
-    displayName: 'orca',
+    path: '/remote/pebble',
+    displayName: 'pebble',
     setupState: 'ready',
     setupMethod: 'cloned',
     createdAt: 1,
@@ -33,24 +33,24 @@ describe('buildAutomationRunContextForRepo', () => {
     expect(
       buildAutomationRunContextForRepo({
         repoId: 'repo-builder',
-        repos: [repo('repo-local', '/local/orca'), repo('repo-builder', '/remote/orca')],
+        repos: [repo('repo-local', '/local/pebble'), repo('repo-builder', '/remote/pebble')],
         projectHostSetups: [
           setup({
             id: 'setup-local',
             hostId: 'local',
             repoId: 'repo-local',
-            path: '/local/orca'
+            path: '/local/pebble'
           }),
           setup()
         ]
       })
     ).toEqual({
       kind: 'workspace-run',
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       hostId: 'ssh:builder',
       projectHostSetupId: 'setup-builder',
       repoId: 'repo-builder',
-      path: '/remote/orca'
+      path: '/remote/pebble'
     })
   })
 

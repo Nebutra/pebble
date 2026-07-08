@@ -99,32 +99,32 @@ describe('new-workspace-composer-repo', () => {
   })
 
   describe('resolveComposerActiveRepoId', () => {
-    const localOrca = makeRepo('local-orca', { upstream: { owner: 'stablyai', repo: 'orca' } })
-    const runtimeOrca = makeRepo('runtime-orca', {
-      connectionId: 'runtime-ssh-orca-1',
-      upstream: { owner: 'stablyai', repo: 'orca' }
+    const localPebble = makeRepo('local-pebble', { upstream: { owner: 'nebutra', repo: 'pebble' } })
+    const runtimePebble = makeRepo('runtime-pebble', {
+      connectionId: 'runtime-ssh-pebble-1',
+      upstream: { owner: 'nebutra', repo: 'pebble' }
     })
-    const otherProject = makeRepo('noqa', { upstream: { owner: 'stablyai', repo: 'noqa' } })
-    const repos = [otherProject, localOrca, runtimeOrca]
+    const otherProject = makeRepo('noqa', { upstream: { owner: 'nebutra', repo: 'noqa' } })
+    const repos = [otherProject, localPebble, runtimePebble]
     const eligibleRepos = getComposerEligibleRepos(repos)
 
     it('maps an active runtime-owned SSH repo to its local same-project sibling', () => {
-      expect(resolveComposerActiveRepoId(repos, eligibleRepos, 'runtime-orca')).toBe('local-orca')
+      expect(resolveComposerActiveRepoId(repos, eligibleRepos, 'runtime-pebble')).toBe('local-pebble')
     })
 
     it('leaves a normal active repo unchanged', () => {
-      expect(resolveComposerActiveRepoId(repos, eligibleRepos, 'local-orca')).toBe('local-orca')
+      expect(resolveComposerActiveRepoId(repos, eligibleRepos, 'local-pebble')).toBe('local-pebble')
     })
 
     it('keeps the runtime repo id when no same-project sibling is eligible', () => {
-      const onlyRuntime = [runtimeOrca]
+      const onlyRuntime = [runtimePebble]
       expect(
         resolveComposerActiveRepoId(
           onlyRuntime,
           getComposerEligibleRepos(onlyRuntime),
-          'runtime-orca'
+          'runtime-pebble'
         )
-      ).toBe('runtime-orca')
+      ).toBe('runtime-pebble')
     })
 
     it('passes through null/undefined active repo', () => {

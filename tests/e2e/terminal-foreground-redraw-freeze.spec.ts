@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import type { Page, TestInfo } from '@stablyai/playwright-test'
-import { test, expect } from './helpers/orca-app'
+import type { Page, TestInfo } from '@nebutra/playwright-test'
+import { test, expect } from './helpers/pebble-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActiveTerminalManager } from './helpers/terminal'
 import { waitForTerminalPtyDataInjector } from './helpers/terminal-pty-injection'
@@ -249,48 +249,48 @@ function annotateMeasurement(
 }
 
 test.describe('Terminal foreground redraw freeze repro', () => {
-  test('Codex-style line rewrites request a visible row refresh', async ({ orcaPage }) => {
-    await waitForSessionReady(orcaPage)
-    await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
-    await waitForActiveTerminalManager(orcaPage, 30_000)
+  test('Codex-style line rewrites request a visible row refresh', async ({ pebblePage }) => {
+    await waitForSessionReady(pebblePage)
+    await waitForActiveWorktree(pebblePage)
+    await ensureTerminalVisible(pebblePage)
+    await waitForActiveTerminalManager(pebblePage, 30_000)
 
-    const { paneKey } = await waitForActivePaneHookDescriptor(orcaPage)
-    await waitForTerminalPtyDataInjector(orcaPage, paneKey)
-    await installActivePaneRefreshProbe(orcaPage)
+    const { paneKey } = await waitForActivePaneHookDescriptor(pebblePage)
+    await waitForTerminalPtyDataInjector(pebblePage, paneKey)
+    await installActivePaneRefreshProbe(pebblePage)
     try {
-      const refreshBaseline = await readRefreshProbeCount(orcaPage)
-      await resetSchedulerDebug(orcaPage)
-      const measurement = await measureRendererDuringRewriteBurst(orcaPage, paneKey)
-      const scheduler = await readSchedulerDebug(orcaPage)
+      const refreshBaseline = await readRefreshProbeCount(pebblePage)
+      await resetSchedulerDebug(pebblePage)
+      const measurement = await measureRendererDuringRewriteBurst(pebblePage, paneKey)
+      const scheduler = await readSchedulerDebug(pebblePage)
 
       expect(measurement.injectedFrames).toBe(REWRITE_REDRAW_FRAME_COUNT)
       expect(measurement.maxTimerDriftMs).toBeLessThan(MAX_RENDERER_TIMER_DRIFT_MS)
       expect(scheduler.deferredForegroundEnqueueCount).toBeGreaterThan(0)
       await expect
-        .poll(async () => (await readRefreshProbeCount(orcaPage)) - refreshBaseline, {
+        .poll(async () => (await readRefreshProbeCount(pebblePage)) - refreshBaseline, {
           timeout: 5_000,
           message: 'Codex-style terminal rewrites did not request an xterm refresh'
         })
         .toBeGreaterThan(0)
     } finally {
-      await disposeActivePaneRefreshProbe(orcaPage)
+      await disposeActivePaneRefreshProbe(pebblePage)
     }
   })
 
   test('active OpenTUI-style redraw bursts do not monopolize the renderer', async ({
-    orcaPage
+    pebblePage
   }, testInfo) => {
-    await waitForSessionReady(orcaPage)
-    await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
-    await waitForActiveTerminalManager(orcaPage, 30_000)
+    await waitForSessionReady(pebblePage)
+    await waitForActiveWorktree(pebblePage)
+    await ensureTerminalVisible(pebblePage)
+    await waitForActiveTerminalManager(pebblePage, 30_000)
 
-    const { paneKey } = await waitForActivePaneHookDescriptor(orcaPage)
-    await waitForTerminalPtyDataInjector(orcaPage, paneKey)
-    await resetSchedulerDebug(orcaPage)
-    const measurement = await measureRendererDuringBurst(orcaPage, paneKey)
-    const scheduler = await readSchedulerDebug(orcaPage)
+    const { paneKey } = await waitForActivePaneHookDescriptor(pebblePage)
+    await waitForTerminalPtyDataInjector(pebblePage, paneKey)
+    await resetSchedulerDebug(pebblePage)
+    const measurement = await measureRendererDuringBurst(pebblePage, paneKey)
+    const scheduler = await readSchedulerDebug(pebblePage)
     annotateMeasurement(testInfo, measurement, scheduler)
 
     expect(measurement.injectedFrames).toBe(REDRAW_FRAME_COUNT)
@@ -301,7 +301,7 @@ test.describe('Terminal foreground redraw freeze repro', () => {
   })
 
   test('captured OpenCode/OpenTUI redraw bytes do not monopolize foreground writes', async ({
-    orcaPage
+    pebblePage
   }, testInfo) => {
     const frames = loadCapturedOpenCodeSmallRedrawFrames()
     test.skip(
@@ -309,16 +309,16 @@ test.describe('Terminal foreground redraw freeze repro', () => {
       `OpenCode PTY capture missing; run "git clone https://github.com/anomalyco/opencode.git .tmp/opencode" then "node tests/e2e/capture-opencode-tui-repro.mjs" to generate ${OPENCODE_CAPTURE_PATH}`
     )
 
-    await waitForSessionReady(orcaPage)
-    await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
-    await waitForActiveTerminalManager(orcaPage, 30_000)
+    await waitForSessionReady(pebblePage)
+    await waitForActiveWorktree(pebblePage)
+    await ensureTerminalVisible(pebblePage)
+    await waitForActiveTerminalManager(pebblePage, 30_000)
 
-    const { paneKey } = await waitForActivePaneHookDescriptor(orcaPage)
-    await waitForTerminalPtyDataInjector(orcaPage, paneKey)
-    await resetSchedulerDebug(orcaPage)
-    const measurement = await measureRendererDuringFrames(orcaPage, paneKey, frames)
-    const scheduler = await readSchedulerDebug(orcaPage)
+    const { paneKey } = await waitForActivePaneHookDescriptor(pebblePage)
+    await waitForTerminalPtyDataInjector(pebblePage, paneKey)
+    await resetSchedulerDebug(pebblePage)
+    const measurement = await measureRendererDuringFrames(pebblePage, paneKey, frames)
+    const scheduler = await readSchedulerDebug(pebblePage)
     annotateMeasurement(testInfo, measurement, scheduler)
 
     expect(measurement.injectedFrames).toBe(frames.length)

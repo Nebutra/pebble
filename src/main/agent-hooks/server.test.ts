@@ -1510,11 +1510,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postHook = (prompt: string): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody({ hook_event_name: 'UserPromptSubmit', prompt }))
         })
@@ -1534,7 +1534,7 @@ describe('AgentHookServer listener replay', () => {
   })
 
   it('hydrates cached statuses as not observed in the current runtime', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'orca-agent-hooks-'))
+    const dir = mkdtempSync(join(tmpdir(), 'pebble-agent-hooks-'))
     const firstServer = new AgentHookServer()
     const secondServer = new AgentHookServer()
     try {
@@ -1571,14 +1571,14 @@ describe('AgentHookServer listener replay', () => {
     await server.start({ env: 'production' })
     try {
       const env = server.buildPtyEnv()
-      expect(env.ORCA_AGENT_HOOK_PORT).toBeTruthy()
-      expect(env.ORCA_AGENT_HOOK_TOKEN).toBeTruthy()
+      expect(env.PEBBLE_AGENT_HOOK_PORT).toBeTruthy()
+      expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBeTruthy()
 
-      const response = await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+      const response = await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(
           buildBody({
@@ -1619,11 +1619,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -1632,7 +1632,7 @@ describe('AgentHookServer listener replay', () => {
         postClaudeHook({
           hook_event_name: 'PermissionRequest',
           tool_name: 'Bash',
-          tool_input: { command: 'rm -rf /tmp/orca-subagent-repro' }
+          tool_input: { command: 'rm -rf /tmp/pebble-subagent-repro' }
         })
       ).resolves.toMatchObject({ status: 204 })
       await expect(
@@ -1649,7 +1649,7 @@ describe('AgentHookServer listener replay', () => {
           state: 'waiting',
           agentType: 'claude',
           toolName: 'Bash',
-          toolInput: 'rm -rf /tmp/orca-subagent-repro'
+          toolInput: 'rm -rf /tmp/pebble-subagent-repro'
         })
       ])
     } finally {
@@ -1663,11 +1663,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -1675,12 +1675,12 @@ describe('AgentHookServer listener replay', () => {
       await postClaudeHook({
         hook_event_name: 'PermissionRequest',
         tool_name: 'Bash',
-        tool_input: { command: 'rm -rf /tmp/orca-subagent-repro' }
+        tool_input: { command: 'rm -rf /tmp/pebble-subagent-repro' }
       })
       await postClaudeHook({
         hook_event_name: 'PreToolUse',
         tool_name: 'Bash',
-        tool_input: { command: 'rm -rf /tmp/orca-subagent-repro' }
+        tool_input: { command: 'rm -rf /tmp/pebble-subagent-repro' }
       })
 
       expect(server.getStatusSnapshot()).toEqual([
@@ -1689,7 +1689,7 @@ describe('AgentHookServer listener replay', () => {
           state: 'waiting',
           agentType: 'claude',
           toolName: 'Bash',
-          toolInput: 'rm -rf /tmp/orca-subagent-repro'
+          toolInput: 'rm -rf /tmp/pebble-subagent-repro'
         })
       ])
     } finally {
@@ -1703,11 +1703,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -1715,12 +1715,12 @@ describe('AgentHookServer listener replay', () => {
       await postClaudeHook({
         hook_event_name: 'PermissionRequest',
         tool_name: 'Bash',
-        tool_input: { command: 'rm -rf /tmp/orca-subagent-repro' }
+        tool_input: { command: 'rm -rf /tmp/pebble-subagent-repro' }
       })
       await postClaudeHook({
         hook_event_name: 'PreToolUse',
         tool_name: 'Bash',
-        tool_input: { command: 'rm -rf /tmp/orca-subagent-repro' },
+        tool_input: { command: 'rm -rf /tmp/pebble-subagent-repro' },
         tool_use_id: 'toolu-approved-1'
       })
 
@@ -1730,7 +1730,7 @@ describe('AgentHookServer listener replay', () => {
           state: 'waiting',
           agentType: 'claude',
           toolName: 'Bash',
-          toolInput: 'rm -rf /tmp/orca-subagent-repro'
+          toolInput: 'rm -rf /tmp/pebble-subagent-repro'
         })
       ])
     } finally {
@@ -1744,11 +1744,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -1756,18 +1756,18 @@ describe('AgentHookServer listener replay', () => {
       await postClaudeHook({
         hook_event_name: 'PreToolUse',
         tool_name: 'Bash',
-        tool_input: { command: 'rm -rf /tmp/orca-2824-permission-target' },
+        tool_input: { command: 'rm -rf /tmp/pebble-2824-permission-target' },
         tool_use_id: 'toolu-approved-by-claude'
       })
       await postClaudeHook({
         hook_event_name: 'PermissionRequest',
         tool_name: 'Bash',
-        tool_input: { command: 'rm -rf /tmp/orca-2824-permission-target' }
+        tool_input: { command: 'rm -rf /tmp/pebble-2824-permission-target' }
       })
       await postClaudeHook({
         hook_event_name: 'PostToolUse',
         tool_name: 'Bash',
-        tool_input: { command: 'rm -rf /tmp/orca-2824-permission-target' },
+        tool_input: { command: 'rm -rf /tmp/pebble-2824-permission-target' },
         tool_use_id: 'toolu-approved-by-claude'
       })
 
@@ -1777,7 +1777,7 @@ describe('AgentHookServer listener replay', () => {
           state: 'working',
           agentType: 'claude',
           toolName: 'Bash',
-          toolInput: 'rm -rf /tmp/orca-2824-permission-target'
+          toolInput: 'rm -rf /tmp/pebble-2824-permission-target'
         })
       ])
     } finally {
@@ -1791,11 +1791,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -1837,11 +1837,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -1883,11 +1883,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -1930,11 +1930,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -1980,11 +1980,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -1993,13 +1993,13 @@ describe('AgentHookServer listener replay', () => {
         hook_event_name: 'PermissionRequest',
         agent_type: 'main',
         tool_name: 'Bash',
-        tool_input: { command: 'rm -rf /tmp/orca-subagent-repro' }
+        tool_input: { command: 'rm -rf /tmp/pebble-subagent-repro' }
       })
       await postClaudeHook({
         hook_event_name: 'PreToolUse',
         agent_type: 'main',
         tool_name: 'Bash',
-        tool_input: { command: 'rm -rf /tmp/orca-subagent-repro' },
+        tool_input: { command: 'rm -rf /tmp/pebble-subagent-repro' },
         tool_use_id: 'toolu-approved-1'
       })
 
@@ -2009,7 +2009,7 @@ describe('AgentHookServer listener replay', () => {
           state: 'working',
           agentType: 'claude',
           toolName: 'Bash',
-          toolInput: 'rm -rf /tmp/orca-subagent-repro'
+          toolInput: 'rm -rf /tmp/pebble-subagent-repro'
         })
       ])
     } finally {
@@ -2023,11 +2023,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -2068,11 +2068,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -2113,11 +2113,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -2158,11 +2158,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -2198,11 +2198,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       const env = server.buildPtyEnv()
       const postClaudeHook = async (payload: Record<string, unknown>): Promise<Response> =>
-        fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+        fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(buildBody(payload))
         })
@@ -2210,7 +2210,7 @@ describe('AgentHookServer listener replay', () => {
       await postClaudeHook({
         hook_event_name: 'PermissionRequest',
         tool_name: 'Bash',
-        tool_input: { command: 'rm -rf /tmp/orca-subagent-repro' }
+        tool_input: { command: 'rm -rf /tmp/pebble-subagent-repro' }
       })
       await postClaudeHook({
         hook_event_name: 'UserPromptSubmit',
@@ -2237,11 +2237,11 @@ describe('AgentHookServer listener replay', () => {
     await server.start({ env: 'production' })
     try {
       const env = server.buildPtyEnv()
-      await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/codex`, {
+      await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/codex`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(
           buildBody({
@@ -2273,12 +2273,12 @@ describe('AgentHookServer listener replay', () => {
         payload: Record<string, unknown>
       ): Promise<void> => {
         const response = await fetch(
-          `http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/${source}`,
+          `http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/${source}`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+              'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
             },
             body: JSON.stringify(buildBody(payload))
           }
@@ -2326,11 +2326,11 @@ describe('AgentHookServer listener replay', () => {
     try {
       server.registerPaneKeyAlias('tab-1:0', PANE)
       const env = server.buildPtyEnv()
-      const response = await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+      const response = await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(
           buildBody(
@@ -2369,11 +2369,11 @@ describe('AgentHookServer listener replay', () => {
     await server.start({ env: 'production' })
     try {
       const env = server.buildPtyEnv()
-      const response = await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+      const response = await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(
           buildBody(
@@ -2523,18 +2523,18 @@ describe('AgentHookServer listener replay', () => {
         tabId: 'tab-1',
         worktreeId: 'repo::/tmp/worktree with "quotes"',
         env: 'production',
-        version: env.ORCA_AGENT_HOOK_VERSION ?? '',
+        version: env.PEBBLE_AGENT_HOOK_VERSION ?? '',
         payload: JSON.stringify({
           hook_event_name: 'UserPromptSubmit',
           prompt: 'form encoded'
         })
       })
 
-      const response = await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+      const response = await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: params
       })
@@ -2576,14 +2576,14 @@ describe('AgentHookServer listener replay', () => {
           tabId: 'tab-1',
           worktreeId: 'wt-1',
           env: 'production',
-          version: env.ORCA_AGENT_HOOK_VERSION ?? '',
+          version: env.PEBBLE_AGENT_HOOK_VERSION ?? '',
           payload: JSON.stringify(payload)
         })
-        const response = await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/codex`, {
+        const response = await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/codex`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: params
         })
@@ -2672,11 +2672,11 @@ describe('AgentHookServer listener replay', () => {
     await server.start({ env: 'production' })
     try {
       const env = server.buildPtyEnv()
-      const response = await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/hermes`, {
+      const response = await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/hermes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(
           buildBody({
@@ -2716,11 +2716,11 @@ describe('AgentHookServer listener replay', () => {
       const listener = vi.fn()
       server.setListener(listener)
 
-      const response = await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/amp`, {
+      const response = await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/amp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(
           buildBody({
@@ -3073,11 +3073,11 @@ describe('AgentHookServer prompt-sent telemetry', () => {
     await server.start({ env: 'production' })
     try {
       const env = server.buildPtyEnv()
-      const response = await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/claude`, {
+      const response = await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/claude`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(
           buildBody({
@@ -3485,11 +3485,11 @@ describe('AgentHookServer prompt-sent telemetry', () => {
     await server.start({ env: 'production' })
     try {
       const env = server.buildPtyEnv()
-      const response = await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/opencode`, {
+      const response = await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/opencode`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(
           buildBody({
@@ -3501,12 +3501,12 @@ describe('AgentHookServer prompt-sent telemetry', () => {
         )
       })
       const updatedResponse = await fetch(
-        `http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/opencode`,
+        `http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/opencode`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+            'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
           },
           body: JSON.stringify(
             buildBody({
@@ -3870,7 +3870,7 @@ describe('Claude hook normalization', () => {
     let transcriptPath: string
 
     beforeEach(() => {
-      tmpDir = mkdtempSync(join(tmpdir(), 'orca-hook-test-'))
+      tmpDir = mkdtempSync(join(tmpdir(), 'pebble-hook-test-'))
       transcriptPath = join(tmpDir, 'transcript.jsonl')
     })
 
@@ -4031,7 +4031,7 @@ describe('Codex hook normalization', () => {
   })
 
   it('PermissionRequest maps to waiting and surfaces the pending tool input', () => {
-    // Why: Codex asks for user attention through PermissionRequest. Orca's
+    // Why: Codex asks for user attention through PermissionRequest. Pebble's
     // sidebar red dot depends on this becoming `waiting`; treating it like
     // PreToolUse would leave the pane looking busy while it is blocked on the
     // user.
@@ -5079,13 +5079,13 @@ describe('Copilot hook normalization', () => {
       buildBody({
         hook_event_name: 'PermissionRequest',
         tool_name: 'bash',
-        tool_input: { command: 'rm -rf /tmp/orca-test' }
+        tool_input: { command: 'rm -rf /tmp/pebble-test' }
       }),
       'production'
     )
     expect(result?.payload.state).toBe('working')
     expect(result?.payload.toolName).toBe('bash')
-    expect(result?.payload.toolInput).toBe('rm -rf /tmp/orca-test')
+    expect(result?.payload.toolInput).toBe('rm -rf /tmp/pebble-test')
   })
 
   it('surfaces lowercase Copilot file tool input previews', () => {
@@ -5177,7 +5177,7 @@ describe('Copilot hook normalization', () => {
   })
 
   it('Stop reads the final assistant message from Copilot transcript events', () => {
-    const tmpDir = mkdtempSync(join(tmpdir(), 'orca-copilot-transcript-'))
+    const tmpDir = mkdtempSync(join(tmpdir(), 'pebble-copilot-transcript-'))
     const transcriptPath = join(tmpDir, 'events.jsonl')
     try {
       const lines = [
@@ -5224,11 +5224,11 @@ describe('Copilot hook normalization', () => {
       const env = server.buildPtyEnv()
       const listener = vi.fn()
       server.setListener(listener)
-      const response = await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/copilot`, {
+      const response = await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/copilot`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(
           buildBody({ hook_event_name: 'Notification', notificationType: 'permission_prompt' })
@@ -5249,7 +5249,7 @@ describe('Copilot hook normalization', () => {
 
   it('updates Copilot Stop with final transcript text after a non-blocking retry', async () => {
     const server = new AgentHookServer()
-    const tmpDir = mkdtempSync(join(tmpdir(), 'orca-copilot-transcript-retry-'))
+    const tmpDir = mkdtempSync(join(tmpdir(), 'pebble-copilot-transcript-retry-'))
     const transcriptPath = join(tmpDir, 'events.jsonl')
     writeFileSync(transcriptPath, '')
     await server.start({ env: 'production' })
@@ -5258,11 +5258,11 @@ describe('Copilot hook normalization', () => {
       const listener = vi.fn()
       server.setListener(listener)
 
-      await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/copilot`, {
+      await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/copilot`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(
           buildBody({
@@ -5271,11 +5271,11 @@ describe('Copilot hook normalization', () => {
           })
         )
       })
-      const response = await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/copilot`, {
+      const response = await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/copilot`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(
           buildBody({ hook_event_name: 'Stop', transcript_path: transcriptPath })
@@ -5283,11 +5283,11 @@ describe('Copilot hook normalization', () => {
       })
 
       expect(response.status).toBe(204)
-      await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/copilot`, {
+      await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/copilot`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(buildBody({ hook_event_name: 'SessionEnd', reason: 'complete' }))
       })
@@ -5325,7 +5325,7 @@ describe('Copilot hook normalization', () => {
 
   it('updates Grok Stop with final chat-history text after a non-blocking retry', async () => {
     const server = new AgentHookServer()
-    const tmpDir = mkdtempSync(join(tmpdir(), 'orca-grok-chat-history-retry-'))
+    const tmpDir = mkdtempSync(join(tmpdir(), 'pebble-grok-chat-history-retry-'))
     const sessionId = '019e37f4-5135-7b63-a4ab-6d13aa6bf528'
     const cwd = join(tmpDir, 'workspace')
     const sessionDir = join(tmpDir, '.grok', 'sessions', encodeURIComponent(cwd), sessionId)
@@ -5339,19 +5339,19 @@ describe('Copilot hook normalization', () => {
       const listener = vi.fn()
       server.setListener(listener)
 
-      await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/grok`, {
+      await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/grok`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(buildBody({ hookEventName: 'user_prompt_submit', prompt: 'hihi' }))
       })
-      const response = await fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}/hook/grok`, {
+      const response = await fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}/hook/grok`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+          'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
         },
         body: JSON.stringify(buildBody({ hookEventName: 'Stop', sessionId, cwd }))
       })
@@ -5392,7 +5392,7 @@ describe('Endpoint file lifecycle', () => {
   let userDataPath: string
 
   beforeEach(() => {
-    userDataPath = mkdtempSync(join(tmpdir(), 'orca-endpoint-'))
+    userDataPath = mkdtempSync(join(tmpdir(), 'pebble-endpoint-'))
   })
 
   afterEach(() => {
@@ -5407,13 +5407,17 @@ describe('Endpoint file lifecycle', () => {
       expect(filePath).toBeTruthy()
       expect(existsSync(filePath!)).toBe(true)
       const contents = readFileSync(filePath!, 'utf8')
-      const expectedPort = server.buildPtyEnv().ORCA_AGENT_HOOK_PORT
-      const expectedToken = server.buildPtyEnv().ORCA_AGENT_HOOK_TOKEN
+      const expectedPort = server.buildPtyEnv().PEBBLE_AGENT_HOOK_PORT
+      const expectedToken = server.buildPtyEnv().PEBBLE_AGENT_HOOK_TOKEN
       const prefix = process.platform === 'win32' ? 'set ' : ''
-      expect(contents).toContain(`${prefix}ORCA_AGENT_HOOK_PORT=${expectedPort}`)
-      expect(contents).toContain(`${prefix}ORCA_AGENT_HOOK_TOKEN=${expectedToken}`)
-      expect(contents).toContain(`${prefix}ORCA_AGENT_HOOK_ENV=development`)
-      expect(contents).toContain(`${prefix}ORCA_AGENT_HOOK_VERSION=1`)
+      expect(contents).toContain(`${prefix}PEBBLE_AGENT_HOOK_PORT=${expectedPort}`)
+      expect(contents).toContain(`${prefix}PEBBLE_AGENT_HOOK_TOKEN=${expectedToken}`)
+      expect(contents).toContain(`${prefix}PEBBLE_AGENT_HOOK_ENV=development`)
+      expect(contents).toContain(`${prefix}PEBBLE_AGENT_HOOK_VERSION=1`)
+      expect(contents).toContain(`${prefix}PEBBLE_AGENT_HOOK_PORT=${expectedPort}`)
+      expect(contents).toContain(`${prefix}PEBBLE_AGENT_HOOK_TOKEN=${expectedToken}`)
+      expect(contents).toContain(`${prefix}PEBBLE_AGENT_HOOK_ENV=development`)
+      expect(contents).toContain(`${prefix}PEBBLE_AGENT_HOOK_VERSION=1`)
     } finally {
       server.stop()
     }
@@ -5441,14 +5445,14 @@ describe('Endpoint file lifecycle', () => {
     const server = new AgentHookServer()
     await server.start({ env: 'production', userDataPath })
     const firstPath = server.endpointFilePath
-    const firstToken = server.buildPtyEnv().ORCA_AGENT_HOOK_TOKEN
+    const firstToken = server.buildPtyEnv().PEBBLE_AGENT_HOOK_TOKEN
     server.stop()
 
     await server.start({ env: 'production', userDataPath })
     try {
       const secondPath = server.endpointFilePath
-      const secondPort = server.buildPtyEnv().ORCA_AGENT_HOOK_PORT
-      const secondToken = server.buildPtyEnv().ORCA_AGENT_HOOK_TOKEN
+      const secondPort = server.buildPtyEnv().PEBBLE_AGENT_HOOK_PORT
+      const secondToken = server.buildPtyEnv().PEBBLE_AGENT_HOOK_TOKEN
       // Path is stable (so PTYs stamped before restart can still find the file)
       expect(secondPath).toBe(firstPath)
       // But contents are refreshed with the new token (and port) — that is the
@@ -5464,9 +5468,9 @@ describe('Endpoint file lifecycle', () => {
       // "contents does NOT contain firstPort" assertion would flake on the
       // (rare but legitimate) case where listen(0) reuses the same ephemeral
       // port across restarts. The token is randomUUID() and cannot collide.
-      expect(contents).toContain(`ORCA_AGENT_HOOK_PORT=${secondPort}`)
-      expect(contents).toContain(`ORCA_AGENT_HOOK_TOKEN=${secondToken}`)
-      expect(contents).not.toContain(`ORCA_AGENT_HOOK_TOKEN=${firstToken}`)
+      expect(contents).toContain(`PEBBLE_AGENT_HOOK_PORT=${secondPort}`)
+      expect(contents).toContain(`PEBBLE_AGENT_HOOK_TOKEN=${secondToken}`)
+      expect(contents).not.toContain(`PEBBLE_AGENT_HOOK_TOKEN=${firstToken}`)
     } finally {
       server.stop()
     }
@@ -5476,7 +5480,7 @@ describe('Endpoint file lifecycle', () => {
     // Why: stop() deliberately does NOT unlink the endpoint file. A stale file
     // points at a dead port — the fail-open path (hook POSTs silently fail,
     // same as pre-endpoint-file). Unlinking would introduce a TOCTOU race with a
-    // concurrent Orca instance sharing userData that could rewrite the file
+    // concurrent Pebble instance sharing userData that could rewrite the file
     // between our token check and unlink. The next successful start()
     // overwrites the file atomically; tmp-file orphan hygiene is handled by
     // the sweep inside writeEndpointFile().
@@ -5488,30 +5492,31 @@ describe('Endpoint file lifecycle', () => {
     expect(existsSync(filePath)).toBe(true)
   })
 
-  it('buildPtyEnv includes ORCA_AGENT_HOOK_ENDPOINT when the server is running', async () => {
+  it('buildPtyEnv includes PEBBLE_AGENT_HOOK_ENDPOINT when the server is running', async () => {
     const server = new AgentHookServer()
     await server.start({ env: 'production', userDataPath })
     try {
       const env = server.buildPtyEnv()
-      expect(env.ORCA_AGENT_HOOK_ENDPOINT).toBe(server.endpointFilePath)
+      expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toBe(server.endpointFilePath)
+      expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toBe(server.endpointFilePath)
     } finally {
       server.stop()
     }
   })
 
-  it('buildPtyEnv includes namespaced ORCA_AGENT_HOOK_ENDPOINT for development servers', async () => {
+  it('buildPtyEnv includes namespaced PEBBLE_AGENT_HOOK_ENDPOINT for development servers', async () => {
     const server = new AgentHookServer()
     await server.start({
       env: 'development',
       userDataPath,
-      endpointNamespace: 'com.stablyai.orca.dev.test123'
+      endpointNamespace: 'nebutra.pebble.dev.test123'
     })
     try {
       const env = server.buildPtyEnv()
-      expect(env.ORCA_AGENT_HOOK_ENDPOINT).toBe(server.endpointFilePath)
-      expect(env.ORCA_AGENT_HOOK_ENDPOINT).toContain('com.stablyai.orca.dev.test123')
-      expect(env.ORCA_AGENT_HOOK_PORT).toBeTruthy()
-      expect(env.ORCA_AGENT_HOOK_TOKEN).toBeTruthy()
+      expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toBe(server.endpointFilePath)
+      expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toContain('nebutra.pebble.dev.test123')
+      expect(env.PEBBLE_AGENT_HOOK_PORT).toBeTruthy()
+      expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBeTruthy()
     } finally {
       server.stop()
     }
@@ -5524,8 +5529,10 @@ describe('Endpoint file lifecycle', () => {
     await secondServer.start({ env: 'development', userDataPath, endpointNamespace: 'dev-b' })
     try {
       expect(firstServer.endpointFilePath).not.toBe(secondServer.endpointFilePath)
-      expect(firstServer.buildPtyEnv().ORCA_AGENT_HOOK_ENDPOINT).toBe(firstServer.endpointFilePath)
-      expect(secondServer.buildPtyEnv().ORCA_AGENT_HOOK_ENDPOINT).toBe(
+      expect(firstServer.buildPtyEnv().PEBBLE_AGENT_HOOK_ENDPOINT).toBe(
+        firstServer.endpointFilePath
+      )
+      expect(secondServer.buildPtyEnv().PEBBLE_AGENT_HOOK_ENDPOINT).toBe(
         secondServer.endpointFilePath
       )
       expect(existsSync(firstServer.endpointFilePath!)).toBe(true)
@@ -5536,7 +5543,7 @@ describe('Endpoint file lifecycle', () => {
     }
   })
 
-  it('buildPtyEnv omits ORCA_AGENT_HOOK_ENDPOINT when no userDataPath was provided', async () => {
+  it('buildPtyEnv omits PEBBLE_AGENT_HOOK_ENDPOINT when no userDataPath was provided', async () => {
     // Why: the endpoint file is opt-in via start({ userDataPath }). In tests
     // and in the packaged main-process path where userData is unset for any
     // reason, hooks should fall back to the v1 behavior (no ENDPOINT key).
@@ -5544,9 +5551,10 @@ describe('Endpoint file lifecycle', () => {
     await server.start({ env: 'production' })
     try {
       const env = server.buildPtyEnv()
-      expect(env.ORCA_AGENT_HOOK_ENDPOINT).toBeUndefined()
-      expect(env.ORCA_AGENT_HOOK_PORT).toBeTruthy()
-      expect(env.ORCA_AGENT_HOOK_TOKEN).toBeTruthy()
+      expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toBeUndefined()
+      expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toBeUndefined()
+      expect(env.PEBBLE_AGENT_HOOK_PORT).toBeTruthy()
+      expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBeTruthy()
     } finally {
       server.stop()
     }
@@ -5592,10 +5600,10 @@ describe('Endpoint file lifecycle', () => {
     await server.start({ env: 'bad;value', userDataPath })
     try {
       expect(existsSync(server.endpointFilePath!)).toBe(false)
-      expect(server.buildPtyEnv().ORCA_AGENT_HOOK_ENDPOINT).toBeUndefined()
+      expect(server.buildPtyEnv().PEBBLE_AGENT_HOOK_ENDPOINT).toBeUndefined()
       // PORT/TOKEN still flow via PTY env — fail-open to v1 behavior.
-      expect(server.buildPtyEnv().ORCA_AGENT_HOOK_PORT).toBeTruthy()
-      expect(server.buildPtyEnv().ORCA_AGENT_HOOK_TOKEN).toBeTruthy()
+      expect(server.buildPtyEnv().PEBBLE_AGENT_HOOK_PORT).toBeTruthy()
+      expect(server.buildPtyEnv().PEBBLE_AGENT_HOOK_TOKEN).toBeTruthy()
     } finally {
       server.stop()
     }
@@ -5671,12 +5679,12 @@ describe('Endpoint file lifecycle', () => {
     await server.start({ env: 'production', userDataPath })
     try {
       const filePath = server.endpointFilePath!
-      const expectedPort = server.buildPtyEnv().ORCA_AGENT_HOOK_PORT
+      const expectedPort = server.buildPtyEnv().PEBBLE_AGENT_HOOK_PORT
       // Why: sources the file in a subshell and echoes the resulting env var,
       // exactly as the managed hook script does at runtime. If the file shape
       // ever drifts from `KEY=VALUE` (e.g. someone adds shell metacharacters
       // without quoting), this test catches it before users do.
-      const out = execFileSync('/bin/sh', ['-c', `. "${filePath}" && echo "$ORCA_AGENT_HOOK_PORT"`])
+      const out = execFileSync('/bin/sh', ['-c', `. "${filePath}" && echo "$PEBBLE_AGENT_HOOK_PORT"`])
         .toString()
         .trim()
       expect(out).toBe(expectedPort)
@@ -5690,7 +5698,7 @@ describe('Last-status persistence', () => {
   let userDataPath: string
 
   beforeEach(() => {
-    userDataPath = mkdtempSync(join(tmpdir(), 'orca-laststatus-'))
+    userDataPath = mkdtempSync(join(tmpdir(), 'pebble-laststatus-'))
   })
 
   afterEach(() => {
@@ -5714,11 +5722,11 @@ describe('Last-status persistence', () => {
     path: string = '/hook/claude'
   ): Promise<Response> {
     const env = server.buildPtyEnv()
-    return fetch(`http://127.0.0.1:${env.ORCA_AGENT_HOOK_PORT}${path}`, {
+    return fetch(`http://127.0.0.1:${env.PEBBLE_AGENT_HOOK_PORT}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Orca-Agent-Hook-Token': env.ORCA_AGENT_HOOK_TOKEN
+        'X-Pebble-Agent-Hook-Token': env.PEBBLE_AGENT_HOOK_TOKEN
       },
       body: JSON.stringify(body)
     })

@@ -18,29 +18,29 @@ import {
   getZshStartupFileSourceBlock
 } from '../shell-templates'
 
-const ORCA_USER_DATA_PATH_ENV = 'ORCA_USER_DATA_PATH'
-const SHELL_READY_MARKER = '\\033]777;orca-shell-ready\\007'
+const PEBBLE_USER_DATA_PATH_ENV = 'PEBBLE_USER_DATA_PATH'
+const SHELL_READY_MARKER = '\\033]777;pebble-shell-ready\\007'
 
 let didEnsureShellReadyWrappers = false
 
 function getShellReadyWrapperRoot(): string {
-  const userDataPath = process.env[ORCA_USER_DATA_PATH_ENV]
-  // Why: older/test launchers may not seed ORCA_USER_DATA_PATH. Keep a
+  const userDataPath = process.env[PEBBLE_USER_DATA_PATH_ENV]
+  // Why: older/test launchers may not seed the managed userData env. Keep a
   // fallback so daemon startup does not fail before the parent can be fixed.
-  return join(userDataPath || tmpdir(), userDataPath ? 'shell-ready' : 'orca-shell-ready')
+  return join(userDataPath || tmpdir(), userDataPath ? 'shell-ready' : 'pebble-shell-ready')
 }
 
 // Why: if our own process inherited ZDOTDIR from a parent shell that was
-// itself an Orca PTY (e.g. the user launched Orca from a terminal inside a
-// running Orca), that ZDOTDIR points at an Orca shell-ready wrapper dir.
-// Propagating it as the new PTY's ORCA_ORIG_ZDOTDIR makes the wrapper's
-// `source "$ORCA_ORIG_ZDOTDIR/.zshenv"` line source itself recursively —
+// itself a Pebble PTY (e.g. the user launched Pebble from a terminal inside a
+// running Pebble), that ZDOTDIR points at a Pebble shell-ready wrapper dir.
+// Propagating it as the new PTY's PEBBLE_ORIG_ZDOTDIR makes the wrapper's
+// `source "$PEBBLE_ORIG_ZDOTDIR/.zshenv"` line source itself recursively —
 // zsh gives "job table full or recursion limit exceeded" and the shell
 // never reaches a usable prompt.
 //
-// Any path component ending in `/shell-ready/zsh` is an Orca wrapper dir
+// Any path component ending in `/shell-ready/zsh` is a Pebble wrapper dir
 // (regardless of whether it came from this daemon's userData, a packaged
-// Orca, or a different dev build). Treat it as if ZDOTDIR were unset so the
+// Pebble, or a different dev build). Treat it as if ZDOTDIR were unset so the
 // caller falls back to HOME for the user's real config root.
 function normalizeOriginalZdotdirCandidate(value: string | undefined): string | null {
   if (!value) {
@@ -61,7 +61,7 @@ function normalizeOriginalZdotdirCandidate(value: string | undefined): string | 
 function resolveOriginalZdotdir(): string {
   return (
     normalizeOriginalZdotdirCandidate(process.env.ZDOTDIR) ||
-    normalizeOriginalZdotdirCandidate(process.env.ORCA_ORIG_ZDOTDIR) ||
+    normalizeOriginalZdotdirCandidate(process.env.PEBBLE_ORIG_ZDOTDIR) ||
     process.env.HOME ||
     ''
   )
@@ -86,7 +86,7 @@ function shellReadyWrappersExist(): boolean {
 }
 
 export function getDaemonBashShellReadyRcfileContent(): string {
-  return `# Orca daemon bash shell-ready wrapper
+  return `# Pebble daemon bash shell-ready wrapper
 [[ -f /etc/profile ]] && source /etc/profile
 if [[ -f "$HOME/.bash_profile" ]]; then
   source "$HOME/.bash_profile"
@@ -95,162 +95,162 @@ elif [[ -f "$HOME/.bash_login" ]]; then
 elif [[ -f "$HOME/.profile" ]]; then
   source "$HOME/.profile"
 fi
-# Why: enable bracketed paste so Orca can deliver a multiline startup prompt as
+# Why: enable bracketed paste so Pebble can deliver a multiline startup prompt as
 # a single literal paste (ESC[200~…ESC[201~); without it, older readline builds
 # treat each embedded newline as Enter and mangle the prompt into PS2
 # continuation. Modern readline defaults this on; force it for the rest.
 [[ $- == *i* ]] && bind 'set enable-bracketed-paste on' 2>/dev/null
-__orca_restore_attribution_path() {
-  [[ -n "\${ORCA_ATTRIBUTION_SHIM_DIR:-}" ]] || return 0
+__pebble_restore_attribution_path() {
+  [[ -n "\${PEBBLE_ATTRIBUTION_SHIM_DIR:-}" ]] || return 0
   case "$PATH" in
-    "\${ORCA_ATTRIBUTION_SHIM_DIR}"|"\${ORCA_ATTRIBUTION_SHIM_DIR}:"*) return 0 ;;
+    "\${PEBBLE_ATTRIBUTION_SHIM_DIR}"|"\${PEBBLE_ATTRIBUTION_SHIM_DIR}:"*) return 0 ;;
   esac
-  export PATH="\${ORCA_ATTRIBUTION_SHIM_DIR}:$PATH"
+  export PATH="\${PEBBLE_ATTRIBUTION_SHIM_DIR}:$PATH"
 }
-__orca_restore_attribution_path
-__orca_restore_agent_teams_path() {
-  [[ -n "\${ORCA_AGENT_TEAMS_SHIM_DIR:-}" ]] || return 0
+__pebble_restore_attribution_path
+__pebble_restore_agent_teams_path() {
+  [[ -n "\${PEBBLE_AGENT_TEAMS_SHIM_DIR:-}" ]] || return 0
   case "$PATH" in
-    "\${ORCA_AGENT_TEAMS_SHIM_DIR}"|"\${ORCA_AGENT_TEAMS_SHIM_DIR}:"*) return 0 ;;
+    "\${PEBBLE_AGENT_TEAMS_SHIM_DIR}"|"\${PEBBLE_AGENT_TEAMS_SHIM_DIR}:"*) return 0 ;;
   esac
-  export PATH="\${ORCA_AGENT_TEAMS_SHIM_DIR}:$PATH"
+  export PATH="\${PEBBLE_AGENT_TEAMS_SHIM_DIR}:$PATH"
 }
-__orca_restore_agent_teams_path
-# Why: user startup files may set the default OpenCode config after Orca's
-# spawn env; restore the Orca-managed config dir before the first prompt.
-[[ -n "\${ORCA_OPENCODE_CONFIG_DIR:-}" ]] && export OPENCODE_CONFIG_DIR="\${ORCA_OPENCODE_CONFIG_DIR}"
-[[ -n "\${ORCA_MIMOCODE_HOME:-}" ]] && export MIMOCODE_HOME="\${ORCA_MIMOCODE_HOME}"
+__pebble_restore_agent_teams_path
+# Why: user startup files may set the default OpenCode config after Pebble's
+# spawn env; restore the Pebble-managed config dir before the first prompt.
+[[ -n "\${PEBBLE_OPENCODE_CONFIG_DIR:-}" ]] && export OPENCODE_CONFIG_DIR="\${PEBBLE_OPENCODE_CONFIG_DIR}"
+[[ -n "\${PEBBLE_MIMOCODE_HOME:-}" ]] && export MIMOCODE_HOME="\${PEBBLE_MIMOCODE_HOME}"
 ${getPosixOmpShellWrapper()}
-# Why: Codex must keep using Orca's runtime CODEX_HOME after profile scripts.
-[[ -n "\${ORCA_CODEX_HOME:-}" ]] && export CODEX_HOME="\${ORCA_CODEX_HOME}"
+# Why: Codex must keep using Pebble's runtime CODEX_HOME after profile scripts.
+[[ -n "\${PEBBLE_CODEX_HOME:-}" ]] && export CODEX_HOME="\${PEBBLE_CODEX_HOME}"
 # Why: emit OSC 133 C/D so terminal-command-lifecycle can drop stale agent
 # status when the foreground command exits — mirrors the zsh daemon wrapper.
 # Without this, bash users (default on most Linux distros) keep a stuck
 # 'working' spinner after the CLI exits without a Stop/SessionEnd hook.
-__orca_osc133_precmd() {
+__pebble_osc133_precmd() {
   local exit_code=$?
-  __orca_in_prompt_command=1
-  if [[ -n "\${__orca_in_command:-}" ]]; then
+  __pebble_in_prompt_command=1
+  if [[ -n "\${__pebble_in_command:-}" ]]; then
     printf "\\033]133;D;%s\\007" "$exit_code"
-    unset __orca_in_command
+    unset __pebble_in_command
   fi
   printf "\\033]133;A\\007"
 }
-__orca_osc133_prompt_done() {
-  unset __orca_in_prompt_command
+__pebble_osc133_prompt_done() {
+  unset __pebble_in_prompt_command
 }
-__orca_run_user_debug_trap() {
-  if [[ -n "\${__orca_user_debug_trap:-}" ]]; then
-    eval "$__orca_user_debug_trap" || true
+__pebble_run_user_debug_trap() {
+  if [[ -n "\${__pebble_user_debug_trap:-}" ]]; then
+    eval "$__pebble_user_debug_trap" || true
   fi
 }
-__orca_osc133_preexec() {
-  __orca_run_user_debug_trap
-  [[ -z "\${__orca_in_prompt_command:-}" ]] || return
+__pebble_osc133_preexec() {
+  __pebble_run_user_debug_trap
+  [[ -z "\${__pebble_in_prompt_command:-}" ]] || return
   # Why: bash DEBUG fires for every simple command, including PROMPT_COMMAND
   # bodies. Skip our own prompt-time helpers so they don't mark the shell as
   # "in command" before the prompt has even drawn.
   case "$BASH_COMMAND" in
-    *__orca_osc133_precmd*|*__orca_osc133_prompt_done*|*__orca_prompt_mark*) return ;;
+    *__pebble_osc133_precmd*|*__pebble_osc133_prompt_done*|*__pebble_prompt_mark*) return ;;
   esac
   printf "\\033]133;C\\007"
-  __orca_in_command=1
+  __pebble_in_command=1
 }
 # Why: prepend so we capture $? before the user's PROMPT_COMMAND chain mutates it.
-__orca_normalize_prompt_command() {
-  local __orca_joined="" __orca_prompt_part
+__pebble_normalize_prompt_command() {
+  local __pebble_joined="" __pebble_prompt_part
   if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
-    for __orca_prompt_part in "\${PROMPT_COMMAND[@]}"; do
-      [[ -n "$__orca_prompt_part" ]] || continue
-      if [[ -n "$__orca_joined" ]]; then
-        __orca_joined="$__orca_joined;$__orca_prompt_part"
+    for __pebble_prompt_part in "\${PROMPT_COMMAND[@]}"; do
+      [[ -n "$__pebble_prompt_part" ]] || continue
+      if [[ -n "$__pebble_joined" ]]; then
+        __pebble_joined="$__pebble_joined;$__pebble_prompt_part"
       else
-        __orca_joined="$__orca_prompt_part"
+        __pebble_joined="$__pebble_prompt_part"
       fi
     done
-    PROMPT_COMMAND="$__orca_joined"
+    PROMPT_COMMAND="$__pebble_joined"
   fi
 }
-__orca_prepend_prompt_command() {
-  __orca_normalize_prompt_command
-  PROMPT_COMMAND="__orca_osc133_precmd\${PROMPT_COMMAND:+;\${PROMPT_COMMAND}}"
+__pebble_prepend_prompt_command() {
+  __pebble_normalize_prompt_command
+  PROMPT_COMMAND="__pebble_osc133_precmd\${PROMPT_COMMAND:+;\${PROMPT_COMMAND}}"
 }
-__orca_append_prompt_command() {
+__pebble_append_prompt_command() {
   local command="$1"
-  __orca_normalize_prompt_command
+  __pebble_normalize_prompt_command
   if [[ -n "\${PROMPT_COMMAND:-}" ]]; then
     PROMPT_COMMAND="\${PROMPT_COMMAND};$command"
   else
     PROMPT_COMMAND="$command"
   fi
 }
-__orca_prepend_prompt_command
-if [[ "\${ORCA_SHELL_READY_MARKER:-0}" == "1" ]]; then
-  __orca_prompt_mark() {
+__pebble_prepend_prompt_command
+if [[ "\${PEBBLE_SHELL_READY_MARKER:-0}" == "1" ]]; then
+  __pebble_prompt_mark() {
     printf "${SHELL_READY_MARKER}"
   }
-  __orca_append_prompt_command "__orca_prompt_mark"
+  __pebble_append_prompt_command "__pebble_prompt_mark"
 fi
-__orca_append_prompt_command "__orca_osc133_prompt_done"
-__orca_debug_trap_spec="$(trap -p DEBUG)"
-if [[ -n "$__orca_debug_trap_spec" ]]; then
-  __orca_debug_trap_command="\${__orca_debug_trap_spec#trap -- }"
-  __orca_debug_trap_command="\${__orca_debug_trap_command% DEBUG}"
-  eval "__orca_user_debug_trap=$__orca_debug_trap_command"
+__pebble_append_prompt_command "__pebble_osc133_prompt_done"
+__pebble_debug_trap_spec="$(trap -p DEBUG)"
+if [[ -n "$__pebble_debug_trap_spec" ]]; then
+  __pebble_debug_trap_command="\${__pebble_debug_trap_spec#trap -- }"
+  __pebble_debug_trap_command="\${__pebble_debug_trap_command% DEBUG}"
+  eval "__pebble_user_debug_trap=$__pebble_debug_trap_command"
 fi
-unset __orca_debug_trap_spec __orca_debug_trap_command
-unset -f __orca_normalize_prompt_command __orca_prepend_prompt_command __orca_append_prompt_command
+unset __pebble_debug_trap_spec __pebble_debug_trap_command
+unset -f __pebble_normalize_prompt_command __pebble_prepend_prompt_command __pebble_append_prompt_command
 # Why: arm DEBUG after wrapper setup; otherwise bash treats our own rcfile
 # commands as a foreground command and emits a fake C/D before the first prompt.
-trap '__orca_osc133_preexec' DEBUG
+trap '__pebble_osc133_preexec' DEBUG
 `
 }
 
 export function getDaemonZshShellReadyRcfileContent(): string {
-  return `# Orca daemon zsh shell-ready wrapper
+  return `# Pebble daemon zsh shell-ready wrapper
 ${getZshStartupFileSourceBlock({
   fileName: '.zshrc',
   interactiveOnly: true,
   skipWhenHomeIsCurrentZdotdir: true
 })}
-__orca_restore_attribution_path() {
-  [[ -n "\${ORCA_ATTRIBUTION_SHIM_DIR:-}" ]] || return 0
+__pebble_restore_attribution_path() {
+  [[ -n "\${PEBBLE_ATTRIBUTION_SHIM_DIR:-}" ]] || return 0
   case "$PATH" in
-    "\${ORCA_ATTRIBUTION_SHIM_DIR}"|"\${ORCA_ATTRIBUTION_SHIM_DIR}:"*) return 0 ;;
+    "\${PEBBLE_ATTRIBUTION_SHIM_DIR}"|"\${PEBBLE_ATTRIBUTION_SHIM_DIR}:"*) return 0 ;;
   esac
-  export PATH="\${ORCA_ATTRIBUTION_SHIM_DIR}:$PATH"
+  export PATH="\${PEBBLE_ATTRIBUTION_SHIM_DIR}:$PATH"
 }
-[[ ! -o login ]] && __orca_restore_attribution_path
-__orca_restore_agent_teams_path() {
-  [[ -n "\${ORCA_AGENT_TEAMS_SHIM_DIR:-}" ]] || return 0
+[[ ! -o login ]] && __pebble_restore_attribution_path
+__pebble_restore_agent_teams_path() {
+  [[ -n "\${PEBBLE_AGENT_TEAMS_SHIM_DIR:-}" ]] || return 0
   case "$PATH" in
-    "\${ORCA_AGENT_TEAMS_SHIM_DIR}"|"\${ORCA_AGENT_TEAMS_SHIM_DIR}:"*) return 0 ;;
+    "\${PEBBLE_AGENT_TEAMS_SHIM_DIR}"|"\${PEBBLE_AGENT_TEAMS_SHIM_DIR}:"*) return 0 ;;
   esac
-  export PATH="\${ORCA_AGENT_TEAMS_SHIM_DIR}:$PATH"
+  export PATH="\${PEBBLE_AGENT_TEAMS_SHIM_DIR}:$PATH"
 }
-[[ ! -o login ]] && __orca_restore_agent_teams_path
+[[ ! -o login ]] && __pebble_restore_agent_teams_path
 if [[ ! -o login ]]; then
   # Why: ~/.zshrc can export the user's default OpenCode config after spawn.
-  [[ -n "\${ORCA_OPENCODE_CONFIG_DIR:-}" ]] && export OPENCODE_CONFIG_DIR="\${ORCA_OPENCODE_CONFIG_DIR}"
-  [[ -n "\${ORCA_MIMOCODE_HOME:-}" ]] && export MIMOCODE_HOME="\${ORCA_MIMOCODE_HOME}"
+  [[ -n "\${PEBBLE_OPENCODE_CONFIG_DIR:-}" ]] && export OPENCODE_CONFIG_DIR="\${PEBBLE_OPENCODE_CONFIG_DIR}"
+  [[ -n "\${PEBBLE_MIMOCODE_HOME:-}" ]] && export MIMOCODE_HOME="\${PEBBLE_MIMOCODE_HOME}"
   ${getPosixOmpShellWrapper()}
-  [[ -n "\${ORCA_CODEX_HOME:-}" ]] && export CODEX_HOME="\${ORCA_CODEX_HOME}"
+  [[ -n "\${PEBBLE_CODEX_HOME:-}" ]] && export CODEX_HOME="\${PEBBLE_CODEX_HOME}"
 fi
-__orca_osc133_precmd() {
+__pebble_osc133_precmd() {
   local exit_code=$?
-  if [[ -n "\${__orca_in_command:-}" ]]; then
+  if [[ -n "\${__pebble_in_command:-}" ]]; then
     printf "\\033]133;D;%s\\007" "$exit_code"
-    unset __orca_in_command
+    unset __pebble_in_command
   fi
   printf "\\033]133;A\\007"
 }
-__orca_osc133_preexec() {
+__pebble_osc133_preexec() {
   printf "\\033]133;C\\007"
-  __orca_in_command=1
+  __pebble_in_command=1
 }
-# Why: prepend so Orca captures $? before user prompt hooks can overwrite it.
-precmd_functions=(__orca_osc133_precmd \${precmd_functions[@]})
-preexec_functions=(__orca_osc133_preexec \${preexec_functions[@]})
+# Why: prepend so Pebble captures $? before user prompt hooks can overwrite it.
+precmd_functions=(__pebble_osc133_precmd \${precmd_functions[@]})
+preexec_functions=(__pebble_osc133_preexec \${preexec_functions[@]})
 if [[ ! -o login ]]; then
 ${getZshFinalZdotdirRestoreBlock()}
 fi
@@ -271,33 +271,33 @@ function ensureShellReadyWrappers(): void {
   const bashDir = join(root, 'bash')
 
   const zshEnv = getZshEnvTemplate(zshDir, 'daemon')
-  const zshProfile = `# Orca daemon zsh shell-ready wrapper
+  const zshProfile = `# Pebble daemon zsh shell-ready wrapper
 ${getZshStartupFileSourceBlock({ fileName: '.zprofile' })}
 `
   const zshRc = getDaemonZshShellReadyRcfileContent()
-  const zshLogin = `# Orca daemon zsh shell-ready wrapper
+  const zshLogin = `# Pebble daemon zsh shell-ready wrapper
 ${getZshStartupFileSourceBlock({ fileName: '.zlogin', interactiveOnly: true })}
-__orca_restore_attribution_path() {
-  [[ -n "\${ORCA_ATTRIBUTION_SHIM_DIR:-}" ]] || return 0
+__pebble_restore_attribution_path() {
+  [[ -n "\${PEBBLE_ATTRIBUTION_SHIM_DIR:-}" ]] || return 0
   case "$PATH" in
-    "\${ORCA_ATTRIBUTION_SHIM_DIR}"|"\${ORCA_ATTRIBUTION_SHIM_DIR}:"*) return 0 ;;
+    "\${PEBBLE_ATTRIBUTION_SHIM_DIR}"|"\${PEBBLE_ATTRIBUTION_SHIM_DIR}:"*) return 0 ;;
   esac
-  export PATH="\${ORCA_ATTRIBUTION_SHIM_DIR}:$PATH"
+  export PATH="\${PEBBLE_ATTRIBUTION_SHIM_DIR}:$PATH"
 }
-__orca_restore_attribution_path
-__orca_restore_agent_teams_path() {
-  [[ -n "\${ORCA_AGENT_TEAMS_SHIM_DIR:-}" ]] || return 0
+__pebble_restore_attribution_path
+__pebble_restore_agent_teams_path() {
+  [[ -n "\${PEBBLE_AGENT_TEAMS_SHIM_DIR:-}" ]] || return 0
   case "$PATH" in
-    "\${ORCA_AGENT_TEAMS_SHIM_DIR}"|"\${ORCA_AGENT_TEAMS_SHIM_DIR}:"*) return 0 ;;
+    "\${PEBBLE_AGENT_TEAMS_SHIM_DIR}"|"\${PEBBLE_AGENT_TEAMS_SHIM_DIR}:"*) return 0 ;;
   esac
-  export PATH="\${ORCA_AGENT_TEAMS_SHIM_DIR}:$PATH"
+  export PATH="\${PEBBLE_AGENT_TEAMS_SHIM_DIR}:$PATH"
 }
-__orca_restore_agent_teams_path
+__pebble_restore_agent_teams_path
 # Why: .zlogin is the final login startup file before the prompt is shown.
-[[ -n "\${ORCA_OPENCODE_CONFIG_DIR:-}" ]] && export OPENCODE_CONFIG_DIR="\${ORCA_OPENCODE_CONFIG_DIR}"
-[[ -n "\${ORCA_MIMOCODE_HOME:-}" ]] && export MIMOCODE_HOME="\${ORCA_MIMOCODE_HOME}"
+[[ -n "\${PEBBLE_OPENCODE_CONFIG_DIR:-}" ]] && export OPENCODE_CONFIG_DIR="\${PEBBLE_OPENCODE_CONFIG_DIR}"
+[[ -n "\${PEBBLE_MIMOCODE_HOME:-}" ]] && export MIMOCODE_HOME="\${PEBBLE_MIMOCODE_HOME}"
 ${getPosixOmpShellWrapper()}
-[[ -n "\${ORCA_CODEX_HOME:-}" ]] && export CODEX_HOME="\${ORCA_CODEX_HOME}"
+[[ -n "\${PEBBLE_CODEX_HOME:-}" ]] && export CODEX_HOME="\${PEBBLE_CODEX_HOME}"
 ${getZshShellReadyMarkerRegistrationBlock(SHELL_READY_MARKER)}
 ${getZshFinalZdotdirRestoreBlock()}
 `
@@ -335,7 +335,7 @@ ${getZshFinalZdotdirRestoreBlock()}
 
 export function resolvePtyShellPath(env: Record<string, string>): string {
   if (process.platform === 'win32') {
-    return env.ORCA_TERMINAL_WINDOWS_SHELL || 'powershell.exe'
+    return env.PEBBLE_TERMINAL_WINDOWS_SHELL || 'powershell.exe'
   }
   return env.SHELL || process.env.SHELL || '/bin/zsh'
 }
@@ -367,10 +367,10 @@ function getWrappedShellLaunchConfig(
     return {
       args: ['-l'],
       env: {
-        ORCA_ORIG_ZDOTDIR: resolveOriginalZdotdir(),
-        ORCA_ZSHENV_SOURCE_DIR: resolveOriginalZshenvSourceDir(),
+        PEBBLE_ORIG_ZDOTDIR: resolveOriginalZdotdir(),
+        PEBBLE_ZSHENV_SOURCE_DIR: resolveOriginalZshenvSourceDir(),
         ZDOTDIR: join(root, 'zsh'),
-        ORCA_SHELL_READY_MARKER: options.emitReadyMarker ? '1' : '0'
+        PEBBLE_SHELL_READY_MARKER: options.emitReadyMarker ? '1' : '0'
       },
       supportsReadyMarker: options.emitReadyMarker
     }
@@ -382,7 +382,7 @@ function getWrappedShellLaunchConfig(
     return {
       args: ['--rcfile', join(root, 'bash', 'rcfile')],
       env: {
-        ORCA_SHELL_READY_MARKER: options.emitReadyMarker ? '1' : '0'
+        PEBBLE_SHELL_READY_MARKER: options.emitReadyMarker ? '1' : '0'
       },
       supportsReadyMarker: options.emitReadyMarker
     }

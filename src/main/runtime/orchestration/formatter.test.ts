@@ -70,7 +70,7 @@ describe('formatMessageBanner', () => {
 
   it('includes reply hint with message ID', () => {
     const banner = formatMessageBanner(makeMessage({ id: 'msg_xyz789' }))
-    expect(banner).toContain('[Reply: orca orchestration reply --id msg_xyz789 --body "..."]')
+    expect(banner).toContain('[Reply: pebble orchestration reply --id msg_xyz789 --body "..."]')
   })
 
   it('ends with a separator line', () => {

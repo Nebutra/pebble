@@ -7,13 +7,13 @@ import {
 } from '../../../../shared/constants'
 import { clampNumber } from '@/lib/terminal-theme'
 
-export const ORCA_EDITOR_QUIESCE_FILE_SAVES_EVENT = 'orca:editor-quiesce-file-saves'
-export const ORCA_EDITOR_EXTERNAL_FILE_CHANGE_EVENT = 'orca:editor-external-file-change'
-export const ORCA_EDITOR_SAVE_FILE_EVENT = 'orca:editor-save-file'
-export const ORCA_EDITOR_SAVE_AND_CLOSE_EVENT = 'orca:save-and-close'
-export const ORCA_EDITOR_FILE_SAVED_EVENT = 'orca:editor-file-saved'
-export const ORCA_EDITOR_REQUEST_CMD_SAVE_EVENT = 'orca:editor-request-cmd-save'
-export const ORCA_EDITOR_REQUEST_FILE_CLOSE_EVENT = 'orca:editor-request-file-close'
+export const PEBBLE_EDITOR_QUIESCE_FILE_SAVES_EVENT = 'pebble:editor-quiesce-file-saves'
+export const PEBBLE_EDITOR_EXTERNAL_FILE_CHANGE_EVENT = 'pebble:editor-external-file-change'
+export const PEBBLE_EDITOR_SAVE_FILE_EVENT = 'pebble:editor-save-file'
+export const PEBBLE_EDITOR_SAVE_AND_CLOSE_EVENT = 'pebble:save-and-close'
+export const PEBBLE_EDITOR_FILE_SAVED_EVENT = 'pebble:editor-file-saved'
+export const PEBBLE_EDITOR_REQUEST_CMD_SAVE_EVENT = 'pebble:editor-request-cmd-save'
+export const PEBBLE_EDITOR_REQUEST_FILE_CLOSE_EVENT = 'pebble:editor-request-file-close'
 
 export type EditorPathMutationTarget = {
   worktreeId: string
@@ -124,7 +124,7 @@ export async function requestEditorSaveQuiesce(target: EditorSaveQuiesceTarget):
   await new Promise<void>((resolve) => {
     let claimed = false
     window.dispatchEvent(
-      new CustomEvent<EditorSaveQuiesceDetail>(ORCA_EDITOR_QUIESCE_FILE_SAVES_EVENT, {
+      new CustomEvent<EditorSaveQuiesceDetail>(PEBBLE_EDITOR_QUIESCE_FILE_SAVES_EVENT, {
         detail: {
           ...target,
           claim: () => {
@@ -147,7 +147,7 @@ export async function requestEditorFileSave(target: EditorSaveFileTarget): Promi
   await new Promise<void>((resolve, reject) => {
     let claimed = false
     window.dispatchEvent(
-      new CustomEvent<EditorSaveFileDetail>(ORCA_EDITOR_SAVE_FILE_EVENT, {
+      new CustomEvent<EditorSaveFileDetail>(PEBBLE_EDITOR_SAVE_FILE_EVENT, {
         detail: {
           ...target,
           claim: () => {
@@ -170,7 +170,7 @@ export async function requestEditorFileSave(target: EditorSaveFileTarget): Promi
 
 export function requestEditorFileClose(fileId: string): void {
   window.dispatchEvent(
-    new CustomEvent<EditorRequestFileCloseDetail>(ORCA_EDITOR_REQUEST_FILE_CLOSE_EVENT, {
+    new CustomEvent<EditorRequestFileCloseDetail>(PEBBLE_EDITOR_REQUEST_FILE_CLOSE_EVENT, {
       detail: { fileId }
     })
   )
@@ -178,7 +178,7 @@ export function requestEditorFileClose(fileId: string): void {
 
 export function notifyEditorExternalFileChange(target: EditorPathMutationTarget): void {
   window.dispatchEvent(
-    new CustomEvent<EditorPathMutationTarget>(ORCA_EDITOR_EXTERNAL_FILE_CHANGE_EVENT, {
+    new CustomEvent<EditorPathMutationTarget>(PEBBLE_EDITOR_EXTERNAL_FILE_CHANGE_EVENT, {
       detail: target
     })
   )

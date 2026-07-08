@@ -1,5 +1,5 @@
-import type { Page } from '@stablyai/playwright-test'
-import { expect } from '@stablyai/playwright-test'
+import type { Page } from '@nebutra/playwright-test'
+import { expect } from '@nebutra/playwright-test'
 
 /** Open the right sidebar file explorer and wait for store state to match. */
 export async function openFileExplorer(page: Page): Promise<void> {
@@ -34,7 +34,7 @@ export async function openFileExplorer(page: Page): Promise<void> {
  *
  * Why: the tests assert file-open behavior, not DOM tree rendering. Opening a
  * stable seeded file through the same editor store action avoids hidden-window
- * explorer DOM flakiness while still exercising Orca's editor tab model.
+ * explorer DOM flakiness while still exercising Pebble's editor tab model.
  */
 export async function clickFileInExplorer(
   page: Page,

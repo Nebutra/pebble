@@ -16,11 +16,11 @@ const posixOnlyIt = isWindowsHost ? it.skip : it
 const expectedOmpStatusExtension = posix.join(
   '/tmp/default-omp-agent',
   'extensions',
-  'orca-agent-status.ts'
+  'pebble-agent-status.ts'
 )
 const expectedAttributionShimDir = join(
-  '/tmp/orca-user-data',
-  'orca-terminal-attribution',
+  '/tmp/pebble-user-data',
+  'pebble-terminal-attribution',
   isWindowsHost ? 'win32' : 'posix'
 )
 
@@ -216,8 +216,8 @@ const RESOLVED_WINDOWS_POWERSHELL = 'C:\\Windows\\System32\\WindowsPowerShell\\v
 const RESOLVED_PWSH7 = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
 const TEST_CODEX_HOME =
   process.platform === 'win32'
-    ? 'C:\\Users\\test\\AppData\\Roaming\\orca\\codex-runtime-home\\home'
-    : '/tmp/orca-codex-home'
+    ? 'C:\\Users\\test\\AppData\\Roaming\\pebble\\codex-runtime-home\\home'
+    : '/tmp/pebble-codex-home'
 
 function makeDisposable() {
   return { dispose: vi.fn() }
@@ -247,18 +247,18 @@ describe('registerPtyHandlers', () => {
   }
 
   const savedOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR
-  const savedOrcaOpenCodeConfigDir = process.env.ORCA_OPENCODE_CONFIG_DIR
-  const savedOrcaOpenCodeSourceConfigDir = process.env.ORCA_OPENCODE_SOURCE_CONFIG_DIR
+  const savedPebbleOpenCodeConfigDir = process.env.PEBBLE_OPENCODE_CONFIG_DIR
+  const savedPebbleOpenCodeSourceConfigDir = process.env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR
   const savedPiAgentDir = process.env.PI_CODING_AGENT_DIR
-  const savedOrcaPiAgentDir = process.env.ORCA_PI_CODING_AGENT_DIR
-  const savedOrcaPiSourceAgentDir = process.env.ORCA_PI_SOURCE_AGENT_DIR
-  const savedOrcaCodexHome = process.env.ORCA_CODEX_HOME
-  const savedOrcaOmpAgentDir = process.env.ORCA_OMP_CODING_AGENT_DIR
-  const savedOrcaOmpSourceAgentDir = process.env.ORCA_OMP_SOURCE_AGENT_DIR
-  const savedOrcaOmpStatusExtension = process.env.ORCA_OMP_STATUS_EXTENSION
-  const savedOrcaClaudeAgentStatusSettings = process.env.ORCA_CLAUDE_AGENT_STATUS_SETTINGS
+  const savedPebblePiAgentDir = process.env.PEBBLE_PI_CODING_AGENT_DIR
+  const savedPebblePiSourceAgentDir = process.env.PEBBLE_PI_SOURCE_AGENT_DIR
+  const savedPebbleCodexHome = process.env.PEBBLE_CODEX_HOME
+  const savedPebbleOmpAgentDir = process.env.PEBBLE_OMP_CODING_AGENT_DIR
+  const savedPebbleOmpSourceAgentDir = process.env.PEBBLE_OMP_SOURCE_AGENT_DIR
+  const savedPebbleOmpStatusExtension = process.env.PEBBLE_OMP_STATUS_EXTENSION
+  const savedPebbleClaudeAgentStatusSettings = process.env.PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS
   const savedProcessPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
-  const savedDisableMacosLoginShell = process.env.ORCA_DISABLE_MACOS_LOGIN_SHELL
+  const savedDisableMacosLoginShell = process.env.PEBBLE_DISABLE_MACOS_LOGIN_SHELL
 
   beforeEach(() => {
     // Why: most PTY spawn tests assert POSIX shell behavior; Windows-specific
@@ -270,19 +270,19 @@ describe('registerPtyHandlers', () => {
     // Why: with platform forced to darwin, the TCC login(1) wrapper would
     // rewrite every spawn argv these tests assert. Its own integration test
     // below re-enables it.
-    process.env.ORCA_DISABLE_MACOS_LOGIN_SHELL = '1'
+    process.env.PEBBLE_DISABLE_MACOS_LOGIN_SHELL = '1'
     delete process.env.OPENCODE_CONFIG_DIR
-    delete process.env.ORCA_OPENCODE_SOURCE_CONFIG_DIR
-    delete process.env.ORCA_OPENCODE_CONFIG_DIR
-    delete process.env.ORCA_AGENT_HOOK_ENDPOINT
-    delete process.env.ORCA_CLAUDE_AGENT_STATUS_SETTINGS
+    delete process.env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR
+    delete process.env.PEBBLE_OPENCODE_CONFIG_DIR
+    delete process.env.PEBBLE_AGENT_HOOK_ENDPOINT
+    delete process.env.PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS
     delete process.env.PI_CODING_AGENT_DIR
-    delete process.env.ORCA_PI_SOURCE_AGENT_DIR
-    delete process.env.ORCA_PI_CODING_AGENT_DIR
-    delete process.env.ORCA_CODEX_HOME
-    delete process.env.ORCA_OMP_SOURCE_AGENT_DIR
-    delete process.env.ORCA_OMP_CODING_AGENT_DIR
-    delete process.env.ORCA_OMP_STATUS_EXTENSION
+    delete process.env.PEBBLE_PI_SOURCE_AGENT_DIR
+    delete process.env.PEBBLE_PI_CODING_AGENT_DIR
+    delete process.env.PEBBLE_CODEX_HOME
+    delete process.env.PEBBLE_OMP_SOURCE_AGENT_DIR
+    delete process.env.PEBBLE_OMP_CODING_AGENT_DIR
+    delete process.env.PEBBLE_OMP_STATUS_EXTENSION
     handlers.clear()
     handleMock.mockReset()
     onMock.mockReset()
@@ -330,34 +330,34 @@ describe('registerPtyHandlers', () => {
     removeHandlerMock.mockImplementation((channel: string) => {
       handlers.delete(channel)
     })
-    getPathMock.mockReturnValue('/tmp/orca-user-data')
+    getPathMock.mockReturnValue('/tmp/pebble-user-data')
     existsSyncMock.mockReturnValue(true)
     statSyncMock.mockReturnValue({ isDirectory: () => true, mode: 0o755 })
     readFileSyncMock.mockReturnValue('')
     openCodeBuildPtyEnvMock.mockImplementation((_ptyId: string, existingConfigDir?: string) => ({
-      ORCA_OPENCODE_HOOK_PORT: '4567',
-      ORCA_OPENCODE_HOOK_TOKEN: 'opencode-token',
-      ORCA_OPENCODE_PTY_ID: 'test-pty',
+      PEBBLE_OPENCODE_HOOK_PORT: '4567',
+      PEBBLE_OPENCODE_HOOK_TOKEN: 'opencode-token',
+      PEBBLE_OPENCODE_PTY_ID: 'test-pty',
       OPENCODE_CONFIG_DIR: existingConfigDir
-        ? '/tmp/orca-opencode-overlay'
-        : '/tmp/orca-opencode-config'
+        ? '/tmp/pebble-opencode-overlay'
+        : '/tmp/pebble-opencode-config'
     }))
     mimoCodeBuildPtyEnvMock.mockImplementation((_ptyId: string, existingHome?: string) => ({
-      MIMOCODE_HOME: existingHome ? '/tmp/orca-mimocode-overlay' : '/tmp/orca-mimocode-shared'
+      MIMOCODE_HOME: existingHome ? '/tmp/pebble-mimocode-overlay' : '/tmp/pebble-mimocode-shared'
     }))
     buildAgentHookEnvMock.mockReturnValue({
-      ORCA_AGENT_HOOK_PORT: '5678',
-      ORCA_AGENT_HOOK_TOKEN: 'agent-token'
+      PEBBLE_AGENT_HOOK_PORT: '5678',
+      PEBBLE_AGENT_HOOK_TOKEN: 'agent-token'
     })
     piBuildPtyEnvMock.mockImplementation(
       (_ptyId: string, existingAgentDir?: string, kind?: string) =>
         kind === 'omp'
           ? {
-              ORCA_OMP_SOURCE_AGENT_DIR: existingAgentDir ?? '/tmp/default-omp-agent',
-              ORCA_OMP_STATUS_EXTENSION: `${existingAgentDir ?? '/tmp/default-omp-agent'}/extensions/orca-agent-status.ts`
+              PEBBLE_OMP_SOURCE_AGENT_DIR: existingAgentDir ?? '/tmp/default-omp-agent',
+              PEBBLE_OMP_STATUS_EXTENSION: `${existingAgentDir ?? '/tmp/default-omp-agent'}/extensions/pebble-agent-status.ts`
             }
           : {
-              ORCA_PI_SOURCE_AGENT_DIR: existingAgentDir ?? '/tmp/default-pi-agent'
+              PEBBLE_PI_SOURCE_AGENT_DIR: existingAgentDir ?? '/tmp/default-pi-agent'
             }
     )
     isPwshAvailableMock.mockReturnValue(false)
@@ -381,64 +381,64 @@ describe('registerPtyHandlers', () => {
       Object.defineProperty(process, 'platform', savedProcessPlatform)
     }
     if (savedDisableMacosLoginShell !== undefined) {
-      process.env.ORCA_DISABLE_MACOS_LOGIN_SHELL = savedDisableMacosLoginShell
+      process.env.PEBBLE_DISABLE_MACOS_LOGIN_SHELL = savedDisableMacosLoginShell
     } else {
-      delete process.env.ORCA_DISABLE_MACOS_LOGIN_SHELL
+      delete process.env.PEBBLE_DISABLE_MACOS_LOGIN_SHELL
     }
     if (savedOpenCodeConfigDir !== undefined) {
       process.env.OPENCODE_CONFIG_DIR = savedOpenCodeConfigDir
     } else {
       delete process.env.OPENCODE_CONFIG_DIR
     }
-    if (savedOrcaOpenCodeConfigDir !== undefined) {
-      process.env.ORCA_OPENCODE_CONFIG_DIR = savedOrcaOpenCodeConfigDir
+    if (savedPebbleOpenCodeConfigDir !== undefined) {
+      process.env.PEBBLE_OPENCODE_CONFIG_DIR = savedPebbleOpenCodeConfigDir
     } else {
-      delete process.env.ORCA_OPENCODE_CONFIG_DIR
+      delete process.env.PEBBLE_OPENCODE_CONFIG_DIR
     }
-    if (savedOrcaOpenCodeSourceConfigDir !== undefined) {
-      process.env.ORCA_OPENCODE_SOURCE_CONFIG_DIR = savedOrcaOpenCodeSourceConfigDir
+    if (savedPebbleOpenCodeSourceConfigDir !== undefined) {
+      process.env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR = savedPebbleOpenCodeSourceConfigDir
     } else {
-      delete process.env.ORCA_OPENCODE_SOURCE_CONFIG_DIR
+      delete process.env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR
     }
     if (savedPiAgentDir !== undefined) {
       process.env.PI_CODING_AGENT_DIR = savedPiAgentDir
     } else {
       delete process.env.PI_CODING_AGENT_DIR
     }
-    if (savedOrcaPiAgentDir !== undefined) {
-      process.env.ORCA_PI_CODING_AGENT_DIR = savedOrcaPiAgentDir
+    if (savedPebblePiAgentDir !== undefined) {
+      process.env.PEBBLE_PI_CODING_AGENT_DIR = savedPebblePiAgentDir
     } else {
-      delete process.env.ORCA_PI_CODING_AGENT_DIR
+      delete process.env.PEBBLE_PI_CODING_AGENT_DIR
     }
-    if (savedOrcaPiSourceAgentDir === undefined) {
-      delete process.env.ORCA_PI_SOURCE_AGENT_DIR
+    if (savedPebblePiSourceAgentDir === undefined) {
+      delete process.env.PEBBLE_PI_SOURCE_AGENT_DIR
     } else {
-      process.env.ORCA_PI_SOURCE_AGENT_DIR = savedOrcaPiSourceAgentDir
+      process.env.PEBBLE_PI_SOURCE_AGENT_DIR = savedPebblePiSourceAgentDir
     }
-    if (savedOrcaCodexHome === undefined) {
-      delete process.env.ORCA_CODEX_HOME
+    if (savedPebbleCodexHome === undefined) {
+      delete process.env.PEBBLE_CODEX_HOME
     } else {
-      process.env.ORCA_CODEX_HOME = savedOrcaCodexHome
+      process.env.PEBBLE_CODEX_HOME = savedPebbleCodexHome
     }
-    if (savedOrcaOmpAgentDir !== undefined) {
-      process.env.ORCA_OMP_CODING_AGENT_DIR = savedOrcaOmpAgentDir
+    if (savedPebbleOmpAgentDir !== undefined) {
+      process.env.PEBBLE_OMP_CODING_AGENT_DIR = savedPebbleOmpAgentDir
     } else {
-      delete process.env.ORCA_OMP_CODING_AGENT_DIR
+      delete process.env.PEBBLE_OMP_CODING_AGENT_DIR
     }
-    if (savedOrcaOmpSourceAgentDir !== undefined) {
-      process.env.ORCA_OMP_SOURCE_AGENT_DIR = savedOrcaOmpSourceAgentDir
+    if (savedPebbleOmpSourceAgentDir !== undefined) {
+      process.env.PEBBLE_OMP_SOURCE_AGENT_DIR = savedPebbleOmpSourceAgentDir
     } else {
-      delete process.env.ORCA_OMP_SOURCE_AGENT_DIR
+      delete process.env.PEBBLE_OMP_SOURCE_AGENT_DIR
     }
-    if (savedOrcaOmpStatusExtension !== undefined) {
-      process.env.ORCA_OMP_STATUS_EXTENSION = savedOrcaOmpStatusExtension
+    if (savedPebbleOmpStatusExtension !== undefined) {
+      process.env.PEBBLE_OMP_STATUS_EXTENSION = savedPebbleOmpStatusExtension
     } else {
-      delete process.env.ORCA_OMP_STATUS_EXTENSION
+      delete process.env.PEBBLE_OMP_STATUS_EXTENSION
     }
-    if (savedOrcaClaudeAgentStatusSettings === undefined) {
-      delete process.env.ORCA_CLAUDE_AGENT_STATUS_SETTINGS
+    if (savedPebbleClaudeAgentStatusSettings === undefined) {
+      delete process.env.PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS
     } else {
-      process.env.ORCA_CLAUDE_AGENT_STATUS_SETTINGS = savedOrcaClaudeAgentStatusSettings
+      process.env.PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS = savedPebbleClaudeAgentStatusSettings
     }
   })
 
@@ -739,79 +739,79 @@ describe('registerPtyHandlers', () => {
       const env = await spawnAndGetEnv()
       expect(env.TERM).toBe('xterm-256color')
       expect(env.COLORTERM).toBe('truecolor')
-      expect(env.TERM_PROGRAM).toBe('Orca')
+      expect(env.TERM_PROGRAM).toBe('Pebble')
     })
 
     it('advertises OSC 8 hyperlink support via FORCE_HYPERLINK', async () => {
       // Why: the supports-hyperlinks npm package hard-codes a TERM_PROGRAM
       // allowlist (iTerm.app / WezTerm / vscode) and reports false for
-      // TERM_PROGRAM=Orca, so tools like Claude Code emit plain text instead
+      // TERM_PROGRAM=Pebble, so tools like Claude Code emit plain text instead
       // of ESC]8;; wrappers. Setting FORCE_HYPERLINK=1 forces the detector to
       // return true; xterm.js + our linkHandler handle the sequences natively.
       const env = await spawnAndGetEnv()
       expect(env.FORCE_HYPERLINK).toBe('1')
     })
 
-    it('surfaces ORCA_APP_VERSION as TERM_PROGRAM_VERSION for TUI feature gating', async () => {
-      const env = await spawnAndGetEnv(undefined, { ORCA_APP_VERSION: '1.2.3-test' })
+    it('surfaces PEBBLE_APP_VERSION as TERM_PROGRAM_VERSION for TUI feature gating', async () => {
+      const env = await spawnAndGetEnv(undefined, { PEBBLE_APP_VERSION: '1.2.3-test' })
       expect(env.TERM_PROGRAM_VERSION).toBe('1.2.3-test')
     })
 
-    it('falls back to a placeholder version when ORCA_APP_VERSION is unset', async () => {
-      const env = await spawnAndGetEnv(undefined, { ORCA_APP_VERSION: undefined })
+    it('falls back to a placeholder version when PEBBLE_APP_VERSION is unset', async () => {
+      const env = await spawnAndGetEnv(undefined, { PEBBLE_APP_VERSION: undefined })
       expect(env.TERM_PROGRAM_VERSION).toBe('0.0.0-dev')
     })
 
-    it('injects the selected Codex home into Orca terminal PTYs', async () => {
+    it('injects the selected Codex home into Pebble terminal PTYs', async () => {
       const env = await spawnAndGetEnv(undefined, undefined, () => TEST_CODEX_HOME)
       expect(env.CODEX_HOME).toBe(TEST_CODEX_HOME)
-      expect(env.ORCA_CODEX_HOME).toBe(TEST_CODEX_HOME)
+      expect(env.PEBBLE_CODEX_HOME).toBe(TEST_CODEX_HOME)
     })
 
-    it('injects the OpenCode hook env into Orca terminal PTYs', async () => {
+    it('injects the OpenCode hook env into Pebble terminal PTYs', async () => {
       // Why: clear any ambient OPENCODE_CONFIG_DIR so the mock's value is used
       const env = await spawnAndGetEnv(undefined, { OPENCODE_CONFIG_DIR: undefined })
       expect(openCodeBuildPtyEnvMock).toHaveBeenCalledTimes(1)
       expect(openCodeBuildPtyEnvMock.mock.calls[0]?.[0]).toEqual(expect.any(String))
-      expect(env.ORCA_OPENCODE_HOOK_PORT).toBe('4567')
-      expect(env.ORCA_OPENCODE_HOOK_TOKEN).toBe('opencode-token')
-      expect(env.ORCA_OPENCODE_PTY_ID).toBe('test-pty')
+      expect(env.PEBBLE_OPENCODE_HOOK_PORT).toBe('4567')
+      expect(env.PEBBLE_OPENCODE_HOOK_TOKEN).toBe('opencode-token')
+      expect(env.PEBBLE_OPENCODE_PTY_ID).toBe('test-pty')
       expect(env.OPENCODE_CONFIG_DIR).toEqual(expect.any(String))
-      expect(env.ORCA_OPENCODE_CONFIG_DIR).toBe(env.OPENCODE_CONFIG_DIR)
+      expect(env.PEBBLE_OPENCODE_CONFIG_DIR).toBe(env.OPENCODE_CONFIG_DIR)
     })
 
-    it('mirrors the original OpenCode source dir when launched from an Orca overlay shell', async () => {
+    it('mirrors the original OpenCode source dir when launched from an Pebble overlay shell', async () => {
       const env = await spawnAndGetEnv({
-        OPENCODE_CONFIG_DIR: '/tmp/parent-orca-opencode-overlay',
-        ORCA_OPENCODE_SOURCE_CONFIG_DIR: '/tmp/user-opencode-config'
+        OPENCODE_CONFIG_DIR: '/tmp/parent-pebble-opencode-overlay',
+        PEBBLE_OPENCODE_SOURCE_CONFIG_DIR: '/tmp/user-opencode-config'
       })
       expect(openCodeBuildPtyEnvMock).toHaveBeenCalledWith(
         expect.any(String),
         '/tmp/user-opencode-config'
       )
-      expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-overlay')
-      expect(env.ORCA_OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-overlay')
-      expect(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR).toBe('/tmp/user-opencode-config')
+      expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-overlay')
+      expect(env.PEBBLE_OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-overlay')
+      expect(env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR).toBe('/tmp/user-opencode-config')
     })
 
-    it('does not treat inherited Orca OpenCode config as user config without a source dir', async () => {
+    it('does not treat inherited Pebble OpenCode config as user config without a source dir', async () => {
       const env = await spawnAndGetEnv({
-        OPENCODE_CONFIG_DIR: '/tmp/parent-orca-opencode-overlay',
-        ORCA_OPENCODE_CONFIG_DIR: '/tmp/parent-orca-opencode-overlay'
+        OPENCODE_CONFIG_DIR: '/tmp/parent-pebble-opencode-overlay',
+        PEBBLE_OPENCODE_CONFIG_DIR: '/tmp/parent-pebble-opencode-overlay'
       })
 
       expect(openCodeBuildPtyEnvMock).toHaveBeenCalledWith(expect.any(String), undefined)
-      expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-config')
-      expect(env.ORCA_OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-config')
-      expect(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR).toBeUndefined()
+      expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-config')
+      expect(env.PEBBLE_OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-config')
+      expect(env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR).toBeUndefined()
     })
 
-    it('restores user OpenCode config when agent status hooks are disabled in a nested Orca shell', async () => {
+    it('restores user OpenCode config when agent status hooks are disabled in a nested Pebble shell', async () => {
       const env = await spawnAndGetEnv(
         {
-          OPENCODE_CONFIG_DIR: '/tmp/parent-orca-opencode-overlay',
-          ORCA_OPENCODE_CONFIG_DIR: '/tmp/parent-orca-opencode-overlay',
-          ORCA_OPENCODE_SOURCE_CONFIG_DIR: '/tmp/user-opencode-config'
+          OPENCODE_CONFIG_DIR: '/tmp/parent-pebble-opencode-overlay',
+          PEBBLE_OPENCODE_CONFIG_DIR: '/tmp/parent-pebble-opencode-overlay',
+          PEBBLE_OPENCODE_SOURCE_CONFIG_DIR: '/tmp/user-opencode-config'
         },
         undefined,
         undefined,
@@ -820,15 +820,15 @@ describe('registerPtyHandlers', () => {
 
       expect(openCodeBuildPtyEnvMock).not.toHaveBeenCalled()
       expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/user-opencode-config')
-      expect(env.ORCA_OPENCODE_CONFIG_DIR).toBeUndefined()
-      expect(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR).toBeUndefined()
+      expect(env.PEBBLE_OPENCODE_CONFIG_DIR).toBeUndefined()
+      expect(env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR).toBeUndefined()
     })
 
     it('strips inherited OpenCode overlay env when agent status hooks are disabled without a source dir', async () => {
       const env = await spawnAndGetEnv(
         {
-          OPENCODE_CONFIG_DIR: '/tmp/parent-orca-opencode-overlay',
-          ORCA_OPENCODE_CONFIG_DIR: '/tmp/parent-orca-opencode-overlay'
+          OPENCODE_CONFIG_DIR: '/tmp/parent-pebble-opencode-overlay',
+          PEBBLE_OPENCODE_CONFIG_DIR: '/tmp/parent-pebble-opencode-overlay'
         },
         undefined,
         undefined,
@@ -837,17 +837,17 @@ describe('registerPtyHandlers', () => {
 
       expect(openCodeBuildPtyEnvMock).not.toHaveBeenCalled()
       expect(env.OPENCODE_CONFIG_DIR).toBeUndefined()
-      expect(env.ORCA_OPENCODE_CONFIG_DIR).toBeUndefined()
-      expect(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR).toBeUndefined()
+      expect(env.PEBBLE_OPENCODE_CONFIG_DIR).toBeUndefined()
+      expect(env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR).toBeUndefined()
     })
 
     it('injects MiMo overlay env only when launch command is mimo', async () => {
       const env = await spawnAndGetEnv(undefined, undefined, undefined, undefined, 'mimo')
 
       expect(mimoCodeBuildPtyEnvMock).toHaveBeenCalledTimes(1)
-      expect(env.MIMOCODE_HOME).toBe('/tmp/orca-mimocode-shared')
-      expect(env.ORCA_MIMOCODE_HOME).toBe('/tmp/orca-mimocode-shared')
-      expect(env.ORCA_MIMOCODE_SOURCE_HOME).toBeUndefined()
+      expect(env.MIMOCODE_HOME).toBe('/tmp/pebble-mimocode-shared')
+      expect(env.PEBBLE_MIMOCODE_HOME).toBe('/tmp/pebble-mimocode-shared')
+      expect(env.PEBBLE_MIMOCODE_SOURCE_HOME).toBeUndefined()
     })
 
     it.each(['/usr/local/bin/mimo --prompt hi', '"C:\\Program Files\\MiMo\\mimo.cmd" --prompt hi'])(
@@ -856,8 +856,8 @@ describe('registerPtyHandlers', () => {
         const env = await spawnAndGetEnv(undefined, undefined, undefined, undefined, launchCommand)
 
         expect(mimoCodeBuildPtyEnvMock).toHaveBeenCalledTimes(1)
-        expect(env.MIMOCODE_HOME).toBe('/tmp/orca-mimocode-shared')
-        expect(env.ORCA_MIMOCODE_HOME).toBe('/tmp/orca-mimocode-shared')
+        expect(env.MIMOCODE_HOME).toBe('/tmp/pebble-mimocode-shared')
+        expect(env.PEBBLE_MIMOCODE_HOME).toBe('/tmp/pebble-mimocode-shared')
       }
     )
 
@@ -871,8 +871,8 @@ describe('registerPtyHandlers', () => {
       )
 
       expect(mimoCodeBuildPtyEnvMock).toHaveBeenCalledTimes(1)
-      expect(env.MIMOCODE_HOME).toBe('/tmp/orca-mimocode-shared')
-      expect(env.ORCA_MIMOCODE_HOME).toBe('/tmp/orca-mimocode-shared')
+      expect(env.MIMOCODE_HOME).toBe('/tmp/pebble-mimocode-shared')
+      expect(env.PEBBLE_MIMOCODE_HOME).toBe('/tmp/pebble-mimocode-shared')
     })
 
     it('does not inject MiMo overlay for non-mimo launches', async () => {
@@ -881,12 +881,12 @@ describe('registerPtyHandlers', () => {
       expect(mimoCodeBuildPtyEnvMock).not.toHaveBeenCalled()
     })
 
-    it('restores user MiMo home when agent status hooks are disabled in a nested Orca shell', async () => {
+    it('restores user MiMo home when agent status hooks are disabled in a nested Pebble shell', async () => {
       const env = await spawnAndGetEnv(
         {
-          MIMOCODE_HOME: '/tmp/parent-orca-mimocode-overlay',
-          ORCA_MIMOCODE_HOME: '/tmp/parent-orca-mimocode-overlay',
-          ORCA_MIMOCODE_SOURCE_HOME: '/tmp/user-mimocode-home'
+          MIMOCODE_HOME: '/tmp/parent-pebble-mimocode-overlay',
+          PEBBLE_MIMOCODE_HOME: '/tmp/parent-pebble-mimocode-overlay',
+          PEBBLE_MIMOCODE_SOURCE_HOME: '/tmp/user-mimocode-home'
         },
         undefined,
         undefined,
@@ -896,12 +896,12 @@ describe('registerPtyHandlers', () => {
 
       expect(mimoCodeBuildPtyEnvMock).not.toHaveBeenCalled()
       expect(env.MIMOCODE_HOME).toBe('/tmp/user-mimocode-home')
-      expect(env.ORCA_MIMOCODE_HOME).toBeUndefined()
-      expect(env.ORCA_MIMOCODE_SOURCE_HOME).toBeUndefined()
+      expect(env.PEBBLE_MIMOCODE_HOME).toBeUndefined()
+      expect(env.PEBBLE_MIMOCODE_SOURCE_HOME).toBeUndefined()
     })
 
     posixOnlyIt(
-      'reproduces issue #1534: GUI-launched Orca mirrors zshrc-only OpenCode config',
+      'reproduces issue #1534: GUI-launched Pebble mirrors zshrc-only OpenCode config',
       async () => {
         // Why: the reporter's app process did not inherit OPENCODE_CONFIG_DIR;
         // their interactive zsh startup later exported a company config repo.
@@ -920,38 +920,38 @@ describe('registerPtyHandlers', () => {
           HOME: '/home/pim',
           SHELL: '/bin/zsh',
           OPENCODE_CONFIG_DIR: undefined,
-          ORCA_OPENCODE_SOURCE_CONFIG_DIR: undefined
+          PEBBLE_OPENCODE_SOURCE_CONFIG_DIR: undefined
         })
 
         expect(openCodeBuildPtyEnvMock).toHaveBeenCalledWith(
           expect.any(String),
           '/home/pim/company/opencode-config'
         )
-        expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-overlay')
-        expect(env.ORCA_OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-overlay')
-        expect(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR).toBe('/home/pim/company/opencode-config')
-        expect(env.OPENCODE_CONFIG_DIR).not.toBe(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR)
+        expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-overlay')
+        expect(env.PEBBLE_OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-overlay')
+        expect(env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR).toBe('/home/pim/company/opencode-config')
+        expect(env.OPENCODE_CONFIG_DIR).not.toBe(env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR)
       }
     )
 
-    it('installs Pi managed extensions without redirecting Orca terminal PTY homes', async () => {
+    it('installs Pi managed extensions without redirecting Pebble terminal PTY homes', async () => {
       const env = await spawnAndGetEnv(undefined, { PI_CODING_AGENT_DIR: '/tmp/user-pi-agent' })
       expect(piBuildPtyEnvMock).toHaveBeenCalledWith(expect.any(String), '/tmp/user-pi-agent', 'pi')
       expect(piBuildPtyEnvMock).toHaveBeenCalledWith(expect.any(String), undefined, 'omp')
       expect(env.PI_CODING_AGENT_DIR).toBe('/tmp/user-pi-agent')
-      expect(env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
-      expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBe('/tmp/user-pi-agent')
-      expect(env.ORCA_OMP_CODING_AGENT_DIR).toBeUndefined()
-      expect(env.ORCA_OMP_STATUS_EXTENSION).toBe(
-        '/tmp/default-omp-agent/extensions/orca-agent-status.ts'
+      expect(env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBe('/tmp/user-pi-agent')
+      expect(env.PEBBLE_OMP_CODING_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_OMP_STATUS_EXTENSION).toBe(
+        '/tmp/default-omp-agent/extensions/pebble-agent-status.ts'
       )
     })
 
     it('threads command: "omp" through to piBuildPtyEnv and emits OMP status metadata', async () => {
-      // Why: OMP launches must emit OMP-named Orca shadow vars (ORCA_OMP_*),
+      // Why: OMP launches must emit OMP-named Pebble shadow vars (PEBBLE_OMP_*),
       // not Pi-named ones. The PI_CODING_AGENT_DIR binary var is unavoidable
       // (OMP's own binary reads it — see C:\tmp\pr-workspace\oh-my-pi
-      // packages/utils/src/dirs.ts), but every other Orca-owned env name
+      // packages/utils/src/dirs.ts), but every other Pebble-owned env name
       // stays kind-scoped so an OMP PTY never accumulates Pi shadow state.
       const env = await spawnAndGetEnv(
         undefined,
@@ -966,14 +966,14 @@ describe('registerPtyHandlers', () => {
         'omp'
       )
       expect(env.PI_CODING_AGENT_DIR).toBe('/tmp/user-omp-agent')
-      expect(env.ORCA_OMP_CODING_AGENT_DIR).toBeUndefined()
-      expect(env.ORCA_OMP_STATUS_EXTENSION).toBe(
-        '/tmp/user-omp-agent/extensions/orca-agent-status.ts'
+      expect(env.PEBBLE_OMP_CODING_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_OMP_STATUS_EXTENSION).toBe(
+        '/tmp/user-omp-agent/extensions/pebble-agent-status.ts'
       )
-      expect(env.ORCA_OMP_SOURCE_AGENT_DIR).toBe('/tmp/user-omp-agent')
+      expect(env.PEBBLE_OMP_SOURCE_AGENT_DIR).toBe('/tmp/user-omp-agent')
       // CRITICAL: a Pi-named shadow MUST NOT leak into an OMP PTY env.
-      expect(env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
-      expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBeUndefined()
     })
 
     it('uses sequenced startup env as the OMP launch hint when command is a wrapper', async () => {
@@ -993,29 +993,29 @@ describe('registerPtyHandlers', () => {
         '/tmp/user-omp-agent',
         'omp'
       )
-      expect(env.ORCA_OMP_STATUS_EXTENSION).toBe(
-        '/tmp/user-omp-agent/extensions/orca-agent-status.ts'
+      expect(env.PEBBLE_OMP_STATUS_EXTENSION).toBe(
+        '/tmp/user-omp-agent/extensions/pebble-agent-status.ts'
       )
-      expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBeUndefined()
     })
 
-    it('mirrors the original Pi source dir when launched from an Orca overlay shell', async () => {
+    it('mirrors the original Pi source dir when launched from an Pebble overlay shell', async () => {
       const env = await spawnAndGetEnv({
-        PI_CODING_AGENT_DIR: '/tmp/parent-orca-pi-overlay',
-        ORCA_PI_SOURCE_AGENT_DIR: '/tmp/user-pi-agent'
+        PI_CODING_AGENT_DIR: '/tmp/parent-pebble-pi-overlay',
+        PEBBLE_PI_SOURCE_AGENT_DIR: '/tmp/user-pi-agent'
       })
       expect(piBuildPtyEnvMock).toHaveBeenCalledWith(expect.any(String), '/tmp/user-pi-agent', 'pi')
-      expect(env.PI_CODING_AGENT_DIR).toBe('/tmp/parent-orca-pi-overlay')
-      expect(env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
-      expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBe('/tmp/user-pi-agent')
+      expect(env.PI_CODING_AGENT_DIR).toBe('/tmp/parent-pebble-pi-overlay')
+      expect(env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBe('/tmp/user-pi-agent')
     })
 
     it('does not use an inherited Pi overlay source for an OMP launch', async () => {
       const env = await spawnAndGetEnv(
         {
-          PI_CODING_AGENT_DIR: '/tmp/parent-orca-pi-overlay',
-          ORCA_PI_CODING_AGENT_DIR: '/tmp/parent-orca-pi-overlay',
-          ORCA_PI_SOURCE_AGENT_DIR: '/tmp/user-pi-agent'
+          PI_CODING_AGENT_DIR: '/tmp/parent-pebble-pi-overlay',
+          PEBBLE_PI_CODING_AGENT_DIR: '/tmp/parent-pebble-pi-overlay',
+          PEBBLE_PI_SOURCE_AGENT_DIR: '/tmp/user-pi-agent'
         },
         undefined,
         undefined,
@@ -1024,18 +1024,18 @@ describe('registerPtyHandlers', () => {
       )
 
       expect(piBuildPtyEnvMock).toHaveBeenCalledWith(expect.any(String), undefined, 'omp')
-      expect(env.ORCA_OMP_CODING_AGENT_DIR).toBeUndefined()
-      expect(env.ORCA_OMP_SOURCE_AGENT_DIR).toBe('/tmp/default-omp-agent')
-      expect(env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
-      expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_OMP_CODING_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_OMP_SOURCE_AGENT_DIR).toBe('/tmp/default-omp-agent')
+      expect(env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBeUndefined()
     })
 
     it('does not use an inherited OMP overlay source for an explicit Pi launch', async () => {
       const env = await spawnAndGetEnv(
         {
-          PI_CODING_AGENT_DIR: '/tmp/parent-orca-omp-overlay',
-          ORCA_OMP_CODING_AGENT_DIR: '/tmp/parent-orca-omp-overlay',
-          ORCA_OMP_SOURCE_AGENT_DIR: '/tmp/user-omp-agent'
+          PI_CODING_AGENT_DIR: '/tmp/parent-pebble-omp-overlay',
+          PEBBLE_OMP_CODING_AGENT_DIR: '/tmp/parent-pebble-omp-overlay',
+          PEBBLE_OMP_SOURCE_AGENT_DIR: '/tmp/user-omp-agent'
         },
         undefined,
         undefined,
@@ -1044,19 +1044,19 @@ describe('registerPtyHandlers', () => {
       )
 
       expect(piBuildPtyEnvMock).toHaveBeenCalledWith(expect.any(String), undefined, 'pi')
-      expect(env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
-      expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBe('/tmp/default-pi-agent')
-      expect(env.ORCA_OMP_CODING_AGENT_DIR).toBeUndefined()
-      expect(env.ORCA_OMP_SOURCE_AGENT_DIR).toBeUndefined()
-      expect(env.ORCA_OMP_STATUS_EXTENSION).toBeUndefined()
+      expect(env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBe('/tmp/default-pi-agent')
+      expect(env.PEBBLE_OMP_CODING_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_OMP_SOURCE_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_OMP_STATUS_EXTENSION).toBeUndefined()
     })
 
-    it('restores user Pi config when agent status hooks are disabled in a nested Orca shell', async () => {
+    it('restores user Pi config when agent status hooks are disabled in a nested Pebble shell', async () => {
       const env = await spawnAndGetEnv(
         {
-          PI_CODING_AGENT_DIR: '/tmp/parent-orca-pi-overlay',
-          ORCA_PI_CODING_AGENT_DIR: '/tmp/parent-orca-pi-overlay',
-          ORCA_PI_SOURCE_AGENT_DIR: '/tmp/user-pi-agent'
+          PI_CODING_AGENT_DIR: '/tmp/parent-pebble-pi-overlay',
+          PEBBLE_PI_CODING_AGENT_DIR: '/tmp/parent-pebble-pi-overlay',
+          PEBBLE_PI_SOURCE_AGENT_DIR: '/tmp/user-pi-agent'
         },
         undefined,
         undefined,
@@ -1065,8 +1065,8 @@ describe('registerPtyHandlers', () => {
 
       expect(piBuildPtyEnvMock).not.toHaveBeenCalled()
       expect(env.PI_CODING_AGENT_DIR).toBe('/tmp/user-pi-agent')
-      expect(env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
-      expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
+      expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBeUndefined()
     })
 
     posixOnlyIt(
@@ -1088,12 +1088,12 @@ describe('registerPtyHandlers', () => {
           'pi'
         )
         expect(env.PI_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBe('/home/tester/.config/pi-agent')
+        expect(env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
+        expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBe('/home/tester/.config/pi-agent')
       }
     )
 
-    it('injects the agent hook receiver env into Orca terminal PTYs', async () => {
+    it('injects the agent hook receiver env into Pebble terminal PTYs', async () => {
       const env = await spawnAndGetEnv()
       // Why: after the daemon-parity refactor, buildAgentHookEnv runs exactly
       // once for a local spawn — inside the shared buildPtyHostEnv helper,
@@ -1101,46 +1101,46 @@ describe('registerPtyHandlers', () => {
       // both route through. The handler's separate ad-hoc injection (which
       // used to cause a double-call for local spawns) is gone.
       expect(buildAgentHookEnvMock).toHaveBeenCalledTimes(1)
-      expect(env.ORCA_AGENT_HOOK_PORT).toBe('5678')
-      expect(env.ORCA_AGENT_HOOK_TOKEN).toBe('agent-token')
+      expect(env.PEBBLE_AGENT_HOOK_PORT).toBe('5678')
+      expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBe('agent-token')
     })
 
     it('strips stale inherited hook receiver env before injecting this runtime', async () => {
       const env = await spawnAndGetEnv({
-        ORCA_AGENT_HOOK_PORT: '1111',
-        ORCA_AGENT_HOOK_TOKEN: 'stale-token',
-        ORCA_AGENT_HOOK_ENV: 'production',
-        ORCA_AGENT_HOOK_VERSION: 'stale-version',
-        ORCA_AGENT_HOOK_ENDPOINT: '/tmp/stale-endpoint.env',
-        ORCA_CLAUDE_AGENT_STATUS_SETTINGS: '/tmp/orca/agent-hooks/claude-agent-status-settings.json'
+        PEBBLE_AGENT_HOOK_PORT: '1111',
+        PEBBLE_AGENT_HOOK_TOKEN: 'stale-token',
+        PEBBLE_AGENT_HOOK_ENV: 'production',
+        PEBBLE_AGENT_HOOK_VERSION: 'stale-version',
+        PEBBLE_AGENT_HOOK_ENDPOINT: '/tmp/stale-endpoint.env',
+        PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS: '/tmp/pebble/agent-hooks/claude-agent-status-settings.json'
       })
 
-      expect(env.ORCA_AGENT_HOOK_PORT).toBe('5678')
-      expect(env.ORCA_AGENT_HOOK_TOKEN).toBe('agent-token')
-      expect(env.ORCA_AGENT_HOOK_ENV).toBeUndefined()
-      expect(env.ORCA_AGENT_HOOK_VERSION).toBeUndefined()
-      expect(env.ORCA_AGENT_HOOK_ENDPOINT).toBeUndefined()
-      expect(env.ORCA_CLAUDE_AGENT_STATUS_SETTINGS).toBeUndefined()
+      expect(env.PEBBLE_AGENT_HOOK_PORT).toBe('5678')
+      expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBe('agent-token')
+      expect(env.PEBBLE_AGENT_HOOK_ENV).toBeUndefined()
+      expect(env.PEBBLE_AGENT_HOOK_VERSION).toBeUndefined()
+      expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toBeUndefined()
+      expect(env.PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS).toBeUndefined()
     })
 
     it('does not leak inherited hook receiver env if the hook server is unavailable', async () => {
       buildAgentHookEnvMock.mockReturnValueOnce({})
 
       const env = await spawnAndGetEnv({
-        ORCA_AGENT_HOOK_PORT: '1111',
-        ORCA_AGENT_HOOK_TOKEN: 'stale-token',
-        ORCA_AGENT_HOOK_ENV: 'production',
-        ORCA_AGENT_HOOK_VERSION: 'stale-version',
-        ORCA_AGENT_HOOK_ENDPOINT: '/tmp/stale-endpoint.env',
-        ORCA_CLAUDE_AGENT_STATUS_SETTINGS: '/tmp/orca/agent-hooks/claude-agent-status-settings.json'
+        PEBBLE_AGENT_HOOK_PORT: '1111',
+        PEBBLE_AGENT_HOOK_TOKEN: 'stale-token',
+        PEBBLE_AGENT_HOOK_ENV: 'production',
+        PEBBLE_AGENT_HOOK_VERSION: 'stale-version',
+        PEBBLE_AGENT_HOOK_ENDPOINT: '/tmp/stale-endpoint.env',
+        PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS: '/tmp/pebble/agent-hooks/claude-agent-status-settings.json'
       })
 
-      expect(env.ORCA_AGENT_HOOK_PORT).toBeUndefined()
-      expect(env.ORCA_AGENT_HOOK_TOKEN).toBeUndefined()
-      expect(env.ORCA_AGENT_HOOK_ENV).toBeUndefined()
-      expect(env.ORCA_AGENT_HOOK_VERSION).toBeUndefined()
-      expect(env.ORCA_AGENT_HOOK_ENDPOINT).toBeUndefined()
-      expect(env.ORCA_CLAUDE_AGENT_STATUS_SETTINGS).toBeUndefined()
+      expect(env.PEBBLE_AGENT_HOOK_PORT).toBeUndefined()
+      expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBeUndefined()
+      expect(env.PEBBLE_AGENT_HOOK_ENV).toBeUndefined()
+      expect(env.PEBBLE_AGENT_HOOK_VERSION).toBeUndefined()
+      expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toBeUndefined()
+      expect(env.PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS).toBeUndefined()
     })
 
     it('prepends local git/gh attribution shims when attribution is enabled', async () => {
@@ -1148,10 +1148,12 @@ describe('registerPtyHandlers', () => {
         enableGitHubAttribution: true
       }))
 
-      expect(env.ORCA_ENABLE_GIT_ATTRIBUTION).toBe('1')
-      expect(env.ORCA_GIT_COMMIT_TRAILER).toBe('Co-authored-by: Orca <help@stably.ai>')
-      expect(env.ORCA_GH_PR_FOOTER).toBe('Made with [Orca](https://github.com/stablyai/orca) 🐋')
-      expect(env.ORCA_GH_ISSUE_FOOTER).toBe('Made with [Orca](https://github.com/stablyai/orca) 🐋')
+      expect(env.PEBBLE_ENABLE_GIT_ATTRIBUTION).toBe('1')
+      expect(env.PEBBLE_GIT_COMMIT_TRAILER).toBe('Co-authored-by: Pebble <help@nebutra.ai>')
+      expect(env.PEBBLE_GH_PR_FOOTER).toBe('Made with [Pebble](https://github.com/nebutra/pebble)')
+      expect(env.PEBBLE_GH_ISSUE_FOOTER).toBe(
+        'Made with [Pebble](https://github.com/nebutra/pebble)'
+      )
       expect(env.PATH).toContain(expectedAttributionShimDir)
     })
 
@@ -1160,10 +1162,10 @@ describe('registerPtyHandlers', () => {
         enableGitHubAttribution: false
       }))
 
-      expect(env.ORCA_ENABLE_GIT_ATTRIBUTION).toBeUndefined()
-      expect(env.ORCA_GIT_COMMIT_TRAILER).toBeUndefined()
-      expect(env.ORCA_GH_PR_FOOTER).toBeUndefined()
-      expect(env.ORCA_GH_ISSUE_FOOTER).toBeUndefined()
+      expect(env.PEBBLE_ENABLE_GIT_ATTRIBUTION).toBeUndefined()
+      expect(env.PEBBLE_GIT_COMMIT_TRAILER).toBeUndefined()
+      expect(env.PEBBLE_GH_PR_FOOTER).toBeUndefined()
+      expect(env.PEBBLE_GH_ISSUE_FOOTER).toBeUndefined()
       expect(env.PATH ?? '').not.toContain(expectedAttributionShimDir)
     })
 
@@ -1192,18 +1194,18 @@ describe('registerPtyHandlers', () => {
       })
 
       const env = daemonSpawn.mock.calls.at(-1)![0].env
-      expect(env.ORCA_ENABLE_GIT_ATTRIBUTION).toBe('1')
+      expect(env.PEBBLE_ENABLE_GIT_ATTRIBUTION).toBe('1')
       expect(env.PATH).toContain(expectedAttributionShimDir)
     })
 
-    it('overrides ambient CODEX_HOME with the Orca-managed home for system default', async () => {
+    it('overrides ambient CODEX_HOME with the Pebble-managed home for system default', async () => {
       const env = await spawnAndGetEnv(
         undefined,
         { CODEX_HOME: '/tmp/system-codex-home' },
         () => TEST_CODEX_HOME
       )
       expect(env.CODEX_HOME).toBe(TEST_CODEX_HOME)
-      expect(env.ORCA_CODEX_HOME).toBe(TEST_CODEX_HOME)
+      expect(env.PEBBLE_CODEX_HOME).toBe(TEST_CODEX_HOME)
     })
 
     it('injects explicit proxy settings into local PTY env', async () => {
@@ -1382,8 +1384,8 @@ describe('registerPtyHandlers', () => {
           OPENCODE_CONFIG_DIR: undefined
         })
         expect(openCodeBuildPtyEnvMock).toHaveBeenCalled()
-        expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-config')
-        expect(env.ORCA_OPENCODE_HOOK_PORT).toBe('4567')
+        expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-config')
+        expect(env.PEBBLE_OPENCODE_HOOK_PORT).toBe('4567')
       })
 
       it('mirrors a user-provided OPENCODE_CONFIG_DIR into a source-scoped overlay on the daemon path', async () => {
@@ -1394,23 +1396,23 @@ describe('registerPtyHandlers', () => {
           expect.any(String),
           '/user/custom/opencode'
         )
-        expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-overlay')
-        expect(env.ORCA_OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-overlay')
-        expect(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR).toBe('/user/custom/opencode')
+        expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-overlay')
+        expect(env.PEBBLE_OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-overlay')
+        expect(env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR).toBe('/user/custom/opencode')
       })
 
       it('uses source OpenCode config env instead of remirroring a parent overlay', async () => {
         const env = await daemonSpawnAndGetEnv({
-          OPENCODE_CONFIG_DIR: '/tmp/parent-orca-opencode-overlay',
-          ORCA_OPENCODE_SOURCE_CONFIG_DIR: '/user/custom/opencode'
+          OPENCODE_CONFIG_DIR: '/tmp/parent-pebble-opencode-overlay',
+          PEBBLE_OPENCODE_SOURCE_CONFIG_DIR: '/user/custom/opencode'
         })
         expect(openCodeBuildPtyEnvMock).toHaveBeenCalledWith(
           expect.any(String),
           '/user/custom/opencode'
         )
-        expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-overlay')
-        expect(env.ORCA_OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-overlay')
-        expect(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR).toBe('/user/custom/opencode')
+        expect(env.OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-overlay')
+        expect(env.PEBBLE_OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-overlay')
+        expect(env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR).toBe('/user/custom/opencode')
       })
 
       it('installs Pi managed extensions without redirecting homes on the daemon path', async () => {
@@ -1418,10 +1420,10 @@ describe('registerPtyHandlers', () => {
         expect(piBuildPtyEnvMock).toHaveBeenCalledWith(expect.any(String), '/user/.pi/agent', 'pi')
         expect(piBuildPtyEnvMock).toHaveBeenCalledWith(expect.any(String), undefined, 'omp')
         expect(env.PI_CODING_AGENT_DIR).toBe('/user/.pi/agent')
-        expect(env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBe('/user/.pi/agent')
-        expect(env.ORCA_OMP_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_OMP_STATUS_EXTENSION).toBe(expectedOmpStatusExtension)
+        expect(env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
+        expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBe('/user/.pi/agent')
+        expect(env.PEBBLE_OMP_CODING_AGENT_DIR).toBeUndefined()
+        expect(env.PEBBLE_OMP_STATUS_EXTENSION).toBe(expectedOmpStatusExtension)
       })
 
       it('threads command: "omp" through to piBuildPtyEnv on the daemon path with OMP status metadata', async () => {
@@ -1441,13 +1443,13 @@ describe('registerPtyHandlers', () => {
           'omp'
         )
         expect(env.PI_CODING_AGENT_DIR).toBe('/user/.omp/agent')
-        expect(env.ORCA_OMP_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_OMP_STATUS_EXTENSION).toBe(
-          '/user/.omp/agent/extensions/orca-agent-status.ts'
+        expect(env.PEBBLE_OMP_CODING_AGENT_DIR).toBeUndefined()
+        expect(env.PEBBLE_OMP_STATUS_EXTENSION).toBe(
+          '/user/.omp/agent/extensions/pebble-agent-status.ts'
         )
-        expect(env.ORCA_OMP_SOURCE_AGENT_DIR).toBe('/user/.omp/agent')
-        expect(env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBeUndefined()
+        expect(env.PEBBLE_OMP_SOURCE_AGENT_DIR).toBe('/user/.omp/agent')
+        expect(env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
+        expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBeUndefined()
       })
 
       it('uses sequenced startup env as the daemon OMP launch hint when command is a wrapper', async () => {
@@ -1467,16 +1469,16 @@ describe('registerPtyHandlers', () => {
           '/user/.omp/agent',
           'omp'
         )
-        expect(env.ORCA_OMP_STATUS_EXTENSION).toBe(
-          '/user/.omp/agent/extensions/orca-agent-status.ts'
+        expect(env.PEBBLE_OMP_STATUS_EXTENSION).toBe(
+          '/user/.omp/agent/extensions/pebble-agent-status.ts'
         )
-        expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBeUndefined()
+        expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBeUndefined()
       })
 
       it('injects the selected Codex home on the daemon path', async () => {
         const env = await daemonSpawnAndGetEnv({}, () => TEST_CODEX_HOME)
         expect(env.CODEX_HOME).toBe(TEST_CODEX_HOME)
-        expect(env.ORCA_CODEX_HOME).toBe(TEST_CODEX_HOME)
+        expect(env.PEBBLE_CODEX_HOME).toBe(TEST_CODEX_HOME)
       })
 
       it('injects explicit proxy settings on the daemon path', async () => {
@@ -1499,11 +1501,11 @@ describe('registerPtyHandlers', () => {
         try {
           const spawnOptions = await daemonSpawnAndGetOptions(
             {},
-            () => 'C:\\Users\\test\\AppData\\Roaming\\Orca\\codex-runtime-home\\home',
+            () => 'C:\\Users\\test\\AppData\\Roaming\\Pebble\\codex-runtime-home\\home',
             undefined,
             {
-              CODEX_HOME: 'C:\\Users\\test\\AppData\\Roaming\\Orca\\codex-runtime-home\\home',
-              ORCA_CODEX_HOME: 'C:\\Users\\test\\AppData\\Roaming\\Orca\\codex-runtime-home\\home'
+              CODEX_HOME: 'C:\\Users\\test\\AppData\\Roaming\\Pebble\\codex-runtime-home\\home',
+              PEBBLE_CODEX_HOME: 'C:\\Users\\test\\AppData\\Roaming\\Pebble\\codex-runtime-home\\home'
             },
             {
               cwd: '\\\\wsl.localhost\\Ubuntu\\home\\test\\repo',
@@ -1512,9 +1514,9 @@ describe('registerPtyHandlers', () => {
           )
           const { env } = spawnOptions
           expect(env.CODEX_HOME).toBeUndefined()
-          expect(env.ORCA_CODEX_HOME).toBeUndefined()
+          expect(env.PEBBLE_CODEX_HOME).toBeUndefined()
           expect(spawnOptions.envToDelete).toEqual(
-            expect.arrayContaining(['CODEX_HOME', 'ORCA_CODEX_HOME'])
+            expect.arrayContaining(['CODEX_HOME', 'PEBBLE_CODEX_HOME'])
           )
         } finally {
           Object.defineProperty(process, 'platform', {
@@ -1533,18 +1535,18 @@ describe('registerPtyHandlers', () => {
         try {
           const spawnOptions = await daemonSpawnAndGetOptions(
             {},
-            () => 'C:\\Users\\test\\AppData\\Roaming\\Orca\\codex-runtime-home\\home',
+            () => 'C:\\Users\\test\\AppData\\Roaming\\Pebble\\codex-runtime-home\\home',
             undefined,
             {
               CODEX_HOME: 'C:\\Users\\test\\.codex',
-              ORCA_CODEX_HOME: 'C:\\Users\\test\\AppData\\Roaming\\Orca\\codex-runtime-home\\home'
+              PEBBLE_CODEX_HOME: 'C:\\Users\\test\\AppData\\Roaming\\Pebble\\codex-runtime-home\\home'
             },
             { shellOverride: 'wsl.exe' }
           )
           expect(spawnOptions.env.CODEX_HOME).toBeUndefined()
-          expect(spawnOptions.env.ORCA_CODEX_HOME).toBeUndefined()
+          expect(spawnOptions.env.PEBBLE_CODEX_HOME).toBeUndefined()
           expect(spawnOptions.envToDelete).toEqual(
-            expect.arrayContaining(['CODEX_HOME', 'ORCA_CODEX_HOME'])
+            expect.arrayContaining(['CODEX_HOME', 'PEBBLE_CODEX_HOME'])
           )
         } finally {
           Object.defineProperty(process, 'platform', {
@@ -1556,21 +1558,21 @@ describe('registerPtyHandlers', () => {
 
       it('injects the agent-hook receiver env on the daemon path', async () => {
         const env = await daemonSpawnAndGetEnv({})
-        expect(env.ORCA_AGENT_HOOK_PORT).toBe('5678')
-        expect(env.ORCA_AGENT_HOOK_TOKEN).toBe('agent-token')
+        expect(env.PEBBLE_AGENT_HOOK_PORT).toBe('5678')
+        expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBe('agent-token')
       })
 
       it('deletes stale Claude scoped settings env from daemon-hosted PTYs', async () => {
         const spawnOptions = await daemonSpawnAndGetOptions({}, undefined, undefined, {
-          ORCA_CLAUDE_AGENT_STATUS_SETTINGS:
-            '/tmp/orca/agent-hooks/claude-agent-status-settings.json'
+          PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS:
+            '/tmp/pebble/agent-hooks/claude-agent-status-settings.json'
         })
-        expect(spawnOptions.env.ORCA_CLAUDE_AGENT_STATUS_SETTINGS).toBeUndefined()
+        expect(spawnOptions.env.PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS).toBeUndefined()
         expect(spawnOptions.envToDelete).toEqual(
-          expect.arrayContaining(['ORCA_CLAUDE_AGENT_STATUS_SETTINGS'])
+          expect.arrayContaining(['PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS'])
         )
-        expect(spawnOptions.env.ORCA_AGENT_HOOK_PORT).toBe('5678')
-        expect(spawnOptions.env.ORCA_AGENT_HOOK_TOKEN).toBe('agent-token')
+        expect(spawnOptions.env.PEBBLE_AGENT_HOOK_PORT).toBe('5678')
+        expect(spawnOptions.env.PEBBLE_AGENT_HOOK_TOKEN).toBe('agent-token')
       })
 
       it('deletes stale Claude scoped settings env from runtime-created daemon PTYs', async () => {
@@ -1592,8 +1594,8 @@ describe('registerPtyHandlers', () => {
           onPtyExit: vi.fn(),
           onPtyData: vi.fn()
         }
-        process.env.ORCA_CLAUDE_AGENT_STATUS_SETTINGS =
-          '/tmp/orca/agent-hooks/claude-agent-status-settings.json'
+        process.env.PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS =
+          '/tmp/pebble/agent-hooks/claude-agent-status-settings.json'
         handlers.clear()
         registerPtyHandlers(mainWindow as never, runtime as never)
         const controller = runtime.setPtyController.mock.calls[0]?.[0] as RuntimeSpawnController
@@ -1601,12 +1603,12 @@ describe('registerPtyHandlers', () => {
         await controller.spawn({ cols: 80, rows: 24, worktreeId: 'wt-runtime', env: {} })
 
         const spawnOptions = daemonSpawn.mock.calls.at(-1)?.[0] as DaemonSpawnCall
-        expect(spawnOptions.env.ORCA_CLAUDE_AGENT_STATUS_SETTINGS).toBeUndefined()
+        expect(spawnOptions.env.PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS).toBeUndefined()
         expect(spawnOptions.envToDelete).toEqual(
-          expect.arrayContaining(['ORCA_CLAUDE_AGENT_STATUS_SETTINGS'])
+          expect.arrayContaining(['PEBBLE_CLAUDE_AGENT_STATUS_SETTINGS'])
         )
-        expect(spawnOptions.env.ORCA_AGENT_HOOK_PORT).toBe('5678')
-        expect(spawnOptions.env.ORCA_AGENT_HOOK_TOKEN).toBe('agent-token')
+        expect(spawnOptions.env.PEBBLE_AGENT_HOOK_PORT).toBe('5678')
+        expect(spawnOptions.env.PEBBLE_AGENT_HOOK_TOKEN).toBe('agent-token')
       })
 
       it('uses the owning project WSL runtime for runtime-created daemon PTYs', async () => {
@@ -1748,21 +1750,21 @@ describe('registerPtyHandlers', () => {
           worktreeId: 'wt-runtime',
           command: 'claude',
           env: {
-            PATH: `/tmp/orca-agent-teams-bin${delimiter}/usr/bin`,
-            ORCA_AGENT_TEAMS_TEAM_ID: 'team-test',
-            TERM_PROGRAM: 'Orca',
-            ORCA_ATTRIBUTION_SHIM_DIR: '/tmp/stale-attribution'
+            PATH: `/tmp/pebble-agent-teams-bin${delimiter}/usr/bin`,
+            PEBBLE_AGENT_TEAMS_TEAM_ID: 'team-test',
+            TERM_PROGRAM: 'Pebble',
+            PEBBLE_ATTRIBUTION_SHIM_DIR: '/tmp/stale-attribution'
           },
-          envToDelete: ['TERM_PROGRAM', 'ORCA_ATTRIBUTION_SHIM_DIR']
+          envToDelete: ['TERM_PROGRAM', 'PEBBLE_ATTRIBUTION_SHIM_DIR']
         })
 
         const spawnOptions = daemonSpawn.mock.calls.at(-1)?.[0] as DaemonSpawnCall
-        expect(spawnOptions.env.PATH.split(delimiter)[0]).toBe('/tmp/orca-agent-teams-bin')
+        expect(spawnOptions.env.PATH.split(delimiter)[0]).toBe('/tmp/pebble-agent-teams-bin')
         expect(spawnOptions.env.PATH).toContain(expectedAttributionShimDir)
         expect(spawnOptions.env.TERM_PROGRAM).toBeUndefined()
-        expect(spawnOptions.env.ORCA_ATTRIBUTION_SHIM_DIR).toBeUndefined()
+        expect(spawnOptions.env.PEBBLE_ATTRIBUTION_SHIM_DIR).toBeUndefined()
         expect(spawnOptions.envToDelete).toEqual(
-          expect.arrayContaining(['TERM_PROGRAM', 'ORCA_ATTRIBUTION_SHIM_DIR'])
+          expect.arrayContaining(['TERM_PROGRAM', 'PEBBLE_ATTRIBUTION_SHIM_DIR'])
         )
       })
 
@@ -1773,11 +1775,11 @@ describe('registerPtyHandlers', () => {
         mockedApp.isPackaged = false
         try {
           const env = await daemonSpawnAndGetEnv({}, undefined, undefined, {
-            ORCA_AGENT_HOOK_ENDPOINT: '/tmp/stale-endpoint.env'
+            PEBBLE_AGENT_HOOK_ENDPOINT: '/tmp/stale-endpoint.env'
           })
-          expect(env.ORCA_AGENT_HOOK_ENDPOINT).toBeUndefined()
-          expect(env.ORCA_AGENT_HOOK_PORT).toBe('5678')
-          expect(env.ORCA_AGENT_HOOK_TOKEN).toBe('agent-token')
+          expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toBeUndefined()
+          expect(env.PEBBLE_AGENT_HOOK_PORT).toBe('5678')
+          expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBe('agent-token')
         } finally {
           mockedApp.isPackaged = prev
         }
@@ -1787,37 +1789,37 @@ describe('registerPtyHandlers', () => {
         const env = await daemonSpawnAndGetEnv({}, undefined, () => ({
           enableGitHubAttribution: true
         }))
-        expect(env.ORCA_ENABLE_GIT_ATTRIBUTION).toBe('1')
+        expect(env.PEBBLE_ENABLE_GIT_ATTRIBUTION).toBe('1')
         expect(env.PATH).toContain(expectedAttributionShimDir)
       })
 
       it('keeps the Agent Teams tmux shim ahead of host PATH shims on daemon pty:spawn', async () => {
         const spawnOptions = await daemonSpawnAndGetOptions(
           {
-            PATH: `/tmp/orca-agent-teams-bin${delimiter}/usr/bin`,
-            ORCA_AGENT_TEAMS_TEAM_ID: 'team-test',
-            TERM_PROGRAM: 'Orca',
-            ORCA_ATTRIBUTION_SHIM_DIR: '/tmp/stale-attribution'
+            PATH: `/tmp/pebble-agent-teams-bin${delimiter}/usr/bin`,
+            PEBBLE_AGENT_TEAMS_TEAM_ID: 'team-test',
+            TERM_PROGRAM: 'Pebble',
+            PEBBLE_ATTRIBUTION_SHIM_DIR: '/tmp/stale-attribution'
           },
           undefined,
           () => ({ enableGitHubAttribution: true }),
           undefined,
           {
             command: 'claude',
-            envToDelete: ['TERM_PROGRAM', 'ORCA_ATTRIBUTION_SHIM_DIR']
+            envToDelete: ['TERM_PROGRAM', 'PEBBLE_ATTRIBUTION_SHIM_DIR']
           }
         )
 
-        expect(spawnOptions.env.PATH.split(delimiter)[0]).toBe('/tmp/orca-agent-teams-bin')
+        expect(spawnOptions.env.PATH.split(delimiter)[0]).toBe('/tmp/pebble-agent-teams-bin')
         expect(spawnOptions.env.PATH).toContain(expectedAttributionShimDir)
         expect(spawnOptions.env.TERM_PROGRAM).toBeUndefined()
-        expect(spawnOptions.env.ORCA_ATTRIBUTION_SHIM_DIR).toBeUndefined()
+        expect(spawnOptions.env.PEBBLE_ATTRIBUTION_SHIM_DIR).toBeUndefined()
         expect(spawnOptions.envToDelete).toEqual(
-          expect.arrayContaining(['TERM_PROGRAM', 'ORCA_ATTRIBUTION_SHIM_DIR'])
+          expect.arrayContaining(['TERM_PROGRAM', 'PEBBLE_ATTRIBUTION_SHIM_DIR'])
         )
       })
 
-      it('injects dev-mode ORCA_USER_DATA_PATH + dev CLI PATH on the daemon path', async () => {
+      it('injects dev-mode PEBBLE_USER_DATA_PATH + dev CLI PATH on the daemon path', async () => {
         // Why: the mocked `app` (see vi.mock at the top of the file) is a
         // plain object, so we can flip isPackaged for the scope of the test.
         const { app } = await import('electron')
@@ -1826,8 +1828,8 @@ describe('registerPtyHandlers', () => {
         mockedApp.isPackaged = false
         try {
           const env = await daemonSpawnAndGetEnv({ PATH: '/usr/bin' })
-          expect(env.ORCA_USER_DATA_PATH).toBe('/tmp/orca-user-data')
-          expect(env.PATH).toContain(join('/tmp/orca-user-data', 'cli', 'bin'))
+          expect(env.PEBBLE_USER_DATA_PATH).toBe('/tmp/pebble-user-data')
+          expect(env.PATH).toContain(join('/tmp/pebble-user-data', 'cli', 'bin'))
         } finally {
           mockedApp.isPackaged = prev
         }
@@ -1842,9 +1844,9 @@ describe('registerPtyHandlers', () => {
           const env = await daemonSpawnAndGetEnv({}, undefined, undefined, {
             PATH: '/system/bin'
           })
-          expect(env.ORCA_USER_DATA_PATH).toBe('/tmp/orca-user-data')
+          expect(env.PEBBLE_USER_DATA_PATH).toBe('/tmp/pebble-user-data')
           expect(env.PATH).toContain(
-            `${join('/tmp/orca-user-data', 'cli', 'bin')}${delimiter}/system/bin`
+            `${join('/tmp/pebble-user-data', 'cli', 'bin')}${delimiter}/system/bin`
           )
         } finally {
           mockedApp.isPackaged = prev
@@ -1907,7 +1909,7 @@ describe('registerPtyHandlers', () => {
         // existing-agent-dir guard stays consistent whether Pi's env was
         // carried on the IPC wire or inherited by the daemon via fork. The
         // fallback must reach piTitlebarExtensionService.buildPtyEnv as the
-        // second arg so Orca installs managed extensions in the user's root.
+        // second arg so Pebble installs managed extensions in the user's root.
         const env = await daemonSpawnAndGetEnv({}, undefined, undefined, {
           PI_CODING_AGENT_DIR: '/ambient/pi/agent'
         })
@@ -1917,22 +1919,22 @@ describe('registerPtyHandlers', () => {
           'pi'
         )
         expect(env.PI_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBe('/ambient/pi/agent')
+        expect(env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
+        expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBe('/ambient/pi/agent')
       })
 
       it('skips attribution shims on the daemon path when the setting is disabled', async () => {
         const env = await daemonSpawnAndGetEnv({ PATH: '/usr/bin' }, undefined, () => ({
           enableGitHubAttribution: false
         }))
-        expect(env.ORCA_ENABLE_GIT_ATTRIBUTION).toBeUndefined()
+        expect(env.PEBBLE_ENABLE_GIT_ATTRIBUTION).toBeUndefined()
         expect(env.PATH ?? '').not.toContain(expectedAttributionShimDir)
       })
 
       it('does not mutate the caller-provided args.env on the daemon path', async () => {
         // Why: the handler clones baseEnv before calling buildPtyHostEnv so
         // IPC-provided env stays pristine. A regression would silently leak
-        // Orca host env (hook tokens, overlay paths) back into the renderer's
+        // Pebble host env (hook tokens, overlay paths) back into the renderer's
         // copy of the object, which it may reuse for unrelated IPC calls.
         const daemonSpawn = setupDaemonAdapter()
         const argsEnv: Record<string, string> = { FOO: 'bar' }
@@ -1947,7 +1949,7 @@ describe('registerPtyHandlers', () => {
         // Sanity: the spawn did receive the injected env, proving the test
         // isn't passing because buildPtyHostEnv never ran.
         const spawnEnv = daemonSpawn.mock.calls.at(-1)![0].env
-        expect(spawnEnv.ORCA_AGENT_HOOK_PORT).toBe('5678')
+        expect(spawnEnv.PEBBLE_AGENT_HOOK_PORT).toBe('5678')
         expect(spawnEnv).not.toBe(argsEnv)
       })
 
@@ -2079,7 +2081,7 @@ describe('registerPtyHandlers', () => {
         await handlers.get('pty:spawn')!(null, {
           cols: 80,
           rows: 24,
-          env: { FOO: 'bar', ORCA_PANE_KEY: makePaneKey('tab-1', leafId) },
+          env: { FOO: 'bar', PEBBLE_PANE_KEY: makePaneKey('tab-1', leafId) },
           connectionId: 'ssh-1',
           worktreeId: 'wt-1',
           tabId: 'tab-1',
@@ -2088,22 +2090,22 @@ describe('registerPtyHandlers', () => {
         const spawnOptions = sshSpawn.mock.calls.at(-1)![0]
         const env = spawnOptions.env
         // Why: every host-local var must be absent over SSH — the hook
-        // server is on the Orca host's 127.0.0.1, dev CLI / attribution /
+        // server is on the Pebble host's 127.0.0.1, dev CLI / attribution /
         // overlay / plugin-dir paths only exist on the local disk, so
         // shipping any of them to a remote shell is at best useless and at
         // worst a credential leak.
-        expect(env.ORCA_AGENT_HOOK_PORT).toBeUndefined()
-        expect(env.ORCA_AGENT_HOOK_TOKEN).toBeUndefined()
-        expect(env.ORCA_ENABLE_GIT_ATTRIBUTION).toBeUndefined()
+        expect(env.PEBBLE_AGENT_HOOK_PORT).toBeUndefined()
+        expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBeUndefined()
+        expect(env.PEBBLE_ENABLE_GIT_ATTRIBUTION).toBeUndefined()
         expect(env.OPENCODE_CONFIG_DIR).toBeUndefined()
-        expect(env.ORCA_OPENCODE_CONFIG_DIR).toBeUndefined()
-        expect(env.ORCA_OPENCODE_SOURCE_CONFIG_DIR).toBeUndefined()
+        expect(env.PEBBLE_OPENCODE_CONFIG_DIR).toBeUndefined()
+        expect(env.PEBBLE_OPENCODE_SOURCE_CONFIG_DIR).toBeUndefined()
         expect(env.MIMOCODE_HOME).toBeUndefined()
-        expect(env.ORCA_MIMOCODE_HOME).toBeUndefined()
-        expect(env.ORCA_MIMOCODE_SOURCE_HOME).toBeUndefined()
+        expect(env.PEBBLE_MIMOCODE_HOME).toBeUndefined()
+        expect(env.PEBBLE_MIMOCODE_SOURCE_HOME).toBeUndefined()
         expect(env.PI_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBeUndefined()
+        expect(env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
+        expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBeUndefined()
         expect(env.CODEX_HOME).toBeUndefined()
         expect(env.HTTP_PROXY).toBeUndefined()
         expect(env.HTTPS_PROXY).toBeUndefined()
@@ -2135,7 +2137,7 @@ describe('registerPtyHandlers', () => {
         await handlers.get('pty:spawn')!(null, {
           cols: 80,
           rows: 24,
-          env: { ORCA_PANE_KEY: 'tab-1:pane:1' },
+          env: { PEBBLE_PANE_KEY: 'tab-1:pane:1' },
           connectionId: 'ssh-1',
           worktreeId: 'wt-1',
           tabId: 'tab-1',
@@ -2143,7 +2145,7 @@ describe('registerPtyHandlers', () => {
         })
         expect(store.upsertSshRemotePtyLease).toHaveBeenCalledTimes(1)
         const legacySpawnOptions = sshSpawn.mock.calls.at(-1)?.[0]
-        expect(legacySpawnOptions?.env.ORCA_PANE_KEY).toBeUndefined()
+        expect(legacySpawnOptions?.env.PEBBLE_PANE_KEY).toBeUndefined()
         expect(legacySpawnOptions?.paneKey).toBeUndefined()
         expect(legacySpawnOptions?.tabId).toBe('tab-1')
         expect(store.upsertSshRemotePtyLease.mock.calls[0]?.[0]).not.toHaveProperty('leafId')
@@ -2925,7 +2927,7 @@ describe('registerPtyHandlers', () => {
         expect(runtime.onPtyExit).toHaveBeenCalledWith('remote-pty', -1)
       })
 
-      it('strips ORCA_PANE_KEY/TAB_ID/WORKTREE_ID from SSH spawn env when remote agent hooks are disabled', async () => {
+      it('strips PEBBLE_PANE_KEY/TAB_ID/WORKTREE_ID from SSH spawn env when remote agent hooks are disabled', async () => {
         const sshSpawn = vi.fn(async (_opts: { env: Record<string, string> }) => ({
           id: 'ssh-pty'
         }))
@@ -2953,39 +2955,39 @@ describe('registerPtyHandlers', () => {
         } as never)
         handlers.clear()
         registerPtyHandlers(mainWindow as never)
-        const prevFlag = process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS
-        process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS = '0'
+        const prevFlag = process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS
+        process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS = '0'
         try {
           await handlers.get('pty:spawn')!(null, {
             cols: 80,
             rows: 24,
             env: {
               FOO: 'bar',
-              ORCA_PANE_KEY: 'tab-1:0',
-              ORCA_TAB_ID: 'tab-1',
-              ORCA_WORKTREE_ID: 'wt-1'
+              PEBBLE_PANE_KEY: 'tab-1:0',
+              PEBBLE_TAB_ID: 'tab-1',
+              PEBBLE_WORKTREE_ID: 'wt-1'
             },
             connectionId: 'ssh-1'
           })
           const env = sshSpawn.mock.calls.at(-1)![0].env
           expect(env.FOO).toBe('bar')
-          expect(env.ORCA_PANE_KEY).toBeUndefined()
-          expect(env.ORCA_TAB_ID).toBeUndefined()
-          expect(env.ORCA_WORKTREE_ID).toBeUndefined()
-          expect(env.ORCA_AGENT_HOOK_TOKEN).toBeUndefined()
+          expect(env.PEBBLE_PANE_KEY).toBeUndefined()
+          expect(env.PEBBLE_TAB_ID).toBeUndefined()
+          expect(env.PEBBLE_WORKTREE_ID).toBeUndefined()
+          expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBeUndefined()
           // Why: the local hook server's userData-relative endpoint file path
           // is meaningless on the remote box; assert it does not leak.
-          expect(env.ORCA_AGENT_HOOK_ENDPOINT).toBeUndefined()
+          expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toBeUndefined()
         } finally {
           if (prevFlag === undefined) {
-            delete process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS
+            delete process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS
           } else {
-            process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS = prevFlag
+            process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS = prevFlag
           }
         }
       })
 
-      it('forwards ORCA_PANE_KEY/TAB_ID/WORKTREE_ID over SSH by default', async () => {
+      it('forwards PEBBLE_PANE_KEY/TAB_ID/WORKTREE_ID over SSH by default', async () => {
         const sshSpawn = vi.fn(async (_opts: { env: Record<string, string> }) => ({
           id: 'ssh-pty'
         }))
@@ -3013,8 +3015,8 @@ describe('registerPtyHandlers', () => {
         } as never)
         handlers.clear()
         registerPtyHandlers(mainWindow as never)
-        const prevFlag = process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS
-        delete process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS
+        const prevFlag = process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS
+        delete process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS
         try {
           const leafId = '22222222-2222-4222-8222-222222222222'
           const paneKey = makePaneKey('tab-2', leafId)
@@ -3023,28 +3025,28 @@ describe('registerPtyHandlers', () => {
             rows: 24,
             env: {
               FOO: 'bar',
-              ORCA_PANE_KEY: paneKey,
-              ORCA_TAB_ID: 'tab-2',
-              ORCA_WORKTREE_ID: 'wt-2'
+              PEBBLE_PANE_KEY: paneKey,
+              PEBBLE_TAB_ID: 'tab-2',
+              PEBBLE_WORKTREE_ID: 'wt-2'
             },
             connectionId: 'ssh-1',
             tabId: 'tab-2',
             leafId
           })
           const env = sshSpawn.mock.calls.at(-1)![0].env
-          expect(env.ORCA_PANE_KEY).toBe(paneKey)
-          expect(env.ORCA_TAB_ID).toBe('tab-2')
-          expect(env.ORCA_WORKTREE_ID).toBe('wt-2')
+          expect(env.PEBBLE_PANE_KEY).toBe(paneKey)
+          expect(env.PEBBLE_TAB_ID).toBe('tab-2')
+          expect(env.PEBBLE_WORKTREE_ID).toBe('wt-2')
           // Local hook server coords still must NOT cross the wire — the
           // relay is the source of truth for those.
-          expect(env.ORCA_AGENT_HOOK_TOKEN).toBeUndefined()
-          expect(env.ORCA_AGENT_HOOK_PORT).toBeUndefined()
-          expect(env.ORCA_AGENT_HOOK_ENDPOINT).toBeUndefined()
+          expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBeUndefined()
+          expect(env.PEBBLE_AGENT_HOOK_PORT).toBeUndefined()
+          expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toBeUndefined()
         } finally {
           if (prevFlag === undefined) {
-            delete process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS
+            delete process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS
           } else {
-            process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS = prevFlag
+            process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS = prevFlag
           }
         }
       })
@@ -3988,7 +3990,7 @@ describe('registerPtyHandlers', () => {
     })
   })
 
-  it('injects ORCA_TERMINAL_HANDLE for non-local PTY providers', async () => {
+  it('injects PEBBLE_TERMINAL_HANDLE for non-local PTY providers', async () => {
     const spawn = vi.fn(async () => ({ id: 'remote-pty' }))
     registerSshPtyProvider('ssh-1', {
       spawn,
@@ -4029,7 +4031,7 @@ describe('registerPtyHandlers', () => {
       expect.objectContaining({
         env: expect.objectContaining({
           EXISTING: '1',
-          ORCA_TERMINAL_HANDLE: 'term_remote'
+          PEBBLE_TERMINAL_HANDLE: 'term_remote'
         })
       })
     )
@@ -4048,10 +4050,10 @@ describe('registerPtyHandlers', () => {
         env: {
           CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
           PATH: `/tmp/fresh-agent-teams${delimiter}/usr/bin`,
-          TMUX: '/tmp/orca-claude-agent-teams/team-fresh,0,1',
+          TMUX: '/tmp/pebble-claude-agent-teams/team-fresh,0,1',
           TMUX_PANE: '%1',
-          ORCA_AGENT_TEAMS_TEAM_ID: 'team-fresh',
-          ORCA_AGENT_TEAMS_TOKEN: 'fresh-token'
+          PEBBLE_AGENT_TEAMS_TEAM_ID: 'team-fresh',
+          PEBBLE_AGENT_TEAMS_TOKEN: 'fresh-token'
         }
       })),
       registerPreAllocatedHandleForPty: vi.fn(),
@@ -4072,24 +4074,24 @@ describe('registerPtyHandlers', () => {
       leafId,
       worktreeId: 'wt-1',
       env: {
-        ORCA_PANE_KEY: `tab-1:${leafId}`,
-        ORCA_TAB_ID: 'tab-1',
-        ORCA_WORKTREE_ID: 'wt-1',
+        PEBBLE_PANE_KEY: `tab-1:${leafId}`,
+        PEBBLE_TAB_ID: 'tab-1',
+        PEBBLE_WORKTREE_ID: 'wt-1',
         CLAUDE_PROFILE: 'captured',
         PATH: `/tmp/stale-agent-teams${delimiter}/usr/bin`,
-        TMUX: '/tmp/orca-claude-agent-teams/team-stale,0,1',
-        ORCA_AGENT_TEAMS_TEAM_ID: 'team-stale',
-        ORCA_AGENT_TEAMS_TOKEN: 'stale-token',
-        TERM_PROGRAM: 'Orca',
-        ORCA_ATTRIBUTION_SHIM_DIR: '/tmp/stale-attribution'
+        TMUX: '/tmp/pebble-claude-agent-teams/team-stale,0,1',
+        PEBBLE_AGENT_TEAMS_TEAM_ID: 'team-stale',
+        PEBBLE_AGENT_TEAMS_TOKEN: 'stale-token',
+        TERM_PROGRAM: 'Pebble',
+        PEBBLE_ATTRIBUTION_SHIM_DIR: '/tmp/stale-attribution'
       },
       launchConfig: {
         agentCommand: 'claude --teammate-mode auto',
         agentArgs: '',
         agentEnv: {
           CLAUDE_PROFILE: 'captured',
-          ORCA_AGENT_TEAMS_TEAM_ID: 'team-stale',
-          ORCA_AGENT_TEAMS_TOKEN: 'stale-token'
+          PEBBLE_AGENT_TEAMS_TEAM_ID: 'team-stale',
+          PEBBLE_AGENT_TEAMS_TOKEN: 'stale-token'
         }
       },
       launchAgent: 'claude'
@@ -4100,27 +4102,27 @@ describe('registerPtyHandlers', () => {
       handle: 'term_agent_teams',
       baseEnv: expect.objectContaining({
         CLAUDE_PROFILE: 'captured',
-        ORCA_AGENT_TEAMS_TEAM_ID: 'team-stale'
+        PEBBLE_AGENT_TEAMS_TEAM_ID: 'team-stale'
       })
     })
     expect(spawnOptions.env).toMatchObject({
       CLAUDE_PROFILE: 'captured',
       CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-      ORCA_TERMINAL_HANDLE: 'term_agent_teams',
-      ORCA_AGENT_TEAMS_TEAM_ID: 'team-fresh',
-      ORCA_AGENT_TEAMS_TOKEN: 'fresh-token',
-      TMUX: '/tmp/orca-claude-agent-teams/team-fresh,0,1',
+      PEBBLE_TERMINAL_HANDLE: 'term_agent_teams',
+      PEBBLE_AGENT_TEAMS_TEAM_ID: 'team-fresh',
+      PEBBLE_AGENT_TEAMS_TOKEN: 'fresh-token',
+      TMUX: '/tmp/pebble-claude-agent-teams/team-fresh,0,1',
       TMUX_PANE: '%1'
     })
     expect(spawnOptions.env.PATH.split(delimiter)[0]).toBe('/tmp/fresh-agent-teams')
     expect(spawnOptions.env.TERM_PROGRAM).toBeUndefined()
-    expect(spawnOptions.env.ORCA_ATTRIBUTION_SHIM_DIR).toBeUndefined()
+    expect(spawnOptions.env.PEBBLE_ATTRIBUTION_SHIM_DIR).toBeUndefined()
     expect(result.launchConfig?.agentEnv).toMatchObject({
       CLAUDE_PROFILE: 'captured',
       CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-      ORCA_AGENT_TEAMS_TEAM_ID: 'team-fresh',
-      ORCA_AGENT_TEAMS_TOKEN: 'fresh-token',
-      TMUX: '/tmp/orca-claude-agent-teams/team-fresh,0,1'
+      PEBBLE_AGENT_TEAMS_TEAM_ID: 'team-fresh',
+      PEBBLE_AGENT_TEAMS_TOKEN: 'fresh-token',
+      TMUX: '/tmp/pebble-claude-agent-teams/team-fresh,0,1'
     })
     expect(runtime.registerPreAllocatedHandleForPty).toHaveBeenCalledWith(
       expect.any(String),
@@ -4136,8 +4138,8 @@ describe('registerPtyHandlers', () => {
       prepareClaudeAgentTeamsLeaderForHandle: vi.fn(async () => ({
         env: {
           CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-          ORCA_AGENT_TEAMS_TEAM_ID: 'team-fresh',
-          ORCA_AGENT_TEAMS_TOKEN: 'fresh-token'
+          PEBBLE_AGENT_TEAMS_TEAM_ID: 'team-fresh',
+          PEBBLE_AGENT_TEAMS_TOKEN: 'fresh-token'
         }
       })),
       registerPreAllocatedHandleForPty: vi.fn(),
@@ -4158,9 +4160,9 @@ describe('registerPtyHandlers', () => {
       leafId,
       worktreeId: 'wt-1',
       env: {
-        ORCA_PANE_KEY: `tab-1:${leafId}`,
-        ORCA_TAB_ID: 'tab-1',
-        ORCA_WORKTREE_ID: 'wt-1'
+        PEBBLE_PANE_KEY: `tab-1:${leafId}`,
+        PEBBLE_TAB_ID: 'tab-1',
+        PEBBLE_WORKTREE_ID: 'wt-1'
       },
       launchConfig: {
         agentCommand: 'claude',
@@ -4256,7 +4258,7 @@ describe('registerPtyHandlers', () => {
 
     const spawnCall = spawnMock.mock.calls.at(-1)!
     const env = spawnCall[2].env as Record<string, string>
-    expect(env.ORCA_TERMINAL_HANDLE).toBe('term_expected')
+    expect(env.PEBBLE_TERMINAL_HANDLE).toBe('term_expected')
     expect(runtime.preAllocateHandleForPty).not.toHaveBeenCalled()
     expect(runtime.registerPreAllocatedHandleForPty).toHaveBeenCalledWith(
       expect.any(String),
@@ -4349,7 +4351,7 @@ describe('registerPtyHandlers', () => {
       worktreeId: 'wt-1',
       tabId: 'tab-headless',
       leafId,
-      env: { ORCA_PANE_KEY: makePaneKey('tab-headless', leafId) },
+      env: { PEBBLE_PANE_KEY: makePaneKey('tab-headless', leafId) },
       persistHostSessionBinding: true
     })
 
@@ -4439,12 +4441,12 @@ describe('registerPtyHandlers', () => {
       worktreeId: 'repo-1::/tmp',
       tabId: 'tab-race',
       leafId,
-      env: { ORCA_PANE_KEY: paneKey },
+      env: { PEBBLE_PANE_KEY: paneKey },
       persistHostSessionBinding: true
     })
     await Promise.resolve()
 
-    // Why: SSH can strip ORCA_PANE_KEY before spawn; tab/leaf metadata must
+    // Why: SSH can strip PEBBLE_PANE_KEY before spawn; tab/leaf metadata must
     // still dedupe against runtime materialization.
     const rendererSpawn = handlers.get('pty:spawn')!(null, {
       cols: 80,
@@ -4454,8 +4456,8 @@ describe('registerPtyHandlers', () => {
       tabId: 'tab-race',
       leafId,
       env: {
-        ORCA_TAB_ID: 'tab-race',
-        ORCA_WORKTREE_ID: 'repo-1::/tmp'
+        PEBBLE_TAB_ID: 'tab-race',
+        PEBBLE_WORKTREE_ID: 'repo-1::/tmp'
       }
     }) as Promise<{ id: string }>
     await Promise.resolve()
@@ -4554,9 +4556,9 @@ describe('registerPtyHandlers', () => {
       tabId: 'tab-race',
       leafId,
       env: {
-        ORCA_PANE_KEY: paneKey,
-        ORCA_TAB_ID: 'tab-race',
-        ORCA_WORKTREE_ID: 'repo-1::/tmp'
+        PEBBLE_PANE_KEY: paneKey,
+        PEBBLE_TAB_ID: 'tab-race',
+        PEBBLE_WORKTREE_ID: 'repo-1::/tmp'
       }
     }) as Promise<{ id: string }>
     await Promise.resolve()
@@ -4569,7 +4571,7 @@ describe('registerPtyHandlers', () => {
       worktreeId: 'repo-1::/tmp',
       tabId: 'tab-race',
       leafId,
-      env: { ORCA_PANE_KEY: paneKey },
+      env: { PEBBLE_PANE_KEY: paneKey },
       persistHostSessionBinding: true
     })
     await Promise.resolve()
@@ -4703,7 +4705,7 @@ describe('registerPtyHandlers', () => {
       worktreeId: 'wt-1',
       tabId: 'tab-runtime-reservation',
       leafId,
-      env: { ORCA_PANE_KEY: paneKey },
+      env: { PEBBLE_PANE_KEY: paneKey },
       persistHostSessionBinding: true
     }
 
@@ -4991,8 +4993,8 @@ describe('registerPtyHandlers', () => {
         persistHostSessionBinding?: boolean
       }): Promise<{ id: string }>
     }
-    const savedRemoteHooks = process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS
-    process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS = '0'
+    const savedRemoteHooks = process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS
+    process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS = '0'
     const remoteSpawn = vi.fn(async (_opts: { env?: Record<string, string> }) => ({
       id: 'ssh:ssh-runtime-env@@relay-pty'
     }))
@@ -5051,9 +5053,9 @@ describe('registerPtyHandlers', () => {
         rows: 24,
         env: {
           FOO: 'bar',
-          ORCA_PANE_KEY: makePaneKey('tab-remote', leafId),
-          ORCA_TAB_ID: 'tab-remote',
-          ORCA_WORKTREE_ID: 'wt-remote'
+          PEBBLE_PANE_KEY: makePaneKey('tab-remote', leafId),
+          PEBBLE_TAB_ID: 'tab-remote',
+          PEBBLE_WORKTREE_ID: 'wt-remote'
         },
         connectionId: 'ssh-runtime-env',
         worktreeId: 'wt-remote',
@@ -5064,9 +5066,9 @@ describe('registerPtyHandlers', () => {
 
       const env = remoteSpawn.mock.calls[0]?.[0].env
       expect(env).toMatchObject({ FOO: 'bar' })
-      expect(env?.ORCA_PANE_KEY).toBeUndefined()
-      expect(env?.ORCA_TAB_ID).toBeUndefined()
-      expect(env?.ORCA_WORKTREE_ID).toBeUndefined()
+      expect(env?.PEBBLE_PANE_KEY).toBeUndefined()
+      expect(env?.PEBBLE_TAB_ID).toBeUndefined()
+      expect(env?.PEBBLE_WORKTREE_ID).toBeUndefined()
       expect(store.upsertSshRemotePtyLease).toHaveBeenCalledWith(
         expect.objectContaining({
           targetId: 'ssh-runtime-env',
@@ -5077,9 +5079,9 @@ describe('registerPtyHandlers', () => {
       )
     } finally {
       if (savedRemoteHooks === undefined) {
-        delete process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS
+        delete process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS
       } else {
-        process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS = savedRemoteHooks
+        process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS = savedRemoteHooks
       }
       unregisterSshPtyProvider('ssh-runtime-env')
     }
@@ -5165,7 +5167,7 @@ describe('registerPtyHandlers', () => {
         sessionId: 'ssh:ssh-reattach-fail@@relay-pty',
         persistHostSessionBinding: true
       })
-    ).rejects.toThrow(/ORCA_TERMINAL_SESSION_STATE_SAVE_FAILED/)
+    ).rejects.toThrow(/PEBBLE_TERMINAL_SESSION_STATE_SAVE_FAILED/)
 
     expect(store.upsertSshRemotePtyLease).not.toHaveBeenCalled()
     expect(store.removeSshRemotePtyLease).not.toHaveBeenCalled()
@@ -5463,7 +5465,7 @@ describe('registerPtyHandlers', () => {
           sessionId: appPtyId,
           persistHostSessionBinding: true
         })
-      ).rejects.toThrow(/ORCA_TERMINAL_SESSION_STATE_SAVE_FAILED/)
+      ).rejects.toThrow(/PEBBLE_TERMINAL_SESSION_STATE_SAVE_FAILED/)
 
       expect(remoteShutdown).toHaveBeenCalledWith(appPtyId, { immediate: true })
       expect(store.upsertSshRemotePtyLease).not.toHaveBeenCalled()
@@ -5508,7 +5510,7 @@ describe('registerPtyHandlers', () => {
       cols: 80,
       rows: 24,
       worktreeId: 'wt-1',
-      env: { ORCA_PANE_KEY: ` ${paneKey} ` }
+      env: { PEBBLE_PANE_KEY: ` ${paneKey} ` }
     })
 
     expect(spawnController.hasRendererSerializer?.(result.id)).toBe(false)
@@ -5537,7 +5539,7 @@ describe('registerPtyHandlers', () => {
     expect(hasPendingRendererSerializerForPaneKey(paneKey)).toBe(false)
   })
 
-  it('ignores renderer-provided ORCA_TERMINAL_HANDLE for local PTY spawns', async () => {
+  it('ignores renderer-provided PEBBLE_TERMINAL_HANDLE for local PTY spawns', async () => {
     const runtime = {
       setPtyController: vi.fn(),
       preAllocateHandleForPty: vi.fn(() => 'term_trusted'),
@@ -5550,16 +5552,16 @@ describe('registerPtyHandlers', () => {
     await handlers.get('pty:spawn')!(null, {
       cols: 80,
       rows: 24,
-      env: { ORCA_TERMINAL_HANDLE: 'term_untrusted' }
+      env: { PEBBLE_TERMINAL_HANDLE: 'term_untrusted' }
     })
 
     const spawnCall = spawnMock.mock.calls.at(-1)!
     const env = spawnCall[2].env as Record<string, string>
-    expect(env.ORCA_TERMINAL_HANDLE).toBe('term_trusted')
+    expect(env.PEBBLE_TERMINAL_HANDLE).toBe('term_trusted')
     expect(runtime.preAllocateHandleForPty).toHaveBeenCalledWith(expect.any(String))
   })
 
-  it('forwards the trusted Orca terminal handle into managed WSL terminals', async () => {
+  it('forwards the trusted Pebble terminal handle into managed WSL terminals', async () => {
     const platform = Object.getOwnPropertyDescriptor(process, 'platform')
     Object.defineProperty(process, 'platform', {
       configurable: true,
@@ -5589,14 +5591,14 @@ describe('registerPtyHandlers', () => {
     const spawnCall = spawnMock.mock.calls.at(-1)!
     const env = spawnCall[2].env as Record<string, string>
     expect(spawnCall[0]).toBe('wsl.exe')
-    expect(env.ORCA_TERMINAL_HANDLE).toBe('term_wsl')
+    expect(env.PEBBLE_TERMINAL_HANDLE).toBe('term_wsl')
     expect(env.WSLENV?.split(':')).toEqual(
       expect.arrayContaining([
-        'ORCA_TERMINAL_HANDLE/u',
-        'ORCA_AGENT_HOOK_PORT/u',
-        'ORCA_AGENT_HOOK_TOKEN/u',
-        'ORCA_OMP_SOURCE_AGENT_DIR/p',
-        'ORCA_OMP_STATUS_EXTENSION/p',
+        'PEBBLE_TERMINAL_HANDLE/u',
+        'PEBBLE_AGENT_HOOK_PORT/u',
+        'PEBBLE_AGENT_HOOK_TOKEN/u',
+        'PEBBLE_OMP_SOURCE_AGENT_DIR/p',
+        'PEBBLE_OMP_STATUS_EXTENSION/p',
         'POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD'
       ])
     )
@@ -5988,7 +5990,7 @@ describe('registerPtyHandlers', () => {
       registerPtyHandlers(
         mainWindow as never,
         undefined,
-        () => 'C:\\Users\\test\\AppData\\Roaming\\Orca\\codex-runtime-home\\home',
+        () => 'C:\\Users\\test\\AppData\\Roaming\\Pebble\\codex-runtime-home\\home',
         () =>
           ({
             terminalWindowsShell: 'wsl.exe',
@@ -6000,7 +6002,7 @@ describe('registerPtyHandlers', () => {
       const spawnOptions = spawnMock.mock.calls.at(-1)?.[2] as { env: Record<string, string> }
       expect(spawnMock).toHaveBeenCalledWith('wsl.exe', expect.any(Array), expect.any(Object))
       expect(spawnOptions.env.CODEX_HOME).toBeUndefined()
-      expect(spawnOptions.env.ORCA_CODEX_HOME).toBeUndefined()
+      expect(spawnOptions.env.PEBBLE_CODEX_HOME).toBeUndefined()
     })
 
     it('keeps shellOverride priority for one-off tabs', async () => {
@@ -6010,7 +6012,7 @@ describe('registerPtyHandlers', () => {
       registerPtyHandlers(
         mainWindow as never,
         undefined,
-        () => 'C:\\Users\\test\\AppData\\Roaming\\Orca\\codex-runtime-home\\home',
+        () => 'C:\\Users\\test\\AppData\\Roaming\\Pebble\\codex-runtime-home\\home',
         () =>
           ({
             terminalWindowsShell: 'powershell.exe',
@@ -6026,7 +6028,7 @@ describe('registerPtyHandlers', () => {
       const spawnOptions = spawnMock.mock.calls.at(-1)?.[2] as { env: Record<string, string> }
       expect(spawnMock).toHaveBeenCalledWith('wsl.exe', expect.any(Array), expect.any(Object))
       expect(spawnOptions.env.CODEX_HOME).toBeUndefined()
-      expect(spawnOptions.env.ORCA_CODEX_HOME).toBeUndefined()
+      expect(spawnOptions.env.PEBBLE_CODEX_HOME).toBeUndefined()
     })
   })
 
@@ -6111,8 +6113,8 @@ describe('registerPtyHandlers', () => {
       })
       expect(shell).toBe('/bin/zsh')
       expect(args).toEqual(['-l'])
-      expect(options.env.ZDOTDIR).toBe('/tmp/orca-user-data/shell-ready/zsh')
-      expect(options.env.ORCA_ORIG_ZDOTDIR).toBe(process.env.HOME)
+      expect(options.env.ZDOTDIR).toBe('/tmp/pebble-user-data/shell-ready/zsh')
+      expect(options.env.PEBBLE_ORIG_ZDOTDIR).toBe(process.env.HOME)
     } finally {
       Object.defineProperty(process, 'platform', {
         configurable: true,
@@ -6134,7 +6136,7 @@ describe('registerPtyHandlers', () => {
   posixOnlyIt('wraps macOS spawns in login(1) with SHELL re-asserted via env(1)', async () => {
     const originalShell = process.env.SHELL
     // Re-enable the TCC login wrapper the suite-level beforeEach disables.
-    delete process.env.ORCA_DISABLE_MACOS_LOGIN_SHELL
+    delete process.env.PEBBLE_DISABLE_MACOS_LOGIN_SHELL
     process.env.SHELL = '/bin/zsh'
 
     try {
@@ -6151,7 +6153,7 @@ describe('registerPtyHandlers', () => {
       // The spawn env keeps the real shell so identity/name logic is intact.
       expect(options.env.SHELL).toBe('/bin/zsh')
     } finally {
-      process.env.ORCA_DISABLE_MACOS_LOGIN_SHELL = '1'
+      process.env.PEBBLE_DISABLE_MACOS_LOGIN_SHELL = '1'
       if (originalShell === undefined) {
         delete process.env.SHELL
       } else {
@@ -6174,10 +6176,10 @@ describe('registerPtyHandlers', () => {
       const [shell, args, options] = await spawnAndGetCall({ cwd: '/tmp' })
       expect(shell).toBe('/bin/zsh')
       expect(args).toEqual(['-l'])
-      expect(options.env.OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-config')
-      expect(options.env.ORCA_OPENCODE_CONFIG_DIR).toBe('/tmp/orca-opencode-config')
-      expect(options.env.ZDOTDIR).toBe('/tmp/orca-user-data/shell-ready/zsh')
-      expect(options.env.ORCA_SHELL_READY_MARKER).toBe('0')
+      expect(options.env.OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-config')
+      expect(options.env.PEBBLE_OPENCODE_CONFIG_DIR).toBe('/tmp/pebble-opencode-config')
+      expect(options.env.ZDOTDIR).toBe('/tmp/pebble-user-data/shell-ready/zsh')
+      expect(options.env.PEBBLE_SHELL_READY_MARKER).toBe('0')
     } finally {
       Object.defineProperty(process, 'platform', {
         configurable: true,
@@ -6201,9 +6203,9 @@ describe('registerPtyHandlers', () => {
     })
     process.env.SHELL = '/bin/zsh'
     openCodeBuildPtyEnvMock.mockImplementationOnce(() => ({
-      ORCA_OPENCODE_HOOK_PORT: '4567',
-      ORCA_OPENCODE_HOOK_TOKEN: 'opencode-token',
-      ORCA_OPENCODE_PTY_ID: 'test-pty'
+      PEBBLE_OPENCODE_HOOK_PORT: '4567',
+      PEBBLE_OPENCODE_HOOK_TOKEN: 'opencode-token',
+      PEBBLE_OPENCODE_PTY_ID: 'test-pty'
     }))
 
     try {
@@ -6214,12 +6216,12 @@ describe('registerPtyHandlers', () => {
       expect(shell).toBe('/bin/zsh')
       expect(args).toEqual(['-l'])
       expect(options.env.OPENCODE_CONFIG_DIR).toBeUndefined()
-      expect(options.env.ORCA_OPENCODE_CONFIG_DIR).toBeUndefined()
+      expect(options.env.PEBBLE_OPENCODE_CONFIG_DIR).toBeUndefined()
       expect(options.env.PI_CODING_AGENT_DIR).toBe('/tmp/user-pi-agent')
-      expect(options.env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
-      expect(options.env.ORCA_PI_SOURCE_AGENT_DIR).toBe('/tmp/user-pi-agent')
-      expect(options.env.ZDOTDIR).toBe('/tmp/orca-user-data/shell-ready/zsh')
-      expect(options.env.ORCA_SHELL_READY_MARKER).toBe('0')
+      expect(options.env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
+      expect(options.env.PEBBLE_PI_SOURCE_AGENT_DIR).toBe('/tmp/user-pi-agent')
+      expect(options.env.ZDOTDIR).toBe('/tmp/pebble-user-data/shell-ready/zsh')
+      expect(options.env.PEBBLE_SHELL_READY_MARKER).toBe('0')
     } finally {
       Object.defineProperty(process, 'platform', {
         configurable: true,
@@ -6312,7 +6314,7 @@ describe('registerPtyHandlers', () => {
         })
 
         const [, , options] = spawnMock.mock.calls[0]!
-        expect(options.env.ORCA_SHELL_READY_MARKER).toBe('0')
+        expect(options.env.PEBBLE_SHELL_READY_MARKER).toBe('0')
 
         await Promise.resolve()
         vi.advanceTimersByTime(49)
@@ -6345,7 +6347,7 @@ describe('registerPtyHandlers', () => {
       })
 
       const [, , options] = spawnMock.mock.calls[0]!
-      expect(options.env.ORCA_SHELL_READY_MARKER).toBe('1')
+      expect(options.env.PEBBLE_SHELL_READY_MARKER).toBe('1')
       expect(mockProc.proc.write).not.toHaveBeenCalled()
 
       mockProc.emitData('last login: today\r\n')
@@ -6353,7 +6355,7 @@ describe('registerPtyHandlers', () => {
       await Promise.resolve()
       expect(mockProc.proc.write).not.toHaveBeenCalled()
 
-      mockProc.emitData('\x1b]777;orca-shell-ready\x07')
+      mockProc.emitData('\x1b]777;pebble-shell-ready\x07')
       await Promise.resolve()
       vi.advanceTimersByTime(50)
       await Promise.resolve()
@@ -6384,7 +6386,7 @@ describe('registerPtyHandlers', () => {
           startupCommandDelivery: 'shell-ready'
         })
 
-        mockProc.emitData('\x1b]777;orca-shell-ready\x07\r\nuser@host % ')
+        mockProc.emitData('\x1b]777;pebble-shell-ready\x07\r\nuser@host % ')
         await Promise.resolve()
         vi.advanceTimersByTime(29)
         await Promise.resolve()
@@ -6414,10 +6416,10 @@ describe('registerPtyHandlers', () => {
       })
 
       const [, , options] = spawnMock.mock.calls[0]!
-      expect(options.env.ORCA_SHELL_READY_MARKER).toBe('1')
+      expect(options.env.PEBBLE_SHELL_READY_MARKER).toBe('1')
       expect(mockProc.proc.write).not.toHaveBeenCalled()
 
-      mockProc.emitData('\x1b]777;orca-shell-ready\x07')
+      mockProc.emitData('\x1b]777;pebble-shell-ready\x07')
       await Promise.resolve()
       vi.runAllTimers()
       await Promise.resolve()
@@ -7615,9 +7617,9 @@ describe('registerPtyHandlers', () => {
         expect.objectContaining({
           cwd: '/tmp',
           env: expect.objectContaining({
-            ORCA_OPENCODE_CONFIG_DIR: '/tmp/orca-opencode-config',
-            ORCA_SHELL_READY_MARKER: '0',
-            ZDOTDIR: '/tmp/orca-user-data/shell-ready/zsh'
+            PEBBLE_OPENCODE_CONFIG_DIR: '/tmp/pebble-opencode-config',
+            PEBBLE_SHELL_READY_MARKER: '0',
+            ZDOTDIR: '/tmp/pebble-user-data/shell-ready/zsh'
           })
         })
       )
@@ -7798,7 +7800,7 @@ describe('registerPtyHandlers', () => {
       worktreeId: 'wt-1',
       tabId: 'tab-1',
       leafId,
-      env: { ORCA_PANE_KEY: 'tab-1:0' }
+      env: { PEBBLE_PANE_KEY: 'tab-1:0' }
     })
 
     expect(registerPtyMock).toHaveBeenLastCalledWith(
@@ -7820,7 +7822,7 @@ describe('registerPtyHandlers', () => {
       worktreeId: 'wt-1',
       tabId: 'tab-1',
       leafId,
-      env: { ORCA_PANE_KEY: stablePaneKey }
+      env: { PEBBLE_PANE_KEY: stablePaneKey }
     })
 
     expect(registerPtyMock).toHaveBeenLastCalledWith(
@@ -7836,7 +7838,7 @@ describe('registerPtyHandlers', () => {
       worktreeId: 'wt-1',
       tabId: 'tab-1',
       leafId,
-      env: { ORCA_PANE_KEY: makePaneKey('tab-2', leafId) }
+      env: { PEBBLE_PANE_KEY: makePaneKey('tab-2', leafId) }
     })
 
     expect(registerPtyMock).toHaveBeenLastCalledWith(
@@ -7857,7 +7859,7 @@ describe('registerPtyHandlers', () => {
       worktreeId: 'wt-1',
       tabId: 'tab-1',
       leafId,
-      env: { ORCA_PANE_KEY: stablePaneKey }
+      env: { PEBBLE_PANE_KEY: stablePaneKey }
     })) as { id: string }
     const second = (await handlers.get('pty:spawn')!(null, {
       cols: 80,
@@ -7865,7 +7867,7 @@ describe('registerPtyHandlers', () => {
       worktreeId: 'wt-1',
       tabId: 'tab-1',
       leafId,
-      env: { ORCA_PANE_KEY: stablePaneKey }
+      env: { PEBBLE_PANE_KEY: stablePaneKey }
     })) as { id: string }
 
     expect(getPtyIdForPaneKey(stablePaneKey)).toBe(second.id)
@@ -7891,7 +7893,7 @@ describe('registerPtyHandlers', () => {
       worktreeId: 'wt-1',
       tabId: 'tab-1',
       leafId,
-      env: { ORCA_PANE_KEY: stablePaneKey }
+      env: { PEBBLE_PANE_KEY: stablePaneKey }
     })) as { id: string }
 
     expect(getPtyIdForPaneKey(stablePaneKey)).toBe(current.id)
@@ -7933,9 +7935,9 @@ describe('registerPtyHandlers', () => {
           cwd: '/tmp',
           env: expect.objectContaining({
             SHELL: '/bin/zsh',
-            ORCA_OPENCODE_CONFIG_DIR: '/tmp/orca-opencode-config',
-            ORCA_SHELL_READY_MARKER: '0',
-            ZDOTDIR: '/tmp/orca-user-data/shell-ready/zsh'
+            PEBBLE_OPENCODE_CONFIG_DIR: '/tmp/pebble-opencode-config',
+            PEBBLE_SHELL_READY_MARKER: '0',
+            ZDOTDIR: '/tmp/pebble-user-data/shell-ready/zsh'
           })
         })
       )

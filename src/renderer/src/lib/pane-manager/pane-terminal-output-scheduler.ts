@@ -90,7 +90,7 @@ const SYNCHRONIZED_OUTPUT_END_SEQUENCE = '\x1b[?2026l'
 // Why: CAN aborts a partial escape sequence before resetting style and showing
 // the lossy-backlog warning.
 const BACKGROUND_BACKLOG_WARNING =
-  '\x18\x1b[0m\r\n[Orca skipped hidden terminal output because the backlog exceeded 2 MB.]\r\n'
+  '\x18\x1b[0m\r\n[Pebble skipped hidden terminal output because the backlog exceeded 2 MB.]\r\n'
 
 const queuedByTerminal = new Map<TerminalOutputTarget, QueueEntry>()
 const backlogRecoveryByTerminal = new WeakMap<

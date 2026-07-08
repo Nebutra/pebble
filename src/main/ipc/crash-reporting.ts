@@ -21,7 +21,7 @@ import {
   recordCrashBreadcrumb
 } from '../crash-reporting/crash-breadcrumb-store'
 import { collectDiagnosticBundle, getDiagnosticsStatus } from '../observability'
-import { resolveDiagnosticOrcaChannel } from '../observability/diagnostic-upload-endpoint'
+import { resolveDiagnosticPebbleChannel } from '../observability/diagnostic-upload-endpoint'
 import { startSpan } from '../observability/tracer'
 import type { FeedbackDiagnosticBundleAttachment } from './feedback'
 import {
@@ -352,7 +352,7 @@ function collectCrashDiagnosticBundleAttachment(): CrashDiagnosticBundleAttachme
       platform: os.platform(),
       arch: os.arch(),
       osRelease: os.release(),
-      orcaChannel: resolveDiagnosticOrcaChannel(),
+      pebbleChannel: resolveDiagnosticPebbleChannel(),
       // Why: Help > Report Crash is often used after relaunch, long after the
       // default 30 minute support bundle window would miss the failure context.
       lookbackMinutes: CRASH_REPORT_LOG_LOOKBACK_MINUTES

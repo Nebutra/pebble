@@ -78,7 +78,7 @@ export function printResult<TResult>(
 export function formatCliError(error: unknown, context: CliErrorContext = {}): string {
   const message = error instanceof Error ? error.message : String(error)
   if (error instanceof RuntimeClientError && error.code === 'runtime_unavailable') {
-    return `${message}\nOrca is not running. Run 'orca open' first.`
+    return `${message}\nPebble is not running. Run 'pebble open' first.`
   }
   if (
     error instanceof RuntimeClientError &&
@@ -94,7 +94,7 @@ export function formatCliError(error: unknown, context: CliErrorContext = {}): s
     error instanceof RuntimeRpcFailureError &&
     error.response.error.code === 'runtime_unavailable'
   ) {
-    return `${message}\nOrca is not running. Run 'orca open' first.`
+    return `${message}\nPebble is not running. Run 'pebble open' first.`
   }
   if (error instanceof RuntimeRpcFailureError) {
     const data = error.response.error.data

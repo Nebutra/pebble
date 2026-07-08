@@ -10,7 +10,7 @@ vi.mock('child_process', () => ({
   spawn: spawnMock
 }))
 
-import { launchOrcaApp, serveOrcaApp } from './launch'
+import { launchPebbleApp, servePebbleApp } from './launch'
 
 class FakeChildProcess extends EventEmitter {
   stdout = new EventEmitter()
@@ -18,16 +18,16 @@ class FakeChildProcess extends EventEmitter {
   unref = vi.fn()
 }
 
-describe('serveOrcaApp', () => {
+describe('servePebbleApp', () => {
   beforeEach(() => {
     spawnMock.mockReset()
-    process.env.ORCA_APP_EXECUTABLE = '/Applications/Orca.app/Contents/MacOS/Orca'
+    process.env.PEBBLE_APP_EXECUTABLE = '/Applications/Pebble.app/Contents/MacOS/Pebble'
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
-    delete process.env.ORCA_APP_EXECUTABLE
-    delete process.env.ORCA_APP_EXECUTABLE_NEEDS_APP_ROOT
+    delete process.env.PEBBLE_APP_EXECUTABLE
+    delete process.env.PEBBLE_APP_EXECUTABLE_NEEDS_APP_ROOT
   })
 
   it('pins the Electron child cwd to the app root instead of the caller cwd', async () => {
@@ -44,10 +44,10 @@ describe('serveOrcaApp', () => {
     }
     spawnMock.mockReturnValue(child)
 
-    await expect(serveOrcaApp({ json: true })).resolves.toBe(0)
+    await expect(servePebbleApp({ json: true })).resolves.toBe(0)
 
     expect(spawnMock).toHaveBeenCalledWith(
-      '/Applications/Orca.app/Contents/MacOS/Orca',
+      '/Applications/Pebble.app/Contents/MacOS/Pebble',
       ['--serve', '--serve-json'],
       expect.objectContaining({
         cwd: resolve(__dirname, '../../..')
@@ -70,7 +70,7 @@ describe('serveOrcaApp', () => {
     spawnMock.mockReturnValue(child)
 
     await expect(
-      serveOrcaApp({
+      servePebbleApp({
         json: true,
         port: '6768',
         pairingAddress: '100.64.1.20',
@@ -79,7 +79,7 @@ describe('serveOrcaApp', () => {
     ).resolves.toBe(0)
 
     expect(spawnMock).toHaveBeenCalledWith(
-      '/Applications/Orca.app/Contents/MacOS/Orca',
+      '/Applications/Pebble.app/Contents/MacOS/Pebble',
       [
         '--serve',
         '--serve-json',
@@ -96,8 +96,8 @@ describe('serveOrcaApp', () => {
   })
 
   it('passes the app root before serve flags for dev Electron executables', async () => {
-    process.env.ORCA_APP_EXECUTABLE = '/repo/node_modules/.bin/electron'
-    process.env.ORCA_APP_EXECUTABLE_NEEDS_APP_ROOT = '1'
+    process.env.PEBBLE_APP_EXECUTABLE = '/repo/node_modules/.bin/electron'
+    process.env.PEBBLE_APP_EXECUTABLE_NEEDS_APP_ROOT = '1'
     const child = {
       kill: vi.fn(),
       once: vi.fn(
@@ -111,7 +111,7 @@ describe('serveOrcaApp', () => {
     }
     spawnMock.mockReturnValue(child)
 
-    await expect(serveOrcaApp({ json: true, port: '6768' })).resolves.toBe(0)
+    await expect(servePebbleApp({ json: true, port: '6768' })).resolves.toBe(0)
 
     expect(spawnMock).toHaveBeenCalledWith(
       '/repo/node_modules/.bin/electron',
@@ -127,7 +127,7 @@ describe('serveOrcaApp', () => {
     spawnMock.mockReturnValue(child)
     const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
-    const result = serveOrcaApp({
+    const result = servePebbleApp({
       pairingAddress: 'wss://sandbox.example.com',
       recipeJson: true,
       projectRoot: '/workspace/repo'
@@ -135,14 +135,14 @@ describe('serveOrcaApp', () => {
     queueMicrotask(() => {
       child.stdout.emit(
         'data',
-        '{"schemaVersion":1,"pairingCode":"orca://pair?code=abc","projectRoot":"/workspace/repo"}\n'
+        '{"schemaVersion":1,"pairingCode":"pebble://pair?code=abc","projectRoot":"/workspace/repo"}\n'
       )
     })
 
     await expect(result).resolves.toBe(0)
 
     expect(spawnMock).toHaveBeenCalledWith(
-      '/Applications/Orca.app/Contents/MacOS/Orca',
+      '/Applications/Pebble.app/Contents/MacOS/Pebble',
       [
         '--serve',
         '--serve-pairing-address',
@@ -158,7 +158,7 @@ describe('serveOrcaApp', () => {
       })
     )
     expect(writeSpy).toHaveBeenCalledWith(
-      '{"schemaVersion":1,"pairingCode":"orca://pair?code=abc","projectRoot":"/workspace/repo"}\n'
+      '{"schemaVersion":1,"pairingCode":"pebble://pair?code=abc","projectRoot":"/workspace/repo"}\n'
     )
     expect(child.unref).toHaveBeenCalled()
   })
@@ -166,7 +166,7 @@ describe('serveOrcaApp', () => {
   it('uses a shell when a Windows npm command shim is the Electron executable', async () => {
     const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')
     Object.defineProperty(process, 'platform', { value: 'win32' })
-    process.env.ORCA_APP_EXECUTABLE = 'C:\\repo\\node_modules\\.bin\\electron.cmd'
+    process.env.PEBBLE_APP_EXECUTABLE = 'C:\\repo\\node_modules\\.bin\\electron.cmd'
     const child = {
       kill: vi.fn(),
       once: vi.fn(
@@ -181,7 +181,7 @@ describe('serveOrcaApp', () => {
     spawnMock.mockReturnValue(child)
 
     try {
-      await expect(serveOrcaApp({ json: true })).resolves.toBe(0)
+      await expect(servePebbleApp({ json: true })).resolves.toBe(0)
       expect(spawnMock).toHaveBeenCalledWith(
         'C:\\repo\\node_modules\\.bin\\electron.cmd',
         ['--serve', '--serve-json'],
@@ -197,23 +197,23 @@ describe('serveOrcaApp', () => {
   })
 })
 
-describe('launchOrcaApp', () => {
+describe('launchPebbleApp', () => {
   beforeEach(() => {
     spawnMock.mockReset()
   })
 
   afterEach(() => {
-    delete process.env.ORCA_OPEN_COMMAND
-    delete process.env.ORCA_APP_EXECUTABLE
-    delete process.env.ORCA_APP_EXECUTABLE_NEEDS_APP_ROOT
+    delete process.env.PEBBLE_OPEN_COMMAND
+    delete process.env.PEBBLE_APP_EXECUTABLE
+    delete process.env.PEBBLE_APP_EXECUTABLE_NEEDS_APP_ROOT
   })
 
   it('handles asynchronous detached spawn errors without throwing', async () => {
-    process.env.ORCA_APP_EXECUTABLE = '/missing/Orca'
+    process.env.PEBBLE_APP_EXECUTABLE = '/missing/Pebble'
     const child = new FakeChildProcess()
     spawnMock.mockReturnValue(child)
 
-    launchOrcaApp()
+    launchPebbleApp()
     child.emit('error', new Error('ENOENT'))
     await Promise.resolve()
 

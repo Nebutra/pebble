@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import type { Page } from '@stablyai/playwright-test'
-import { expect } from '@stablyai/playwright-test'
+import type { Page } from '@nebutra/playwright-test'
+import { expect } from '@nebutra/playwright-test'
 import { sendToTerminal } from './helpers/terminal'
 import { nodeTerminalCommand } from './terminal-node-command'
 import { buildFreshShellProbeInputSequence } from './terminal-probe-input-sequence'
@@ -80,7 +80,7 @@ export async function waitForPtyShellEcho(
   ptyId: string,
   timeoutMs: number
 ): Promise<void> {
-  const marker = `ORCA_PTY_READY_${randomUUID()}`
+  const marker = `PEBBLE_PTY_READY_${randomUUID()}`
   const deadline = Date.now() + timeoutMs
   await waitForPtyPaneMounted(page, ptyId, Math.min(10_000, timeoutMs))
   while (Date.now() < deadline) {

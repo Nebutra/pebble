@@ -3,9 +3,9 @@ import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { mkdtemp } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { test, expect } from './helpers/orca-app'
+import { test, expect } from './helpers/pebble-app'
 import { waitForSessionReady } from './helpers/store'
-import type { ElectronApplication, Locator } from '@stablyai/playwright-test'
+import type { ElectronApplication, Locator } from '@nebutra/playwright-test'
 
 const IMPORT_AS_GROUP_BUTTON_NAME = 'Yes, import as group'
 
@@ -33,7 +33,7 @@ async function createNestedRepoFixture(): Promise<{
   // canonicalized repo.path / projectGroup.parentPath on macOS, where
   // os.tmpdir() (/var/...) symlinks to /private/var/... and the app canonicalizes
   // imported paths via `git rev-parse --show-toplevel`.
-  const parentPath = realpathSync(await mkdtemp(path.join(os.tmpdir(), 'orca-e2e-folder-setup-')))
+  const parentPath = realpathSync(await mkdtemp(path.join(os.tmpdir(), 'pebble-e2e-folder-setup-')))
   tempRoots.push(parentPath)
   const repoNames = ['api-service', 'web-client']
   const projectPaths = repoNames.map((name) => path.join(parentPath, name))
@@ -59,7 +59,7 @@ async function createLargeNestedRepoFixture(): Promise<{
   // canonicalized repo.path on macOS (os.tmpdir() /var/... symlinks to
   // /private/var/...).
   const parentPath = realpathSync(
-    await mkdtemp(path.join(os.tmpdir(), 'orca-e2e-large-folder-setup-'))
+    await mkdtemp(path.join(os.tmpdir(), 'pebble-e2e-large-folder-setup-'))
   )
   tempRoots.push(parentPath)
   const nestedParent = path.join(
@@ -116,21 +116,21 @@ function getImportAsGroupButton(importDialog: Locator): Locator {
 test.describe('Folder setup', () => {
   test('imports nested repositories from the add-project dialog as a project group', async ({
     electronApp,
-    orcaPage
+    pebblePage
   }) => {
-    await waitForSessionReady(orcaPage)
+    await waitForSessionReady(pebblePage)
     const fixture = await createNestedRepoFixture()
     await chooseFolderInNativeDialog(electronApp, fixture.parentPath)
 
-    await orcaPage
+    await pebblePage
       .getByRole('button', { name: /Add Project/i })
       .first()
       .click()
-    const dialog = orcaPage.getByRole('dialog', { name: /Add a project/i })
+    const dialog = pebblePage.getByRole('dialog', { name: /Add a project/i })
     await expect(dialog).toBeVisible()
     await dialog.getByRole('button', { name: /Browse folder/i }).click()
 
-    const importDialog = orcaPage.getByRole('dialog', {
+    const importDialog = pebblePage.getByRole('dialog', {
       name: /Import repositories from folder/i
     })
     await expect(
@@ -144,7 +144,7 @@ test.describe('Folder setup', () => {
     await expect
       .poll(
         () =>
-          orcaPage.evaluate(async (args) => {
+          pebblePage.evaluate(async (args) => {
             const state = window.__store?.getState()
             if (!state) {
               return null
@@ -174,31 +174,31 @@ test.describe('Folder setup', () => {
         projectGroupOrders: [0, 1]
       })
 
-    await orcaPage.evaluate(() => {
+    await pebblePage.evaluate(() => {
       const state = window.__store?.getState()
       state?.closeModal()
       state?.setGroupBy('repo')
     })
-    await expect(orcaPage.getByText(fixture.groupName)).toBeVisible()
+    await expect(pebblePage.getByText(fixture.groupName)).toBeVisible()
   })
 
   test('imports a small selection from a large nested folder without modal overflow', async ({
     electronApp,
-    orcaPage
+    pebblePage
   }) => {
-    await waitForSessionReady(orcaPage)
+    await waitForSessionReady(pebblePage)
     const fixture = await createLargeNestedRepoFixture()
     await chooseFolderInNativeDialog(electronApp, fixture.parentPath)
 
-    await orcaPage
+    await pebblePage
       .getByRole('button', { name: /Add Project/i })
       .first()
       .click()
-    const dialog = orcaPage.getByRole('dialog', { name: /Add a project/i })
+    const dialog = pebblePage.getByRole('dialog', { name: /Add a project/i })
     await expect(dialog).toBeVisible()
     await dialog.getByRole('button', { name: /Browse folder/i }).click()
 
-    const importDialog = orcaPage.getByRole('dialog', {
+    const importDialog = pebblePage.getByRole('dialog', {
       name: /Import repositories from folder/i
     })
     await expect(importDialog.getByText(/Found 87 repositories in/)).toBeVisible()
@@ -231,7 +231,7 @@ test.describe('Folder setup', () => {
     await expect
       .poll(
         () =>
-          orcaPage.evaluate(async (args) => {
+          pebblePage.evaluate(async (args) => {
             const state = window.__store?.getState()
             if (!state) {
               return null

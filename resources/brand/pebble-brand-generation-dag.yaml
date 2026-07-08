@@ -1,0 +1,209 @@
+# Pebble brand material DAG.
+#
+# Structure:
+# 1. Foundation boards lock palette, material, and pebbling philosophy.
+# 2. Core mark tasks use those boards as actual refs, not prompt-only memory.
+# 3. App icon becomes the production visual anchor.
+# 4. Downstream material refs the same anchor so hero/social/mobile variants stay consistent.
+tasks:
+  - id: foundation-material-board
+    name: 01-foundation-material-board
+    provider: mox
+    model: gpt-image-2
+    ratio: "16:9"
+    prompt: >-
+      Create a Pebble brand material and palette reference board, not a logo.
+      Arrange smooth matte river pebbles, soft ceramic chips, warm paper grain,
+      and small mineral swatches in a clean editorial flat-lay. Palette:
+      Pebble Mist warm off-white, Warm Stone, Shell Pink, Clay Rose, Moss Sage,
+      Tide Blue, and Ink Graphite. Soft upper-left daylight, gentle shadows,
+      tactile flat-skeuomorphic 2026 design, lifestyle-friendly but technical,
+      no text, no letters, no logo, no animal, no watermark.
+
+  - id: foundation-pebbling-symbols
+    name: 02-foundation-pebbling-symbols
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs: ["@foundation-material-board"]
+    prompt: >-
+      Using the referenced Pebble material board, create a clean symbol sheet
+      of three small pebbling motifs: a single chosen pebble, a small pebble
+      placed beside a larger pebble as a thoughtful gift, and two rounded
+      stones leaning toward each other. Keep them simple, centered, high
+      contrast, matte stone and ceramic feeling, warm and precise, plain warm
+      background, no text, no letters, no animal, no legacy whale mark, no
+      watermark.
+
+  - id: core-mark-seed
+    name: 03-core-mark-seed
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs: ["@foundation-material-board", "@foundation-pebbling-symbols"]
+    prompt: >-
+      Design the primary Pebble logo mark using the referenced material board
+      and pebbling symbol sheet. Create an abstract pebble-shaped letter P
+      without using text: one large smooth pebble forms the main bowl, one
+      smaller pebble reads as the thoughtful gift signal. Use warm stone and
+      mist palette, matte ceramic-mineral material, soft rounded asymmetry,
+      subtle upper-left light, high contrast, centered composition,
+      vector-friendly silhouette, plain warm off-white background, no animal,
+      no legacy whale mark, no letters, no words, no watermark.
+
+  - id: core-mark-production-clean
+    name: 04-core-mark-production-clean
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs: ["@core-mark-seed"]
+    prompt: >-
+      Refine the referenced Pebble logo mark into a production-clean symbol.
+      Keep the same abstract pebble P silhouette and gifted small pebble, but
+      simplify clutter, remove extra details, strengthen edge clarity, make the
+      shape readable at 48 pixels, preserve soft matte stone tactility, centered
+      with generous safe area on a plain warm background, no text, no letters,
+      no animal, no legacy whale mark, no watermark.
+
+  - id: app-icon-classic
+    name: 05-app-icon-classic
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs: ["@foundation-material-board", "@core-mark-production-clean"]
+    prompt: >-
+      Convert the referenced production Pebble mark and material board into a
+      polished desktop app icon. Rounded square icon field, warm Pebble Mist
+      base, centered abstract pebble P mark, matte mineral surface, subtle
+      depth, soft shadow, clean macOS Big Sur style icon volume but flatter and
+      calmer, excellent legibility at 48 pixels, no text, no animal, no legacy
+      whale mark, no watermark.
+
+  - id: app-icon-soft-watercolor
+    name: 06-app-icon-soft-watercolor
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs: ["@app-icon-classic", "@foundation-material-board"]
+    prompt: >-
+      Create a soft lifestyle variant of the referenced Pebble app icon while
+      preserving the exact same core mark silhouette and centered composition.
+      Rounded square app icon, warm matte stone base, gentle shell pink and
+      clay rose watercolor wash, tiny moss sage and tide blue mineral accents,
+      tactile but uncluttered, Xiaohongshu-friendly warmth, still precise and
+      technical, readable at small size, no text, no animal, no watermark.
+
+  - id: app-icon-technical-mineral
+    name: 07-app-icon-technical-mineral
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs: ["@app-icon-classic", "@foundation-material-board"]
+    prompt: >-
+      Create a cooler technical variant of the referenced Pebble app icon while
+      preserving the exact same core mark silhouette and centered composition.
+      Rounded square app icon, sanded mineral surface, Tide Blue and Warm Stone
+      palette, restrained shell pink highlight, precise edge clarity, subtle
+      grid-like reflected light, calm engineering product feeling, readable at
+      48 pixels, no text, no animal, no watermark.
+
+  - id: monochrome-glyph-chromakey
+    name: 08-monochrome-glyph-chromakey
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs: ["@core-mark-production-clean"]
+    prompt: >-
+      Create a flat monochrome production glyph based on the referenced Pebble
+      mark. Preserve the exact same abstract pebble P silhouette. Single solid
+      black shape, no gradients, no texture, no shadow, no antialias fuzz,
+      centered, generous safe area, pure chroma key green background #00FF00,
+      no text, no letters, no animal, no watermark.
+
+  - id: small-icon-legibility-proof
+    name: 09-small-icon-legibility-proof
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs: ["@app-icon-classic", "@monochrome-glyph-chromakey"]
+    prompt: >-
+      Create a simple app icon legibility proof sheet using the referenced
+      Pebble icon and monochrome glyph. Show the same mark repeated as clean
+      icon previews at large, medium, and tiny sizes on light and dark neutral
+      backgrounds. No labels, no text, no decorative elements, no animal, no
+      watermark.
+
+  - id: mobile-splash-mark
+    name: 10-mobile-splash-mark
+    provider: mox
+    model: gpt-image-2
+    ratio: "3:2"
+    refs: ["@app-icon-classic", "@foundation-material-board"]
+    prompt: >-
+      Design a mobile splash image for Pebble using the referenced icon and
+      material board. Wide horizontal composition, centered icon mark with
+      generous padding, warm Pebble Mist background, subtle paper grain, soft
+      mineral shadow, quiet and premium, no text, no animal, no watermark.
+
+  - id: readme-hero-background
+    name: 11-readme-hero-background
+    provider: mox
+    model: gpt-image-2
+    ratio: "16:9"
+    refs: ["@app-icon-classic", "@foundation-material-board", "@foundation-pebbling-symbols"]
+    prompt: >-
+      Create a warm brand hero background for Pebble using the referenced
+      icon, material board, and pebbling motifs as visual anchors. Smooth
+      hand-selected pebbles on a clean desk, one small stone placed beside a
+      notebook as a thoughtful signal, faint laptop edge and soft terminal glow
+      in the background, warm morning light, matte mineral texture, Pebble Mist,
+      Warm Stone, Shell Pink, Moss Sage, Tide Blue accents, elegant tactile
+      flat-skeuomorphic 2026 design, clean space reserved for product screenshot
+      overlay, no generated text, no extra logos, no animal, no watermark.
+
+  - id: onboarding-soft-pattern
+    name: 12-onboarding-soft-pattern
+    provider: mox
+    model: gpt-image-2
+    ratio: "16:9"
+    refs: ["@foundation-material-board", "@foundation-pebbling-symbols"]
+    prompt: >-
+      Create a subtle onboarding background texture for Pebble using the
+      referenced material board and pebbling motifs. Low-contrast warm stone
+      paper surface with soft rounded pebble forms, gentle clay rose and tide
+      blue mineral flecks, quiet depth, no central subject, no text, no logos,
+      no animal, no watermark. It must work behind product demo cards and stay
+      calm.
+
+  - id: social-card-background
+    name: 13-social-card-background
+    provider: mox
+    model: gpt-image-2
+    ratio: "16:9"
+    refs: ["@app-icon-classic", "@foundation-material-board"]
+    prompt: >-
+      Create a social card background for Pebble using the referenced app icon
+      and material board. Place a polished rounded pebble app icon object on a
+      warm desk-like mineral surface. Composition leaves clean negative space
+      for text overlay on the left, soft flat-skeuomorphic material, warm stone
+      and shell pink with small tide blue technical accent, premium but
+      friendly, no generated text, no animal, no watermark.
+
+  - id: brand-system-overview
+    name: 14-brand-system-overview
+    provider: mox
+    model: gpt-image-2
+    ratio: "16:9"
+    refs:
+      - "@foundation-material-board"
+      - "@core-mark-production-clean"
+      - "@app-icon-classic"
+      - "@app-icon-soft-watercolor"
+      - "@app-icon-technical-mineral"
+      - "@readme-hero-background"
+    prompt: >-
+      Create a clean brand system overview board from the referenced Pebble
+      assets. Arrange the material palette, production mark, classic app icon,
+      soft lifestyle icon, technical mineral icon, and hero background as a
+      coherent visual family. Keep the layout editorial and minimal with no
+      readable generated text, no fake labels, no animal, no watermark.

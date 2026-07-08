@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pebble.local/contracts/runtime-events.schema.json",
+  "title": "Pebble Runtime Event",
+  "type": "object",
+  "required": ["version", "id", "timestamp", "topic", "payload"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "pebble.events.v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "topic": {
+      "enum": [
+        "project.changed",
+        "worktree.changed",
+        "session.output",
+        "session.status",
+        "agent.changed",
+        "orchestration.changed",
+        "automation.changed",
+        "external-task.changed",
+        "source-control.changed",
+        "file.changed",
+        "release.changed",
+        "settings.changed",
+        "provider.changed",
+        "browser.changed",
+        "computer.changed",
+        "emulator.changed",
+        "mobile-relay.changed"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

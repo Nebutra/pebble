@@ -55,7 +55,7 @@ export function HostRemoveDialog({
   }
 
   // Why: runtime-environment removal needs active-environment switching and
-  // error context owned by the Orca servers settings pane, so we deep-link
+  // error context owned by the Pebble servers settings pane, so we deep-link
   // there with the host pre-selected instead of duplicating that flow.
   const handleRemoveRuntime = (environmentId: string): void => {
     const state = useAppStore.getState()
@@ -115,7 +115,7 @@ export function HostRemoveDialog({
             {isRuntime
               ? translate(
                   'auto.components.sidebar.HostRemoveDialog.4d5e6f7a8b',
-                  'This opens the Orca servers settings where you can remove this server.'
+                  'This opens the Pebble servers settings where you can remove this server.'
                 )
               : translate(
                   'auto.components.sidebar.HostRemoveDialog.5e6f7a8b9c',

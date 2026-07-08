@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import type { Page } from '@stablyai/playwright-test'
-import { expect } from '@stablyai/playwright-test'
+import type { Page } from '@nebutra/playwright-test'
+import { expect } from '@nebutra/playwright-test'
 import { sendToTerminal } from './helpers/terminal'
 import {
   getTerminalContentForPtyId,
@@ -77,7 +77,7 @@ export async function waitForPtyColumnsAtMost(
   let lastMarker = ''
   let lastTerminalTail = ''
   while (Date.now() < deadline) {
-    const marker = `ORCA_PTY_COLUMNS_${randomUUID()}`
+    const marker = `PEBBLE_PTY_COLUMNS_${randomUUID()}`
     lastMarker = marker
     for (const input of buildFreshShellProbeInputSequence(
       `${nodeTerminalCommand([

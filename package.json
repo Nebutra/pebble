@@ -1,12 +1,12 @@
 {
-  "name": "orca",
+  "name": "pebble",
   "version": "1.4.124-rc.8",
   "description": "Next-gen IDE for parallel agentic development",
-  "homepage": "https://github.com/stablyai/orca",
-  "author": "stablyai",
+  "homepage": "https://github.com/nebutra/pebble",
+  "author": "Nebutra",
   "bin": {
-    "orca": "./out/cli/index.js",
-    "orca-dev": "./config/scripts/orca-dev.mjs"
+    "pebble": "./out/cli/index.js",
+    "pebble-dev": "./config/scripts/pebble-dev.mjs"
   },
   "main": "./out/main/index.js",
   "scripts": {
@@ -68,7 +68,7 @@
     "build:win": "pnpm run build:desktop && pnpm run ensure:electron-runtime && electron-builder --config config/electron-builder.config.cjs --win",
     "build:icons": "bash resources/icon-source/generate.sh",
     "build:mac": "pnpm run build:desktop && pnpm run build:computer-macos && pnpm run ensure:electron-runtime && electron-builder --config config/electron-builder.config.cjs --mac",
-    "build:mac:release": "node config/scripts/verify-macos-release-env.mjs && ORCA_MAC_RELEASE=1 pnpm run build:desktop && ORCA_MAC_RELEASE=1 pnpm run build:computer-macos && pnpm run ensure:electron-runtime && ORCA_MAC_RELEASE=1 electron-builder --config config/electron-builder.config.cjs --mac",
+    "build:mac:release": "node config/scripts/verify-macos-release-env.mjs && PEBBLE_MAC_RELEASE=1 pnpm run build:desktop && PEBBLE_MAC_RELEASE=1 pnpm run build:computer-macos && pnpm run ensure:electron-runtime && PEBBLE_MAC_RELEASE=1 electron-builder --config config/electron-builder.config.cjs --mac",
     "build:linux": "pnpm run build:desktop && pnpm run ensure:electron-runtime && electron-builder --config config/electron-builder.config.cjs --linux AppImage deb",
     "test:e2e": "pnpm run ensure:electron-runtime && npx playwright test --config tests/playwright.config.ts --project electron-headless",
     "test:e2e:floating-mobile-emulator": "pnpm run ensure:electron-runtime && npx playwright test tests/e2e/floating-mobile-emulator-tab.spec.ts --config tests/playwright.config.ts --project electron-headless --workers=1",
@@ -119,7 +119,7 @@
     "@electron/rebuild": "^4.0.4",
     "@monaco-editor/react": "^4.7.0",
     "@playwright/test": "^1.59.1",
-    "@stablyai/playwright-test": "^2.1.14",
+    "@nebutra/playwright-test": "^2.1.14",
     "@tailwindcss/vite": "^4.2.4",
     "@tanstack/react-virtual": "^3.13.24",
     "@testing-library/jest-dom": "^6.9.1",

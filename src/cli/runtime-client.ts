@@ -6,7 +6,7 @@ export {
   RuntimeClient,
   RuntimeClientError,
   RuntimeRpcFailureError,
-  serveOrcaApp,
+  servePebbleApp,
   getDefaultUserDataPath,
   type RuntimeRpcFailure,
   type RuntimeRpcResponse,

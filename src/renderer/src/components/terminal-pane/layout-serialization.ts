@@ -28,7 +28,7 @@ export const EMPTY_LAYOUT: TerminalLayoutSnapshot = {
 // Why: xterm's SerializeAddon captures display state by emitting mode-setting
 // bytes (e.g. `\e[?1004h` for focus reporting) so a re-fed emulator lands in
 // the same mode as the snapshot source. That's correct for tmux-style
-// "attach to a still-running TUI" — but Orca restores scrollback against a
+// "attach to a still-running TUI" — but Pebble restores scrollback against a
 // *fresh* shell, with no TUI to consume those modes. A stale focus-reporting
 // bit causes xterm to emit `\e[I`/`\e[O` on every pane click, which the
 // fresh zsh treats as unbound key input and rings the bell for.
@@ -93,7 +93,7 @@ export const POST_REPLAY_LIVE_AGENT_REATTACH_RESET = `${RESET_TERMINAL_CURSOR_ST
 // Why Nerd Fonts are listed after the regular monospace fonts: OMP, Powerline
 // prompts, and many shell plugins emit glyphs in the Unicode Private Use Area
 // (U+E000–U+F8FF) that no standard monospace font contains. The bundled symbol
-// font gives Orca a known-good fallback even on clean systems, while the
+// font gives Pebble a known-good fallback even on clean systems, while the
 // installed-font fallbacks keep users' existing terminal setups working.
 const FALLBACK_FONTS = [
   'SF Mono', // macOS 10.12+
@@ -103,7 +103,7 @@ const FALLBACK_FONTS = [
   'Consolas', // Windows Vista+
   'DejaVu Sans Mono', // Linux (common)
   'Liberation Mono', // Linux (common)
-  'Orca Nerd Font Symbols', // bundled PUA fallback for OMP/Powerline glyphs
+  'Pebble Nerd Font Symbols', // bundled PUA fallback for OMP/Powerline glyphs
   'Symbols Nerd Font Mono', // purpose-built Nerd Fonts symbols-only fallback
   'MesloLGS Nerd Font', // p10k's recommended font; very common on zsh setups
   'JetBrainsMono Nerd Font', // widely installed; Ghostty ships a JBM-derived font

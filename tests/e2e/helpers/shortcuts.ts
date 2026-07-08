@@ -1,4 +1,4 @@
-import type { Page } from '@stablyai/playwright-test'
+import type { Page } from '@nebutra/playwright-test'
 
 type ShortcutOptions = {
   shift?: boolean
@@ -21,7 +21,7 @@ async function getModifierKey(page: Page): Promise<'Meta' | 'Control'> {
 /**
  * Press a Cmd/Ctrl shortcut using the platform-specific modifier key.
  *
- * Why: Orca binds shortcuts as Cmd on macOS and Ctrl on Linux/Windows. Using
+ * Why: Pebble binds shortcuts as Cmd on macOS and Ctrl on Linux/Windows. Using
  * a helper keeps the E2E suite aligned with the app's runtime shortcut logic
  * instead of hardcoding macOS-only key chords in each spec.
  */

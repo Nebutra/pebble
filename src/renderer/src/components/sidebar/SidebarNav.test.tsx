@@ -194,20 +194,20 @@ describe('SidebarNav', () => {
     setSidebarState()
   })
 
-  it('hides the Agents entry while settings are loading', () => {
-    expect(shouldShowAgentsButton(null)).toBe(false)
+  it('shows the Agents entry while settings are loading', () => {
+    expect(shouldShowAgentsButton(null)).toBe(true)
   })
 
-  it('hides the Agents entry while the experimental Agents view is off', () => {
+  it('shows the Agents entry even when the legacy experimental flag is off', () => {
     expect(
       shouldShowAgentsButton({
         ...getDefaultSettings('/tmp'),
         experimentalActivity: false
       })
-    ).toBe(false)
+    ).toBe(true)
   })
 
-  it('shows the Agents entry when the experimental Agents view is on', () => {
+  it('shows the Agents entry when the legacy experimental flag is on', () => {
     expect(
       shouldShowAgentsButton({
         ...getDefaultSettings('/tmp'),
@@ -247,6 +247,14 @@ describe('SidebarNav', () => {
     expect(queryButtonByText(container, 'Automations')).toBeNull()
   })
 
+  it('opens the Agents view from default settings', async () => {
+    const container = await renderSidebarNav()
+
+    await clickButton(getButtonByText(container, 'Agents'))
+
+    expect(mocks.openActivityPage).toHaveBeenCalled()
+  })
+
   it('hides Automations from its sidebar context menu', async () => {
     const container = await renderSidebarNav()
 
@@ -263,7 +271,7 @@ describe('SidebarNav', () => {
   it('hides Mobile from its sidebar context menu', async () => {
     const container = await renderSidebarNav()
 
-    const mobileMenu = getButtonByText(container, 'Orca Mobile').closest(
+    const mobileMenu = getButtonByText(container, 'Pebble Mobile').closest(
       '[data-testid="context-menu"]'
     )
     expect(mobileMenu).not.toBeNull()

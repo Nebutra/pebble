@@ -1,7 +1,7 @@
 import type { EmulatorStreamInfo } from '@/components/emulator-pane/emulator-pane-types'
 
-export const EMULATOR_MANUAL_LAUNCH_STARTED_EVENT = 'orca:emulator-launch-started'
-export const EMULATOR_MANUAL_LAUNCH_FAILED_EVENT = 'orca:emulator-launch-failed'
+export const EMULATOR_MANUAL_LAUNCH_STARTED_EVENT = 'pebble:emulator-launch-started'
+export const EMULATOR_MANUAL_LAUNCH_FAILED_EVENT = 'pebble:emulator-launch-failed'
 
 const manualLaunchesByWorktree = new Set<string>()
 const prelaunchedSessionsByWorktree = new Map<string, EmulatorStreamInfo>()

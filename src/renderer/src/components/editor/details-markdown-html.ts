@@ -30,7 +30,7 @@ export function escapeDetailsHtml(value: string): string {
 export function parseDetailsAttributes(rawAttributes: string): Record<string, unknown> {
   return {
     open: /\sopen(?:\s|=|$)/i.test(rawAttributes),
-    variant: /\sdata-orca-toggle=(?:"heading-1"|'heading-1'|heading-1)(?:\s|$)/i.test(rawAttributes)
+    variant: /\sdata-pebble-toggle=(?:"heading-1"|'heading-1'|heading-1)(?:\s|$)/i.test(rawAttributes)
       ? 'heading-1'
       : null
   }
@@ -45,10 +45,10 @@ export function detailsBodyHtmlToMarkdown(body: string): string {
 }
 
 export function renderDetailsAttributes(attrs: Record<string, unknown> | undefined): string {
-  const attributes = ['class="orca-details"']
+  const attributes = ['class="pebble-details"']
 
   if (attrs?.variant === 'heading-1') {
-    attributes.push('data-orca-toggle="heading-1"')
+    attributes.push('data-pebble-toggle="heading-1"')
   }
 
   if (attrs?.open === true) {
@@ -154,8 +154,8 @@ function hasOnlySupportedDetailsAttributes(rawAttributes: string): boolean {
   return (
     rawAttributes
       .replace(/\s+open(?:\s*=\s*(?:""|"open"|''|'open'|open))?(?=\s|$)/giu, '')
-      .replace(/\s+class\s*=\s*(?:"orca-details"|'orca-details'|orca-details)(?=\s|$)/giu, '')
-      .replace(/\s+data-orca-toggle\s*=\s*(?:"heading-1"|'heading-1'|heading-1)(?=\s|$)/giu, '')
+      .replace(/\s+class\s*=\s*(?:"pebble-details"|'pebble-details'|pebble-details)(?=\s|$)/giu, '')
+      .replace(/\s+data-pebble-toggle\s*=\s*(?:"heading-1"|'heading-1'|heading-1)(?=\s|$)/giu, '')
       .trim() === ''
   )
 }

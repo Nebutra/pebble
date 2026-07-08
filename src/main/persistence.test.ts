@@ -150,7 +150,7 @@ async function withPlatform<T>(platform: NodeJS.Platform, fn: () => Promise<T>):
 }
 
 function dataFile(): string {
-  return join(testState.dir, 'orca-data.json')
+  return join(testState.dir, 'pebble-data.json')
 }
 
 function writeDataFile(data: unknown): void {
@@ -320,7 +320,7 @@ function makeBalancedLegacyPaneLayout(start: number, end: number): TerminalPaneL
 
 describe('Store', () => {
   beforeEach(() => {
-    testState.dir = mkdtempSync(join(tmpdir(), 'orca-test-'))
+    testState.dir = mkdtempSync(join(tmpdir(), 'pebble-test-'))
     trackMock.mockReset()
     getCohortAtEmitMock.mockReset()
     getCohortAtEmitMock.mockReturnValue({ nth_repo_added: 2 })
@@ -343,16 +343,16 @@ describe('Store', () => {
       repos: [
         makeRepo({
           id: 'local-repo',
-          path: '/Users/alice/orca',
-          displayName: 'Orca',
-          upstream: { owner: 'StablyAI', repo: 'Orca' }
+          path: '/Users/alice/pebble',
+          displayName: 'Pebble',
+          upstream: { owner: 'Nebutra', repo: 'Pebble' }
         }),
         makeRepo({
           id: 'remote-repo',
-          path: '/home/alice/orca',
-          displayName: 'orca',
+          path: '/home/alice/pebble',
+          displayName: 'pebble',
           connectionId: 'gpu-vm',
-          upstream: { owner: 'stablyai', repo: 'orca' }
+          upstream: { owner: 'nebutra', repo: 'pebble' }
         })
       ]
     })
@@ -361,22 +361,22 @@ describe('Store', () => {
 
     expect(store.getProjects()).toEqual([
       expect.objectContaining({
-        id: 'github:stablyai/orca',
+        id: 'github:nebutra/pebble',
         sourceRepoIds: ['local-repo', 'remote-repo']
       })
     ])
     expect(store.getProjectHostSetups()).toEqual([
       expect.objectContaining({
         id: 'local-repo',
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         hostId: 'local',
-        path: '/Users/alice/orca'
+        path: '/Users/alice/pebble'
       }),
       expect.objectContaining({
         id: 'remote-repo',
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         hostId: 'ssh:gpu-vm',
-        path: '/home/alice/orca'
+        path: '/home/alice/pebble'
       })
     ])
 
@@ -499,7 +499,7 @@ describe('Store', () => {
     expect(settings.openInApplications).toEqual([
       { id: 'vscode', label: 'VS Code', command: 'code' }
     ])
-    expect(settings.experimentalActivity).toBe(false)
+    expect(settings.experimentalActivity).toBe(true)
     expect(settings.experimentalActivityDefaultedOffForAllUsers).toBe(true)
     expect(settings.experimentalTerminalAttention).toBe(false)
     expect(settings.experimentalNewWorktreeCardStyle).toBe(true)
@@ -1501,7 +1501,7 @@ describe('Store', () => {
     const store = await createStore()
     store.addRepo(
       makeRepo({
-        upstream: { owner: 'stablyai', repo: 'orca' },
+        upstream: { owner: 'nebutra', repo: 'pebble' },
         connectionId: 'builder'
       })
     )
@@ -1519,7 +1519,7 @@ describe('Store', () => {
 
     expect(automation.runContext).toMatchObject({
       kind: 'workspace-run',
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       hostId: toSshExecutionHostId('builder'),
       projectHostSetupId: 'r1',
       repoId: 'r1',
@@ -1528,11 +1528,11 @@ describe('Store', () => {
     expect(automation.sourceContext).toMatchObject({
       kind: 'task-source',
       provider: 'github',
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       hostId: toSshExecutionHostId('builder'),
       projectHostSetupId: 'r1',
       repoId: 'r1',
-      providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' }
+      providerIdentity: { provider: 'github', owner: 'nebutra', repo: 'pebble' }
     })
   })
 
@@ -1541,7 +1541,7 @@ describe('Store', () => {
     store.addRepo(
       makeRepo({
         executionHostId: toRuntimeExecutionHostId('gpu-server'),
-        upstream: { owner: 'stablyai', repo: 'orca' }
+        upstream: { owner: 'nebutra', repo: 'pebble' }
       })
     )
 
@@ -1564,7 +1564,7 @@ describe('Store', () => {
 
   it('snapshots automation contexts onto runs', async () => {
     const store = await createStore()
-    store.addRepo(makeRepo({ upstream: { owner: 'stablyai', repo: 'orca' } }))
+    store.addRepo(makeRepo({ upstream: { owner: 'nebutra', repo: 'pebble' } }))
     const automation = store.createAutomation({
       name: 'Nightly',
       prompt: 'Run checks',
@@ -1592,7 +1592,7 @@ describe('Store', () => {
     const store = await createStore()
     store.addRepo(
       makeRepo({
-        upstream: { owner: 'stablyai', repo: 'orca' },
+        upstream: { owner: 'nebutra', repo: 'pebble' },
         connectionId: 'builder'
       })
     )
@@ -1627,7 +1627,7 @@ describe('Store', () => {
 
     expect(migratedAutomation?.runContext).toMatchObject({
       kind: 'workspace-run',
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       hostId: toSshExecutionHostId('builder'),
       projectHostSetupId: 'r1',
       repoId: 'r1',
@@ -1636,11 +1636,11 @@ describe('Store', () => {
     expect(migratedAutomation?.sourceContext).toMatchObject({
       kind: 'task-source',
       provider: 'github',
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       hostId: toSshExecutionHostId('builder'),
       projectHostSetupId: 'r1',
       repoId: 'r1',
-      providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' }
+      providerIdentity: { provider: 'github', owner: 'nebutra', repo: 'pebble' }
     })
     expect(migratedRun?.runContext).toEqual(migratedAutomation?.runContext)
     expect(migratedRun?.sourceContext).toEqual(migratedAutomation?.sourceContext)
@@ -1897,7 +1897,7 @@ describe('Store', () => {
     expect(store.getSettings().showAutomationsButton).toBe(true)
     expect(store.getSettings().combinedDiffFileTreeVisibleByDefault).toBe(false)
     expect(store.getSettings().visibleTaskProviders).toEqual(['github', 'gitlab', 'linear', 'jira'])
-    expect(store.getSettings().experimentalActivity).toBe(false)
+    expect(store.getSettings().experimentalActivity).toBe(true)
     expect(store.getSettings().experimentalActivityDefaultedOffForAllUsers).toBe(true)
     expect(store.getSettings().experimentalTerminalAttention).toBe(false)
     expect(store.getSettings().notifications.customSoundPath).toBeNull()
@@ -2137,7 +2137,7 @@ describe('Store', () => {
       customAgentCommand: 'claude'
     })
     store.flush()
-    const persisted = JSON.parse(readFileSync(join(testState.dir, 'orca-data.json'), 'utf-8'))
+    const persisted = JSON.parse(readFileSync(join(testState.dir, 'pebble-data.json'), 'utf-8'))
     expect(persisted.settings.sourceControlAi.actions.commitMessage).toEqual({
       agentId: 'claude',
       commandInputTemplate: '{basePrompt}\n\nRollback commit prompt'
@@ -2296,7 +2296,7 @@ describe('Store', () => {
     })
 
     const store = await createStore()
-    expect(store.getSettings().terminalShortcutPolicy).toBe('orca-first')
+    expect(store.getSettings().terminalShortcutPolicy).toBe('pebble-first')
   })
 
   it('normalizes malformed source control group order on load', async () => {
@@ -3077,12 +3077,12 @@ describe('Store', () => {
     store.updateRepo('r1', {
       displayName: 'renamed',
       worktreeBasePath: '../new-worktrees',
-      upstream: { owner: 'stablyai', repo: 'orca' }
+      upstream: { owner: 'nebutra', repo: 'pebble' }
     })
 
     expect(store.getProjects()).toEqual([
       expect.objectContaining({
-        id: 'github:stablyai/orca',
+        id: 'github:nebutra/pebble',
         displayName: 'renamed',
         sourceRepoIds: ['r1']
       })
@@ -3090,7 +3090,7 @@ describe('Store', () => {
     expect(store.getProjectHostSetups()).toEqual([
       expect.objectContaining({
         id: 'r1',
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         displayName: 'renamed',
         worktreeBasePath: '../new-worktrees'
       })
@@ -3182,11 +3182,11 @@ describe('Store', () => {
     const store = await createStore()
     store.addRepo({
       ...makeRepo({ id: 'r1', displayName: 'Cloud Project' }),
-      upstream: { owner: 'stablyai', repo: 'cloud-project' }
+      upstream: { owner: 'nebutra', repo: 'cloud-project' }
     })
 
     const result = store.createProjectHostSetup({
-      projectId: 'github:stablyai/cloud-project',
+      projectId: 'github:nebutra/cloud-project',
       hostId: 'runtime:gpu-vm',
       setupId: 'cloud-project::gpu-vm',
       displayName: 'GPU VM',
@@ -3195,12 +3195,12 @@ describe('Store', () => {
     })
 
     expect(result?.project).toMatchObject({
-      id: 'github:stablyai/cloud-project',
+      id: 'github:nebutra/cloud-project',
       displayName: 'Cloud Project'
     })
     expect(result?.setup).toMatchObject({
       id: 'cloud-project::gpu-vm',
-      projectId: 'github:stablyai/cloud-project',
+      projectId: 'github:nebutra/cloud-project',
       hostId: 'runtime:gpu-vm',
       repoId: '',
       path: '',
@@ -3219,11 +3219,11 @@ describe('Store', () => {
     const store = await createStore()
     store.addRepo({
       ...makeRepo({ id: 'r1', displayName: 'Cloud Project' }),
-      upstream: { owner: 'stablyai', repo: 'cloud-project' }
+      upstream: { owner: 'nebutra', repo: 'cloud-project' }
     })
     const independentSetup = makeProjectHostSetup({
       id: 'cloud-project::gpu-vm',
-      projectId: 'github:stablyai/cloud-project',
+      projectId: 'github:nebutra/cloud-project',
       hostId: 'runtime:gpu-vm'
     })
     store.createProjectHostSetup({
@@ -3234,7 +3234,7 @@ describe('Store', () => {
 
     expect(() =>
       store.createProjectHostSetup({
-        projectId: 'github:stablyai/cloud-project',
+        projectId: 'github:nebutra/cloud-project',
         hostId: 'runtime:gpu-vm',
         setupId: 'duplicate'
       })
@@ -3400,9 +3400,9 @@ describe('Store', () => {
     store.addRepo(makeRepo())
 
     const updated = store.updateRepo('r1', {
-      upstream: { owner: ' stablyai ', repo: ' orca ' }
+      upstream: { owner: ' nebutra ', repo: ' pebble ' }
     })
-    expect(updated!.upstream).toEqual({ owner: 'stablyai', repo: 'orca' })
+    expect(updated!.upstream).toEqual({ owner: 'nebutra', repo: 'pebble' })
 
     store.updateRepo('r1', { upstream: null })
     store.flush()
@@ -4128,7 +4128,7 @@ describe('Store', () => {
 
   it('normalizes disabled TUI agents on load and update', async () => {
     writeFileSync(
-      join(testState.dir, 'orca-data.json'),
+      join(testState.dir, 'pebble-data.json'),
       JSON.stringify({
         settings: {
           disabledTuiAgents: ['codex', 'not-real', 'codex', 'claude']
@@ -4154,7 +4154,7 @@ describe('Store', () => {
 
   it('migrates yolo default args onto untouched agent launch settings', async () => {
     writeFileSync(
-      join(testState.dir, 'orca-data.json'),
+      join(testState.dir, 'pebble-data.json'),
       JSON.stringify({
         settings: {
           agentCmdOverrides: {}
@@ -4176,7 +4176,7 @@ describe('Store', () => {
 
   it('does not add yolo defaults for legacy agents with command overrides', async () => {
     writeFileSync(
-      join(testState.dir, 'orca-data.json'),
+      join(testState.dir, 'pebble-data.json'),
       JSON.stringify({
         settings: {
           agentCmdOverrides: {
@@ -4195,7 +4195,7 @@ describe('Store', () => {
 
   it('removes unsupported TUI skip-permissions args from migrated profiles', async () => {
     writeFileSync(
-      join(testState.dir, 'orca-data.json'),
+      join(testState.dir, 'pebble-data.json'),
       JSON.stringify({
         settings: {
           agentYoloDefaultsMigrated: true,
@@ -4223,7 +4223,7 @@ describe('Store', () => {
 
   it('normalizes app icon on load and update', async () => {
     writeFileSync(
-      join(testState.dir, 'orca-data.json'),
+      join(testState.dir, 'pebble-data.json'),
       JSON.stringify({
         settings: {
           appIcon: 'not-real'
@@ -4377,7 +4377,7 @@ describe('Store', () => {
     expect(store.getSettings().terminalShortcutPolicy).toBe('terminal-first')
 
     store.updateSettings({ terminalShortcutPolicy: 'terminal-maybe' as never })
-    expect(store.getSettings().terminalShortcutPolicy).toBe('orca-first')
+    expect(store.getSettings().terminalShortcutPolicy).toBe('pebble-first')
   })
 
   it('reloads sourceControlViewMode from global settings without touching workspace state', async () => {
@@ -4729,7 +4729,7 @@ describe('Store', () => {
     const store = await createStore()
     store.setGitHubCache({ pr: { 'o/r#7': { fetchedAt: 7 } as never }, issue: {} })
     store.flush()
-    expect(existsSync(join(testState.dir, 'orca-github-cache.json'))).toBe(true)
+    expect(existsSync(join(testState.dir, 'pebble-github-cache.json'))).toBe(true)
 
     const restarted = await createStore()
     expect(restarted.getGitHubCache().pr['o/r#7']).toEqual({ fetchedAt: 7 })
@@ -5633,7 +5633,7 @@ describe('Store', () => {
 
   it('missing terminalMacOptionAsAlt in persisted file defaults to "auto" and flags migrated', async () => {
     // Existing file predates the setting entirely. Treat like upgrade from
-    // pre-Option-as-Alt Orca: land on 'auto' and mark migrated so we don't
+    // pre-Option-as-Alt Pebble: land on 'auto' and mark migrated so we don't
     // re-examine.
     writeDataFile({
       schemaVersion: 1,
@@ -5682,7 +5682,7 @@ describe('Store', () => {
     expect(store.getSettings().experimentalCompactWorktreeCards).toBeUndefined()
   })
 
-  it('defaults legacy experimentalActivity profiles off once', async () => {
+  it('defaults legacy experimentalActivity profiles on after graduation', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -5695,11 +5695,11 @@ describe('Store', () => {
 
     const store = await createStore()
 
-    expect(store.getSettings().experimentalActivity).toBe(false)
+    expect(store.getSettings().experimentalActivity).toBe(true)
     expect(store.getSettings().experimentalActivityDefaultedOffForAllUsers).toBe(true)
   })
 
-  it('preserves experimentalActivity after the default-off migration has run', async () => {
+  it('keeps experimentalActivity on after the graduation migration has run', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -8753,7 +8753,7 @@ describe('Store', () => {
   // inference because the `telemetry` field is new in this release: keying
   // on its presence would misclassify every pre-telemetry install as fresh,
   // silently flipping existing users to default-on and violating the social
-  // contract they installed Orca under.
+  // contract they installed Pebble under.
 
   it('classifies a truly fresh install as new-user cohort (file absent → optedIn=true)', async () => {
     // No data file written — truly fresh install of the telemetry release.
@@ -8793,7 +8793,7 @@ describe('Store', () => {
   it('still classifies as existing-user cohort when the data file is corrupt', async () => {
     // Load-bearing: `fileExistedOnLoad` stays true even when the parse
     // throws, so the corrupt-file catch path must also apply the migration.
-    // Otherwise a user whose `orca-data.json` got corrupted would be
+    // Otherwise a user whose `pebble-data.json` got corrupted would be
     // silently opted in as if they were a fresh install.
     mkdirSync(testState.dir, { recursive: true })
     writeFileSync(dataFile(), '{{{corrupt json', 'utf-8')
@@ -8840,7 +8840,7 @@ describe('Store.migrateWorktreeIdentity', () => {
   const NEW_WORKSPACE_KEY = worktreeWorkspaceKey(NEW)
 
   beforeEach(() => {
-    testState.dir = mkdtempSync(join(tmpdir(), 'orca-test-'))
+    testState.dir = mkdtempSync(join(tmpdir(), 'pebble-test-'))
   })
 
   afterEach(() => {
@@ -9000,7 +9000,7 @@ describe('Store.migrateWorktreeIdentity', () => {
 
 describe('Store host-partitioned workspace sessions', () => {
   beforeEach(() => {
-    testState.dir = mkdtempSync(join(tmpdir(), 'orca-test-'))
+    testState.dir = mkdtempSync(join(tmpdir(), 'pebble-test-'))
   })
 
   afterEach(() => {
@@ -9150,7 +9150,7 @@ describe('Store host-partitioned workspace sessions', () => {
 
 describe('Store native-chat tab viewMode persistence', () => {
   beforeEach(() => {
-    testState.dir = mkdtempSync(join(tmpdir(), 'orca-test-'))
+    testState.dir = mkdtempSync(join(tmpdir(), 'pebble-test-'))
   })
 
   afterEach(() => {

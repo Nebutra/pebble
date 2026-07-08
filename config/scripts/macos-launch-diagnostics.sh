@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Capture one-shot macOS launch diagnostics for a published Orca release.
+# Capture one-shot macOS launch diagnostics for a published Pebble release.
 #
 # Usage:
-#   ORCA_DIAGNOSTIC_TAG=v1.4.42-rc.1 bash config/scripts/macos-launch-diagnostics.sh
+#   PEBBLE_DIAGNOSTIC_TAG=v1.4.42-rc.1 bash config/scripts/macos-launch-diagnostics.sh
 #   bash config/scripts/macos-launch-diagnostics.sh --tag v1.4.42-rc.1
 set -euo pipefail
 
-REPO="${ORCA_DIAGNOSTIC_REPO:-stablyai/orca}"
-TAG="${ORCA_DIAGNOSTIC_TAG:-}"
+REPO="${PEBBLE_DIAGNOSTIC_REPO:-nebutra/pebble}"
+TAG="${PEBBLE_DIAGNOSTIC_TAG:-}"
 KEEP=0
 
 while [[ $# -gt 0 ]]; do
@@ -26,10 +26,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     -h|--help)
       cat <<'EOF'
-Capture one-shot macOS launch diagnostics for a published Orca release.
+Capture one-shot macOS launch diagnostics for a published Pebble release.
 
 Usage:
-  ORCA_DIAGNOSTIC_TAG=v1.4.42-rc.1 bash config/scripts/macos-launch-diagnostics.sh
+  PEBBLE_DIAGNOSTIC_TAG=v1.4.42-rc.1 bash config/scripts/macos-launch-diagnostics.sh
   bash config/scripts/macos-launch-diagnostics.sh --tag v1.4.42-rc.1
 EOF
       exit 0
@@ -48,14 +48,14 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 if [[ -z "$TAG" ]]; then
-  echo "Set ORCA_DIAGNOSTIC_TAG or pass --tag vX.Y.Z-rc.N." >&2
+  echo "Set PEBBLE_DIAGNOSTIC_TAG or pass --tag vX.Y.Z-rc.N." >&2
   exit 2
 fi
 
 ARCH="$(uname -m)"
 case "$ARCH" in
-  arm64) ASSET="orca-macos-arm64.dmg" ;;
-  x86_64) ASSET="orca-macos-x64.dmg" ;;
+  arm64) ASSET="pebble-macos-arm64.dmg" ;;
+  x86_64) ASSET="pebble-macos-x64.dmg" ;;
   *)
     echo "Unsupported macOS architecture: $ARCH" >&2
     exit 2
@@ -63,21 +63,21 @@ case "$ARCH" in
 esac
 
 TIMESTAMP="$(date -u '+%Y%m%dT%H%M%SZ')"
-WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/orca-launch-diagnostics.XXXXXXXX")"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/pebble-launch-diagnostics.XXXXXXXX")"
 OUT_DIR="$WORK_DIR/output"
 MOUNT_DIR="$WORK_DIR/mount"
-APP_DIR="$WORK_DIR/Orca.app"
+APP_DIR="$WORK_DIR/Pebble.app"
 DMG_PATH="$WORK_DIR/$ASSET"
 mkdir -p "$OUT_DIR" "$MOUNT_DIR"
 
 if [[ -d "$HOME/Desktop" ]]; then
-  ZIP_PATH="$HOME/Desktop/orca-launch-diagnostics-${TAG}-${TIMESTAMP}.zip"
+  ZIP_PATH="$HOME/Desktop/pebble-launch-diagnostics-${TAG}-${TIMESTAMP}.zip"
 else
-  ZIP_PATH="$PWD/orca-launch-diagnostics-${TAG}-${TIMESTAMP}.zip"
+  ZIP_PATH="$PWD/pebble-launch-diagnostics-${TAG}-${TIMESTAMP}.zip"
 fi
 
 diag_log() {
-  printf '[orca-diagnostics] %s\n' "$*"
+  printf '[pebble-diagnostics] %s\n' "$*"
 }
 
 run_capture() {
@@ -121,23 +121,23 @@ write_environment_report() {
     echo "## shell"
     echo "$SHELL"
     echo
-    echo "## current Orca processes before diagnostics"
-    pgrep -fl 'Orca|orca' || true
+    echo "## current Pebble processes before diagnostics"
+    pgrep -fl 'Pebble|pebble' || true
   } >"$OUT_DIR/environment.txt"
 }
 
-ensure_no_existing_orca() {
+ensure_no_existing_pebble() {
   local existing
-  existing="$(pgrep -x Orca || true)"
+  existing="$(pgrep -x Pebble || true)"
   if [[ -z "$existing" ]]; then
     return 0
   fi
 
   {
-    echo "An Orca process is already running. Close Orca and run this script again."
+    echo "A Pebble process is already running. Close Pebble and run this script again."
     echo
     ps -p "$(printf '%s' "$existing" | paste -sd, -)" -o pid=,ppid=,command= || true
-  } | tee "$OUT_DIR/existing-orca-process.txt" >&2
+  } | tee "$OUT_DIR/existing-pebble-process.txt" >&2
   exit 2
 }
 
@@ -187,7 +187,7 @@ write_app_report() {
 
 start_log_stream() {
   local file="$1"
-  local predicate='process == "Orca" OR eventMessage CONTAINS[c] "Orca" OR eventMessage CONTAINS[c] "com.stablyai.orca"'
+  local predicate='process == "Pebble" OR eventMessage CONTAINS[c] "Pebble" OR eventMessage CONTAINS[c] "nebutra.pebble"'
   if command -v log >/dev/null 2>&1; then
     command log stream --style compact --predicate "$predicate" >"$file" 2>&1 &
     echo "$!"
@@ -204,8 +204,8 @@ stop_log_stream() {
   fi
 }
 
-latest_orca_pid_for_app() {
-  pgrep -nf "$APP_DIR/Contents/MacOS/Orca" || true
+latest_pebble_pid_for_app() {
+  pgrep -nf "$APP_DIR/Contents/MacOS/Pebble" || true
 }
 
 sample_process_once() {
@@ -218,7 +218,7 @@ sample_process_once() {
 
 terminate_app_processes() {
   local pid
-  pid="$(latest_orca_pid_for_app)"
+  pid="$(latest_pebble_pid_for_app)"
   if [[ -n "$pid" ]]; then
     kill "$pid" >/dev/null 2>&1 || true
     sleep 1
@@ -237,7 +237,7 @@ wait_for_probe() {
 
   for i in $(seq 1 200); do
     local app_pid
-    app_pid="$(latest_orca_pid_for_app)"
+    app_pid="$(latest_pebble_pid_for_app)"
     if [[ "$sampled" -eq 0 && -n "$app_pid" ]]; then
       sampled=1
       echo "sampled_pid=$app_pid" >>"$OUT_DIR/$label.meta"
@@ -284,9 +284,9 @@ run_launchservices_probe() {
       --stdout "$stdout_file" \
       --stderr "$stderr_file" \
       --env ELECTRON_ENABLE_LOGGING=1 \
-      --env ORCA_STARTUP_DIAGNOSTICS=trace \
-      --env ORCA_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
-      --env ORCA_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
+      --env PEBBLE_STARTUP_DIAGNOSTICS=trace \
+      --env PEBBLE_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
+      --env PEBBLE_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
       --env "$extra_env_name=$extra_env_value" \
       "$APP_DIR" &
   else
@@ -294,9 +294,9 @@ run_launchservices_probe() {
       --stdout "$stdout_file" \
       --stderr "$stderr_file" \
       --env ELECTRON_ENABLE_LOGGING=1 \
-      --env ORCA_STARTUP_DIAGNOSTICS=trace \
-      --env ORCA_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
-      --env ORCA_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
+      --env PEBBLE_STARTUP_DIAGNOSTICS=trace \
+      --env PEBBLE_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
+      --env PEBBLE_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
       "$APP_DIR" &
   fi
   local runner_pid="$!"
@@ -322,10 +322,10 @@ run_direct_exec_probe() {
   } >"$OUT_DIR/$label.meta"
 
   ELECTRON_ENABLE_LOGGING=1 \
-    ORCA_STARTUP_DIAGNOSTICS=trace \
-    ORCA_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
-    ORCA_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
-    "$APP_DIR/Contents/MacOS/Orca" >"$stdout_file" 2>"$stderr_file" &
+    PEBBLE_STARTUP_DIAGNOSTICS=trace \
+    PEBBLE_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
+    PEBBLE_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
+    "$APP_DIR/Contents/MacOS/Pebble" >"$stdout_file" 2>"$stderr_file" &
   local runner_pid="$!"
   wait_for_probe "$runner_pid" "$label"
   echo "ended_utc=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >>"$OUT_DIR/$label.meta"
@@ -333,7 +333,7 @@ run_direct_exec_probe() {
 }
 
 write_system_log_snapshot() {
-  local predicate='process == "Orca" OR eventMessage CONTAINS[c] "Orca" OR eventMessage CONTAINS[c] "com.stablyai.orca"'
+  local predicate='process == "Pebble" OR eventMessage CONTAINS[c] "Pebble" OR eventMessage CONTAINS[c] "nebutra.pebble"'
   if command -v log >/dev/null 2>&1; then
     diag_log "capturing recent unified log snapshot"
     command log show --style syslog --last 10m --predicate "$predicate" >"$OUT_DIR/system-log-last-10m.log" 2>&1 || true
@@ -356,11 +356,11 @@ package_results() {
 }
 
 write_environment_report
-ensure_no_existing_orca
+ensure_no_existing_pebble
 download_and_copy_app
 write_app_report
 run_launchservices_probe "launchservices-trace"
-run_launchservices_probe "launchservices-bypass-lock" "ORCA_BYPASS_SINGLE_INSTANCE_LOCK" "1"
+run_launchservices_probe "launchservices-bypass-lock" "PEBBLE_BYPASS_SINGLE_INSTANCE_LOCK" "1"
 run_direct_exec_probe
 write_system_log_snapshot
 package_results

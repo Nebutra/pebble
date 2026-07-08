@@ -113,7 +113,7 @@ describe('hosted review slice', () => {
             number: 12,
             title: 'Old GitHub PR',
             state: 'open',
-            url: 'https://github.com/acme/orca/pull/12',
+            url: 'https://github.com/acme/pebble/pull/12',
             checksStatus: 'pending',
             updatedAt: '2026-03-28T00:00:00Z',
             mergeable: 'UNKNOWN',
@@ -126,7 +126,7 @@ describe('hosted review slice', () => {
             number: 99,
             title: 'Old path-scoped GitHub PR',
             state: 'closed',
-            url: 'https://github.com/acme/orca/pull/99',
+            url: 'https://github.com/acme/pebble/pull/99',
             checksStatus: 'failure',
             updatedAt: '2026-03-28T00:00:00Z',
             mergeable: 'UNKNOWN',
@@ -289,7 +289,7 @@ describe('hosted review slice', () => {
     mockApi.hostedReview.create.mockResolvedValueOnce({
       ok: true,
       number: 12,
-      url: 'https://github.com/acme/orca/pull/12'
+      url: 'https://github.com/acme/pebble/pull/12'
     })
     const store = makeStore()
 
@@ -319,7 +319,7 @@ describe('hosted review slice', () => {
     mockApi.hostedReview.create.mockResolvedValueOnce({
       ok: true,
       number: 12,
-      url: 'https://github.com/acme/orca/pull/12'
+      url: 'https://github.com/acme/pebble/pull/12'
     })
     const store = makeStore()
     store.setState({
@@ -382,7 +382,7 @@ describe('hosted review slice', () => {
     runtimeRpc.callRuntimeRpc.mockResolvedValueOnce({
       ok: true,
       number: 12,
-      url: 'https://github.com/acme/orca/pull/12'
+      url: 'https://github.com/acme/pebble/pull/12'
     })
     const store = makeStore({
       activeRuntimeEnvironmentId: 'env-win'
@@ -522,7 +522,7 @@ describe('hosted review slice', () => {
       number: 7,
       title: 'Merged at head',
       state: 'merged',
-      url: 'https://github.com/acme/orca/pull/7',
+      url: 'https://github.com/acme/pebble/pull/7',
       status: 'success',
       updatedAt: '2026-05-10T00:00:00.000Z',
       mergeable: 'MERGEABLE',
@@ -553,7 +553,7 @@ describe('hosted review slice', () => {
       number: 7,
       title: 'Merged with unpulled final head',
       state: 'merged',
-      url: 'https://github.com/acme/orca/pull/7',
+      url: 'https://github.com/acme/pebble/pull/7',
       status: 'success',
       updatedAt: '2026-05-10T00:00:00.000Z',
       mergeable: 'MERGEABLE',
@@ -600,7 +600,7 @@ describe('hosted review slice', () => {
             number: 7,
             title: 'Merged at head',
             state: 'merged',
-            url: 'https://github.com/acme/orca/pull/7',
+            url: 'https://github.com/acme/pebble/pull/7',
             status: 'success',
             updatedAt: '2026-05-10T00:00:00.000Z',
             mergeable: 'MERGEABLE',

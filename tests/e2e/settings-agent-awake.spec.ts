@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import type { ElectronApplication, Page } from '@stablyai/playwright-test'
-import { test, expect } from './helpers/orca-app'
+import type { ElectronApplication, Page } from '@nebutra/playwright-test'
+import { test, expect } from './helpers/pebble-app'
 import { waitForSessionReady } from './helpers/store'
 import type { GlobalSettings } from '../../src/shared/types'
 import { readHookEndpoint } from './helpers/agent-hook-endpoint'
@@ -48,22 +48,22 @@ async function dismissTransientAnnouncement(page: Page): Promise<void> {
 async function installPowerSaveBlockerProbe(electronApp: ElectronApplication): Promise<void> {
   await electronApp.evaluate(({ powerSaveBlocker }) => {
     const root = globalThis as typeof globalThis & {
-      __orcaAwakePowerProbe?: {
+      __pebbleAwakePowerProbe?: {
         starts: { type: string; id: number }[]
         stops: { id: number }[]
         originalStart: typeof powerSaveBlocker.start
         originalStop: typeof powerSaveBlocker.stop
       }
     }
-    if (root.__orcaAwakePowerProbe) {
-      root.__orcaAwakePowerProbe.starts = []
-      root.__orcaAwakePowerProbe.stops = []
+    if (root.__pebbleAwakePowerProbe) {
+      root.__pebbleAwakePowerProbe.starts = []
+      root.__pebbleAwakePowerProbe.stops = []
       return
     }
 
     const originalStart = powerSaveBlocker.start.bind(powerSaveBlocker)
     const originalStop = powerSaveBlocker.stop.bind(powerSaveBlocker)
-    root.__orcaAwakePowerProbe = {
+    root.__pebbleAwakePowerProbe = {
       starts: [],
       stops: [],
       originalStart,
@@ -72,12 +72,12 @@ async function installPowerSaveBlockerProbe(electronApp: ElectronApplication): P
 
     powerSaveBlocker.start = ((type) => {
       const id = originalStart(type)
-      root.__orcaAwakePowerProbe?.starts.push({ type, id })
+      root.__pebbleAwakePowerProbe?.starts.push({ type, id })
       return id
     }) as typeof powerSaveBlocker.start
 
     powerSaveBlocker.stop = ((id) => {
-      root.__orcaAwakePowerProbe?.stops.push({ id })
+      root.__pebbleAwakePowerProbe?.stops.push({ id })
       originalStop(id)
     }) as typeof powerSaveBlocker.stop
   })
@@ -89,12 +89,12 @@ async function readPowerSaveBlockerProbe(
   return electronApp.evaluate(({ powerSaveBlocker }) => {
     const probe = (
       globalThis as typeof globalThis & {
-        __orcaAwakePowerProbe?: {
+        __pebbleAwakePowerProbe?: {
           starts: { type: string; id: number }[]
           stops: { id: number }[]
         }
       }
-    ).__orcaAwakePowerProbe
+    ).__pebbleAwakePowerProbe
     const starts = probe?.starts ?? []
     return {
       starts: starts.map((start) => ({ ...start })),
@@ -117,7 +117,7 @@ async function postCodexHookEvent(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Orca-Agent-Hook-Token': endpoint.token
+      'X-Pebble-Agent-Hook-Token': endpoint.token
     },
     body: JSON.stringify({
       paneKey: options.paneKey,
@@ -135,20 +135,20 @@ async function postCodexHookEvent(
 }
 
 test.describe('Agent awake setting', () => {
-  test.beforeEach(async ({ orcaPage }) => {
-    await waitForSessionReady(orcaPage)
+  test.beforeEach(async ({ pebblePage }) => {
+    await waitForSessionReady(pebblePage)
   })
 
-  test('can be toggled from Agents settings and persists through IPC', async ({ orcaPage }) => {
-    await openSettings(orcaPage)
-    await dismissTransientAnnouncement(orcaPage)
-    await orcaPage.getByPlaceholder('Search settings').fill('awake')
+  test('can be toggled from Agents settings and persists through IPC', async ({ pebblePage }) => {
+    await openSettings(pebblePage)
+    await dismissTransientAnnouncement(pebblePage)
+    await pebblePage.getByPlaceholder('Search settings').fill('awake')
 
     await expect(
-      orcaPage.getByText('Keep computer awake while agents are working').first()
+      pebblePage.getByText('Keep computer awake while agents are working').first()
     ).toBeVisible()
 
-    const keepAwakeSwitch = orcaPage.getByRole('switch', {
+    const keepAwakeSwitch = pebblePage.getByRole('switch', {
       name: 'Keep computer awake while agents are working'
     })
 
@@ -156,7 +156,7 @@ test.describe('Agent awake setting', () => {
     await keepAwakeSwitch.click()
     await expect(keepAwakeSwitch).toHaveAttribute('aria-checked', 'true')
     await expect
-      .poll(async () => (await getSettings(orcaPage)).keepComputerAwakeWhileAgentsRun, {
+      .poll(async () => (await getSettings(pebblePage)).keepComputerAwakeWhileAgentsRun, {
         timeout: 5_000,
         message: 'keep-awake setting did not persist after enabling'
       })
@@ -165,7 +165,7 @@ test.describe('Agent awake setting', () => {
     await keepAwakeSwitch.click()
     await expect(keepAwakeSwitch).toHaveAttribute('aria-checked', 'false')
     await expect
-      .poll(async () => (await getSettings(orcaPage)).keepComputerAwakeWhileAgentsRun, {
+      .poll(async () => (await getSettings(pebblePage)).keepComputerAwakeWhileAgentsRun, {
         timeout: 5_000,
         message: 'keep-awake setting did not persist after disabling'
       })
@@ -174,10 +174,10 @@ test.describe('Agent awake setting', () => {
 
   test('keeps the OS awake only while a hook-reported agent is working', async ({
     electronApp,
-    orcaPage
+    pebblePage
   }) => {
     await installPowerSaveBlockerProbe(electronApp)
-    await setKeepAwake(orcaPage, true)
+    await setKeepAwake(pebblePage, true)
 
     const tabId = 'e2e-awake-tab'
     const paneKey = `${tabId}:${randomUUID()}`

@@ -58,6 +58,7 @@ import { normalizeAutoRenameBranchFromWorkDefaultOn } from '../../../shared/auto
 import { normalizeTerminalCursorStyleDefault } from '../../../shared/terminal-cursor-style-settings'
 import { normalizeTerminalCustomThemes } from '../../../shared/terminal-custom-themes'
 import { normalizeUiLanguage } from '../../../shared/ui-language'
+import { MANAGED_WORKTREE_OWNERSHIP } from '../../../shared/worktree-ownership'
 import type { RateLimitState } from '../../../shared/rate-limit-types'
 import type { RuntimeStatus, RuntimeSyncWindowGraph } from '../../../shared/runtime-types'
 import {
@@ -108,12 +109,12 @@ import { normalizeContextualTourIds, type ContextualTourId } from '../../../shar
 import { translate } from '@/i18n/i18n'
 import { getDefaultCreateProjectParent } from '@/components/sidebar/create-project-defaults'
 
-const SETTINGS_STORAGE_KEY = 'orca.web.settings.v1'
-const UI_STORAGE_KEY = 'orca.web.ui.v1'
-const SESSION_STORAGE_KEY = 'orca.web.workspaceSession.v1'
-const ONBOARDING_STORAGE_KEY = 'orca.web.onboarding.v1'
-const GITHUB_CACHE_STORAGE_KEY = 'orca.web.githubCache.v1'
-const KEYBINDINGS_STORAGE_KEY = 'orca.web.keybindings.v1'
+const SETTINGS_STORAGE_KEY = 'pebble.web.settings.v1'
+const UI_STORAGE_KEY = 'pebble.web.ui.v1'
+const SESSION_STORAGE_KEY = 'pebble.web.workspaceSession.v1'
+const ONBOARDING_STORAGE_KEY = 'pebble.web.onboarding.v1'
+const GITHUB_CACHE_STORAGE_KEY = 'pebble.web.githubCache.v1'
+const KEYBINDINGS_STORAGE_KEY = 'pebble.web.keybindings.v1'
 // Why: browser-paired clients need desktop parity for large dev sessions; the
 // runtime's no-limit default remains capped for lower-level RPC callers.
 const WEB_RUNTIME_WORKTREE_LIST_LIMIT = 10_000
@@ -440,8 +441,8 @@ const webKeybindingListeners = new Set<(snapshot: KeybindingFileSnapshot) => voi
 
 export function installWebPreloadApi(): void {
   activeEnvironment = readStoredWebRuntimeEnvironment()
-  const webWindow = window as unknown as { __ORCA_WEB_CLIENT__?: boolean }
-  webWindow.__ORCA_WEB_CLIENT__ = true
+  const webWindow = window as unknown as { __PEBBLE_WEB_CLIENT__?: boolean }
+  webWindow.__PEBBLE_WEB_CLIENT__ = true
   window.electron = createFallbackProxy(['electron']) as Window['electron']
   window.api = withFallback(createWebPreloadApi(), []) as PreloadApi
 }
@@ -451,7 +452,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     app: {
       getIdentity: () =>
         Promise.resolve({
-          name: 'Orca',
+          name: 'Pebble',
           isDev: false,
           devLabel: null,
           devBranch: null,
@@ -480,7 +481,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       complete: () => Promise.resolve(),
       disable: () => Promise.resolve(),
       openWeb: () => Promise.resolve(),
-      starOrca: () => Promise.resolve(false),
+      starPebble: () => Promise.resolve(false),
       forceShow: () => Promise.resolve(),
       agentValueMoment: () => Promise.resolve({ status: 'skipped' }),
       showAgentValueMoment: () => Promise.resolve(),
@@ -1081,7 +1082,7 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
     addFromPairingCode: async ({ name, pairingCode }) => {
       const offer = parseWebPairingInput(pairingCode)
       if (!offer) {
-        throw new Error('Invalid Orca pairing code.')
+        throw new Error('Invalid Pebble pairing code.')
       }
       closeActiveRuntimeClients()
       activeEnvironment = createStoredWebRuntimeEnvironment({ name, offer })
@@ -1708,7 +1709,7 @@ function createBrowserApi(): NonNullable<Partial<PreloadApi>['browser']> {
     onNavigationUpdate: () => noopUnsubscribe,
     onActivateView: () => noopUnsubscribe,
     onPaneFocus: () => noopUnsubscribe,
-    onOpenLinkInOrcaTab: () => noopUnsubscribe,
+    onOpenLinkInPebbleTab: () => noopUnsubscribe,
     cancelDownload: () => Promise.resolve(false),
     setGrabMode: () =>
       Promise.resolve({
@@ -1878,8 +1879,8 @@ function createGitHubApi(): WebGitHubApi {
         args
       ),
     onWorkItemMutated: () => noopUnsubscribe,
-    checkOrcaStarred: () => Promise.resolve(null),
-    starOrca: () => Promise.resolve(false),
+    checkPebbleStarred: () => Promise.resolve(null),
+    starPebble: () => Promise.resolve(false),
     rateLimit: (args) =>
       route<WebGitHubResult<'rateLimit'>>(GITHUB_WEB_RPC_METHODS.rateLimit, args),
     diagnoseAuth: () =>
@@ -2318,7 +2319,7 @@ function createPreflightApi(): NonNullable<Partial<PreloadApi>['preflight']> {
 function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
   const status = {
     platform: getBrowserPlatform(),
-    commandName: getBrowserPlatform() === 'linux' ? 'orca-ide' : 'orca',
+    commandName: getBrowserPlatform() === 'linux' ? 'pebble-ide' : 'pebble',
     commandPath: null,
     pathDirectory: null,
     pathConfigured: false,
@@ -2328,7 +2329,7 @@ function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
     state: 'unsupported',
     currentTarget: null,
     unsupportedReason: 'launch_mode_unavailable',
-    detail: 'CLI registration is managed on the Orca server, not in the web browser.'
+    detail: 'CLI registration is managed on the Pebble server, not in the web browser.'
   } as const
   return {
     getInstallStatus: () => Promise.resolve(status),
@@ -2362,7 +2363,7 @@ function createAgentHooksApi(): NonNullable<Partial<PreloadApi>['agentHooks']> {
       state: 'not_installed',
       configPath: '',
       managedHooksPresent: false,
-      detail: 'Agent hook status is only available on the Orca server.'
+      detail: 'Agent hook status is only available on the Pebble server.'
     } as const)
   return {
     claudeStatus: () => status('claude'),
@@ -2410,7 +2411,7 @@ function createComputerUsePermissionsApi(): NonNullable<
         helperAppPath: null,
         openedSettings: false,
         launchedHelper: false,
-        nextStep: 'Computer-use permissions are managed on the Orca server.'
+        nextStep: 'Computer-use permissions are managed on the Pebble server.'
       })),
     reset: () =>
       Promise.resolve({
@@ -2777,13 +2778,13 @@ function resolveEnvironment(selector: string): StoredWebRuntimeEnvironment {
     // a fresh web-* environment id even when it points at the same active server.
     return environment
   }
-  throw new Error(`Unknown Orca runtime environment: ${selector}`)
+  throw new Error(`Unknown Pebble runtime environment: ${selector}`)
 }
 
 function requireActiveEnvironment(): StoredWebRuntimeEnvironment {
   activeEnvironment = activeEnvironment ?? readStoredWebRuntimeEnvironment()
   if (!activeEnvironment) {
-    throw new Error('Pair this web client with an Orca server first.')
+    throw new Error('Pair this web client with an Pebble server first.')
   }
   return activeEnvironment
 }
@@ -2928,7 +2929,7 @@ function getStoredOnboarding(): OnboardingState {
     return closed
   }
   const closed = closeWebOnboarding(getDefaultOnboardingState())
-  // Why: pairing already means the user has an Orca server. Desktop first-run
+  // Why: pairing already means the user has an Pebble server. Desktop first-run
   // onboarding would incorrectly probe browser-local tools and block the client.
   writeJson(ONBOARDING_STORAGE_KEY, closed)
   return closed
@@ -3161,7 +3162,7 @@ function toLegacyDetectedWorktreeResult(
     source: 'session-fallback',
     worktrees: worktrees.map((worktree) => ({
       ...worktree,
-      ownership: 'orca-managed',
+      ownership: MANAGED_WORKTREE_OWNERSHIP,
       selectedCheckout: false,
       visible: true
     }))
@@ -3237,7 +3238,7 @@ function mapRepoPathArg(args: unknown): unknown {
     ...record,
     // Why: runtime repo selectors accept loose path/name forms, but duplicate
     // checked-out repos can make those ambiguous. The renderer already passes
-    // Orca's repo id on task calls, so prefer the explicit selector.
+    // Pebble's repo id on task calls, so prefer the explicit selector.
     repo: repoId ? `id:${repoId}` : record.repoPath
   }
 }

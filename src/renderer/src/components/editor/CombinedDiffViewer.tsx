@@ -57,7 +57,7 @@ import {
 } from './CombinedDiffFileTree'
 import { getCombinedDiffFileTreeSectionKey } from './combined-diff-file-tree-model'
 import {
-  ORCA_EDITOR_EXTERNAL_FILE_CHANGE_EVENT,
+  PEBBLE_EDITOR_EXTERNAL_FILE_CHANGE_EVENT,
   type EditorPathMutationTarget
 } from './editor-autosave'
 import {
@@ -144,7 +144,7 @@ function getRetainedResolvedSnapshotEntries(sections: readonly DiffSection[]): G
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener(ORCA_EDITOR_EXTERNAL_FILE_CHANGE_EVENT, (event) => {
+  window.addEventListener(PEBBLE_EDITOR_EXTERNAL_FILE_CHANGE_EVENT, (event) => {
     const detail = (event as CustomEvent<EditorPathMutationTarget>).detail
     if (detail?.relativePath) {
       // Why: inactive combined-diff tabs are unmounted, so only a module-level
@@ -1081,9 +1081,9 @@ export default function CombinedDiffViewer({
         }
       }
     }
-    window.addEventListener(ORCA_EDITOR_EXTERNAL_FILE_CHANGE_EVENT, handler as EventListener)
+    window.addEventListener(PEBBLE_EDITOR_EXTERNAL_FILE_CHANGE_EVENT, handler as EventListener)
     return () =>
-      window.removeEventListener(ORCA_EDITOR_EXTERNAL_FILE_CHANGE_EVENT, handler as EventListener)
+      window.removeEventListener(PEBBLE_EDITOR_EXTERNAL_FILE_CHANGE_EVENT, handler as EventListener)
   }, [file.runtimeEnvironmentId, file.worktreeId, requestCombinedDiffSectionReload, treeMode])
 
   const setAllSectionsCollapsed = useCallback((collapsed: boolean) => {

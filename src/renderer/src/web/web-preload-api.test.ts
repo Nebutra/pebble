@@ -74,7 +74,7 @@ async function installApi(userAgent?: string): Promise<{
 
 function writeStoredRuntimeEnvironment(storage: Storage): void {
   storage.setItem(
-    'orca.web.runtimeEnvironment.v1',
+    'pebble.web.runtimeEnvironment.v1',
     JSON.stringify({
       id: 'web-env-1',
       name: 'Test runtime',
@@ -185,7 +185,7 @@ describe('web keybindings preload API', () => {
     })
 
     expect(updated.overrides['worktree.palette']).toEqual(['Ctrl+Alt+J'])
-    expect(storage.getItem('orca.web.keybindings.v1')).toContain('worktree.palette')
+    expect(storage.getItem('pebble.web.keybindings.v1')).toContain('worktree.palette')
 
     const disabled = await api.keybindings.setAction({
       actionId: 'worktree.palette',
@@ -252,14 +252,14 @@ describe('web settings preload API', () => {
   it('migrates first-work branch auto-rename on for stored legacy web settings once', async () => {
     const globals = installBrowserGlobals('Linux')
     globals.storage.setItem(
-      'orca.web.settings.v1',
+      'pebble.web.settings.v1',
       JSON.stringify({ autoRenameBranchFromWork: false })
     )
     const { installWebPreloadApi } = await import('./web-preload-api')
     installWebPreloadApi()
 
     const settings = await globals.window.api.settings.get()
-    const stored = JSON.parse(globals.storage.getItem('orca.web.settings.v1') ?? '{}') as {
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.settings.v1') ?? '{}') as {
       autoRenameBranchFromWork?: boolean
       autoRenameBranchFromWorkDefaultedOn?: boolean
     }
@@ -272,12 +272,12 @@ describe('web settings preload API', () => {
 
   it('migrates inherited terminal bar cursor defaults for stored web settings once', async () => {
     const globals = installBrowserGlobals('Linux')
-    globals.storage.setItem('orca.web.settings.v1', JSON.stringify({ terminalCursorStyle: 'bar' }))
+    globals.storage.setItem('pebble.web.settings.v1', JSON.stringify({ terminalCursorStyle: 'bar' }))
     const { installWebPreloadApi } = await import('./web-preload-api')
     installWebPreloadApi()
 
     const settings = await globals.window.api.settings.get()
-    const stored = JSON.parse(globals.storage.getItem('orca.web.settings.v1') ?? '{}') as {
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.settings.v1') ?? '{}') as {
       terminalCursorStyle?: string
       terminalCursorStyleDefaultedToBlock?: boolean
     }
@@ -291,7 +291,7 @@ describe('web settings preload API', () => {
   it('preserves terminal cursor choices after the web block-default migration', async () => {
     const globals = installBrowserGlobals('Linux')
     globals.storage.setItem(
-      'orca.web.settings.v1',
+      'pebble.web.settings.v1',
       JSON.stringify({
         terminalCursorStyle: 'bar',
         terminalCursorStyleDefaultedToBlock: true
@@ -308,7 +308,7 @@ describe('web settings preload API', () => {
   it('preserves first-work branch auto-rename web opt-outs after migration', async () => {
     const globals = installBrowserGlobals('Linux')
     globals.storage.setItem(
-      'orca.web.settings.v1',
+      'pebble.web.settings.v1',
       JSON.stringify({
         autoRenameBranchFromWork: false,
         autoRenameBranchFromWorkDefaultedOn: true
@@ -318,7 +318,7 @@ describe('web settings preload API', () => {
     installWebPreloadApi()
 
     const settings = await globals.window.api.settings.get()
-    const stored = JSON.parse(globals.storage.getItem('orca.web.settings.v1') ?? '{}') as {
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.settings.v1') ?? '{}') as {
       autoRenameBranchFromWork?: boolean
       autoRenameBranchFromWorkDefaultedOn?: boolean
     }
@@ -333,7 +333,7 @@ describe('web settings preload API', () => {
     const { api, storage } = await installApi('Linux')
 
     const settings = await api.settings.set({ autoRenameBranchFromWork: false })
-    const stored = JSON.parse(storage.getItem('orca.web.settings.v1') ?? '{}') as {
+    const stored = JSON.parse(storage.getItem('pebble.web.settings.v1') ?? '{}') as {
       autoRenameBranchFromWork?: boolean
       autoRenameBranchFromWorkDefaultedOn?: boolean
     }
@@ -368,7 +368,7 @@ describe('web settings preload API', () => {
     installWebPreloadApi()
 
     const settings = await globals.window.api.settings.get()
-    const stored = JSON.parse(globals.storage.getItem('orca.web.settings.v1') ?? '{}') as {
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.settings.v1') ?? '{}') as {
       compactWorktreeCards?: boolean
     }
 
@@ -401,7 +401,7 @@ describe('web settings preload API', () => {
     installWebPreloadApi()
 
     const settings = await globals.window.api.settings.get()
-    const stored = JSON.parse(globals.storage.getItem('orca.web.settings.v1') ?? '{}') as {
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.settings.v1') ?? '{}') as {
       experimentalNewWorktreeCardStyle?: boolean
     }
 
@@ -439,7 +439,7 @@ describe('web settings preload API', () => {
     installWebPreloadApi()
 
     const settings = await globals.window.api.settings.get()
-    const stored = JSON.parse(globals.storage.getItem('orca.web.settings.v1') ?? '{}') as {
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.settings.v1') ?? '{}') as {
       minimaxGroupId?: string
       minimaxUsageModels?: string
     }
@@ -476,7 +476,7 @@ describe('web settings preload API', () => {
 
     const settings = await globals.window.api.settings.set({ compactWorktreeCards: true })
 
-    const stored = JSON.parse(globals.storage.getItem('orca.web.settings.v1') ?? '{}') as {
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.settings.v1') ?? '{}') as {
       compactWorktreeCards?: boolean
     }
 
@@ -553,7 +553,7 @@ describe('web settings preload API', () => {
       minimaxUsageModels: 'general,abab6.5'
     })
 
-    const stored = JSON.parse(globals.storage.getItem('orca.web.settings.v1') ?? '{}') as {
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.settings.v1') ?? '{}') as {
       minimaxGroupId?: string
       minimaxUsageModels?: string
     }
@@ -707,7 +707,7 @@ describe('web UI preload API', () => {
           return Promise.resolve({
             id: `call-${runtimeCalls.length}`,
             ok: true,
-            result: 'C:\\Users\\alice\\AppData\\Local\\Temp\\orca-paste-image.png',
+            result: 'C:\\Users\\alice\\AppData\\Local\\Temp\\pebble-paste-image.png',
             _meta: { runtimeId: 'runtime-1' }
           })
         }
@@ -726,7 +726,7 @@ describe('web UI preload API', () => {
 
     await expect(
       globals.window.api.ui.saveClipboardImageAsTempFile({ connectionId: 'ssh-1' })
-    ).resolves.toBe('C:\\Users\\alice\\AppData\\Local\\Temp\\orca-paste-image.png')
+    ).resolves.toBe('C:\\Users\\alice\\AppData\\Local\\Temp\\pebble-paste-image.png')
     expect(runtimeCalls).toEqual([
       {
         method: 'clipboard.startImageUpload',
@@ -775,7 +775,7 @@ describe('web UI preload API', () => {
           return Promise.resolve({
             id: `call-${runtimeCalls.length}`,
             ok: true,
-            result: '/tmp/orca-paste-image.png',
+            result: '/tmp/pebble-paste-image.png',
             _meta: { runtimeId: 'runtime-1' }
           })
         }
@@ -792,7 +792,7 @@ describe('web UI preload API', () => {
 
     await expect(
       globals.window.api.ui.saveClipboardImageAsTempFile({ connectionId: null })
-    ).resolves.toBe('/tmp/orca-paste-image.png')
+    ).resolves.toBe('/tmp/pebble-paste-image.png')
     expect(runtimeCalls).toEqual([
       {
         method: 'clipboard.startImageUpload',
@@ -1077,7 +1077,7 @@ describe('web UI preload API', () => {
 
   it('keeps explicit local right sidebar visibility over the legacy default', async () => {
     const { api, storage } = await installApi('Linux')
-    storage.setItem('orca.web.ui.v1', JSON.stringify({ rightSidebarOpen: true }))
+    storage.setItem('pebble.web.ui.v1', JSON.stringify({ rightSidebarOpen: true }))
 
     const ui = await api.ui.get()
 
@@ -1153,7 +1153,7 @@ describe('web UI preload API', () => {
     const globals = installBrowserGlobals('Linux')
     writeStoredRuntimeEnvironment(globals.storage)
     globals.storage.setItem(
-      'orca.web.ui.v1',
+      'pebble.web.ui.v1',
       JSON.stringify({ worktreeCardProperties: ['status', 'pr'] })
     )
     const { installWebPreloadApi } = await import('./web-preload-api')
@@ -1223,7 +1223,7 @@ describe('web UI preload API', () => {
     })
     await first
 
-    const stored = JSON.parse(globals.storage.getItem('orca.web.ui.v1') ?? '{}') as {
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.ui.v1') ?? '{}') as {
       featureInteractions?: FeatureInteractionState
     }
     expect(stored.featureInteractions?.tasks).toEqual({
@@ -1258,7 +1258,7 @@ describe('web UI preload API', () => {
     const globals = installBrowserGlobals('Linux')
     writeStoredRuntimeEnvironment(globals.storage)
     globals.storage.setItem(
-      'orca.web.ui.v1',
+      'pebble.web.ui.v1',
       JSON.stringify({
         featureInteractions: {
           tasks: { firstInteractedAt: 50, interactionCount: 3 }
@@ -1269,7 +1269,7 @@ describe('web UI preload API', () => {
     installWebPreloadApi()
 
     const ui = await globals.window.api.ui.get()
-    const stored = JSON.parse(globals.storage.getItem('orca.web.ui.v1') ?? '{}') as {
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.ui.v1') ?? '{}') as {
       featureInteractions?: FeatureInteractionState
     }
 
@@ -1310,7 +1310,7 @@ describe('web UI preload API', () => {
     const globals = installBrowserGlobals('Linux')
     writeStoredRuntimeEnvironment(globals.storage)
     globals.storage.setItem(
-      'orca.web.ui.v1',
+      'pebble.web.ui.v1',
       JSON.stringify({
         contextualToursSeenIds: ['tasks', 'browser']
       })
@@ -1319,7 +1319,7 @@ describe('web UI preload API', () => {
     installWebPreloadApi()
 
     const ui = await globals.window.api.ui.get()
-    const stored = JSON.parse(globals.storage.getItem('orca.web.ui.v1') ?? '{}') as {
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.ui.v1') ?? '{}') as {
       contextualToursSeenIds?: string[]
     }
 
@@ -1346,7 +1346,7 @@ describe('web UI preload API', () => {
     const globals = installBrowserGlobals('Linux')
     writeStoredRuntimeEnvironment(globals.storage)
     globals.storage.setItem(
-      'orca.web.ui.v1',
+      'pebble.web.ui.v1',
       JSON.stringify({
         featureInteractionTelemetryBuckets: { tasks: 'count_1000_plus' }
       })
@@ -1358,7 +1358,7 @@ describe('web UI preload API', () => {
       featureInteractionTelemetryBuckets: { tasks: 'count_500_999' }
     } as never)
     const ui = await globals.window.api.ui.get()
-    const stored = JSON.parse(globals.storage.getItem('orca.web.ui.v1') ?? '{}') as Record<
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.ui.v1') ?? '{}') as Record<
       string,
       unknown
     >
@@ -1390,7 +1390,7 @@ describe('web UI preload API', () => {
     const globals = installBrowserGlobals('Linux')
     writeStoredRuntimeEnvironment(globals.storage)
     globals.storage.setItem(
-      'orca.web.ui.v1',
+      'pebble.web.ui.v1',
       JSON.stringify({
         contextualToursSeenIds: ['tasks']
       })
@@ -1399,7 +1399,7 @@ describe('web UI preload API', () => {
     installWebPreloadApi()
 
     const ui = await globals.window.api.ui.recordFeatureInteraction('tasks')
-    const stored = JSON.parse(globals.storage.getItem('orca.web.ui.v1') ?? '{}') as {
+    const stored = JSON.parse(globals.storage.getItem('pebble.web.ui.v1') ?? '{}') as {
       contextualToursSeenIds?: string[]
     }
 
@@ -1446,7 +1446,7 @@ describe('web UI preload API', () => {
               ok: true,
               result: {
                 platform: 'darwin',
-                helperAppPath: '/Applications/Orca Computer Use.app',
+                helperAppPath: '/Applications/Pebble Computer Use.app',
                 helperUnavailableReason: null,
                 permissions: [
                   { id: 'accessibility', status: 'granted' },
@@ -1462,7 +1462,7 @@ describe('web UI preload API', () => {
               ok: true,
               result: {
                 platform: 'darwin',
-                helperAppPath: '/Applications/Orca Computer Use.app',
+                helperAppPath: '/Applications/Pebble Computer Use.app',
                 permissionId:
                   params && typeof params === 'object' ? (params as { id?: string }).id : undefined,
                 openedSettings: true,
@@ -1555,9 +1555,9 @@ describe('web repos preload API', () => {
   })
 
   it.each([
-    ['/home/alice', '/home/alice/orca/projects'],
-    ['/', '/orca/projects'],
-    ['C:\\', 'C:\\orca\\projects']
+    ['/home/alice', '/home/alice/pebble/projects'],
+    ['/', '/pebble/projects'],
+    ['C:\\', 'C:\\pebble\\projects']
   ])(
     'resolves the default create-project parent from runtime host home %s',
     async (resolvedPath, expectedParent) => {
@@ -1663,7 +1663,7 @@ describe('web worktree preload API', () => {
       repoId: 'repo-1',
       authoritative: true,
       source: 'session-fallback',
-      worktrees: [{ id: worktree.id, ownership: 'orca-managed', visible: true }]
+      worktrees: [{ id: worktree.id, ownership: 'pebble-managed', visible: true }]
     })
     expect(runtimeCalls).toEqual([
       { method: 'worktree.detectedList', params: { repo: 'repo-1' } },
@@ -1724,11 +1724,11 @@ describe('web worktree preload API', () => {
       createdWithAgent: 'codex',
       startup: {
         command: "codex 'summarize repo'",
-        env: { ORCA_AGENT_MODE: 'direct' },
+        env: { PEBBLE_AGENT_MODE: 'direct' },
         launchConfig: {
           agentCommand: 'codex',
           agentArgs: '--model gpt-5',
-          agentEnv: { ORCA_AGENT_MODE: 'direct' }
+          agentEnv: { PEBBLE_AGENT_MODE: 'direct' }
         },
         startupCommandDelivery: 'shell-ready'
       }
@@ -1757,11 +1757,11 @@ describe('web worktree preload API', () => {
           compareBaseRef: 'refs/remotes/origin/main',
           createdWithAgent: 'codex',
           startupCommand: "codex 'summarize repo'",
-          startupEnv: { ORCA_AGENT_MODE: 'direct' },
+          startupEnv: { PEBBLE_AGENT_MODE: 'direct' },
           startupLaunchConfig: {
             agentCommand: 'codex',
             agentArgs: '--model gpt-5',
-            agentEnv: { ORCA_AGENT_MODE: 'direct' }
+            agentEnv: { PEBBLE_AGENT_MODE: 'direct' }
           },
           startupCommandDelivery: 'shell-ready',
           activate: true
@@ -1857,7 +1857,7 @@ describe('web file preload API', () => {
     await expect(
       api.repos.cloneRemote({
         connectionId: 'ssh-1',
-        url: 'https://github.com/stablyai/orca.git',
+        url: 'https://github.com/nebutra/pebble.git',
         destination: '/workspace'
       })
     ).rejects.toThrow('SSH clone is unavailable in paired web clients.')
@@ -2047,7 +2047,7 @@ describe('web GitHub preload API', () => {
         'addIssueCommentBySlug',
         'addPRReviewComment',
         'addPRReviewCommentReply',
-        'checkOrcaStarred',
+        'checkPebbleStarred',
         'clearProjectItemField',
         'countWorkItems',
         'createIssue',
@@ -2087,7 +2087,7 @@ describe('web GitHub preload API', () => {
         'resolveReviewThread',
         'setPRAutoMerge',
         'setPRFileViewed',
-        'starOrca',
+        'starPebble',
         'updateIssue',
         'updateIssueBySlug',
         'updateIssueCommentBySlug',
@@ -2177,12 +2177,12 @@ describe('web GitHub preload API', () => {
       },
       {
         key: 'workItemByOwnerRepo',
-        args: { repoPath, owner: 'acme', repo: 'orca', number: 7, type: 'pr' },
+        args: { repoPath, owner: 'acme', repo: 'pebble', number: 7, type: 'pr' },
         expectedMethod: 'github.workItemByOwnerRepo',
         expectedParams: withRepo({
           repoPath,
           owner: 'acme',
-          ownerRepo: 'orca',
+          ownerRepo: 'pebble',
           number: 7,
           type: 'pr'
         })
@@ -2402,9 +2402,9 @@ describe('web GitHub preload API', () => {
       },
       {
         key: 'projectWorkItemDetailsBySlug',
-        args: { owner: 'acme', repo: 'orca', number: 7, type: 'issue' },
+        args: { owner: 'acme', repo: 'pebble', number: 7, type: 'issue' },
         expectedMethod: 'github.project.workItemDetailsBySlug',
-        expectedParams: { owner: 'acme', repo: 'orca', number: 7, type: 'issue' }
+        expectedParams: { owner: 'acme', repo: 'pebble', number: 7, type: 'issue' }
       },
       {
         key: 'updateProjectItemField',
@@ -2420,57 +2420,57 @@ describe('web GitHub preload API', () => {
       },
       {
         key: 'updateIssueBySlug',
-        args: { owner: 'acme', repo: 'orca', number: 7, updates: { title: 'New' } },
+        args: { owner: 'acme', repo: 'pebble', number: 7, updates: { title: 'New' } },
         expectedMethod: 'github.project.updateIssueBySlug',
-        expectedParams: { owner: 'acme', repo: 'orca', number: 7, updates: { title: 'New' } }
+        expectedParams: { owner: 'acme', repo: 'pebble', number: 7, updates: { title: 'New' } }
       },
       {
         key: 'updatePullRequestBySlug',
-        args: { owner: 'acme', repo: 'orca', number: 7, updates: { title: 'New' } },
+        args: { owner: 'acme', repo: 'pebble', number: 7, updates: { title: 'New' } },
         expectedMethod: 'github.project.updatePullRequestBySlug',
-        expectedParams: { owner: 'acme', repo: 'orca', number: 7, updates: { title: 'New' } }
+        expectedParams: { owner: 'acme', repo: 'pebble', number: 7, updates: { title: 'New' } }
       },
       {
         key: 'addIssueCommentBySlug',
-        args: { owner: 'acme', repo: 'orca', number: 7, body: 'Fixed' },
+        args: { owner: 'acme', repo: 'pebble', number: 7, body: 'Fixed' },
         expectedMethod: 'github.project.addIssueCommentBySlug',
-        expectedParams: { owner: 'acme', repo: 'orca', number: 7, body: 'Fixed' }
+        expectedParams: { owner: 'acme', repo: 'pebble', number: 7, body: 'Fixed' }
       },
       {
         key: 'updateIssueCommentBySlug',
-        args: { owner: 'acme', repo: 'orca', commentId: 9, body: 'Edited' },
+        args: { owner: 'acme', repo: 'pebble', commentId: 9, body: 'Edited' },
         expectedMethod: 'github.project.updateIssueCommentBySlug',
-        expectedParams: { owner: 'acme', repo: 'orca', commentId: 9, body: 'Edited' }
+        expectedParams: { owner: 'acme', repo: 'pebble', commentId: 9, body: 'Edited' }
       },
       {
         key: 'deleteIssueCommentBySlug',
-        args: { owner: 'acme', repo: 'orca', commentId: 9 },
+        args: { owner: 'acme', repo: 'pebble', commentId: 9 },
         expectedMethod: 'github.project.deleteIssueCommentBySlug',
-        expectedParams: { owner: 'acme', repo: 'orca', commentId: 9 }
+        expectedParams: { owner: 'acme', repo: 'pebble', commentId: 9 }
       },
       {
         key: 'listLabelsBySlug',
-        args: { owner: 'acme', repo: 'orca' },
+        args: { owner: 'acme', repo: 'pebble' },
         expectedMethod: 'github.project.listLabelsBySlug',
-        expectedParams: { owner: 'acme', repo: 'orca' }
+        expectedParams: { owner: 'acme', repo: 'pebble' }
       },
       {
         key: 'listAssignableUsersBySlug',
-        args: { owner: 'acme', repo: 'orca', seedLogins: ['alice'] },
+        args: { owner: 'acme', repo: 'pebble', seedLogins: ['alice'] },
         expectedMethod: 'github.project.listAssignableUsersBySlug',
-        expectedParams: { owner: 'acme', repo: 'orca', seedLogins: ['alice'] }
+        expectedParams: { owner: 'acme', repo: 'pebble', seedLogins: ['alice'] }
       },
       {
         key: 'listIssueTypesBySlug',
-        args: { owner: 'acme', repo: 'orca' },
+        args: { owner: 'acme', repo: 'pebble' },
         expectedMethod: 'github.project.listIssueTypesBySlug',
-        expectedParams: { owner: 'acme', repo: 'orca' }
+        expectedParams: { owner: 'acme', repo: 'pebble' }
       },
       {
         key: 'updateIssueTypeBySlug',
-        args: { owner: 'acme', repo: 'orca', number: 7, issueTypeId: 'it-1' },
+        args: { owner: 'acme', repo: 'pebble', number: 7, issueTypeId: 'it-1' },
         expectedMethod: 'github.project.updateIssueTypeBySlug',
-        expectedParams: { owner: 'acme', repo: 'orca', number: 7, issueTypeId: 'it-1' }
+        expectedParams: { owner: 'acme', repo: 'pebble', number: 7, issueTypeId: 'it-1' }
       }
     ]
 

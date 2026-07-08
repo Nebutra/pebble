@@ -15,7 +15,7 @@ import { join } from 'node:path'
 
 // The service calls app.getPath('userData') for its overlay root. Point that
 // at a real tmp dir so we can exercise the filesystem behavior end-to-end.
-const userDataDir = mkdtempSync(join(tmpdir(), 'orca-pi-test-userdata-'))
+const userDataDir = mkdtempSync(join(tmpdir(), 'pebble-pi-test-userdata-'))
 
 // Why: getDefaultPiAgentDir() inside titlebar-extension-service reads
 // homedir() from 'os'. To exercise the ~/.omp/agent fallback branch we
@@ -54,7 +54,7 @@ describe('PiTitlebarExtensionService', () => {
   let piHome: string
 
   beforeEach(() => {
-    piHome = mkdtempSync(join(tmpdir(), 'orca-pi-test-pihome-'))
+    piHome = mkdtempSync(join(tmpdir(), 'pebble-pi-test-pihome-'))
     // Seed a realistic Pi agent dir with skills, extensions, auth, sessions.
     mkdirSync(join(piHome, 'skills', 'my-skill', 'nested'), { recursive: true })
     writeFileSync(join(piHome, 'skills', 'my-skill', 'SKILL.md'), 'critical user skill')
@@ -108,39 +108,40 @@ describe('PiTitlebarExtensionService', () => {
     })
   }
 
-  it('buildPtyEnv installs Orca extensions into the user agent dir without redirecting the home', () => {
+  it('buildPtyEnv installs Pebble extensions into the user agent dir without redirecting the home', () => {
     const svc = new PiTitlebarExtensionService()
     const env = svc.buildPtyEnv('pty-1', piHome, 'pi')
 
     expect(env.PI_CODING_AGENT_DIR).toBeUndefined()
-    expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBe(piHome)
+    expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBe(piHome)
     const extensions = readdirSync(join(piHome, 'extensions')).sort()
     expect(extensions).toEqual([
-      'orca-agent-status.ts',
-      'orca-prefill.ts',
-      'orca-titlebar-spinner.ts',
+      'pebble-agent-status.ts',
+      'pebble-prefill.ts',
+      'pebble-titlebar-spinner.ts',
       'user-ext'
     ])
     const statusExtensionSource = readFileSync(
-      join(piHome, 'extensions', 'orca-agent-status.ts'),
+      join(piHome, 'extensions', 'pebble-agent-status.ts'),
       'utf-8'
     )
     const titlebarExtensionSource = readFileSync(
-      join(piHome, 'extensions', 'orca-titlebar-spinner.ts'),
+      join(piHome, 'extensions', 'pebble-titlebar-spinner.ts'),
       'utf-8'
     )
     const prefillExtensionSource = readFileSync(
-      join(piHome, 'extensions', 'orca-prefill.ts'),
+      join(piHome, 'extensions', 'pebble-prefill.ts'),
       'utf-8'
     )
-    expect(statusExtensionSource).toContain('@orca-managed-pi-extension')
+    expect(statusExtensionSource).toContain('@pebble-managed-pi-extension')
     expect(statusExtensionSource).toContain('/hook/pi')
     expect(statusExtensionSource).toContain('process.title')
     expect(statusExtensionSource).toContain("return '/hook/omp'")
-    expect(titlebarExtensionSource).toContain('@orca-managed-pi-extension')
-    expect(titlebarExtensionSource).toContain('process.env.ORCA_PANE_KEY')
-    expect(prefillExtensionSource).toContain('@orca-managed-pi-extension')
-    expect(prefillExtensionSource).toContain('process.env.ORCA_PANE_KEY')
+    expect(statusExtensionSource).toContain('process.env.PEBBLE_PANE_KEY')
+    expect(titlebarExtensionSource).toContain('@pebble-managed-pi-extension')
+    expect(titlebarExtensionSource).toContain('process.env.PEBBLE_PANE_KEY')
+    expect(prefillExtensionSource).toContain('@pebble-managed-pi-extension')
+    expect(prefillExtensionSource).toContain('process.env.PEBBLE_PANE_KEY')
     expectPiHomeIntact()
   })
 
@@ -149,7 +150,7 @@ describe('PiTitlebarExtensionService', () => {
     svc.buildPtyEnv('pty-2', piHome, 'pi')
     svc.clearPty('pty-2')
 
-    expect(existsSync(join(piHome, 'extensions', 'orca-agent-status.ts'))).toBe(true)
+    expect(existsSync(join(piHome, 'extensions', 'pebble-agent-status.ts'))).toBe(true)
     expectPiHomeIntact()
   })
 
@@ -160,7 +161,7 @@ describe('PiTitlebarExtensionService', () => {
 
     expect(firstEnv.PI_CODING_AGENT_DIR).toBeUndefined()
     expect(secondEnv.PI_CODING_AGENT_DIR).toBeUndefined()
-    expect(secondEnv.ORCA_PI_SOURCE_AGENT_DIR).toBe(firstEnv.ORCA_PI_SOURCE_AGENT_DIR)
+    expect(secondEnv.PEBBLE_PI_SOURCE_AGENT_DIR).toBe(firstEnv.PEBBLE_PI_SOURCE_AGENT_DIR)
     expect(readFileSync(join(piHome, 'extensions', 'user-ext', 'ext.ts'), 'utf-8')).toBe(
       'user extension'
     )
@@ -175,8 +176,10 @@ describe('PiTitlebarExtensionService', () => {
     const content = 'agent.db credentials'
 
     expect(env.PI_CODING_AGENT_DIR).toBeUndefined()
-    expect(env.ORCA_OMP_SOURCE_AGENT_DIR).toBe(piHome)
-    expect(env.ORCA_OMP_STATUS_EXTENSION).toBe(join(piHome, 'extensions', 'orca-agent-status.ts'))
+    expect(env.PEBBLE_OMP_SOURCE_AGENT_DIR).toBe(piHome)
+    expect(env.PEBBLE_OMP_STATUS_EXTENSION).toBe(
+      join(piHome, 'extensions', 'pebble-agent-status.ts')
+    )
     expect(existsSync(sourcePath)).toBe(false)
     expect(existsSync(join(userDataDir, 'omp-agent-overlays'))).toBe(false)
     expect(existsSync(join(piHome, 'history.db'))).toBe(false)
@@ -193,12 +196,12 @@ describe('PiTitlebarExtensionService', () => {
     expectPiHomeIntact()
   })
 
-  it('rebuilding updates Orca-owned extensions while preserving user files', () => {
+  it('rebuilding updates legacy managed extensions while preserving user files', () => {
     const svc = new PiTitlebarExtensionService()
     svc.buildPtyEnv('pty-refresh-1', piHome, 'pi')
     writeFileSync(
-      join(piHome, 'extensions', 'orca-agent-status.ts'),
-      '// @orca-managed-pi-extension\nstale'
+      join(piHome, 'extensions', 'pebble-agent-status.ts'),
+      '// @pebble-managed-pi-extension\nstale'
     )
 
     rmSync(join(piHome, 'extensions', 'user-ext'), { recursive: true, force: true })
@@ -209,7 +212,7 @@ describe('PiTitlebarExtensionService', () => {
     const secondEnv = svc.buildPtyEnv('pty-refresh-2', piHome, 'pi')
 
     expect(secondEnv.PI_CODING_AGENT_DIR).toBeUndefined()
-    expect(readFileSync(join(piHome, 'extensions', 'orca-agent-status.ts'), 'utf-8')).toContain(
+    expect(readFileSync(join(piHome, 'extensions', 'pebble-agent-status.ts'), 'utf-8')).toContain(
       '/hook/pi'
     )
     expect(readFileSync(join(piHome, 'auth.json'), 'utf-8')).toBe('rotated token')
@@ -218,23 +221,23 @@ describe('PiTitlebarExtensionService', () => {
     )
   })
 
-  it("does not overwrite a user's same-named Orca extension file", () => {
+  it("does not overwrite a user's same-named Pebble extension file", () => {
     const userStatusExtension = 'user-owned status extension'
-    writeFileSync(join(piHome, 'extensions', 'orca-agent-status.ts'), userStatusExtension, 'utf-8')
+    writeFileSync(join(piHome, 'extensions', 'pebble-agent-status.ts'), userStatusExtension, 'utf-8')
 
     const svc = new PiTitlebarExtensionService()
     const env = svc.buildPtyEnv('pty-same-name-extension', piHome, 'pi')
 
     expect(env.PI_CODING_AGENT_DIR).toBeUndefined()
-    expect(readFileSync(join(piHome, 'extensions', 'orca-agent-status.ts'), 'utf-8')).toBe(
+    expect(readFileSync(join(piHome, 'extensions', 'pebble-agent-status.ts'), 'utf-8')).toBe(
       userStatusExtension
     )
     expectPiHomeIntact()
   })
 
-  it('uses an Orca-owned OMP status extension when a same-named user file exists', () => {
+  it('uses a Pebble-owned OMP status extension when a same-named user file exists', () => {
     const userStatusExtension = 'user-owned status extension'
-    const userStatusPath = join(piHome, 'extensions', 'orca-agent-status.ts')
+    const userStatusPath = join(piHome, 'extensions', 'pebble-agent-status.ts')
     writeFileSync(userStatusPath, userStatusExtension, 'utf-8')
 
     const svc = new PiTitlebarExtensionService()
@@ -243,18 +246,18 @@ describe('PiTitlebarExtensionService', () => {
     const fallbackStatusPath = join(
       userDataDir,
       'omp-managed-status-extension',
-      'orca-agent-status.ts'
+      'pebble-agent-status.ts'
     )
     expect(readFileSync(userStatusPath, 'utf-8')).toBe(userStatusExtension)
-    expect(env.ORCA_OMP_STATUS_EXTENSION).toBe(fallbackStatusPath)
-    expect(readFileSync(fallbackStatusPath, 'utf-8')).toContain('@orca-managed-pi-extension')
+    expect(env.PEBBLE_OMP_STATUS_EXTENSION).toBe(fallbackStatusPath)
+    expect(readFileSync(fallbackStatusPath, 'utf-8')).toContain('@pebble-managed-pi-extension')
     expect(readFileSync(fallbackStatusPath, 'utf-8')).toContain('/hook/omp')
   })
 
   it.skipIf(process.platform === 'win32')(
     'writes bundled extensions through a symlinked user extensions dir',
     () => {
-      const realExtensionsDir = mkdtempSync(join(tmpdir(), 'orca-real-pi-extensions-'))
+      const realExtensionsDir = mkdtempSync(join(tmpdir(), 'pebble-real-pi-extensions-'))
       try {
         writeFileSync(join(realExtensionsDir, 'real-user-ext.ts'), 'real user extension')
         rmSync(join(piHome, 'extensions'), { recursive: true, force: true })
@@ -264,10 +267,10 @@ describe('PiTitlebarExtensionService', () => {
         const env = svc.buildPtyEnv('pty-symlinked-extensions', piHome, 'pi')
 
         expect(env.PI_CODING_AGENT_DIR).toBeUndefined()
-        expect(existsSync(join(realExtensionsDir, 'orca-agent-status.ts'))).toBe(true)
-        expect(existsSync(join(realExtensionsDir, 'orca-prefill.ts'))).toBe(true)
-        expect(existsSync(join(realExtensionsDir, 'orca-titlebar-spinner.ts'))).toBe(true)
-        expect(readFileSync(join(realExtensionsDir, 'orca-agent-status.ts'), 'utf-8')).toContain(
+        expect(existsSync(join(realExtensionsDir, 'pebble-agent-status.ts'))).toBe(true)
+        expect(existsSync(join(realExtensionsDir, 'pebble-prefill.ts'))).toBe(true)
+        expect(existsSync(join(realExtensionsDir, 'pebble-titlebar-spinner.ts'))).toBe(true)
+        expect(readFileSync(join(realExtensionsDir, 'pebble-agent-status.ts'), 'utf-8')).toContain(
           '/hook/pi'
         )
       } finally {
@@ -282,7 +285,7 @@ describe('PiTitlebarExtensionService', () => {
   it.skipIf(process.platform === 'win32')(
     'safely handles a pre-existing stale overlay with dangling symlinks',
     () => {
-      // Why: simulate an overlay that was left behind by a prior Orca session,
+      // Why: simulate an overlay that was left behind by a prior Pebble session,
       // where the original Pi home it mirrored has since moved. The teardown
       // should unlink the dangling symlinks in place without trying to follow them.
       const legacyOverlayDir = legacyOverlayPath('pi', 'pty-4')
@@ -294,13 +297,13 @@ describe('PiTitlebarExtensionService', () => {
       const env = svc.buildPtyEnv('pty-4', piHome, 'pi')
 
       expect(env.PI_CODING_AGENT_DIR).toBeUndefined()
-      expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBe(piHome)
+      expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBe(piHome)
       expect(existsSync(legacyOverlayDir)).toBe(false)
       expectPiHomeIntact()
     }
   )
 
-  // Why: per-agent source dir. Orca's user picks Pi or OMP per
+  // Why: per-agent source dir. Pebble's user picks Pi or OMP per
   // launch (the agent kind isn't a global install-time choice), so each
   // build's source dir MUST be resolved from the agent kind, not from a
   // disk-presence check that silently shadows the other agent's user
@@ -315,7 +318,7 @@ describe('PiTitlebarExtensionService', () => {
     }
 
     it('launching pi with both ~/.pi/agent and ~/.omp/agent present installs into ~/.pi/agent', () => {
-      const fakeHome = mkdtempSync(join(tmpdir(), 'orca-pi-both-'))
+      const fakeHome = mkdtempSync(join(tmpdir(), 'pebble-pi-both-'))
       seedAgentDir(fakeHome, '.pi', 'pi')
       seedAgentDir(fakeHome, '.omp', 'omp')
 
@@ -325,12 +328,12 @@ describe('PiTitlebarExtensionService', () => {
         const env = svc.buildPtyEnv('pty-pi-both', undefined, 'pi')
 
         expect(env.PI_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_PI_SOURCE_AGENT_DIR).toBe(join(fakeHome, '.pi', 'agent'))
+        expect(env.PEBBLE_PI_SOURCE_AGENT_DIR).toBe(join(fakeHome, '.pi', 'agent'))
         expect(
-          existsSync(join(fakeHome, '.pi', 'agent', 'extensions', 'orca-agent-status.ts'))
+          existsSync(join(fakeHome, '.pi', 'agent', 'extensions', 'pebble-agent-status.ts'))
         ).toBe(true)
         expect(
-          existsSync(join(fakeHome, '.omp', 'agent', 'extensions', 'orca-agent-status.ts'))
+          existsSync(join(fakeHome, '.omp', 'agent', 'extensions', 'pebble-agent-status.ts'))
         ).toBe(false)
       } finally {
         homedirOverride.current = ''
@@ -339,7 +342,7 @@ describe('PiTitlebarExtensionService', () => {
     })
 
     it('launching omp with both ~/.pi/agent and ~/.omp/agent present installs into ~/.omp/agent', () => {
-      const fakeHome = mkdtempSync(join(tmpdir(), 'orca-omp-both-'))
+      const fakeHome = mkdtempSync(join(tmpdir(), 'pebble-omp-both-'))
       seedAgentDir(fakeHome, '.pi', 'pi')
       seedAgentDir(fakeHome, '.omp', 'omp')
 
@@ -349,18 +352,18 @@ describe('PiTitlebarExtensionService', () => {
         const env = svc.buildPtyEnv('pty-omp-both', undefined, 'omp')
 
         expect(env.PI_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_OMP_SOURCE_AGENT_DIR).toBe(join(fakeHome, '.omp', 'agent'))
-        expect(env.ORCA_OMP_STATUS_EXTENSION).toBe(
-          join(fakeHome, '.omp', 'agent', 'extensions', 'orca-agent-status.ts')
+        expect(env.PEBBLE_OMP_SOURCE_AGENT_DIR).toBe(join(fakeHome, '.omp', 'agent'))
+        expect(env.PEBBLE_OMP_STATUS_EXTENSION).toBe(
+          join(fakeHome, '.omp', 'agent', 'extensions', 'pebble-agent-status.ts')
         )
         expect(
           readFileSync(
-            join(fakeHome, '.omp', 'agent', 'extensions', 'orca-agent-status.ts'),
+            join(fakeHome, '.omp', 'agent', 'extensions', 'pebble-agent-status.ts'),
             'utf-8'
           )
         ).toContain('/hook/omp')
         expect(
-          existsSync(join(fakeHome, '.pi', 'agent', 'extensions', 'orca-agent-status.ts'))
+          existsSync(join(fakeHome, '.pi', 'agent', 'extensions', 'pebble-agent-status.ts'))
         ).toBe(false)
       } finally {
         homedirOverride.current = ''
@@ -370,9 +373,9 @@ describe('PiTitlebarExtensionService', () => {
 
     it('launching omp when only ~/.pi/agent exists does NOT mirror Pi state', () => {
       // Why: missing source dir for the resolved kind must materialize the
-      // overlay from empty (Orca extensions only) — never cross-pollinate
+      // overlay from empty (Pebble extensions only) — never cross-pollinate
       // from the other agent's dir.
-      const fakeHome = mkdtempSync(join(tmpdir(), 'orca-omp-only-pi-'))
+      const fakeHome = mkdtempSync(join(tmpdir(), 'pebble-omp-only-pi-'))
       seedAgentDir(fakeHome, '.pi', 'pi')
       expect(existsSync(join(fakeHome, '.omp'))).toBe(false)
 
@@ -383,13 +386,13 @@ describe('PiTitlebarExtensionService', () => {
 
         const ompAgentDir = join(fakeHome, '.omp', 'agent')
         expect(env.PI_CODING_AGENT_DIR).toBeUndefined()
-        expect(env.ORCA_OMP_SOURCE_AGENT_DIR).toBe(ompAgentDir)
+        expect(env.PEBBLE_OMP_SOURCE_AGENT_DIR).toBe(ompAgentDir)
         expect(existsSync(join(ompAgentDir, 'auth.json'))).toBe(false)
         const extensions = readdirSync(join(ompAgentDir, 'extensions')).sort()
         expect(extensions).toEqual([
-          'orca-agent-status.ts',
-          'orca-prefill.ts',
-          'orca-titlebar-spinner.ts'
+          'pebble-agent-status.ts',
+          'pebble-prefill.ts',
+          'pebble-titlebar-spinner.ts'
         ])
       } finally {
         homedirOverride.current = ''

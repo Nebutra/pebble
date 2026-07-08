@@ -157,7 +157,7 @@ export class RemoteRuntimeRequestConnection {
     const plaintext = decrypt(frame, sharedKey)
     if (plaintext === null) {
       this.close(
-        invalidRemoteRuntimeResponseError('Remote Orca runtime returned an undecryptable frame.')
+        invalidRemoteRuntimeResponseError('Remote Pebble runtime returned an undecryptable frame.')
       )
       return
     }

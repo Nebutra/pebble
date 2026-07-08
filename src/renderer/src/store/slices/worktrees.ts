@@ -57,6 +57,7 @@ import {
   type ExecutionHostId
 } from '../../../../shared/execution-host'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
+import { MANAGED_WORKTREE_OWNERSHIP } from '../../../../shared/worktree-ownership'
 import {
   folderWorkspaceKey,
   isWorkspaceKey,
@@ -156,7 +157,7 @@ function showLocalBaseRefRefreshToast(result: LocalBaseRefRefreshResult | undefi
     {
       description: translate(
         'auto.store.slices.worktrees.903b51c2ed',
-        'Workspace created from {{value0}}, but Orca could not fast-forward local {{value1}} because {{value2}}',
+        'Workspace created from {{value0}}, but Pebble could not fast-forward local {{value1}} because {{value2}}',
         { value0: result.baseRef, value1: result.localBranch, value2: reason }
       )
     }
@@ -547,7 +548,7 @@ function toLegacyDetectedWorktreeResult(
     source: 'session-fallback',
     worktrees: result.worktrees.map((worktree) => ({
       ...worktree,
-      ownership: 'orca-managed',
+      ownership: MANAGED_WORKTREE_OWNERSHIP,
       selectedCheckout: false,
       visible: true
     }))
@@ -577,7 +578,7 @@ function notifyRuntimeScopeForbiddenIfNeeded(error: unknown): boolean {
       id: RUNTIME_SCOPE_FORBIDDEN_TOAST_ID,
       description: translate(
         'auto.store.slices.worktrees.runtimeScopeForbiddenDescription',
-        'Workspaces are unavailable on a mobile-scope pairing. Reconnect using the browser access link from Settings → Runtime Environments → Share this Orca server.'
+        'Workspaces are unavailable on a mobile-scope pairing. Reconnect using the browser access link from Settings → Runtime Environments → Share this Pebble server.'
       )
     }
   )

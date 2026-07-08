@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@stablyai/playwright-test'
+import type { Page, TestInfo } from '@nebutra/playwright-test'
 import {
   dispatchActiveTerminalWheelEvent,
   readActiveTerminalScrollState,

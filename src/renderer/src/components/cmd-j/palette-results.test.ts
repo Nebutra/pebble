@@ -89,8 +89,8 @@ const sections: SettingsNavSection[] = [
     icon: Settings,
     searchEntries: [
       {
-        title: 'Orca CLI',
-        description: 'Register or remove the orca shell command.',
+        title: 'Pebble CLI',
+        description: 'Register or remove the pebble shell command.',
         keywords: ['cli', 'path', 'terminal', 'command', 'shell command'],
         cmdJKeywords: ['cli', 'path', 'command', 'shell command'],
         targetSectionId: 'cli'
@@ -116,10 +116,10 @@ const sections: SettingsNavSection[] = [
   },
   {
     id: 'servers',
-    title: 'Remote Orca Servers',
-    description: 'Pair remote Orca runtimes.',
+    title: 'Remote Pebble Servers',
+    description: 'Pair remote Pebble runtimes.',
     icon: Settings,
-    searchEntries: [{ title: 'Remote Orca Servers' }],
+    searchEntries: [{ title: 'Remote Pebble Servers' }],
     group: 'remote'
   },
   {
@@ -189,7 +189,7 @@ describe('Cmd+J palette middle-band ranking', () => {
     ['browser', 'settings:browser'],
     ['quick commands', 'settings:quick-commands'],
     ['add quick command', 'add-quick-command'],
-    ['orca cli', 'settings:general:cli'],
+    ['pebble cli', 'settings:general:cli'],
     ['shell command', 'settings:general:cli']
   ])('ranks %s first', (query, expectedId) => {
     expect(top(query)).toBe(expectedId)
@@ -201,8 +201,8 @@ describe('Cmd+J palette middle-band ranking', () => {
     )
 
     expect(cliResult).toMatchObject({
-      title: 'Orca CLI',
-      description: 'Register or remove the orca shell command.',
+      title: 'Pebble CLI',
+      description: 'Register or remove the pebble shell command.',
       sectionId: 'general',
       targetSectionId: 'cli'
     })

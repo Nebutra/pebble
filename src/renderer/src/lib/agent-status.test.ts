@@ -194,7 +194,7 @@ describe('detectAgentStatusFromTitle', () => {
 
   // --- Cursor (cursor-agent) synthesized titles ---
   // Why: cursor-agent's native OSC title stays literally "Cursor Agent" for
-  // the entire turn, so Orca synthesizes decorated titles from hook events
+  // the entire turn, so Pebble synthesizes decorated titles from hook events
   // to drive the existing spinner/unread pipeline. These tests pin the
   // contract the main-process hook listener relies on.
   it('treats the bare "Cursor Agent" native title as a no-op (not idle)', () => {
@@ -447,7 +447,7 @@ describe('getAgentLabel', () => {
 
   it('treats Claude Code prefixed task titles as Claude even when they mention another CLI', () => {
     expect(getAgentLabel('✳ Gemini CLI')).toBe('Claude Code')
-    expect(getAgentLabel('. Compare Opencode Vs Orca')).toBe('Claude Code')
+    expect(getAgentLabel('. Compare Opencode Vs Pebble')).toBe('Claude Code')
     expect(getAgentLabel('* Review Codex behavior')).toBe('Claude Code')
   })
 

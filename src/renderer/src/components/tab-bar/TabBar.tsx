@@ -368,7 +368,7 @@ function TabBarInner({
       ),
     [agentCmdOverrides, defaultAgent, detectedIds]
   )
-  const isWebClient = (globalThis as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__ === true
+  const isWebClient = (globalThis as { __PEBBLE_WEB_CLIENT__?: boolean }).__PEBBLE_WEB_CLIENT__ === true
   const windowsTerminalCapabilityOwnerKey = getWindowsTerminalCapabilityOwnerKey(
     activeRuntimeEnvironmentId,
     worktreeConnectionId
@@ -1016,7 +1016,7 @@ function TabBarInner({
       ref={clearPendingNewTabMenuFocusOnUnmount}
       className="flex items-stretch h-full overflow-hidden flex-1 min-w-0"
       // Why: only drops aimed at the top tab/session strip should open files in
-      // Orca's editor. Terminal-pane drops need to keep inserting file paths
+      // Pebble's editor. Terminal-pane drops need to keep inserting file paths
       // into the active coding CLI, so preload routes native OS drops based on
       // this explicit surface marker instead of treating the whole app as an
       // editor drop zone.

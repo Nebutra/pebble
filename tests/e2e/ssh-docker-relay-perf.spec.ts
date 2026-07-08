@@ -1,5 +1,5 @@
-import type { Page } from '@stablyai/playwright-test'
-import { test, expect } from './helpers/orca-app'
+import type { Page } from '@nebutra/playwright-test'
+import { test, expect } from './helpers/pebble-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import {
   execInTerminal,
@@ -14,7 +14,7 @@ import {
   type DockerSshRelayTarget
 } from './helpers/docker-ssh-relay-target'
 
-const RUN_DOCKER_SSH = process.env.ORCA_E2E_SSH_DOCKER === '1'
+const RUN_DOCKER_SSH = process.env.PEBBLE_E2E_SSH_DOCKER === '1'
 const KEY_LATENCY_SAMPLES = 'abcdefghij'
 const MAX_MEDIAN_KEY_LATENCY_MS = 500
 const MAX_WORST_KEY_LATENCY_MS = 2_000
@@ -168,27 +168,27 @@ async function reconnectDockerTarget(page: Page, targetId: string): Promise<void
 }
 
 test.describe('Docker SSH relay perf', () => {
-  test.skip(!RUN_DOCKER_SSH, 'Set ORCA_E2E_SSH_DOCKER=1 to run Docker-backed SSH relay perf.')
+  test.skip(!RUN_DOCKER_SSH, 'Set PEBBLE_E2E_SSH_DOCKER=1 to run Docker-backed SSH relay perf.')
   test.skip(process.platform === 'win32', 'Docker SSH relay perf uses POSIX ssh tooling.')
 
   test('keeps remote typing responsive while the Linux relay streams TUI output', async ({
-    orcaPage
+    pebblePage
   }, testInfo) => {
     test.slow()
     let target: DockerSshRelayTarget | null = null
     try {
       target = startDockerSshRelayTarget(testInfo)
-      await waitForSessionReady(orcaPage)
-      await waitForActiveWorktree(orcaPage)
-      await connectDockerRemote(orcaPage, target)
-      await ensureTerminalVisible(orcaPage, 45_000)
-      await waitForActiveTerminalManager(orcaPage, 60_000)
-      const ptyId = await waitForActivePanePtyId(orcaPage, 60_000)
+      await waitForSessionReady(pebblePage)
+      await waitForActiveWorktree(pebblePage)
+      await connectDockerRemote(pebblePage, target)
+      await ensureTerminalVisible(pebblePage, 45_000)
+      await waitForActiveTerminalManager(pebblePage, 60_000)
+      const ptyId = await waitForActivePanePtyId(pebblePage, 60_000)
 
       const runId = String(Date.now())
-      await execInTerminal(orcaPage, ptyId, `node -e ${shellQuote(remoteTypingLoadScript(runId))}`)
-      await waitForTerminalOutput(orcaPage, `REMOTE_TUI_READY_${runId}`, 30_000, 80_000)
-      const measurement = await measureRemoteTyping(orcaPage, ptyId, runId)
+      await execInTerminal(pebblePage, ptyId, `node -e ${shellQuote(remoteTypingLoadScript(runId))}`)
+      await waitForTerminalOutput(pebblePage, `REMOTE_TUI_READY_${runId}`, 30_000, 80_000)
+      const measurement = await measureRemoteTyping(pebblePage, ptyId, runId)
       const summary = `median=${measurement.medianLatencyMs.toFixed(
         1
       )}ms worst=${measurement.worstLatencyMs.toFixed(1)}ms samples=${measurement.latencies
@@ -201,36 +201,36 @@ test.describe('Docker SSH relay perf', () => {
       })
       expect(measurement.medianLatencyMs).toBeLessThan(MAX_MEDIAN_KEY_LATENCY_MS)
       expect(measurement.worstLatencyMs).toBeLessThan(MAX_WORST_KEY_LATENCY_MS)
-      await stopRemoteLoad(orcaPage, ptyId)
+      await stopRemoteLoad(pebblePage, ptyId)
     } finally {
       cleanupDockerSshRelayTarget(target)
     }
   })
 
   test('keeps an SSH workspace terminal usable after disconnect and reconnect', async ({
-    orcaPage
+    pebblePage
   }, testInfo) => {
     test.slow()
     let target: DockerSshRelayTarget | null = null
     try {
       target = startDockerSshRelayTarget(testInfo)
-      await waitForSessionReady(orcaPage)
-      await waitForActiveWorktree(orcaPage)
-      const remote = await connectDockerRemote(orcaPage, target)
-      await ensureTerminalVisible(orcaPage, 45_000)
-      await waitForActiveTerminalManager(orcaPage, 60_000)
-      const beforePtyId = await waitForActivePanePtyId(orcaPage, 60_000)
+      await waitForSessionReady(pebblePage)
+      await waitForActiveWorktree(pebblePage)
+      const remote = await connectDockerRemote(pebblePage, target)
+      await ensureTerminalVisible(pebblePage, 45_000)
+      await waitForActiveTerminalManager(pebblePage, 60_000)
+      const beforePtyId = await waitForActivePanePtyId(pebblePage, 60_000)
       const beforeMarker = `SSH_RECONNECT_BEFORE_${Date.now()}`
-      await execInTerminal(orcaPage, beforePtyId, `printf ${shellQuote(beforeMarker)}`)
-      await waitForTerminalOutput(orcaPage, beforeMarker, 20_000, 60_000)
+      await execInTerminal(pebblePage, beforePtyId, `printf ${shellQuote(beforeMarker)}`)
+      await waitForTerminalOutput(pebblePage, beforeMarker, 20_000, 60_000)
 
-      await reconnectDockerTarget(orcaPage, remote.targetId)
-      await ensureTerminalVisible(orcaPage, 45_000)
-      await waitForActiveTerminalManager(orcaPage, 60_000)
-      const afterPtyId = await waitForActivePanePtyId(orcaPage, 60_000)
+      await reconnectDockerTarget(pebblePage, remote.targetId)
+      await ensureTerminalVisible(pebblePage, 45_000)
+      await waitForActiveTerminalManager(pebblePage, 60_000)
+      const afterPtyId = await waitForActivePanePtyId(pebblePage, 60_000)
       const afterMarker = `SSH_RECONNECT_AFTER_${Date.now()}`
-      await execInTerminal(orcaPage, afterPtyId, `printf ${shellQuote(afterMarker)}`)
-      await waitForTerminalOutput(orcaPage, afterMarker, 20_000, 60_000)
+      await execInTerminal(pebblePage, afterPtyId, `printf ${shellQuote(afterMarker)}`)
+      await waitForTerminalOutput(pebblePage, afterMarker, 20_000, 60_000)
 
       testInfo.annotations.push({
         type: 'docker-ssh-reconnect',

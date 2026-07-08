@@ -23,39 +23,39 @@ describe('linear issue current worktree link resolution', () => {
     const link = getLinearCurrentIssueFromWorktree({
       id: 'repo::/tmp/worktree',
       path: '/tmp/worktree',
-      linkedLinearIssue: 'sta-335',
+      linkedLinearIssue: 'neb-335',
       linkedLinearIssueWorkspaceId: null,
-      linkedLinearIssueOrganizationUrlKey: 'stably'
+      linkedLinearIssueOrganizationUrlKey: 'nebutra'
     })
 
     expect(link).toMatchObject({
-      identifier: 'STA-335',
+      identifier: 'NEB-335',
       workspaceId: null,
-      organizationUrlKey: 'stably',
+      organizationUrlKey: 'nebutra',
       worktreeId: 'repo::/tmp/worktree'
     })
   })
 
   it('backfills workspace id from split organization URL key metadata', () => {
     connectedWorkspaces.push(
-      makeWorkspace('workspace-1', 'stably'),
+      makeWorkspace('workspace-1', 'nebutra'),
       makeWorkspace('workspace-2', 'acme')
     )
 
-    expect(resolveLegacyLinearLinkWorkspace('STA-335', 'stably')).toEqual({
+    expect(resolveLegacyLinearLinkWorkspace('NEB-335', 'nebutra')).toEqual({
       workspaceId: 'workspace-1',
-      organizationUrlKey: 'stably'
+      organizationUrlKey: 'nebutra'
     })
   })
 
   it('keeps ambiguous split organization URL key backfill workspace-free', () => {
     connectedWorkspaces.push(
-      makeWorkspace('workspace-1', 'stably'),
-      makeWorkspace('workspace-2', 'stably')
+      makeWorkspace('workspace-1', 'nebutra'),
+      makeWorkspace('workspace-2', 'nebutra')
     )
 
-    expect(resolveLegacyLinearLinkWorkspace('STA-335', 'stably')).toEqual({
-      organizationUrlKey: 'stably'
+    expect(resolveLegacyLinearLinkWorkspace('NEB-335', 'nebutra')).toEqual({
+      organizationUrlKey: 'nebutra'
     })
   })
 })

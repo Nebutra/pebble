@@ -1,21 +1,21 @@
 // Chinese phrase fixes from high-visibility UI audit round 5.
 export const ZH_PHRASE_FIXES_ROUND5 = [
-  { pattern: /Orca集成开发环境/g, replacement: 'Orca IDE', whenEnIncludes: 'Orca IDE' },
-  { pattern: /Orca第一/g, replacement: 'Orca 优先', whenEnIncludes: 'Orca first' },
-  { pattern: /Orca移动/g, replacement: 'Orca Mobile', whenEnIncludes: 'Orca Mobile' },
-  { pattern: /Orca归属/g, replacement: 'Orca 归因', whenEnIncludes: 'Orca Attribution' },
-  { pattern: /Orca标志/g, replacement: 'Orca 标志', whenEnIncludes: 'Orca logo' },
-  { pattern: /喜欢Orca/g, replacement: '喜欢 Orca', whenEnIncludes: 'Enjoying Orca' },
-  { pattern: /认识Orca/g, replacement: '了解 Orca', whenEnIncludes: 'Get to know Orca' },
-  { pattern: /支持Orca/g, replacement: '支持 Orca', whenEnIncludes: 'Support Orca' },
-  { pattern: /展开Orca/g, replacement: '展开 Orca', whenEnIncludes: 'Expand Orca' },
-  { pattern: /来自Orca/g, replacement: '来自 Orca', whenEnIncludes: 'from Orca' },
+  { pattern: /Pebble集成开发环境/g, replacement: 'Pebble IDE', whenEnIncludes: 'Pebble IDE' },
+  { pattern: /Pebble第一/g, replacement: 'Pebble 优先', whenEnIncludes: 'Pebble first' },
+  { pattern: /Pebble移动/g, replacement: 'Pebble Mobile', whenEnIncludes: 'Pebble Mobile' },
+  { pattern: /Pebble归属/g, replacement: 'Pebble 归因', whenEnIncludes: 'Pebble Attribution' },
+  { pattern: /Pebble标志/g, replacement: 'Pebble 标志', whenEnIncludes: 'Pebble logo' },
+  { pattern: /喜欢Pebble/g, replacement: '喜欢 Pebble', whenEnIncludes: 'Enjoying Pebble' },
+  { pattern: /认识Pebble/g, replacement: '了解 Pebble', whenEnIncludes: 'Get to know Pebble' },
+  { pattern: /支持Pebble/g, replacement: '支持 Pebble', whenEnIncludes: 'Support Pebble' },
+  { pattern: /展开Pebble/g, replacement: '展开 Pebble', whenEnIncludes: 'Expand Pebble' },
+  { pattern: /来自Pebble/g, replacement: '来自 Pebble', whenEnIncludes: 'from Pebble' },
   {
-    pattern: /正在重新启动Orca/g,
-    replacement: '正在重启 Orca',
-    whenEnIncludes: 'Restarting Orca'
+    pattern: /正在重新启动Pebble/g,
+    replacement: '正在重启 Pebble',
+    whenEnIncludes: 'Restarting Pebble'
   },
-  { pattern: /Orca([\u4e00-\u9fff])/g, replacement: 'Orca $1', whenEnIncludes: 'Orca' },
+  { pattern: /Pebble([\u4e00-\u9fff])/g, replacement: 'Pebble $1', whenEnIncludes: 'Pebble' },
   { pattern: /Linear([\u4e00-\u9fff])/g, replacement: 'Linear $1', whenEnIncludes: 'Linear' },
   { pattern: /Codex([\u4e00-\u9fff])/g, replacement: 'Codex $1', whenEnIncludes: 'Codex' },
   { pattern: /Claude([\u4e00-\u9fff])/g, replacement: 'Claude $1', whenEnIncludes: 'Claude' },
@@ -50,8 +50,8 @@ export const ZH_PHRASE_FIXES_ROUND5 = [
     whenEnIncludes: 'actionable issues'
   },
   {
-    pattern: /显示 Orca 移动按钮/g,
-    replacement: '显示 Orca Mobile 按钮',
-    whenEnIncludes: 'Show Orca Mobile Button'
+    pattern: /显示 Pebble 移动按钮/g,
+    replacement: '显示 Pebble Mobile 按钮',
+    whenEnIncludes: 'Show Pebble Mobile Button'
   }
 ]

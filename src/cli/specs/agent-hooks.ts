@@ -4,23 +4,23 @@ import { GLOBAL_FLAGS } from '../args'
 export const AGENT_HOOK_COMMAND_SPECS: CommandSpec[] = [
   {
     path: ['agent', 'hooks', 'status'],
-    summary: 'Show whether Orca-managed agent status hooks are enabled',
-    usage: 'orca agent hooks status [--json]',
+    summary: 'Show whether Pebble-managed agent status hooks are enabled',
+    usage: 'pebble agent hooks status [--json]',
     allowedFlags: [...GLOBAL_FLAGS],
-    examples: ['orca agent hooks status', 'orca agent hooks status --json']
+    examples: ['pebble agent hooks status', 'pebble agent hooks status --json']
   },
   {
     path: ['agent', 'hooks', 'off'],
-    summary: 'Disable Orca-managed agent status hooks and remove local hook entries',
-    usage: 'orca agent hooks off [--json]',
+    summary: 'Disable Pebble-managed agent status hooks and remove local hook entries',
+    usage: 'pebble agent hooks off [--json]',
     allowedFlags: [...GLOBAL_FLAGS],
-    examples: ['orca agent hooks off']
+    examples: ['pebble agent hooks off']
   },
   {
     path: ['agent', 'hooks', 'on'],
-    summary: 'Enable Orca-managed agent status hooks',
-    usage: 'orca agent hooks on [--json]',
+    summary: 'Enable Pebble-managed agent status hooks',
+    usage: 'pebble agent hooks on [--json]',
     allowedFlags: [...GLOBAL_FLAGS],
-    examples: ['orca agent hooks on']
+    examples: ['pebble agent hooks on']
   }
 ]

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { Locator, Page } from '@stablyai/playwright-test'
-import { expect } from '@stablyai/playwright-test'
+import type { Locator, Page } from '@nebutra/playwright-test'
+import { expect } from '@nebutra/playwright-test'
 
 const MARKDOWN_HYDRATION_TIMEOUT_MS = 25_000
 const DRAFT_SERIALIZATION_TIMEOUT_MS = 10_000
@@ -54,7 +54,7 @@ export async function createMarkdownFixture(
   workerIndex: number,
   initialMarkdown: string
 ): Promise<string> {
-  const directory = path.join(context.rootPath, '.orca-e2e-markdown-ordered-list')
+  const directory = path.join(context.rootPath, '.pebble-e2e-markdown-ordered-list')
   await mkdir(directory, { recursive: true })
 
   const filePath = path.join(directory, `${slug}-${workerIndex}-${Date.now()}-${randomUUID()}.md`)

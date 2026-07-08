@@ -130,7 +130,7 @@ import type {
   NotificationPermissionStatusResult,
   NotificationSoundResult,
   OnboardingState,
-  OrcaHooks,
+  PebbleHooks,
   PathSource,
   PersistedUIState,
   PRCheckDetail,
@@ -448,7 +448,7 @@ export type BrowserApi = {
   onPaneFocus: (
     callback: (data: { worktreeId: string | null; browserPageId: string }) => void
   ) => () => void
-  onOpenLinkInOrcaTab: (
+  onOpenLinkInPebbleTab: (
     callback: (event: { browserPageId: string; url: string }) => void
   ) => () => void
   cancelDownload: (args: { downloadId: string }) => Promise<boolean>
@@ -642,8 +642,8 @@ export type DiagnosticsStatusPayload = {
   readonly traceFamilySize: number
   readonly disabledReason?:
     | 'do_not_track'
-    | 'orca_telemetry_disabled'
-    | 'orca_diagnostics_disabled'
+    | 'pebble_telemetry_disabled'
+    | 'pebble_diagnostics_disabled'
     | 'ci'
 }
 export type DiagnosticsBundlePayload = {
@@ -806,7 +806,7 @@ export type AppApi = {
    *  by settings panes that need a full restart to apply changes (e.g. the
    *  terminal-window blur setting in TerminalWindowSection). */
   relaunch: () => Promise<void>
-  /** Restarts Orca through the normal quit pipeline so daemon-backed terminal
+  /** Restarts Pebble through the normal quit pipeline so daemon-backed terminal
    *  sessions survive and can reattach after the new process starts. */
   restart: () => Promise<void>
   /** Reloads the current app renderer through main so expected renderer
@@ -815,7 +815,7 @@ export type AppApi = {
   /** Resolves when the daemon PTY provider and hook receiver have either
    *  started or failed open for the first BrowserWindow. */
   awaitFirstWindowStartupServices: () => Promise<void>
-  /** Emits a startup benchmark marker when ORCA_STARTUP_DIAGNOSTICS is enabled. */
+  /** Emits a startup benchmark marker when PEBBLE_STARTUP_DIAGNOSTICS is enabled. */
   startupDiagnostic: (event: string, details?: Record<string, unknown>) => Promise<void>
   /** Returns the macOS active input mode, or layout ID when no IME mode is
    *  selected (e.g. `com.apple.keylayout.PolishPro`). Used by the
@@ -828,7 +828,7 @@ export type AppApi = {
   setUnreadDockBadgeCount: (count: number) => Promise<void>
   /** Resolves the launch directory for global Floating Terminal tabs. */
   getFloatingTerminalCwd: (args?: FloatingTerminalCwdRequest) => Promise<string>
-  /** Resolves Orca's app-owned directory for auto-created Floating Workspace
+  /** Resolves Pebble's app-owned directory for auto-created Floating Workspace
    *  markdown notes. */
   getFloatingMarkdownDirectory: () => Promise<string>
   /** Opens a native picker for markdown documents, rooted in the floating
@@ -1485,8 +1485,8 @@ export type PreloadApi = {
         number: number
       }) => void
     ) => () => void
-    checkOrcaStarred: () => Promise<boolean | null>
-    starOrca: (source: AppStarSource) => Promise<boolean>
+    checkPebbleStarred: () => Promise<boolean | null>
+    starPebble: (source: AppStarSource) => Promise<boolean>
     /**
      * GitHub API rate-limit snapshot. Does NOT consume quota (the
      * `rate_limit` endpoint is exempt). Cached 30s server-side — pass
@@ -1854,7 +1854,7 @@ export type PreloadApi = {
     complete: () => Promise<void>
     disable: () => Promise<void>
     openWeb: () => Promise<void>
-    starOrca: () => Promise<boolean>
+    starPebble: () => Promise<boolean>
     forceShow: () => Promise<void>
     agentValueMoment: () => Promise<{ status: 'ready'; mode: 'gh' | 'web' } | { status: 'skipped' }>
     showAgentValueMoment: () => Promise<void>
@@ -2041,7 +2041,7 @@ export type PreloadApi = {
     check: (args: { repoId: string }) => Promise<{
       status?: 'ok' | 'error'
       hasHooks: boolean
-      hooks: OrcaHooks | null
+      hooks: PebbleHooks | null
       mayNeedUpdate: boolean
     }>
     inspectSetupScriptImports: (args: { repoId: string }) => Promise<SetupScriptImportCandidate[]>
@@ -2064,8 +2064,8 @@ export type PreloadApi = {
     listRecipes: (args: { repoId: string }) => Promise<{
       status: 'ok' | 'error'
       repoPath: string | null
-      recipes: OrcaHooks['environmentRecipes']
-      diagnostics: NonNullable<OrcaHooks['environmentRecipeDiagnostics']>
+      recipes: PebbleHooks['environmentRecipes']
+      diagnostics: NonNullable<PebbleHooks['environmentRecipeDiagnostics']>
       message?: string
     }>
     listRecipeCatalog: () => Promise<
@@ -2073,8 +2073,8 @@ export type PreloadApi = {
         repoId: string
         repoName: string
         repoPath: string
-        recipes: NonNullable<OrcaHooks['environmentRecipes']>
-        diagnostics: NonNullable<OrcaHooks['environmentRecipeDiagnostics']>
+        recipes: NonNullable<PebbleHooks['environmentRecipes']>
+        diagnostics: NonNullable<PebbleHooks['environmentRecipeDiagnostics']>
       }[]
     >
     doctor: (args: { repoId: string; recipeId: string }) => Promise<EphemeralVmRecipeDoctorResult>
@@ -2088,7 +2088,7 @@ export type PreloadApi = {
     }) => Promise<
       | {
           ok: true
-          connectionType: 'orca-server'
+          connectionType: 'pebble-server'
           runtime: EphemeralVmRuntimeRecord
           environment: PublicKnownRuntimeEnvironment
           stderr: string

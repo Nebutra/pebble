@@ -88,13 +88,13 @@ docs/reference/react-performance-audit.md
 !docs/STYLEGUIDE.md
 !docs/mobile-terminal-shortcut-bar.md
 
-# Stably CLI (only docs/ are tracked)
-.stably/*
-!.stably/docs/
+# Pebble CLI (only docs/ are tracked)
+.pebble/*
+!.pebble/docs/
 .playwright-cli
 .validate-ui-screenshots/
 validation-screenshots/
-.stably-browser
+.pebble-browser
 
 # PR verification evidence screenshots are referenced from notes but should not
 # be committed.

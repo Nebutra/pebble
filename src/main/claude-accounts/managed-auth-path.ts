@@ -3,7 +3,8 @@ import { join, relative, resolve, sep } from 'node:path'
 import { app } from 'electron'
 import { writeFileAtomically } from '../codex-accounts/fs-utils'
 
-const MANAGED_AUTH_MARKER = '.orca-managed-claude-auth'
+export const MANAGED_AUTH_MARKER = '.pebble-managed-claude-auth'
+export const LEGACY_MANAGED_AUTH_MARKER = '.pebble-managed-claude-auth'
 
 export function getClaudeManagedAccountsRoot(): string {
   return join(app.getPath('userData'), 'claude-accounts')
@@ -43,11 +44,18 @@ export function resolveOwnedClaudeManagedAuthPath(
       return null
     }
     const markerPath = join(canonicalCandidate, MANAGED_AUTH_MARKER)
-    const markerValid = isManagedAuthMarkerValid(markerPath, accountId)
+    const legacyMarkerPath = join(canonicalCandidate, LEGACY_MANAGED_AUTH_MARKER)
+    const markerValid =
+      isManagedAuthMarkerValid(markerPath, accountId) ||
+      isManagedAuthMarkerValid(legacyMarkerPath, accountId)
     if (!markerValid && options.adoptLegacyMarker) {
       writeFileSync(markerPath, `${accountId}\n`, { encoding: 'utf-8', mode: 0o600, flag: 'wx' })
     }
-    if (!markerValid && !isManagedAuthMarkerValid(markerPath, accountId)) {
+    if (
+      !markerValid &&
+      !isManagedAuthMarkerValid(markerPath, accountId) &&
+      !isManagedAuthMarkerValid(legacyMarkerPath, accountId)
+    ) {
       return null
     }
     return canonicalCandidate
@@ -78,7 +86,7 @@ export function writeClaudeManagedAuthFile(
 ): void {
   const filePath = resolve(managedAuthPath, filename)
   if (existsSync(filePath) && !isOwnedChildFile(managedAuthPath, filePath)) {
-    throw new Error('Managed Claude auth child file is not owned by Orca.')
+    throw new Error('Managed Claude auth child file is not owned by Pebble.')
   }
   writeFileAtomically(filePath, contents, { mode: 0o600 })
 }

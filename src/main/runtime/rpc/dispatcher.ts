@@ -27,15 +27,15 @@ import {
 } from './errors'
 import { ALL_RPC_METHODS } from './methods'
 import { emulatorProbe, emulatorProbeError } from '../../emulator/emulator-probe'
-import type { OrcaRuntimeService } from '../orca-runtime'
+import type { PebbleRuntimeService } from '../pebble-runtime'
 
 export type DispatcherOptions = {
-  runtime: OrcaRuntimeService
+  runtime: PebbleRuntimeService
   methods?: readonly RpcAnyMethod[]
 }
 
 export class RpcDispatcher {
-  private readonly runtime: OrcaRuntimeService
+  private readonly runtime: PebbleRuntimeService
   private readonly registry: RpcRegistry
 
   constructor({ runtime, methods = ALL_RPC_METHODS }: DispatcherOptions) {

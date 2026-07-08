@@ -205,9 +205,9 @@ describe('runBackgroundWorktreeCreation', () => {
         id: 'repo-1',
         connectionId: null,
         gitRemoteIdentity: {
-          canonicalKey: 'github.com/stablyai/orca',
+          canonicalKey: 'github.com/nebutra/pebble',
           remoteName: 'origin',
-          remoteUrl: 'git@github.com:stablyai/orca.git'
+          remoteUrl: 'git@github.com:nebutra/pebble.git'
         }
       } as never
     ]
@@ -250,7 +250,7 @@ describe('runBackgroundWorktreeCreation', () => {
     expect(prepareEphemeralVmWorkspaceTargetMock).toHaveBeenCalledWith({
       repoId: 'repo-1',
       recipeId: 'cloud-sandbox',
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       workspaceName: 'feature',
       provisionId: 'creation-1',
       setupExistingFolder: store.setupProjectExistingFolder
@@ -297,7 +297,7 @@ describe('runBackgroundWorktreeCreation', () => {
         ephemeralVmRecipe: {
           sourceRepoId: 'repo-1',
           recipeId: 'cloud-sandbox',
-          projectId: 'github:stablyai/orca'
+          projectId: 'github:nebutra/pebble'
         },
         baseBranch: 'abc123',
         compareBaseRef: 'refs/remotes/origin/main',

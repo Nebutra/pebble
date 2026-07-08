@@ -10,7 +10,7 @@ const baseSession: AiVaultSession = {
   agent: 'claude',
   sessionId: 'session-1',
   title: 'Implement project history',
-  cwd: '/Users/ada/orca',
+  cwd: '/Users/ada/pebble',
   branch: 'feature/history',
   model: 'claude-sonnet-4-5',
   filePath: '/Users/ada/.claude/projects/session-1.jsonl',
@@ -21,7 +21,7 @@ const baseSession: AiVaultSession = {
   messageCount: 4,
   totalTokens: 1200,
   previewMessages: [],
-  resumeCommand: "cd '/Users/ada/orca' && claude --resume 'session-1'"
+  resumeCommand: "cd '/Users/ada/pebble' && claude --resume 'session-1'"
 }
 
 describe('toAiVaultProjectKey', () => {
@@ -34,13 +34,13 @@ describe('toAiVaultProjectKey', () => {
 
 describe('buildAiVaultProjectContext', () => {
   it('uses durable worktree project ids before repo fallback', () => {
-    const repo = makeRepo({ id: 'repo-1', displayName: 'Legacy Repo', path: '/Users/ada/orca' })
-    const project = makeProject({ id: 'project-1', displayName: 'Canonical Orca' })
+    const repo = makeRepo({ id: 'repo-1', displayName: 'Legacy Repo', path: '/Users/ada/pebble' })
+    const project = makeProject({ id: 'project-1', displayName: 'Canonical Pebble' })
     const worktree = makeWorktree({
       id: 'wt-1',
       repoId: repo.id,
       projectId: project.id,
-      path: '/Users/ada/orca'
+      path: '/Users/ada/pebble'
     })
 
     const context = buildAiVaultProjectContext({
@@ -59,24 +59,24 @@ describe('buildAiVaultProjectContext', () => {
     expect(context.sessionProjectById.get(baseSession.id)).toMatchObject({
       kind: 'repo',
       key: 'project:project-1',
-      label: 'Canonical Orca'
+      label: 'Canonical Pebble'
     })
   })
 
   it('normalizes compatibility project ids to repo keys', () => {
-    const repo = makeRepo({ id: 'repo-1', displayName: 'Orca', path: '/Users/ada/orca' })
+    const repo = makeRepo({ id: 'repo-1', displayName: 'Pebble', path: '/Users/ada/pebble' })
     const worktree = makeWorktree({
       id: 'wt-1',
       repoId: repo.id,
       projectId: 'repo:repo-1',
-      path: '/Users/ada/orca'
+      path: '/Users/ada/pebble'
     })
 
     const context = buildAiVaultProjectContext({
       repos: [repo],
       worktrees: [worktree],
       projectHostSetupProjection: makeProjection({
-        projects: [makeProject({ id: 'repo:repo-1', displayName: 'Compatibility Orca' })],
+        projects: [makeProject({ id: 'repo:repo-1', displayName: 'Compatibility Pebble' })],
         setups: [makeSetup({ repoId: repo.id, projectId: 'repo:repo-1', path: repo.path })]
       }),
       activeRepo: repo,
@@ -86,7 +86,7 @@ describe('buildAiVaultProjectContext', () => {
 
     expect(context.activeProjectKey).toBe('repo:repo-1')
     expect(context.sessionProjectById.get(baseSession.id)?.key).toBe('repo:repo-1')
-    expect(context.projectLabelByKey.get('repo:repo-1')).toBe('Orca')
+    expect(context.projectLabelByKey.get('repo:repo-1')).toBe('Pebble')
   })
 
   it('falls back to repo ids for legacy records without project metadata', () => {
@@ -111,23 +111,23 @@ describe('buildAiVaultProjectContext', () => {
   })
 
   it('inherits setup project ids for legacy worktrees without project metadata', () => {
-    const repo = makeRepo({ id: 'repo-1', displayName: 'Orca Repo', path: '/repo/orca' })
+    const repo = makeRepo({ id: 'repo-1', displayName: 'Pebble Repo', path: '/repo/pebble' })
     const worktree = makeWorktree({
       id: 'wt-legacy',
       repoId: repo.id,
-      path: '/repo/orca'
+      path: '/repo/pebble'
     })
-    const session = makeSession({ id: 'claude:legacy-worktree', cwd: '/repo/orca/src' })
+    const session = makeSession({ id: 'claude:legacy-worktree', cwd: '/repo/pebble/src' })
 
     const context = buildAiVaultProjectContext({
       repos: [repo],
       worktrees: [worktree],
       projectHostSetupProjection: makeProjection({
-        projects: [makeProject({ id: 'github:stablyai/orca', displayName: 'Canonical Orca' })],
+        projects: [makeProject({ id: 'github:nebutra/pebble', displayName: 'Canonical Pebble' })],
         setups: [
           makeSetup({
             repoId: repo.id,
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             path: repo.path
           })
         ]
@@ -137,32 +137,32 @@ describe('buildAiVaultProjectContext', () => {
       sessions: [session]
     })
 
-    expect(context.activeProjectKey).toBe('project:github:stablyai/orca')
+    expect(context.activeProjectKey).toBe('project:github:nebutra/pebble')
     expect(context.sessionProjectById.get(session.id)).toMatchObject({
       kind: 'repo',
-      key: 'project:github:stablyai/orca',
-      label: 'Canonical Orca'
+      key: 'project:github:nebutra/pebble',
+      label: 'Canonical Pebble'
     })
   })
 
   it('uses active worktree setup project ids when active repo is unavailable', () => {
-    const repo = makeRepo({ id: 'repo-1', displayName: 'Orca Repo', path: '/repo/orca' })
+    const repo = makeRepo({ id: 'repo-1', displayName: 'Pebble Repo', path: '/repo/pebble' })
     const worktree = makeWorktree({
       id: 'wt-restored',
       repoId: repo.id,
-      path: '/repo/orca'
+      path: '/repo/pebble'
     })
-    const session = makeSession({ id: 'claude:restored', cwd: '/repo/orca/src' })
+    const session = makeSession({ id: 'claude:restored', cwd: '/repo/pebble/src' })
 
     const context = buildAiVaultProjectContext({
       repos: [repo],
       worktrees: [worktree],
       projectHostSetupProjection: makeProjection({
-        projects: [makeProject({ id: 'github:stablyai/orca', displayName: 'Canonical Orca' })],
+        projects: [makeProject({ id: 'github:nebutra/pebble', displayName: 'Canonical Pebble' })],
         setups: [
           makeSetup({
             repoId: repo.id,
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             path: repo.path
           })
         ]
@@ -172,20 +172,20 @@ describe('buildAiVaultProjectContext', () => {
       sessions: [session]
     })
 
-    expect(context.activeProjectKey).toBe('project:github:stablyai/orca')
-    expect(context.sessionProjectById.get(session.id)?.key).toBe('project:github:stablyai/orca')
+    expect(context.activeProjectKey).toBe('project:github:nebutra/pebble')
+    expect(context.sessionProjectById.get(session.id)?.key).toBe('project:github:nebutra/pebble')
   })
 
   it('inherits setup host ids for legacy worktrees without host metadata', () => {
-    const repo = makeRepo({ id: 'repo-1', displayName: 'Runtime Repo', path: '/runtime/orca' })
+    const repo = makeRepo({ id: 'repo-1', displayName: 'Runtime Repo', path: '/runtime/pebble' })
     const worktree = makeWorktree({
       id: 'wt-runtime',
       repoId: repo.id,
-      path: '/runtime/orca'
+      path: '/runtime/pebble'
     })
     const session = makeSession({
       id: 'claude:runtime-worktree',
-      cwd: '/runtime/orca/src',
+      cwd: '/runtime/pebble/src',
       executionHostId: 'runtime:preview'
     })
 
@@ -298,16 +298,16 @@ describe('buildAiVaultProjectContext', () => {
   })
 
   it('uses the session host when matching overlapping local and SSH project paths', () => {
-    const localRepo = makeRepo({ id: 'local', displayName: 'Local', path: '/srv/orca' })
+    const localRepo = makeRepo({ id: 'local', displayName: 'Local', path: '/srv/pebble' })
     const sshRepo = makeRepo({
       id: 'ssh',
       displayName: 'SSH',
-      path: '/srv/orca',
+      path: '/srv/pebble',
       connectionId: 'target-1'
     })
     const session = makeSession({
       id: 'claude:ssh-session',
-      cwd: '/srv/orca/src',
+      cwd: '/srv/pebble/src',
       executionHostId: 'ssh:target-1'
     })
 
@@ -341,11 +341,11 @@ describe('buildAiVaultProjectContext', () => {
   })
 
   it('falls back to folder when a legacy hostless session matches multiple host buckets', () => {
-    const localRepo = makeRepo({ id: 'local', displayName: 'Local', path: '/srv/orca' })
-    const runtimeRepo = makeRepo({ id: 'runtime', displayName: 'Runtime', path: '/srv/orca' })
+    const localRepo = makeRepo({ id: 'local', displayName: 'Local', path: '/srv/pebble' })
+    const runtimeRepo = makeRepo({ id: 'runtime', displayName: 'Runtime', path: '/srv/pebble' })
     const session = makeSession({
       id: 'claude:runtime-ambiguous',
-      cwd: '/srv/orca/src',
+      cwd: '/srv/pebble/src',
       executionHostId: undefined as unknown as AiVaultSession['executionHostId']
     })
 
@@ -371,8 +371,8 @@ describe('buildAiVaultProjectContext', () => {
 
     expect(context.sessionProjectById.get(session.id)).toMatchObject({
       kind: 'folder',
-      key: 'folder:/srv/orca/src',
-      label: 'orca/src'
+      key: 'folder:/srv/pebble/src',
+      label: 'pebble/src'
     })
   })
 
@@ -423,7 +423,7 @@ describe('buildAiVaultProjectContext', () => {
   })
 
   it('maps null cwd sessions to unknown', () => {
-    const repo = makeRepo({ id: 'repo-1', displayName: 'Orca', path: '/repo' })
+    const repo = makeRepo({ id: 'repo-1', displayName: 'Pebble', path: '/repo' })
     const session = makeSession({ id: 'claude:unknown', cwd: null })
 
     const context = buildAiVaultProjectContext({
@@ -450,8 +450,8 @@ function makeSession(overrides: Partial<AiVaultSession>): AiVaultSession {
 function makeRepo(overrides: Partial<Repo>): Repo {
   return {
     id: 'repo-1',
-    path: '/Users/ada/orca',
-    displayName: 'Orca',
+    path: '/Users/ada/pebble',
+    displayName: 'Pebble',
     badgeColor: '#737373',
     addedAt: 1,
     ...overrides
@@ -476,8 +476,8 @@ function makeSetup(overrides: Partial<ProjectHostSetup>): ProjectHostSetup {
     projectId: 'project-1',
     hostId: 'local',
     repoId: 'repo-1',
-    path: '/Users/ada/orca',
-    displayName: 'Orca',
+    path: '/Users/ada/pebble',
+    displayName: 'Pebble',
     setupState: 'ready',
     setupMethod: 'legacy-repo',
     createdAt: 1,
@@ -500,7 +500,7 @@ function makeWorktree(overrides: Partial<Worktree>): Worktree {
     isPinned: false,
     sortOrder: 0,
     lastActivityAt: 1,
-    path: '/Users/ada/orca',
+    path: '/Users/ada/pebble',
     head: 'abc123',
     branch: 'main',
     isBare: false,

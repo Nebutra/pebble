@@ -5,7 +5,7 @@ const windowsTestWorkerOptions = process.platform === 'win32' ? { maxWorkers: 4 
 
 export default defineConfig({
   define: {
-    ORCA_FEATURE_WALL_ENABLED: 'true'
+    PEBBLE_FEATURE_WALL_ENABLED: 'true'
   },
   resolve: {
     alias: {
@@ -25,6 +25,7 @@ export default defineConfig({
     // the Vitest 5s defaults are too tight for the slowest integration cases.
     hookTimeout: 60_000,
     testTimeout: 30_000,
+    setupFiles: ['config/vitest-local-storage-compat.ts'],
     // Why: Windows process and shell startup are slower under full-suite load;
     // macOS/Linux keep Vitest's default worker parallelism.
     ...windowsTestWorkerOptions

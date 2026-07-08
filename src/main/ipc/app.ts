@@ -292,7 +292,7 @@ export function registerAppHandlers(store: Store, options: RegisterAppHandlersOp
 
   ipcMain.handle('app:restart', async () => {
     // Why: the hidden admin restart should mirror the update relaunch path:
-    // schedule a new Orca process, then use the normal quit pipeline so daemon
+    // schedule a new Pebble process, then use the normal quit pipeline so daemon
     // checkpoints, runtime metadata, and telemetry flush before exit.
     await runBeforeRelaunchCleanup(options.onBeforeRelaunch)
     setTimeout(() => {

@@ -19,14 +19,14 @@ function repo(overrides: Partial<Repo> & Pick<Repo, 'id' | 'path' | 'displayName
 describe('project host setup projection', () => {
   it('projects a legacy local repo into one project and one ready local setup', () => {
     const projection = projectHostSetupProjectionFromRepos(
-      [repo({ id: 'repo-1', path: '/Users/alice/orca', displayName: 'orca' })],
+      [repo({ id: 'repo-1', path: '/Users/alice/pebble', displayName: 'pebble' })],
       500
     )
 
     expect(projection.projects).toEqual([
       {
         id: 'repo:repo-1',
-        displayName: 'orca',
+        displayName: 'pebble',
         badgeColor: '#737373',
         kind: 'git',
         sourceRepoIds: ['repo-1'],
@@ -40,8 +40,8 @@ describe('project host setup projection', () => {
         projectId: 'repo:repo-1',
         hostId: 'local',
         repoId: 'repo-1',
-        path: '/Users/alice/orca',
-        displayName: 'orca',
+        path: '/Users/alice/pebble',
+        displayName: 'pebble',
         kind: 'git',
         setupState: 'ready',
         setupMethod: 'legacy-repo',
@@ -55,8 +55,8 @@ describe('project host setup projection', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({
         id: 'remote-repo',
-        path: '/home/alice/orca',
-        displayName: 'orca',
+        path: '/home/alice/pebble',
+        displayName: 'pebble',
         connectionId: 'openclaw 2',
         worktreeBasePath: '../worktrees',
         gitUsername: 'alice'
@@ -76,8 +76,8 @@ describe('project host setup projection', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({
         id: 'repo-1',
-        path: '/Users/alice/orca',
-        displayName: 'orca',
+        path: '/Users/alice/pebble',
+        displayName: 'pebble',
         projectHostSetupMethod: 'cloned'
       })
     ])
@@ -89,26 +89,26 @@ describe('project host setup projection', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({
         id: 'local-repo',
-        path: '/Users/alice/orca',
-        displayName: 'Orca',
-        upstream: { owner: 'StablyAI', repo: 'Orca' }
+        path: '/Users/alice/pebble',
+        displayName: 'Pebble',
+        upstream: { owner: 'Nebutra', repo: 'Pebble' }
       }),
       repo({
         id: 'remote-repo',
-        path: '/home/alice/orca',
-        displayName: 'orca',
+        path: '/home/alice/pebble',
+        displayName: 'pebble',
         connectionId: 'gpu-vm',
-        upstream: { owner: 'stablyai', repo: 'orca' }
+        upstream: { owner: 'nebutra', repo: 'pebble' }
       })
     ])
 
     expect(projection.projects).toHaveLength(1)
     expect(projection.projects[0]).toMatchObject({
-      id: 'github:stablyai/orca',
+      id: 'github:nebutra/pebble',
       sourceRepoIds: ['local-repo', 'remote-repo'],
-      providerIdentity: { provider: 'github', owner: 'StablyAI', repo: 'Orca' }
+      providerIdentity: { provider: 'github', owner: 'Nebutra', repo: 'Pebble' }
     })
-    expect(getProjectHostSetupsForProject(projection.setups, 'github:stablyai/orca')).toHaveLength(
+    expect(getProjectHostSetupsForProject(projection.setups, 'github:nebutra/pebble')).toHaveLength(
       2
     )
   })
@@ -117,36 +117,36 @@ describe('project host setup projection', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({
         id: 'local-repo',
-        path: '/Users/alice/orca',
-        displayName: 'Orca',
+        path: '/Users/alice/pebble',
+        displayName: 'Pebble',
         repoIcon: {
           type: 'image',
-          src: 'https://github.com/stablyai.png?size=64',
+          src: 'https://github.com/nebutra.png?size=64',
           source: 'github',
-          label: 'stablyai/orca'
+          label: 'nebutra/pebble'
         }
       }),
       repo({
         id: 'remote-repo',
-        path: '/home/alice/orca',
-        displayName: 'orca',
+        path: '/home/alice/pebble',
+        displayName: 'pebble',
         connectionId: 'gpu-vm',
         repoIcon: {
           type: 'image',
-          src: 'https://github.com/stablyai.png?size=64',
+          src: 'https://github.com/nebutra.png?size=64',
           source: 'github',
-          label: 'StablyAI/Orca'
+          label: 'Nebutra/Pebble'
         }
       })
     ])
 
     expect(projection.projects).toHaveLength(1)
     expect(projection.projects[0]).toMatchObject({
-      id: 'github:stablyai/orca',
+      id: 'github:nebutra/pebble',
       sourceRepoIds: ['local-repo', 'remote-repo'],
-      providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' }
+      providerIdentity: { provider: 'github', owner: 'nebutra', repo: 'pebble' }
     })
-    expect(getProjectHostSetupsForProject(projection.setups, 'github:stablyai/orca')).toHaveLength(
+    expect(getProjectHostSetupsForProject(projection.setups, 'github:nebutra/pebble')).toHaveLength(
       2
     )
   })
@@ -155,33 +155,33 @@ describe('project host setup projection', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({
         id: 'canonical-local-repo',
-        path: '/Users/alice/stably/orca',
-        displayName: 'orca',
+        path: '/Users/alice/nebutra/pebble',
+        displayName: 'pebble',
         gitRemoteIdentity: {
-          canonicalKey: 'github.com/stablyai/orca',
+          canonicalKey: 'github.com/nebutra/pebble',
           remoteName: 'origin',
-          remoteUrl: 'git@github.com:stablyai/orca.git'
+          remoteUrl: 'git@github.com:nebutra/pebble.git'
         }
       }),
       repo({
         id: 'old-branch-checkout',
-        path: '/Users/alice/orca/workspaces/orca/re-enable-webgl-for-remote-runtime-terminals',
+        path: '/Users/alice/pebble/workspaces/pebble/re-enable-webgl-for-remote-runtime-terminals',
         displayName: 're-enable-webgl-for-remote-runtime-terminals',
         repoIcon: {
           type: 'image',
-          src: 'https://github.com/stablyai.png?size=64',
+          src: 'https://github.com/nebutra.png?size=64',
           source: 'github',
-          label: 'stablyai/orca'
+          label: 'nebutra/pebble'
         }
       })
     ])
 
     expect(projection.projects).toHaveLength(1)
     expect(projection.projects[0]).toMatchObject({
-      id: 'github:stablyai/orca',
-      displayName: 'orca',
+      id: 'github:nebutra/pebble',
+      displayName: 'pebble',
       sourceRepoIds: ['canonical-local-repo', 'old-branch-checkout'],
-      providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' }
+      providerIdentity: { provider: 'github', owner: 'nebutra', repo: 'pebble' }
     })
   })
 
@@ -319,9 +319,9 @@ describe('project host setup projection', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({
         id: 'repo-1',
-        path: '/Users/alice/orca',
-        displayName: 'orca',
-        upstream: { owner: 'stablyai', repo: 42 } as never
+        path: '/Users/alice/pebble',
+        displayName: 'pebble',
+        upstream: { owner: 'nebutra', repo: 42 } as never
       })
     ])
 
@@ -332,15 +332,15 @@ describe('project host setup projection', () => {
   it('derives workspace ownership metadata from the repo setup', () => {
     const targetRepo = repo({
       id: 'remote-repo',
-      path: '/home/alice/orca',
-      displayName: 'orca',
+      path: '/home/alice/pebble',
+      displayName: 'pebble',
       connectionId: 'openclaw 2',
-      upstream: { owner: 'stablyai', repo: 'orca' }
+      upstream: { owner: 'nebutra', repo: 'pebble' }
     })
     const projection = projectHostSetupProjectionFromRepos([targetRepo])
 
     expect(getProjectHostSetupWorktreeMeta(projection.setups, targetRepo)).toEqual({
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       hostId: 'ssh:openclaw%202',
       projectHostSetupId: 'remote-repo'
     })
@@ -353,7 +353,7 @@ describe('isGitHubBackedRepo', () => {
       id: 'r',
       path: '/r',
       displayName: 'r',
-      upstream: { owner: 'stablyai', repo: 'orca' }
+      upstream: { owner: 'nebutra', repo: 'pebble' }
     })
     expect(isGitHubBackedRepo(target)).toBe(true)
   })
@@ -365,9 +365,9 @@ describe('isGitHubBackedRepo', () => {
       displayName: 'r',
       repoIcon: {
         type: 'image',
-        src: 'https://github.com/stablyai.png?size=64',
+        src: 'https://github.com/nebutra.png?size=64',
         source: 'github',
-        label: 'stablyai/orca'
+        label: 'nebutra/pebble'
       }
     })
     expect(isGitHubBackedRepo(target)).toBe(true)

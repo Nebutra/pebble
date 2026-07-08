@@ -42,7 +42,7 @@ export async function pickFreePort() {
 }
 
 export function createGpuUserDataDirectory(gpuMode) {
-  const userDataDir = mkdtempSync(path.join(os.tmpdir(), `orca-apphang-${gpuMode}-userdata-`))
+  const userDataDir = mkdtempSync(path.join(os.tmpdir(), `pebble-apphang-${gpuMode}-userdata-`))
   createCompletedOnboardingProfile(userDataDir)
   return userDataDir
 }
@@ -54,9 +54,9 @@ export function launchDevApp({ cdpPort, userDataDir }) {
     ELECTRON_ENABLE_LOGGING: '1',
     ELECTRON_ENABLE_STACK_DUMPING: '1',
     NODE_ENV: 'development',
-    ORCA_DEV_USER_DATA_PATH: userDataDir,
-    ORCA_SKIP_DEV_WEB_PREPARE: '1',
-    ORCA_STARTUP_DIAGNOSTICS: '1',
+    PEBBLE_DEV_USER_DATA_PATH: userDataDir,
+    PEBBLE_SKIP_DEV_WEB_PREPARE: '1',
+    PEBBLE_STARTUP_DIAGNOSTICS: '1',
     REMOTE_DEBUGGING_PORT: String(cdpPort),
     VITE_EXPOSE_STORE: 'true'
   })
@@ -151,7 +151,7 @@ export async function connectToApp(cdpPort) {
 
 export async function installRendererProbe(page) {
   await page.evaluate(() => {
-    if (globalThis.__orcaApphangProbe) {
+    if (globalThis.__pebbleApphangProbe) {
       return
     }
     const probe = {
@@ -170,7 +170,7 @@ export async function installRendererProbe(page) {
       probe.lastTickAt = now
       probe.samples += 1
     }, probe.intervalMs)
-    globalThis.__orcaApphangProbe = { probe, timer }
+    globalThis.__pebbleApphangProbe = { probe, timer }
   })
 }
 
@@ -315,7 +315,7 @@ export async function collectRendererDiagnostics(page) {
             allPaneManagersDiagnostics,
             webglContextCounts,
             webglIdentity: readWebglIdentity(),
-            rendererProbe: globalThis.__orcaApphangProbe?.probe ?? null,
+            rendererProbe: globalThis.__pebbleApphangProbe?.probe ?? null,
             ptySessions: await timed('PTY sessions', window.api?.pty?.listSessions?.()),
             rendererDeliveryDebug: await timed(
               'renderer delivery debug',

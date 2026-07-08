@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { CDPSession, Page, TestInfo } from '@stablyai/playwright-test'
-import { test, expect } from './helpers/orca-app'
+import type { CDPSession, Page, TestInfo } from '@nebutra/playwright-test'
+import { test, expect } from './helpers/pebble-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import {
   focusActiveTerminalInput,
@@ -104,7 +104,7 @@ function emitState(reason) {
   if (suffixColumns > 0) {
     process.stdout.write('\\x1b[' + suffixColumns + 'D')
   }
-  process.stdout.write('\\x1b]1337;OrcaImeState=' + Buffer.from(JSON.stringify({
+  process.stdout.write('\\x1b]1337;PebbleImeState=' + Buffer.from(JSON.stringify({
     reason,
     model,
     cursor,
@@ -175,8 +175,8 @@ process.stdin.on('data', handleData)
 
 async function installImeEventProbe(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const targetWindow = window as unknown as { __orcaImeEventLog?: ImeEventLogEntry[] }
-    targetWindow.__orcaImeEventLog = []
+    const targetWindow = window as unknown as { __pebbleImeEventLog?: ImeEventLogEntry[] }
+    targetWindow.__pebbleImeEventLog = []
     const state = window.__store?.getState()
     const worktreeId = state?.activeWorktreeId
     const tabId =
@@ -196,7 +196,7 @@ async function installImeEventProbe(page: Page): Promise<void> {
       const composition = event instanceof CompositionEvent ? event : null
       const keyboard = event instanceof KeyboardEvent ? event : null
       const rect = textarea.getBoundingClientRect()
-      targetWindow.__orcaImeEventLog!.push({
+      targetWindow.__pebbleImeEventLog!.push({
         type: event.type,
         at: performance.now(),
         data: input?.data ?? composition?.data ?? null,
@@ -234,8 +234,8 @@ async function installImeEventProbe(page: Page): Promise<void> {
 
 async function readImeEventLog(page: Page): Promise<ImeEventLogEntry[]> {
   return page.evaluate(() => {
-    const targetWindow = window as unknown as { __orcaImeEventLog?: ImeEventLogEntry[] }
-    return targetWindow.__orcaImeEventLog ?? []
+    const targetWindow = window as unknown as { __pebbleImeEventLog?: ImeEventLogEntry[] }
+    return targetWindow.__pebbleImeEventLog ?? []
   })
 }
 
@@ -392,67 +392,67 @@ async function launchCodexTui(page: Page, ptyId: string): Promise<void> {
 
 test.describe('Chinese IME terminal chat input repro', () => {
   test('keeps composed Chinese text, cursor movement, and Backspace stable in the agent input surface', async ({
-    orcaPage,
+    pebblePage,
     testRepoPath
   }, testInfo) => {
-    await waitForSessionReady(orcaPage)
-    await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
-    await waitForActiveTerminalManager(orcaPage, 30_000)
+    await waitForSessionReady(pebblePage)
+    await waitForActiveWorktree(pebblePage)
+    await ensureTerminalVisible(pebblePage)
+    await waitForActiveTerminalManager(pebblePage, 30_000)
 
-    const ptyId = await waitForActivePanePtyId(orcaPage)
+    const ptyId = await waitForActivePanePtyId(pebblePage)
     const runId = randomUUID()
-    const scriptPath = path.join(testRepoPath, `.orca-chinese-ime-harness-${runId}.cjs`)
+    const scriptPath = path.join(testRepoPath, `.pebble-chinese-ime-harness-${runId}.cjs`)
     writeFileSync(scriptPath, terminalImeHarnessScript(runId))
-    const session = await orcaPage.context().newCDPSession(orcaPage)
+    const session = await pebblePage.context().newCDPSession(pebblePage)
 
     try {
-      await sendToTerminal(orcaPage, ptyId, `node ${JSON.stringify(scriptPath)}\r`)
-      await waitForTerminalOutput(orcaPage, `IME_HARNESS_READY_${runId}`, 10_000, 20_000)
-      await focusActiveTerminalInput(orcaPage)
-      await installImeEventProbe(orcaPage)
+      await sendToTerminal(pebblePage, ptyId, `node ${JSON.stringify(scriptPath)}\r`)
+      await waitForTerminalOutput(pebblePage, `IME_HARNESS_READY_${runId}`, 10_000, 20_000)
+      await focusActiveTerminalInput(pebblePage)
+      await installImeEventProbe(pebblePage)
 
       await dispatchImeProcessKey(session, 'KeyN')
-      await composeAndCommitChineseText(session, orcaPage, ['n', 'ni', '你', '你好'], '你好')
-      await waitForLivePrompt(orcaPage, '你好')
-      await attachImeEvidence(orcaPage, testInfo, 'after-compose-hello')
-      await orcaPage.keyboard.press('Enter')
+      await composeAndCommitChineseText(session, pebblePage, ['n', 'ni', '你', '你好'], '你好')
+      await waitForLivePrompt(pebblePage, '你好')
+      await attachImeEvidence(pebblePage, testInfo, 'after-compose-hello')
+      await pebblePage.keyboard.press('Enter')
       await expect
-        .poll(async () => (await readPromptState(orcaPage))?.submitted.at(-1) ?? null, {
+        .poll(async () => (await readPromptState(pebblePage))?.submitted.at(-1) ?? null, {
           timeout: 5_000,
           message: 'first submitted prompt did not match the composed Chinese text'
         })
         .toBe('你好')
 
       await commitImeText(session, '一二三四五六七八九十')
-      await waitForLivePrompt(orcaPage, '一二三四五六七八九十')
+      await waitForLivePrompt(pebblePage, '一二三四五六七八九十')
       for (let index = 0; index < 5; index += 1) {
-        await orcaPage.keyboard.press('ArrowLeft')
+        await pebblePage.keyboard.press('ArrowLeft')
       }
       await dispatchImeProcessKey(session, 'KeyZ')
-      await composeAndCommitChineseText(session, orcaPage, ['z', 'zh', '中'], '中')
-      await waitForLivePrompt(orcaPage, '一二三四五中六七八九十')
-      await attachImeEvidence(orcaPage, testInfo, 'after-middle-insert')
+      await composeAndCommitChineseText(session, pebblePage, ['z', 'zh', '中'], '中')
+      await waitForLivePrompt(pebblePage, '一二三四五中六七八九十')
+      await attachImeEvidence(pebblePage, testInfo, 'after-middle-insert')
 
       await setImeComposition(session, 'x')
-      await orcaPage.keyboard.press('Backspace')
-      await waitForLivePrompt(orcaPage, '一二三四五中六七八九十')
+      await pebblePage.keyboard.press('Backspace')
+      await waitForLivePrompt(pebblePage, '一二三四五中六七八九十')
       await setImeComposition(session, '')
       await commitImeText(session, '')
 
-      await orcaPage.keyboard.press('Backspace')
-      await waitForLivePrompt(orcaPage, '一二三四五六七八九十')
-      await attachImeEvidence(orcaPage, testInfo, 'after-single-backspace')
+      await pebblePage.keyboard.press('Backspace')
+      await waitForLivePrompt(pebblePage, '一二三四五六七八九十')
+      await attachImeEvidence(pebblePage, testInfo, 'after-single-backspace')
 
-      await orcaPage.keyboard.press('Enter')
+      await pebblePage.keyboard.press('Enter')
       await expect
-        .poll(async () => (await readPromptState(orcaPage))?.submitted.at(-1) ?? null, {
+        .poll(async () => (await readPromptState(pebblePage))?.submitted.at(-1) ?? null, {
           timeout: 5_000,
           message: 'second submitted prompt did not match the visible Chinese text'
         })
         .toBe('一二三四五六七八九十')
 
-      const log = await readImeEventLog(orcaPage)
+      const log = await readImeEventLog(pebblePage)
       expect(
         log.some((entry) => entry.type === 'compositionstart'),
         'CDP IME path should exercise Chromium/xterm composition events'
@@ -466,64 +466,64 @@ test.describe('Chinese IME terminal chat input repro', () => {
         'Backspace should be observable for both the composition and single-delete assertions'
       ).toBe(2)
     } finally {
-      await attachImeEvidence(orcaPage, testInfo, 'final-ime-evidence').catch(() => undefined)
+      await attachImeEvidence(pebblePage, testInfo, 'final-ime-evidence').catch(() => undefined)
       await session.detach().catch(() => undefined)
-      await sendToTerminal(orcaPage, ptyId, '\x03').catch(() => undefined)
+      await sendToTerminal(pebblePage, ptyId, '\x03').catch(() => undefined)
       rmSync(scriptPath, { force: true })
     }
   })
 
   test('keeps composed Chinese text stable in the real Codex TUI input @real-codex-ime', async ({
-    orcaPage
+    pebblePage
   }, testInfo) => {
     test.skip(
-      process.env.ORCA_E2E_REAL_CODEX_IME !== '1',
-      'Set ORCA_E2E_REAL_CODEX_IME=1 to exercise the locally installed Codex TUI'
+      process.env.PEBBLE_E2E_REAL_CODEX_IME !== '1',
+      'Set PEBBLE_E2E_REAL_CODEX_IME=1 to exercise the locally installed Codex TUI'
     )
 
-    await waitForSessionReady(orcaPage)
-    await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
-    await waitForActiveTerminalManager(orcaPage, 30_000)
+    await waitForSessionReady(pebblePage)
+    await waitForActiveWorktree(pebblePage)
+    await ensureTerminalVisible(pebblePage)
+    await waitForActiveTerminalManager(pebblePage, 30_000)
 
-    const ptyId = await waitForActivePanePtyId(orcaPage)
-    const session = await orcaPage.context().newCDPSession(orcaPage)
+    const ptyId = await waitForActivePanePtyId(pebblePage)
+    const session = await pebblePage.context().newCDPSession(pebblePage)
 
     try {
-      await launchCodexTui(orcaPage, ptyId)
-      await installImeEventProbe(orcaPage)
+      await launchCodexTui(pebblePage, ptyId)
+      await installImeEventProbe(pebblePage)
 
       await dispatchImeProcessKey(session, 'KeyN')
-      await composeAndCommitChineseText(session, orcaPage, ['n', 'ni', '你', '你好'], '你好')
-      await waitForCleanTerminalText(orcaPage, /你好/, 'Codex input did not show composed Chinese')
-      await attachImeEvidence(orcaPage, testInfo, 'codex-after-compose-hello', {
-        cleanTerminal: stripTerminalControls(await getTerminalContent(orcaPage, 20_000))
+      await composeAndCommitChineseText(session, pebblePage, ['n', 'ni', '你', '你好'], '你好')
+      await waitForCleanTerminalText(pebblePage, /你好/, 'Codex input did not show composed Chinese')
+      await attachImeEvidence(pebblePage, testInfo, 'codex-after-compose-hello', {
+        cleanTerminal: stripTerminalControls(await getTerminalContent(pebblePage, 20_000))
       })
 
       await dispatchImeProcessKey(session, 'KeyZ')
-      await composeAndCommitChineseText(session, orcaPage, ['z', 'zh', '中'], '中')
+      await composeAndCommitChineseText(session, pebblePage, ['z', 'zh', '中'], '中')
       await waitForCleanTerminalText(
-        orcaPage,
+        pebblePage,
         /你好中/,
         'Codex input did not keep previously composed text before middle-edit checks'
       )
 
-      await orcaPage.keyboard.press('ArrowLeft')
+      await pebblePage.keyboard.press('ArrowLeft')
       await setImeComposition(session, 'x')
-      await orcaPage.keyboard.press('Backspace')
+      await pebblePage.keyboard.press('Backspace')
       await waitForCleanTerminalText(
-        orcaPage,
+        pebblePage,
         /你好中/,
         'Backspace during Codex composition removed committed Chinese text'
       )
       await setImeComposition(session, '')
       await commitImeText(session, '')
 
-      await attachImeEvidence(orcaPage, testInfo, 'codex-after-composition-backspace', {
-        cleanTerminal: stripTerminalControls(await getTerminalContent(orcaPage, 20_000))
+      await attachImeEvidence(pebblePage, testInfo, 'codex-after-composition-backspace', {
+        cleanTerminal: stripTerminalControls(await getTerminalContent(pebblePage, 20_000))
       })
 
-      const cleanTerminal = stripTerminalControls(await getTerminalContent(orcaPage, 20_000))
+      const cleanTerminal = stripTerminalControls(await getTerminalContent(pebblePage, 20_000))
       expect(
         cleanTerminal,
         'Codex should keep committed Chinese text when Backspace cancels an IME preedit'
@@ -531,11 +531,11 @@ test.describe('Chinese IME terminal chat input repro', () => {
       expect(cleanTerminal).not.toMatch(/\bn(?:i)?你好/)
       expect(cleanTerminal).not.toMatch(/\bz(?:h)?中/)
     } finally {
-      await attachImeEvidence(orcaPage, testInfo, 'codex-final-ime-evidence', {
-        cleanTerminal: stripTerminalControls(await getTerminalContent(orcaPage, 20_000))
+      await attachImeEvidence(pebblePage, testInfo, 'codex-final-ime-evidence', {
+        cleanTerminal: stripTerminalControls(await getTerminalContent(pebblePage, 20_000))
       }).catch(() => undefined)
       await session.detach().catch(() => undefined)
-      await sendToTerminal(orcaPage, ptyId, '\x03/quit\r').catch(() => undefined)
+      await sendToTerminal(pebblePage, ptyId, '\x03/quit\r').catch(() => undefined)
     }
   })
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { RpcDispatcher } from '../dispatcher'
 import type { RpcRequest } from '../core'
-import type { OrcaRuntimeService } from '../../orca-runtime'
+import type { PebbleRuntimeService } from '../../pebble-runtime'
 import { JIRA_METHODS } from './jira'
 
 function makeRequest(method: string, params?: unknown): RpcRequest {
@@ -17,7 +17,7 @@ describe('jira RPC methods', () => {
       jiraConnect: vi.fn().mockResolvedValue({ ok: true, viewer: { displayName: 'Ada' } }),
       jiraSelectSite: vi.fn().mockResolvedValue({ connected: true, viewer: null }),
       jiraDisconnect: vi.fn().mockResolvedValue({ ok: true })
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: JIRA_METHODS })
 
     await dispatcher.dispatch(makeRequest('jira.status'))
@@ -53,7 +53,7 @@ describe('jira RPC methods', () => {
       jiraUpdateIssue: vi.fn().mockResolvedValue({ ok: true }),
       jiraAddIssueComment: vi.fn().mockResolvedValue({ ok: true, id: 'comment-1' }),
       jiraIssueComments: vi.fn().mockResolvedValue([{ id: 'comment-2' }])
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: JIRA_METHODS })
 
     await dispatcher.dispatch(
@@ -126,7 +126,7 @@ describe('jira RPC methods', () => {
       jiraListPriorities: vi.fn().mockResolvedValue([{ id: 'priority-1' }]),
       jiraListAssignableUsers: vi.fn().mockResolvedValue([{ accountId: 'user-1' }]),
       jiraListTransitions: vi.fn().mockResolvedValue([{ id: 'transition-1' }])
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: JIRA_METHODS })
 
     await dispatcher.dispatch(makeRequest('jira.listProjects', { siteId: 'all' }))

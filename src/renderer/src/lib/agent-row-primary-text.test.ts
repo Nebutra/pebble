@@ -5,7 +5,7 @@ describe('getAgentRowPrimaryText', () => {
   it('prefers orchestration display name over the raw hook prompt', () => {
     expect(
       getAgentRowPrimaryText({
-        prompt: 'You are working inside Orca, a multi-agent IDE.',
+        prompt: 'You are working inside Pebble, a multi-agent IDE.',
         orchestration: {
           taskId: 'task-1',
           dispatchId: 'ctx-1',
@@ -19,7 +19,7 @@ describe('getAgentRowPrimaryText', () => {
   it('falls back to task title when display name is absent', () => {
     expect(
       getAgentRowPrimaryText({
-        prompt: 'You are working inside Orca, a multi-agent IDE.',
+        prompt: 'You are working inside Pebble, a multi-agent IDE.',
         orchestration: {
           taskId: 'task-1',
           dispatchId: 'ctx-1',

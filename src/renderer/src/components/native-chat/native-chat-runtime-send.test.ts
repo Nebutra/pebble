@@ -62,7 +62,7 @@ describe('sendNativeChatMessage', () => {
     expect(sendRuntimePtyInput).toHaveBeenLastCalledWith(SETTINGS, PTY, NATIVE_CHAT_SUBMIT)
   })
 
-  it('matches orca-runtime writeTerminalAction Enter gap (500ms)', () => {
+  it('matches pebble-runtime writeTerminalAction Enter gap (500ms)', () => {
     expect(NATIVE_CHAT_SUBMIT_DELAY_MS).toBe(500)
   })
 })
@@ -78,14 +78,14 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
 
   it('bracket-pastes image paths before prompt text so the TUI creates image chips', () => {
     sendNativeChatMessageWithImageAttachments(SETTINGS, PTY, 'what do you see?', [
-      '/tmp/orca-paste-image.png'
+      '/tmp/pebble-paste-image.png'
     ])
 
     expect(sendRuntimePtyInput).toHaveBeenCalledTimes(1)
     expect(sendRuntimePtyInput).toHaveBeenLastCalledWith(
       SETTINGS,
       PTY,
-      buildNativeChatImagePasteBytes('/tmp/orca-paste-image.png')
+      buildNativeChatImagePasteBytes('/tmp/pebble-paste-image.png')
     )
 
     vi.advanceTimersByTime(NATIVE_CHAT_IMAGE_ATTACHMENT_SETTLE_MS)
@@ -102,7 +102,7 @@ describe('sendNativeChatMessageWithImageAttachments', () => {
   })
 
   it('waits the normal submit gap for an attachment-only send', () => {
-    sendNativeChatMessageWithImageAttachments(SETTINGS, PTY, '', ['/tmp/orca-paste-image.png'])
+    sendNativeChatMessageWithImageAttachments(SETTINGS, PTY, '', ['/tmp/pebble-paste-image.png'])
 
     vi.advanceTimersByTime(NATIVE_CHAT_SUBMIT_DELAY_MS - 1)
     expect(sendRuntimePtyInput).toHaveBeenCalledTimes(1)

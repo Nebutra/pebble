@@ -6,8 +6,7 @@ import { app, ipcMain, net } from 'electron'
 // endpoint rejects. Electron's net module runs in the main process and is not
 // subject to CORS, so we proxy the submission through IPC. This mirrors the
 // same pattern used by updater-changelog.ts and updater-nudge.ts.
-const FEEDBACK_API_URL = 'https://www.onorca.dev/v1/feedback'
-const FEEDBACK_API_FALLBACK_URL = 'https://api.onorca.dev/v1/feedback'
+const FEEDBACK_API_URL = 'https://www.nebutra.com/pebble/v1/feedback'
 const FEEDBACK_REQUEST_TIMEOUT_MS = 10_000
 const DIAGNOSTIC_BUNDLE_CONTENT_TYPE = 'application/x-ndjson'
 
@@ -49,7 +48,7 @@ type InternalFeedbackSubmitArgs = FeedbackSubmitArgs & {
 }
 
 // Why: the Slack notification and any follow-up investigation need to know
-// which Orca build and which OS the feedback came from. The main process is
+// which Pebble build and which OS the feedback came from. The main process is
 // the only place with trusted access to these values (app.getVersion and the
 // node os module), so we enrich the payload here rather than trusting the
 // renderer.
@@ -122,7 +121,7 @@ function feedbackRequestBodyInit(body: FeedbackSubmitBody): Pick<RequestInit, 'b
   formData.append(
     'diagnosticBundleFile',
     new Blob([body.diagnosticBundle.content], { type: DIAGNOSTIC_BUNDLE_CONTENT_TYPE }),
-    `orca-diagnostics-${body.diagnosticBundle.bundleSubmissionId}.ndjson`
+    `pebble-diagnostics-${body.diagnosticBundle.bundleSubmissionId}.ndjson`
   )
 
   // Why: multipart avoids JSON-escaping a near-cap NDJSON bundle over the
@@ -140,29 +139,6 @@ function messageFromError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function submitFallbackFeedback(
-  body: FeedbackSubmitBody,
-  primaryError?: unknown
-): Promise<FeedbackSubmitResult> {
-  try {
-    const fallback = await postFeedback(FEEDBACK_API_FALLBACK_URL, body)
-    if (fallback.ok) {
-      return { ok: true }
-    }
-    return { ok: false, status: fallback.status, error: `status ${fallback.status}` }
-  } catch (fallbackError) {
-    const message = messageFromError(fallbackError)
-    if (primaryError === undefined) {
-      return { ok: false, status: null, error: message }
-    }
-    return {
-      ok: false,
-      status: null,
-      error: `${messageFromError(primaryError)}; fallback: ${message}`
-    }
-  }
-}
-
 export async function submitFeedback(
   args: InternalFeedbackSubmitArgs
 ): Promise<FeedbackSubmitResult> {
@@ -172,17 +148,9 @@ export async function submitFeedback(
     if (res.ok) {
       return { ok: true }
     }
-    // Why: keep api.onorca.dev as a compatibility fallback, but prefer the
-    // website API because it owns the Slack file/snippet crash delivery path.
-    if (res.status === 404 || res.status >= 500) {
-      return submitFallbackFeedback(body)
-    }
     return { ok: false, status: res.status, error: `status ${res.status}` }
   } catch (error) {
-    // Why: falling back on any network-level failure preserves the prior
-    // behavior where DNS/connect failures on the primary host transparently
-    // try the legacy API endpoint.
-    return submitFallbackFeedback(body, error)
+    return { ok: false, status: null, error: messageFromError(error) }
   }
 }
 

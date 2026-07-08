@@ -29,10 +29,10 @@ export function normalizeAzureDevOpsApiBaseUrl(value: string): string {
 
 export function getAzureDevOpsAuthConfig(): AzureDevOpsAuthConfig {
   return {
-    apiBaseUrl: envValue('ORCA_AZURE_DEVOPS_API_BASE_URL'),
-    pat: envValue('ORCA_AZURE_DEVOPS_TOKEN') ?? envValue('ORCA_AZURE_DEVOPS_PAT'),
-    accessToken: envValue('ORCA_AZURE_DEVOPS_ACCESS_TOKEN'),
-    username: envValue('ORCA_AZURE_DEVOPS_USERNAME')
+    apiBaseUrl: envValue('PEBBLE_AZURE_DEVOPS_API_BASE_URL'),
+    pat: envValue('PEBBLE_AZURE_DEVOPS_TOKEN') ?? envValue('PEBBLE_AZURE_DEVOPS_PAT'),
+    accessToken: envValue('PEBBLE_AZURE_DEVOPS_ACCESS_TOKEN'),
+    username: envValue('PEBBLE_AZURE_DEVOPS_USERNAME')
   }
 }
 

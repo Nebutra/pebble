@@ -398,7 +398,7 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
         expectedProcess: 'codex',
         followupPrompt: null,
         launchConfig: { agentArgs: '', agentEnv: {} },
-        draftPrompt: 'https://github.com/stablyai/orca/pull/2051'
+        draftPrompt: 'https://github.com/nebutra/pebble/pull/2051'
       }
     })
 
@@ -432,7 +432,7 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
     expect(mockPasteDraftToAgentPtyWhenReady).toHaveBeenCalledWith({
       tabId: 'tab-1',
       ptyId: 'pty-delayed',
-      content: 'https://github.com/stablyai/orca/pull/2051',
+      content: 'https://github.com/nebutra/pebble/pull/2051',
       agent: 'codex',
       forcePaste: true
     })

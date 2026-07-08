@@ -26,7 +26,8 @@ function makeEntries(
     title: item.title ?? `Release ${item.version}`,
     description: item.description ?? '',
     mediaUrl: item.mediaUrl,
-    releaseNotesUrl: item.releaseNotesUrl ?? `https://onorca.dev/changelog/${item.version}`
+    releaseNotesUrl:
+      item.releaseNotesUrl ?? `https://www.nebutra.com/pebble/changelog/${item.version}`
   }))
 }
 
@@ -40,7 +41,7 @@ describe('fetchChangelog', () => {
       {
         version: '1.1.21',
         description: 'New feature',
-        mediaUrl: 'https://onorca.dev/media/1.1.21.gif'
+        mediaUrl: 'https://www.nebutra.com/pebble/media/1.1.21.gif'
       },
       { version: '1.1.20' },
       { version: '1.1.19' }
@@ -49,10 +50,55 @@ describe('fetchChangelog', () => {
 
     const result = await fetchChangelog('1.1.21', '1.1.19')
 
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://www.nebutra.com/pebble/whats-new/changelog.json'
+    )
     expect(result).not.toBeNull()
     expect(result!.release.title).toBe('Release 1.1.21')
-    expect(result!.release.releaseNotesUrl).toBe('https://onorca.dev/changelog/1.1.21')
+    expect(result!.release.releaseNotesUrl).toBe(
+      'https://github.com/nebutra/pebble/releases/tag/v1.1.21'
+    )
     expect(result!.releasesBehind).toBe(2)
+  })
+
+  it('canonicalizes product changelog links to Pebble GitHub releases', async () => {
+    const entries = makeEntries([
+      {
+        version: '1.4.128',
+        description: 'Release popup polish',
+        mediaUrl: 'https://www.nebutra.com/pebble/media/release-popup.gif',
+        releaseNotesUrl: 'https://www.nebutra.com/pebble/changelog/1.4.128'
+      },
+      { version: '1.4.127' }
+    ])
+    fetchMock.mockResolvedValue(jsonResponse(entries))
+
+    const result = await fetchChangelog('1.4.128', '1.4.127')
+
+    expect(result).not.toBeNull()
+    expect(result!.release.releaseNotesUrl).toBe(
+      'https://github.com/nebutra/pebble/releases/tag/v1.4.128'
+    )
+  })
+
+  it('canonicalizes GitHub release notes links to the Pebble repository', async () => {
+    const entries = makeEntries([
+      {
+        version: '1.4.128',
+        description: 'Release popup polish',
+        mediaUrl: 'https://www.nebutra.com/pebble/media/release-popup.gif',
+        releaseNotesUrl: 'https://github.com/example/desktop-client/releases/tag/v1.4.128'
+      },
+      { version: '1.4.127' }
+    ])
+    fetchMock.mockResolvedValue(jsonResponse(entries))
+
+    const result = await fetchChangelog('1.4.128', '1.4.127')
+
+    expect(result).not.toBeNull()
+    expect(result!.release.releaseNotesUrl).toBe(
+      'https://github.com/nebutra/pebble/releases/tag/v1.4.128'
+    )
   })
 
   it('falls back to the most recent rich entry when incoming version is not in JSON', async () => {
@@ -62,8 +108,8 @@ describe('fetchChangelog', () => {
       {
         version: '1.1.17',
         description: 'Cool feature',
-        mediaUrl: 'https://onorca.dev/media/1.1.17.gif',
-        releaseNotesUrl: 'https://onorca.dev/changelog/1.1.17'
+        mediaUrl: 'https://www.nebutra.com/pebble/media/1.1.17.gif',
+        releaseNotesUrl: 'https://www.nebutra.com/pebble/changelog/1.1.17'
       },
       { version: '1.1.16' },
       { version: '1.1.15' }
@@ -76,7 +122,7 @@ describe('fetchChangelog', () => {
     expect(result!.release.title).toBe('Release 1.1.17')
     expect(result!.release.description).toBe('Cool feature')
     // Why: fallback entries link to the generic changelog, not a version-specific page.
-    expect(result!.release.releaseNotesUrl).toBe('https://onorca.dev/changelog')
+    expect(result!.release.releaseNotesUrl).toBe('https://github.com/nebutra/pebble/releases')
     expect(result!.releasesBehind).toBe(2)
   })
 
@@ -88,7 +134,7 @@ describe('fetchChangelog', () => {
       {
         version: '1.1.17',
         description: 'Great update',
-        mediaUrl: 'https://onorca.dev/media/1.1.17.gif'
+        mediaUrl: 'https://www.nebutra.com/pebble/media/1.1.17.gif'
       },
       { version: '1.1.15' }
     ])
@@ -98,7 +144,7 @@ describe('fetchChangelog', () => {
 
     expect(result).not.toBeNull()
     expect(result!.release.title).toBe('Release 1.1.17')
-    expect(result!.release.releaseNotesUrl).toBe('https://onorca.dev/changelog')
+    expect(result!.release.releaseNotesUrl).toBe('https://github.com/nebutra/pebble/releases')
     // releasesBehind is from local (index 2) to incoming (index 0) = 2
     expect(result!.releasesBehind).toBe(2)
   })
@@ -138,7 +184,7 @@ describe('fetchChangelog', () => {
       {
         version: '1.1.17',
         description: 'Old feature',
-        mediaUrl: 'https://onorca.dev/media/old.gif'
+        mediaUrl: 'https://www.nebutra.com/pebble/media/old.gif'
       }
     ])
     fetchMock.mockResolvedValue(jsonResponse(entries))
@@ -158,7 +204,7 @@ describe('fetchChangelog', () => {
       {
         version: '1.1.18',
         description: 'Current feature',
-        mediaUrl: 'https://onorca.dev/media/current.gif'
+        mediaUrl: 'https://www.nebutra.com/pebble/media/current.gif'
       },
       { version: '1.1.17' }
     ])
@@ -168,7 +214,7 @@ describe('fetchChangelog', () => {
 
     expect(result).not.toBeNull()
     expect(result!.release.title).toBe('Release 1.1.18')
-    expect(result!.release.releaseNotesUrl).toBe('https://onorca.dev/changelog')
+    expect(result!.release.releaseNotesUrl).toBe('https://github.com/nebutra/pebble/releases')
   })
 
   it('shows rich entry when local version is not in JSON (very old user)', async () => {
@@ -177,7 +223,7 @@ describe('fetchChangelog', () => {
       {
         version: '1.1.17',
         description: 'Feature demo',
-        mediaUrl: 'https://onorca.dev/media/demo.gif'
+        mediaUrl: 'https://www.nebutra.com/pebble/media/demo.gif'
       }
     ])
     fetchMock.mockResolvedValue(jsonResponse(entries))
@@ -186,7 +232,7 @@ describe('fetchChangelog', () => {
 
     expect(result).not.toBeNull()
     expect(result!.release.title).toBe('Release 1.1.17')
-    expect(result!.release.releaseNotesUrl).toBe('https://onorca.dev/changelog')
+    expect(result!.release.releaseNotesUrl).toBe('https://github.com/nebutra/pebble/releases')
     // releasesBehind is null because the local version isn't in the JSON.
     expect(result!.releasesBehind).toBeNull()
   })
@@ -200,7 +246,7 @@ describe('fetchChangelog', () => {
       {
         version: '1.1.17',
         description: 'Old feature',
-        mediaUrl: 'https://onorca.dev/media/old.gif'
+        mediaUrl: 'https://www.nebutra.com/pebble/media/old.gif'
       }
     ])
     fetchMock.mockResolvedValue(jsonResponse(entries))
@@ -231,12 +277,12 @@ describe('fetchChangelog', () => {
       {
         version: '1.1.21',
         description: 'Latest feature',
-        mediaUrl: 'https://onorca.dev/media/latest.gif'
+        mediaUrl: 'https://www.nebutra.com/pebble/media/latest.gif'
       },
       {
         version: '1.1.17',
         description: 'Older feature',
-        mediaUrl: 'https://onorca.dev/media/old.gif'
+        mediaUrl: 'https://www.nebutra.com/pebble/media/old.gif'
       },
       { version: '1.1.15' }
     ])
@@ -245,13 +291,18 @@ describe('fetchChangelog', () => {
     const result = await fetchChangelog('1.1.21', '1.1.15')
 
     expect(result!.release.title).toBe('Release 1.1.21')
-    // Exact match keeps its own releaseNotesUrl.
-    expect(result!.release.releaseNotesUrl).toBe('https://onorca.dev/changelog/1.1.21')
+    expect(result!.release.releaseNotesUrl).toBe(
+      'https://github.com/nebutra/pebble/releases/tag/v1.1.21'
+    )
   })
 
   it('strips version from the returned release object', async () => {
     const entries = makeEntries([
-      { version: '1.1.17', description: 'Feature', mediaUrl: 'https://onorca.dev/media/demo.gif' },
+      {
+        version: '1.1.17',
+        description: 'Feature',
+        mediaUrl: 'https://www.nebutra.com/pebble/media/demo.gif'
+      },
       { version: '1.1.15' }
     ])
     fetchMock.mockResolvedValue(jsonResponse(entries))

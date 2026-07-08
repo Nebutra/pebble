@@ -8,7 +8,7 @@ import {
   isDirectClaudeCommand,
   type ClaudeAgentTeamsMode
 } from '../../shared/claude-agent-teams-tmux-compat'
-import { getOrcaCliCommandNameForPlatform } from '../../shared/orca-cli-command-name'
+import { getPebbleCliCommandNameForPlatform } from '../../shared/pebble-cli-command-name'
 
 export type ClaudeAgentTeamsLaunchPlan = {
   command: string
@@ -47,45 +47,44 @@ export async function buildClaudeAgentTeamsLaunchPlan(args: {
   return {
     command: addClaudeTeammateModeAuto(args.command),
     env,
-    envToDelete: ['TERM_PROGRAM', 'ORCA_ATTRIBUTION_SHIM_DIR']
+    envToDelete: ['TERM_PROGRAM', 'PEBBLE_ATTRIBUTION_SHIM_DIR']
   }
 }
 
 export function resolveClaudeAgentTeamsShimBin(
   env: Record<string, string | undefined> = process.env
 ): string {
-  if (env.ORCA_AGENT_TEAMS_SHIM_BIN) {
-    return env.ORCA_AGENT_TEAMS_SHIM_BIN
+  if (env.PEBBLE_AGENT_TEAMS_SHIM_BIN) {
+    return env.PEBBLE_AGENT_TEAMS_SHIM_BIN
   }
   const bundled = bundledLauncherPath()
   if (bundled && isExecutableFile(bundled)) {
     return bundled
   }
   return (
-    findExecutableOnPath(process.platform === 'win32' ? 'orca-dev.cmd' : 'orca-dev', env.PATH) ??
-    findExecutableOnPath(getOrcaCliCommandNameForPlatform(process.platform), env.PATH) ??
-    getOrcaCliCommandNameForPlatform(process.platform)
+    findExecutableOnPath(process.platform === 'win32' ? 'pebble-dev.cmd' : 'pebble-dev', env.PATH) ??
+    findExecutableOnPath(getPebbleCliCommandNameForPlatform(process.platform), env.PATH) ??
+    getPebbleCliCommandNameForPlatform(process.platform)
   )
 }
 
 function defaultShimRoot(): string {
-  return join(homedir(), '.orca', 'claude-agent-teams-bin')
+  return join(homedir(), '.pebble', 'claude-agent-teams-bin')
 }
 
 function bundledLauncherPath(): string | null {
   if (!process.resourcesPath) {
     return null
   }
-  if (process.platform === 'darwin') {
-    return join(process.resourcesPath, 'bin', 'orca')
-  }
-  if (process.platform === 'linux') {
-    return join(process.resourcesPath, 'bin', 'orca-ide')
-  }
-  if (process.platform === 'win32') {
-    return join(process.resourcesPath, 'bin', 'orca.cmd')
-  }
-  return null
+  const candidates: string[] =
+    process.platform === 'darwin'
+      ? [join(process.resourcesPath, 'bin', 'pebble')]
+      : process.platform === 'linux'
+        ? [join(process.resourcesPath, 'bin', 'pebble-ide')]
+        : process.platform === 'win32'
+          ? [join(process.resourcesPath, 'bin', 'pebble.cmd')]
+          : []
+  return candidates.find((candidate) => isExecutableFile(candidate)) ?? null
 }
 
 function findExecutableOnPath(command: string, pathValue: string | undefined): string | null {
@@ -117,7 +116,7 @@ function unixShimScript(): string {
   return [
     '#!/usr/bin/env sh',
     'set -eu',
-    `exec "\${ORCA_AGENT_TEAMS_SHIM_BIN:-${getOrcaCliCommandNameForPlatform(process.platform)}}" agent-teams-tmux "$@"`,
+    `exec "\${PEBBLE_AGENT_TEAMS_SHIM_BIN:-${getPebbleCliCommandNameForPlatform(process.platform)}}" agent-teams-tmux "$@"`,
     ''
   ].join('\n')
 }
@@ -126,10 +125,10 @@ function windowsShimScript(): string {
   return [
     '@echo off',
     'setlocal',
-    'if "%ORCA_AGENT_TEAMS_SHIM_BIN%"=="" (',
-    `  set "ORCA_AGENT_TEAMS_SHIM_BIN=${getOrcaCliCommandNameForPlatform(process.platform)}"`,
+    'if "%PEBBLE_AGENT_TEAMS_SHIM_BIN%"=="" (',
+    `  set "PEBBLE_AGENT_TEAMS_SHIM_BIN=${getPebbleCliCommandNameForPlatform(process.platform)}"`,
     ')',
-    '"%ORCA_AGENT_TEAMS_SHIM_BIN%" agent-teams-tmux %*',
+    '"%PEBBLE_AGENT_TEAMS_SHIM_BIN%" agent-teams-tmux %*',
     ''
   ].join('\r\n')
 }

@@ -361,7 +361,7 @@ describe('createExternalWatchEventHandler tombstone coalescing', () => {
     vi.stubGlobal('window', { api: { fs: { readFile } } })
     const { handleFsChanged, dispose } = createExternalWatchEventHandler(findTarget)
 
-    recordSelfWrite('/repo/notes.md', 'orca save')
+    recordSelfWrite('/repo/notes.md', 'pebble save')
     handleFsChanged(payload([{ kind: 'update', absolutePath: '/repo/notes.md' }]))
     await vi.advanceTimersByTimeAsync(100)
 
@@ -374,17 +374,17 @@ describe('createExternalWatchEventHandler tombstone coalescing', () => {
     dispose()
   })
 
-  it('still suppresses the watcher echo from Orca self-writes', async () => {
+  it('still suppresses the watcher echo from Pebble self-writes', async () => {
     vi.mocked(useAppStore.getState).mockReturnValue({
       openFiles: [fileNotes],
       setExternalMutation
     } as never)
     vi.mocked(getOpenFilesForExternalFileChange).mockReturnValue([fileNotes] as never)
-    const readFile = vi.fn().mockResolvedValue({ content: 'orca save', isBinary: false })
+    const readFile = vi.fn().mockResolvedValue({ content: 'pebble save', isBinary: false })
     vi.stubGlobal('window', { api: { fs: { readFile } } })
     const { handleFsChanged, dispose } = createExternalWatchEventHandler(findTarget)
 
-    recordSelfWrite('/repo/notes.md', 'orca save')
+    recordSelfWrite('/repo/notes.md', 'pebble save')
     handleFsChanged(payload([{ kind: 'update', absolutePath: '/repo/notes.md' }]))
     await vi.advanceTimersByTimeAsync(100)
 

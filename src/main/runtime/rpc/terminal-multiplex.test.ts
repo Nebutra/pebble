@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { RpcDispatcher } from './dispatcher'
 import type { RpcRequest } from './core'
-import type { OrcaRuntimeService } from '../orca-runtime'
+import type { PebbleRuntimeService } from '../pebble-runtime'
 import { TERMINAL_METHODS } from './methods/terminal'
 import type { RuntimeTerminalWait } from '../../../shared/runtime-types'
 import {
@@ -15,11 +15,11 @@ import {
   encodeTerminalStreamText
 } from '../../../shared/terminal-stream-protocol'
 
-function stubRuntime(overrides: Partial<OrcaRuntimeService> = {}): OrcaRuntimeService {
+function stubRuntime(overrides: Partial<PebbleRuntimeService> = {}): PebbleRuntimeService {
   return {
     getRuntimeId: () => 'test-runtime',
     ...overrides
-  } as OrcaRuntimeService
+  } as PebbleRuntimeService
 }
 
 function makeRequest(method: string, params?: unknown): RpcRequest {

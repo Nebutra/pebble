@@ -217,7 +217,7 @@ describe('Linux process start-time parsing', () => {
     fields[0] = 'S'
     fields[19] = '987654'
 
-    expect(parseLinuxProcStartTicks(`123 (orca daemon) ${fields.join(' ')}`)).toBe(987654)
+    expect(parseLinuxProcStartTicks(`123 (pebble daemon) ${fields.join(' ')}`)).toBe(987654)
   })
 
   it('parses boot time seconds from proc stat output', () => {
@@ -227,7 +227,7 @@ describe('Linux process start-time parsing', () => {
   it('does not use line-array or whitespace-regex splitting', () => {
     const splitSpy = vi.spyOn(String.prototype, 'split')
 
-    parseLinuxProcStartTicks('123 (orca daemon) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 42')
+    parseLinuxProcStartTicks('123 (pebble daemon) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 42')
     parseLinuxBootTimeSeconds('cpu 1 2 3\nbtime 1700000000')
 
     const usedUnboundedSplit = splitSpy.mock.calls.some(

@@ -11,7 +11,7 @@ import {
 } from './markdown-doc-links'
 import { isDocLinkLiteralCodeTextNode } from './rich-markdown-doc-link-code-context'
 
-const DOC_LINK_PLACEHOLDER_PREFIX = '[[ORCA_DOC_LINK:'
+const DOC_LINK_PLACEHOLDER_PREFIX = '[[PEBBLE_DOC_LINK:'
 const DOC_LINK_PLACEHOLDER_SUFFIX = ']]'
 
 // Why: `.matchAll()` at each call site creates a fresh iterator so the shared

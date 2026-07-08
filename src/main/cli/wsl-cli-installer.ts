@@ -19,8 +19,8 @@ import {
 
 const MANAGED_MARKER = getWslLauncherMarker()
 const BRIDGE_MANAGED_MARKER = getWslBridgeMarker()
-const WSL_COMMAND_NAME = 'orca-ide'
-const LEGACY_WSL_COMMAND_NAME = 'orca'
+const WSL_COMMAND_NAME = 'pebble-ide'
+const LEGACY_WSL_COMMAND_NAME = 'pebble'
 const WSL_COMMAND_TIMEOUT_MS = 10_000
 
 function normalizeManagedScriptContent(content: string): string {
@@ -66,7 +66,7 @@ export class WslCliInstaller {
         state: 'not_installed',
         currentTarget: null,
         pathConfigured: ready.pathConfigured,
-        detail: `Register ${ready.commandPath} to use Orca from WSL.`
+        detail: `Register ${ready.commandPath} to use Pebble from WSL.`
       })
     }
 
@@ -78,7 +78,7 @@ export class WslCliInstaller {
         state: 'conflict',
         currentTarget: null,
         pathConfigured: ready.pathConfigured,
-        detail: `${ready.commandPath} exists but is not an Orca launcher script.`
+        detail: `${ready.commandPath} exists but is not an Pebble launcher script.`
       })
     }
 
@@ -115,7 +115,7 @@ export class WslCliInstaller {
         detail:
           bridgeContent === null || bridgeManaged
             ? `${ready.commandPath} is missing its PowerShell bridge.`
-            : `${ready.bridgePath} exists but is not managed by Orca.`
+            : `${ready.bridgePath} exists but is not managed by Pebble.`
       })
     }
 
@@ -127,8 +127,8 @@ export class WslCliInstaller {
       currentTarget,
       pathConfigured: ready.pathConfigured,
       detail: managed
-        ? `${ready.commandPath} points to a different Orca launcher.`
-        : `${ready.commandPath} exists but is not managed by Orca.`
+        ? `${ready.commandPath} points to a different Pebble launcher.`
+        : `${ready.commandPath} exists but is not managed by Pebble.`
     })
   }
 
@@ -138,7 +138,7 @@ export class WslCliInstaller {
       throw new Error(status.detail ?? 'WSL CLI registration is unavailable.')
     }
     if (status.state === 'conflict') {
-      throw new Error(`Refusing to replace non-Orca command at ${status.commandPath}.`)
+      throw new Error(`Refusing to replace non-Pebble command at ${status.commandPath}.`)
     }
 
     await this.run(
@@ -160,12 +160,12 @@ export class WslCliInstaller {
           getBridgePathFromCommandPath(status.commandPath),
           BRIDGE_MANAGED_MARKER
         ),
-        `cat > "$command_tmp" <<'ORCA_WSL_CLI'`,
+        `cat > "$command_tmp" <<'PEBBLE_WSL_CLI'`,
         buildWslLauncher(status.launcherPath, getBridgePathFromCommandPath(status.commandPath)),
-        'ORCA_WSL_CLI',
-        `cat > "$bridge_tmp" <<'ORCA_WSL_BRIDGE'`,
+        'PEBBLE_WSL_CLI',
+        `cat > "$bridge_tmp" <<'PEBBLE_WSL_BRIDGE'`,
         buildWslBridgeScript(),
-        'ORCA_WSL_BRIDGE',
+        'PEBBLE_WSL_BRIDGE',
         'chmod 755 "$command_tmp"',
         'chmod 644 "$bridge_tmp"',
         buildSafeReplaceGuard(status.commandPath, MANAGED_MARKER),
@@ -173,8 +173,8 @@ export class WslCliInstaller {
           getBridgePathFromCommandPath(status.commandPath),
           BRIDGE_MANAGED_MARKER
         ),
-        // Why: the command was renamed to avoid GNOME Orca; remove only the
-        // old Orca-managed WSL wrapper so unmanaged `orca` commands survive.
+        // Why: the command was renamed to avoid GNOME Pebble; remove only the
+        // old Pebble-managed WSL wrapper so unmanaged `pebble` commands survive.
         `if [ -f "$legacy_command_path" ] && grep -Fq ${quoteShell(MANAGED_MARKER)} "$legacy_command_path"; then rm -f "$legacy_command_path"; fi`,
         `mv -f "$bridge_tmp" ${quoteShell(getBridgePathFromCommandPath(status.commandPath))}`,
         `mv -f "$command_tmp" ${quoteShell(status.commandPath)}`,
@@ -193,7 +193,7 @@ export class WslCliInstaller {
       return status
     }
     if (status.state === 'conflict') {
-      throw new Error(`Refusing to remove non-Orca command at ${status.commandPath}.`)
+      throw new Error(`Refusing to remove non-Pebble command at ${status.commandPath}.`)
     }
 
     await this.run(this.distro as string, buildSafeRemoveCommand(status.commandPath))
@@ -229,7 +229,7 @@ export class WslCliInstaller {
       return {
         status: this.unsupported(
           hostStatus.unsupportedReason ?? 'launcher_missing',
-          hostStatus.detail ?? 'The Windows Orca CLI launcher is missing.'
+          hostStatus.detail ?? 'The Windows Pebble CLI launcher is missing.'
         )
       }
     }
@@ -252,13 +252,13 @@ export class WslCliInstaller {
       return {
         status: this.unsupported(
           'launcher_missing',
-          'WSL Windows interop is unavailable; Orca cannot launch the Windows CLI from WSL.'
+          'WSL Windows interop is unavailable; Pebble cannot launch the Windows CLI from WSL.'
         )
       }
     }
 
     const pathDirectory = `${home}/.local/bin`
-    // Why: matches the Linux CLI rename to `orca-ide` (avoids GNOME Orca conflict).
+    // Why: matches the Linux CLI rename to `pebble-ide` (avoids GNOME Pebble conflict).
     const commandPath = `${pathDirectory}/${WSL_COMMAND_NAME}`
     const pathConfigured =
       (
@@ -285,20 +285,20 @@ export class WslCliInstaller {
       distro,
       [
         `if [ -L ${quoteShell(commandPath)} ]; then`,
-        '  printf __ORCA_NOT_FILE__',
+        '  printf __PEBBLE_NOT_FILE__',
         `elif [ ! -e ${quoteShell(commandPath)} ]; then`,
-        '  printf __ORCA_MISSING__',
+        '  printf __PEBBLE_MISSING__',
         `elif [ ! -f ${quoteShell(commandPath)} ]; then`,
-        '  printf __ORCA_NOT_FILE__',
+        '  printf __PEBBLE_NOT_FILE__',
         'else',
         `  cat ${quoteShell(commandPath)}`,
         'fi'
       ].join('\n')
     )
-    if (output === '__ORCA_MISSING__') {
+    if (output === '__PEBBLE_MISSING__') {
       return null
     }
-    if (output === '__ORCA_NOT_FILE__') {
+    if (output === '__PEBBLE_NOT_FILE__') {
       return 'not_file'
     }
     return output

@@ -20,7 +20,7 @@ const baseSession: AiVaultSession = {
   agent: 'codex',
   sessionId: 'session-1',
   title: 'Find the pane',
-  cwd: '/repo/orca/src',
+  cwd: '/repo/pebble/src',
   branch: null,
   model: null,
   filePath: '/home/ada/.codex/session-1.jsonl',
@@ -36,10 +36,10 @@ const baseSession: AiVaultSession = {
 
 function makeWorktree(overrides: Partial<Worktree> = {}): Worktree {
   const worktree: Worktree = {
-    id: 'repo-1::/repo/orca',
+    id: 'repo-1::/repo/pebble',
     repoId: 'repo-1',
-    displayName: 'orca',
-    path: '/repo/orca',
+    displayName: 'pebble',
+    path: '/repo/pebble',
     head: 'abc123',
     branch: 'main',
     isBare: false,
@@ -60,8 +60,8 @@ function makeWorktree(overrides: Partial<Worktree> = {}): Worktree {
 function makeRepo(overrides: Partial<Repo> = {}): Repo {
   return {
     id: 'repo-1',
-    path: '/repo/orca',
-    displayName: 'orca',
+    path: '/repo/pebble',
+    displayName: 'pebble',
     badgeColor: '#737373',
     addedAt: 1,
     connectionId: null,
@@ -82,8 +82,8 @@ describe('resolveAiVaultSessionWorktreeInfo', () => {
       })
     ).toMatchObject({
       status: 'current',
-      label: 'orca',
-      path: '/repo/orca'
+      label: 'pebble',
+      path: '/repo/pebble'
     })
   })
 
@@ -101,9 +101,9 @@ describe('resolveAiVaultSessionWorktreeInfo', () => {
 
   it('uses prior worktree paths to identify renamed active worktrees', () => {
     const worktree = makeWorktree({
-      id: 'repo-1::/repo/orca-renamed',
-      path: '/repo/orca-renamed',
-      priorWorktreeIds: ['repo-1::/repo/orca']
+      id: 'repo-1::/repo/pebble-renamed',
+      path: '/repo/pebble-renamed',
+      priorWorktreeIds: ['repo-1::/repo/pebble']
     })
 
     expect(
@@ -114,8 +114,8 @@ describe('resolveAiVaultSessionWorktreeInfo', () => {
       })
     ).toMatchObject({
       status: 'active',
-      label: 'orca',
-      path: '/repo/orca'
+      label: 'pebble',
+      path: '/repo/pebble'
     })
   })
 
@@ -128,48 +128,48 @@ describe('resolveAiVaultSessionWorktreeInfo', () => {
       })
     ).toMatchObject({
       status: 'unavailable',
-      label: 'orca/src',
-      path: '/repo/orca/src'
+      label: 'pebble/src',
+      path: '/repo/pebble/src'
     })
   })
 
   it('matches WSL UNC worktree paths to Linux transcript cwd values', () => {
     const worktree = makeWorktree({
-      path: '\\\\wsl.localhost\\Ubuntu\\home\\ada\\orca'
+      path: '\\\\wsl.localhost\\Ubuntu\\home\\ada\\pebble'
     })
 
     expect(
       resolveAiVaultSessionWorktreeInfo({
-        session: { ...baseSession, cwd: '/home/ada/orca/src' },
+        session: { ...baseSession, cwd: '/home/ada/pebble/src' },
         worktrees: [worktree],
         activeWorktreeId: null
       })
     ).toMatchObject({
       status: 'active',
-      label: 'orca',
-      path: '\\\\wsl.localhost\\Ubuntu\\home\\ada\\orca'
+      label: 'pebble',
+      path: '\\\\wsl.localhost\\Ubuntu\\home\\ada\\pebble'
     })
   })
 
   it('uses the session host when multiple worktrees share the same path', () => {
     const localWorktree = makeWorktree({
-      id: 'repo-local::/srv/orca',
+      id: 'repo-local::/srv/pebble',
       repoId: 'repo-local',
       displayName: 'local',
-      path: '/srv/orca',
+      path: '/srv/pebble',
       hostId: 'local'
     })
     const sshWorktree = makeWorktree({
-      id: 'repo-ssh::/srv/orca',
+      id: 'repo-ssh::/srv/pebble',
       repoId: 'repo-ssh',
       displayName: 'ssh',
-      path: '/srv/orca',
+      path: '/srv/pebble',
       hostId: 'ssh:target-1'
     })
 
     expect(
       resolveAiVaultSessionWorktreeInfo({
-        session: { ...baseSession, cwd: '/srv/orca/src', executionHostId: 'ssh:target-1' },
+        session: { ...baseSession, cwd: '/srv/pebble/src', executionHostId: 'ssh:target-1' },
         worktrees: [localWorktree, sshWorktree],
         activeWorktreeId: null
       })
@@ -181,15 +181,15 @@ describe('resolveAiVaultSessionWorktreeInfo', () => {
 
   it('uses repo host ownership when a legacy worktree lacks host metadata', () => {
     const worktree = makeWorktree({
-      id: 'repo-ssh::/srv/orca',
+      id: 'repo-ssh::/srv/pebble',
       repoId: 'repo-ssh',
       displayName: 'ssh',
-      path: '/srv/orca'
+      path: '/srv/pebble'
     })
 
     expect(
       resolveAiVaultSessionWorktreeInfo({
-        session: { ...baseSession, cwd: '/srv/orca/src', executionHostId: 'ssh:target-1' },
+        session: { ...baseSession, cwd: '/srv/pebble/src', executionHostId: 'ssh:target-1' },
         repos: [makeRepo({ id: 'repo-ssh', connectionId: 'target-1', executionHostId: null })],
         worktrees: [worktree],
         activeWorktreeId: null
@@ -228,11 +228,11 @@ describe('extractWorktreePathFromSessionTitle', () => {
   it('reads worktree paths embedded in session titles', () => {
     expect(
       extractWorktreePathFromSessionTitle(
-        'Inspect PR #6229 - Worktree: /Users/ada/projects/orca/fix-tabs'
+        'Inspect PR #6229 - Worktree: /Users/ada/projects/pebble/fix-tabs'
       )
-    ).toBe('/Users/ada/projects/orca/fix-tabs')
-    expect(extractWorktreePathFromSessionTitle('Worktree: /tmp/orca-worker')).toBe(
-      '/tmp/orca-worker'
+    ).toBe('/Users/ada/projects/pebble/fix-tabs')
+    expect(extractWorktreePathFromSessionTitle('Worktree: /tmp/pebble-worker')).toBe(
+      '/tmp/pebble-worker'
     )
   })
 })
@@ -245,12 +245,12 @@ describe('resolveAiVaultSessionWorktreeDisplay', () => {
           ...baseSession,
           cwd: null,
           branch: null,
-          title: 'Fix tabs - Worktree: /Users/ada/projects/orca/fix-tabs'
+          title: 'Fix tabs - Worktree: /Users/ada/projects/pebble/fix-tabs'
         },
         worktrees: [makeWorktree()],
         activeWorktreeId: null
       })?.path
-    ).toBe('/Users/ada/projects/orca/fix-tabs')
+    ).toBe('/Users/ada/projects/pebble/fix-tabs')
 
     expect(
       resolveAiVaultSessionWorktreeDisplay({
@@ -264,8 +264,8 @@ describe('resolveAiVaultSessionWorktreeDisplay', () => {
 
 describe('aiVaultWorktreeCompactPath', () => {
   it('keeps the last two path segments for dense detail rows', () => {
-    expect(aiVaultWorktreeCompactPath('/Users/ada/projects/orca/improve-agent-session')).toBe(
-      'orca/improve-agent-session'
+    expect(aiVaultWorktreeCompactPath('/Users/ada/projects/pebble/improve-agent-session')).toBe(
+      'pebble/improve-agent-session'
     )
   })
 })
@@ -318,8 +318,8 @@ function makeWorktreeInfo(
 ): AiVaultSessionWorktreeInfo {
   return {
     status,
-    label: 'orca',
-    path: '/repo/orca',
-    ...(status === 'unavailable' ? {} : { worktreeId: 'repo-1::/repo/orca' })
+    label: 'pebble',
+    path: '/repo/pebble',
+    ...(status === 'unavailable' ? {} : { worktreeId: 'repo-1::/repo/pebble' })
   }
 }

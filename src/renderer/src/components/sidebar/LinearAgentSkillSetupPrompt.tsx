@@ -12,13 +12,13 @@ import {
   LINEAR_AGENT_SKILL_NAMES,
   LINEAR_TICKETS_SKILL_NAME,
   LINEAR_TICKETS_SKILL_UPDATE_COMMAND,
-  ORCA_LINEAR_SKILL_NAME,
-  ORCA_LINEAR_SKILL_INSTALL_COMMAND,
-  ORCA_LINEAR_SKILL_UPDATE_COMMAND
+  PEBBLE_LINEAR_SKILL_NAME,
+  PEBBLE_LINEAR_SKILL_INSTALL_COMMAND,
+  PEBBLE_LINEAR_SKILL_UPDATE_COMMAND
 } from '@/lib/agent-feature-install-commands'
 import {
-  ensureOrcaCliAvailableForAgentSkillTerminal,
-  isOrcaCliAvailableOnPath
+  ensurePebbleCliAvailableForAgentSkillTerminal,
+  isPebbleCliAvailableOnPath
 } from '@/lib/agent-skill-cli-prerequisite'
 import { cn } from '@/lib/utils'
 import {
@@ -115,10 +115,10 @@ export function LinearAgentSkillSetupPrompt({
     sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
   })
   const command = useMemo(
-    () => buildSkillCommandForRuntime(ORCA_LINEAR_SKILL_INSTALL_COMMAND, agentRuntime),
+    () => buildSkillCommandForRuntime(PEBBLE_LINEAR_SKILL_INSTALL_COMMAND, agentRuntime),
     [agentRuntime]
   )
-  const canonicalSkillInstalled = hasInstalledAgentSkill(skill.skills, ORCA_LINEAR_SKILL_NAME, {
+  const canonicalSkillInstalled = hasInstalledAgentSkill(skill.skills, PEBBLE_LINEAR_SKILL_NAME, {
     sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
   })
   const legacySkillInstalled = hasInstalledAgentSkill(skill.skills, LINEAR_TICKETS_SKILL_NAME, {
@@ -128,7 +128,7 @@ export function LinearAgentSkillSetupPrompt({
   // fresh/canonical/both-name states should move through the canonical name.
   const updateCommand =
     !skill.installed || canonicalSkillInstalled || !legacySkillInstalled
-      ? ORCA_LINEAR_SKILL_UPDATE_COMMAND
+      ? PEBBLE_LINEAR_SKILL_UPDATE_COMMAND
       : LINEAR_TICKETS_SKILL_UPDATE_COMMAND
   const installedCommand = useMemo(
     () => buildSkillCommandForRuntime(updateCommand, agentRuntime),
@@ -191,7 +191,7 @@ export function LinearAgentSkillSetupPrompt({
     void refreshCliStatus()
   }, [refreshCliStatus])
 
-  const cliAvailable = isOrcaCliAvailableOnPath(cliStatus)
+  const cliAvailable = isPebbleCliAvailableOnPath(cliStatus)
   const setupReady = linked && !cliLoading && !skill.loading && cliAvailable && skill.installed
   const missingSetup = linked && !localDismissed && !cliLoading && !skill.loading && !setupReady
   const explicitCheckMatchesContext = activeSetupCheckIdentity === setupCheckIdentity
@@ -312,7 +312,7 @@ export function LinearAgentSkillSetupPrompt({
         const nextStatus =
           agentRuntime.runtime === 'wsl'
             ? await ensureWslCliAvailableForAgentSkillTerminal(agentRuntime)
-            : await ensureOrcaCliAvailableForAgentSkillTerminal({
+            : await ensurePebbleCliAvailableForAgentSkillTerminal({
                 onStatusChange: (nextCliStatus) => {
                   writeIfCurrent(() => setCliStatus(nextCliStatus))
                 }

@@ -1,4 +1,4 @@
-import { expect, type ElectronApplication } from '@stablyai/playwright-test'
+import { expect, type ElectronApplication } from '@nebutra/playwright-test'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import {
@@ -74,7 +74,7 @@ export async function emitCodexHookStatus(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Orca-Agent-Hook-Token': endpoint.token
+      'X-Pebble-Agent-Hook-Token': endpoint.token
     },
     body: JSON.stringify({
       paneKey: status.paneKey,
@@ -103,7 +103,7 @@ export async function emitGrokHookPayload(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Orca-Agent-Hook-Token': endpoint.token
+      'X-Pebble-Agent-Hook-Token': endpoint.token
     },
     body: JSON.stringify({
       paneKey: event.paneKey,

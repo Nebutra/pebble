@@ -106,28 +106,28 @@ describe('buildDispatchPreamble', () => {
     expect(result).toContain('refactor the auth module')
   })
 
-  it('uses orca CLI by default when devMode is not set', () => {
+  it('uses pebble CLI by default when devMode is not set', () => {
     const result = buildDispatchPreamble(baseParams())
-    expect(result).toContain('orca orchestration send')
-    expect(result).toContain('orca orchestration check')
-    expect(result).toContain('orca orchestration ask')
+    expect(result).toContain('pebble orchestration send')
+    expect(result).toContain('pebble orchestration check')
+    expect(result).toContain('pebble orchestration ask')
   })
 
-  it('uses orca-dev CLI when devMode is true', () => {
+  it('uses pebble-dev CLI when devMode is true', () => {
     const result = buildDispatchPreamble(baseParams({ devMode: true }))
-    expect(result).toContain('orca-dev orchestration send')
-    expect(result).toContain('orca-dev orchestration check')
-    expect(result).toContain('orca-dev orchestration ask')
-    const fragments = result.split('orca-dev')
+    expect(result).toContain('pebble-dev orchestration send')
+    expect(result).toContain('pebble-dev orchestration check')
+    expect(result).toContain('pebble-dev orchestration ask')
+    const fragments = result.split('pebble-dev')
     for (const fragment of fragments) {
-      expect(fragment).not.toMatch(/orca orchestration/)
+      expect(fragment).not.toMatch(/pebble orchestration/)
     }
   })
 
-  it('uses orca CLI when devMode is false', () => {
+  it('uses pebble CLI when devMode is false', () => {
     const result = buildDispatchPreamble(baseParams({ devMode: false }))
-    expect(result).toContain('orca orchestration send')
-    expect(result).toContain('orca orchestration check')
+    expect(result).toContain('pebble orchestration send')
+    expect(result).toContain('pebble orchestration check')
   })
 
   it('appends a BASE DRIFT section when baseDrift.behind > 0', () => {

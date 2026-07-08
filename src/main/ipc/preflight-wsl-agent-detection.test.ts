@@ -50,8 +50,8 @@ describe('detectWslCommandsOnPath', () => {
   it('parses detected commands from prefixed stdout', async () => {
     execFileAsyncMock.mockResolvedValue({
       stdout:
-        '__ORCA_AGENT_PATH__claude\t/usr/bin/claude\n' +
-        '__ORCA_AGENT_PATH__codex\t/home/user/.local/bin/codex\n',
+        '__PEBBLE_AGENT_PATH__claude\t/usr/bin/claude\n' +
+        '__PEBBLE_AGENT_PATH__codex\t/home/user/.local/bin/codex\n',
       stderr: ''
     })
 
@@ -62,7 +62,7 @@ describe('detectWslCommandsOnPath', () => {
 
   it('ignores commands whose resolved path is not absolute', async () => {
     execFileAsyncMock.mockResolvedValue({
-      stdout: '__ORCA_AGENT_PATH__claude\tclaude\n',
+      stdout: '__PEBBLE_AGENT_PATH__claude\tclaude\n',
       stderr: ''
     })
 

@@ -15,7 +15,7 @@ import type { TerminalTab, TuiAgent } from '../../../shared/types'
 
 export { resolveExplicitTerminalTitleAgentType as resolveTabAgentFromTitle } from '../../../shared/terminal-title-agent-type'
 
-// A shell name, or the tab's neutral default title — where Orca's
+// A shell name, or the tab's neutral default title — where Pebble's
 // inferred-interrupt reset parks it. Blank titles are no evidence either way.
 function titleShowsNoAgent(title: string, defaultTitle?: string): boolean {
   const trimmed = title.trim()
@@ -137,7 +137,7 @@ export function resolveTabAgentFromSignals(args: {
  *    command boundaries (local panes only); covers agents that emit neither
  *    hooks nor titles, and its shell-foreground mark is title-independent
  *    exit evidence.
- * 3. launchAgent — what Orca launched here; instant bootstrap before hooks
+ * 3. launchAgent — what Pebble launched here; instant bootstrap before hooks
  *    arrive, cleared once hook/process/title evidence shows the launched
  *    agent exited.
  * 4. Title — legacy/unknown-session fallback, and the live override when a pane

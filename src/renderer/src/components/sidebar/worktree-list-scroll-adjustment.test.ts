@@ -18,7 +18,7 @@ import type { Row } from './worktree-list-groups'
 const repo: Repo = {
   id: 'repo-1',
   path: '/repo',
-  displayName: 'orca',
+  displayName: 'pebble',
   badgeColor: '#000',
   addedAt: 1
 }

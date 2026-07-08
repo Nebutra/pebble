@@ -107,23 +107,23 @@ describe('rich markdown round trip', () => {
 
   it('preserves editable details blocks', () => {
     expect(roundTripMarkdown('<details><summary>Toggle</summary><p>Body</p></details>\n')).toBe(
-      '<details class="orca-details">\n<summary>Toggle</summary>\n\nBody\n\n</details>'
+      '<details class="pebble-details">\n<summary>Toggle</summary>\n\nBody\n\n</details>'
     )
   })
 
   it('does not double-escape entities in editable details summaries', () => {
     expect(roundTripMarkdown('<details><summary>A &amp; B</summary><p>Body</p></details>\n')).toBe(
-      '<details class="orca-details">\n<summary>A &amp; B</summary>\n\nBody\n\n</details>'
+      '<details class="pebble-details">\n<summary>A &amp; B</summary>\n\nBody\n\n</details>'
     )
   })
 
   it('preserves heading-styled details blocks', () => {
     expect(
       roundTripMarkdown(
-        '<details data-orca-toggle="heading-1"><summary>Toggle</summary><p>Body</p></details>\n'
+        '<details data-pebble-toggle="heading-1"><summary>Toggle</summary><p>Body</p></details>\n'
       )
     ).toBe(
-      '<details class="orca-details" data-orca-toggle="heading-1">\n<summary>Toggle</summary>\n\nBody\n\n</details>'
+      '<details class="pebble-details" data-pebble-toggle="heading-1">\n<summary>Toggle</summary>\n\nBody\n\n</details>'
     )
   })
 
@@ -165,14 +165,14 @@ describe('rich markdown round trip', () => {
 
   it('inserts editable text toggles from slash commands', () => {
     expect(slashCommandMarkdown('toggle-text')).toBe(
-      '<details class="orca-details" open>\n<summary></summary>\n\n\n\n</details>'
+      '<details class="pebble-details" open>\n<summary></summary>\n\n\n\n</details>'
     )
     expect(slashCommandSelectionParent('toggle-text')).toBe('detailsSummary')
   })
 
   it('inserts editable heading toggles from slash commands', () => {
     expect(slashCommandMarkdown('toggle-h1')).toBe(
-      '<details class="orca-details" data-orca-toggle="heading-1" open>\n<summary></summary>\n\n\n\n</details>'
+      '<details class="pebble-details" data-pebble-toggle="heading-1" open>\n<summary></summary>\n\n\n\n</details>'
     )
     expect(slashCommandSelectionParent('toggle-h1')).toBe('detailsSummary')
   })

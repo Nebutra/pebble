@@ -60,7 +60,7 @@ import { Label } from '@/components/ui/label'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { useAppStore } from '@/store'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
-import { ORCA_BROWSER_BLANK_URL, ORCA_BROWSER_PARTITION } from '../../../../shared/constants'
+import { PEBBLE_BROWSER_BLANK_URL, PEBBLE_BROWSER_PARTITION } from '../../../../shared/constants'
 import type {
   BrowserLoadError,
   BrowserPage as BrowserPageState,
@@ -127,7 +127,7 @@ import {
 } from './remote-browser-keyboard'
 import {
   consumeBrowserFocusRequest,
-  ORCA_BROWSER_FOCUS_REQUEST_EVENT,
+  PEBBLE_BROWSER_FOCUS_REQUEST_EVENT,
   type BrowserFocusRequestDetail
 } from './browser-focus'
 import {
@@ -556,15 +556,15 @@ function buildLoadError(event: {
 }
 
 function toDisplayUrl(url: string): string {
-  return url === ORCA_BROWSER_BLANK_URL ? 'about:blank' : redactKagiSessionToken(url)
+  return url === PEBBLE_BROWSER_BLANK_URL ? 'about:blank' : redactKagiSessionToken(url)
 }
 
 function getBrowserDisplayTitle(title: string | null | undefined, url: string): string {
   if (
     url === 'about:blank' ||
-    url === ORCA_BROWSER_BLANK_URL ||
+    url === PEBBLE_BROWSER_BLANK_URL ||
     title === 'about:blank' ||
-    title === ORCA_BROWSER_BLANK_URL ||
+    title === PEBBLE_BROWSER_BLANK_URL ||
     !title
   ) {
     return 'New Tab'
@@ -1439,7 +1439,7 @@ function RemoteBrowserPagePane({
       const createRemotePage = async (): Promise<string | null> => {
         const currentUrl = currentBrowserTabUrlRef.current
         const initialUrl =
-          currentUrl === ORCA_BROWSER_BLANK_URL ? 'about:blank' : currentUrl || 'about:blank'
+          currentUrl === PEBBLE_BROWSER_BLANK_URL ? 'about:blank' : currentUrl || 'about:blank'
         const created = await callRuntimeRpc<{ browserPageId: string }>(
           target,
           'browser.tabCreate',
@@ -1928,9 +1928,9 @@ function RemoteBrowserPagePane({
       const target = imageRef.current ?? remoteViewportRef.current
       target?.focus()
     }
-    window.addEventListener(ORCA_BROWSER_FOCUS_REQUEST_EVENT, handleBrowserFocusRequest)
+    window.addEventListener(PEBBLE_BROWSER_FOCUS_REQUEST_EVENT, handleBrowserFocusRequest)
     return () =>
-      window.removeEventListener(ORCA_BROWSER_FOCUS_REQUEST_EVENT, handleBrowserFocusRequest)
+      window.removeEventListener(PEBBLE_BROWSER_FOCUS_REQUEST_EVENT, handleBrowserFocusRequest)
   }, [browserTab.id, isActive])
 
   const runRemoteNavigation = useCallback(
@@ -2421,7 +2421,7 @@ function RemoteBrowserPagePane({
                     >
                       {translate(
                         'auto.components.browser.pane.BrowserPane.b5b87d6cbb',
-                        'Open Link In Orca Browser'
+                        'Open Link In Pebble Browser'
                       )}
                     </button>
                     <button
@@ -2846,7 +2846,7 @@ function BrowserPagePane({
   const sessionProfile = sessionProfileId
     ? (browserSessionProfiles.find((p) => p.id === sessionProfileId) ?? null)
     : null
-  const webviewPartition = sessionPartition ?? sessionProfile?.partition ?? ORCA_BROWSER_PARTITION
+  const webviewPartition = sessionPartition ?? sessionProfile?.partition ?? PEBBLE_BROWSER_PARTITION
   const browserSessionImportState = useAppStore((s) => s.browserSessionImportState)
   const clearBrowserSessionImportState = useAppStore((s) => s.clearBrowserSessionImportState)
   const showBrowserZoomFeedback = useCallback((level: number): void => {
@@ -3370,9 +3370,9 @@ function BrowserPagePane({
     // re-selecting an already-active page never remounts. Listening for the
     // matching event lets the active pane consume the durable request
     // immediately without regressing the mount/activation path above.
-    window.addEventListener(ORCA_BROWSER_FOCUS_REQUEST_EVENT, handleBrowserFocusRequest)
+    window.addEventListener(PEBBLE_BROWSER_FOCUS_REQUEST_EVENT, handleBrowserFocusRequest)
     return () =>
-      window.removeEventListener(ORCA_BROWSER_FOCUS_REQUEST_EVENT, handleBrowserFocusRequest)
+      window.removeEventListener(PEBBLE_BROWSER_FOCUS_REQUEST_EVENT, handleBrowserFocusRequest)
   }, [browserTab.id, focusAddressBarNow, focusWebviewNow, isActive])
 
   // Cmd/Ctrl+F — find in page (renderer path: focus on browser chrome)
@@ -3558,13 +3558,13 @@ function BrowserPagePane({
           // when no user-visible navigation happened. If we sync that into the
           // tab model on every activation, switching tabs flashes the blue
           // loading dot and makes hidden tabs look like they are reloading.
-          // Only explicit navigation/load events should drive Orca's loading UI.
+          // Only explicit navigation/load events should drive Pebble's loading UI.
           canGoBack: webview.canGoBack(),
           canGoForward: webview.canGoForward()
         })
       } catch {
         // Why: Electron only exposes these getters after the guest fully
-        // attaches. Ignoring the transient failure avoids crashing Orca while
+        // attaches. Ignoring the transient failure avoids crashing Pebble while
         // the webview guest becomes ready.
       }
     },
@@ -3756,7 +3756,7 @@ function BrowserPagePane({
           trackNextLoadingEventRef.current = false
           // Why: some webview failures still emit did-stop-loading on the
           // original destination URL. If we clear loadError here, the failed
-          // navigation falls back to a blank Chromium surface even though Orca
+          // navigation falls back to a blank Chromium surface even though Pebble
           // already knows this exact load failed.
           onUpdatePageStateRef.current(browserTab.id, {
             loading: false,
@@ -3780,7 +3780,7 @@ function BrowserPagePane({
         setAddressBarValue(toDisplayUrl(browserModelUrl))
       }
       onSetUrlRef.current(browserTab.id, browserModelUrl)
-      if (keepAddressBarFocusRef.current && currentUrl === ORCA_BROWSER_BLANK_URL) {
+      if (keepAddressBarFocusRef.current && currentUrl === PEBBLE_BROWSER_BLANK_URL) {
         focusAddressBarNow()
       } else {
         keepAddressBarFocusRef.current = false
@@ -3854,7 +3854,7 @@ function BrowserPagePane({
       }
       if (event.errorCode === -3) {
         // Why: Chromium reports redirect/cancel races as ERR_ABORTED (-3) even
-        // when the replacement navigation succeeds. Ignore that noise so Orca
+        // when the replacement navigation succeeds. Ignore that noise so Pebble
         // does not show a false load failure for a working page.
         return
       }
@@ -3916,11 +3916,11 @@ function BrowserPagePane({
     if (needsInitialNavigation) {
       // Why: connection-refused localhost tabs can fail before Electron wires up
       // event delivery if src is assigned too early. Attach listeners first so
-      // Orca never misses the initial did-fail-load signal for a new tab.
-      // Only non-blank initial tabs should light up Orca's loading indicator.
+      // Pebble never misses the initial did-fail-load signal for a new tab.
+      // Only non-blank initial tabs should light up Pebble's loading indicator.
       const initialUrl =
-        normalizeBrowserNavigationUrl(initialBrowserUrlRef.current) ?? ORCA_BROWSER_BLANK_URL
-      trackNextLoadingEventRef.current = initialUrl !== ORCA_BROWSER_BLANK_URL
+        normalizeBrowserNavigationUrl(initialBrowserUrlRef.current) ?? PEBBLE_BROWSER_BLANK_URL
+      trackNextLoadingEventRef.current = initialUrl !== PEBBLE_BROWSER_BLANK_URL
       lastKnownWebviewUrlRef.current = initialUrl
       webview.src = initialUrl
     }
@@ -4038,13 +4038,13 @@ function BrowserPagePane({
       webview.src !== normalizedUrl &&
       declaredSrc !== normalizedUrl
     ) {
-      // Why: browserTab.url changes are Orca-driven navigations (address bar,
+      // Why: browserTab.url changes are Pebble-driven navigations (address bar,
       // terminal link open, retry target update). Gate the next did-start-loading
       // event so only real navigations, not tab activation churn, show loading UI.
-      trackNextLoadingEventRef.current = normalizedUrl !== ORCA_BROWSER_BLANK_URL
+      trackNextLoadingEventRef.current = normalizedUrl !== PEBBLE_BROWSER_BLANK_URL
       lastKnownWebviewUrlRef.current = normalizedUrl
       webview.src = normalizedUrl
-      if (normalizedUrl !== ORCA_BROWSER_BLANK_URL) {
+      if (normalizedUrl !== PEBBLE_BROWSER_BLANK_URL) {
         keepAddressBarFocusRef.current = false
         if (document.activeElement === addressBarInputRef.current) {
           focusWebviewNow()
@@ -4090,7 +4090,7 @@ function BrowserPagePane({
 
     // Why: some Electron builds paint Chromium's internal chrome-error page
     // without delivering a timely did-fail-load event to the renderer webview.
-    // Polling only while the active tab is "loading" gives Orca a last-resort
+    // Polling only while the active tab is "loading" gives Pebble a last-resort
     // path to swap the black guest surface without waking every retained
     // inactive browser pane on a 250ms loop.
     detectChromiumErrorPage()
@@ -4499,11 +4499,11 @@ function BrowserPagePane({
         if (!webview) {
           return
         }
-        trackNextLoadingEventRef.current = targetUrl !== ORCA_BROWSER_BLANK_URL
+        trackNextLoadingEventRef.current = targetUrl !== PEBBLE_BROWSER_BLANK_URL
         lastKnownWebviewUrlRef.current =
           normalizeBrowserNavigationUrl(browserModelUrl) ?? browserModelUrl
         webview.src = targetUrl
-        if (targetUrl !== ORCA_BROWSER_BLANK_URL) {
+        if (targetUrl !== PEBBLE_BROWSER_BLANK_URL) {
           focusWebviewNow()
         }
       }
@@ -4593,7 +4593,7 @@ function BrowserPagePane({
   // Why: the store initially holds 'about:blank', but once the webview loads
   // with the safe data: URL, handleDidStopLoading writes the resolved URL back.
   // Match both so the "New Browser Tab" overlay stays visible for blank tabs.
-  const isBlankTab = browserTab.url === 'about:blank' || browserTab.url === ORCA_BROWSER_BLANK_URL
+  const isBlankTab = browserTab.url === 'about:blank' || browserTab.url === PEBBLE_BROWSER_BLANK_URL
   const externalUrl = getOpenableExternalUrl(webviewRef.current, browserTab.url)
   const currentBrowserUrl = getCurrentBrowserUrl(webviewRef.current, browserTab.url)
   const loadErrorMeta = getLoadErrorMetadata(browserTab.loadError)
@@ -4778,7 +4778,7 @@ function BrowserPagePane({
                     >
                       {translate(
                         'auto.components.browser.pane.BrowserPane.b5b87d6cbb',
-                        'Open Link In Orca Browser'
+                        'Open Link In Pebble Browser'
                       )}
                     </button>
                     <button
@@ -5475,7 +5475,7 @@ function BrowserPagePane({
                             'Open failed page in default browser'
                           )}
                           onClick={() => {
-                            // Why: page failures inside Orca can still be recoverable
+                            // Why: page failures inside Pebble can still be recoverable
                             // in the system browser, especially for OAuth, captive
                             // portals, or enterprise auth flows that rely on a full
                             // browser profile. Keep this action in the failed-state

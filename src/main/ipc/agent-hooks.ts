@@ -5,7 +5,7 @@ import type {
   MigrationUnsupportedPtyEntry
 } from '../../shared/agent-status-types'
 import type { AgentInterruptInferenceRequest } from '../../shared/agent-interrupt-intent'
-import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import type { PebbleRuntimeService } from '../runtime/pebble-runtime'
 import { agentHookServer, isValidPaneKey } from '../agent-hooks/server'
 import { isValidTerminalTabId } from '../../shared/terminal-tab-id'
 import { ampHookService } from '../amp/hook-service'
@@ -29,7 +29,7 @@ import { kimiHookService } from '../kimi/hook-service'
 import { openClaudeHookService } from '../openclaude/hook-service'
 
 type AgentStatusRuntimeEnrichment = Pick<
-  OrcaRuntimeService,
+  PebbleRuntimeService,
   'getAgentStatusTerminalHandleForPaneKey' | 'getAgentStatusOrchestrationContextForPaneKey'
 >
 
@@ -60,7 +60,7 @@ function isValidAgentStatusDropTabId(value: unknown): value is string {
   )
 }
 
-// Why: install/remove are intentionally not exposed to the renderer. Orca
+// Why: install/remove are intentionally not exposed to the renderer. Pebble
 // auto-installs managed hooks at app startup (see src/main/index.ts), so a
 // renderer-triggered remove would be silently reverted on the next launch
 // and mislead the user.

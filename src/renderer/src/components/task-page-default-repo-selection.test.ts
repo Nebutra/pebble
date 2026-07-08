@@ -22,39 +22,39 @@ describe('getDefaultTaskRepoSelection', () => {
   it('selects one source per logical GitHub project', () => {
     const selection = getDefaultTaskRepoSelection([
       repo({
-        id: 'local-orca',
-        upstream: { owner: 'StablyAI', repo: 'Orca' }
+        id: 'local-pebble',
+        upstream: { owner: 'Nebutra', repo: 'Pebble' }
       }),
       repo({
-        id: 'ssh-orca',
+        id: 'ssh-pebble',
         connectionId: 'builder',
-        upstream: { owner: 'stablyai', repo: 'orca' }
+        upstream: { owner: 'nebutra', repo: 'pebble' }
       }),
       repo({
         id: 'other',
-        upstream: { owner: 'stablyai', repo: 'other' }
+        upstream: { owner: 'nebutra', repo: 'other' }
       })
     ])
 
-    expect([...selection].sort()).toEqual(['local-orca', 'other'])
+    expect([...selection].sort()).toEqual(['local-pebble', 'other'])
   })
 
   it('prefers local checkout over a remote checkout for the same project', () => {
     const selection = getDefaultTaskRepoSelection([
       repo({
-        id: 'ssh-orca',
+        id: 'ssh-pebble',
         addedAt: 1,
         connectionId: 'builder',
-        upstream: { owner: 'stablyai', repo: 'orca' }
+        upstream: { owner: 'nebutra', repo: 'pebble' }
       }),
       repo({
-        id: 'local-orca',
+        id: 'local-pebble',
         addedAt: 2,
-        upstream: { owner: 'stablyai', repo: 'orca' }
+        upstream: { owner: 'nebutra', repo: 'pebble' }
       })
     ])
 
-    expect([...selection]).toEqual(['local-orca'])
+    expect([...selection]).toEqual(['local-pebble'])
   })
 
   it('keeps same-named folders separate when provider identity is missing', () => {
@@ -73,9 +73,9 @@ describe('getDefaultTaskRepoSelection', () => {
         displayName: 'claude-swap',
         repoIcon: {
           type: 'image',
-          src: 'https://github.com/stablyai.png?size=64',
+          src: 'https://github.com/nebutra.png?size=64',
           source: 'github',
-          label: 'stablyai/claude-swap'
+          label: 'nebutra/claude-swap'
         }
       }),
       repo({
@@ -84,9 +84,9 @@ describe('getDefaultTaskRepoSelection', () => {
         connectionId: 'builder',
         repoIcon: {
           type: 'image',
-          src: 'https://github.com/stablyai.png?size=64',
+          src: 'https://github.com/nebutra.png?size=64',
           source: 'github',
-          label: 'StablyAI/claude-swap'
+          label: 'Nebutra/claude-swap'
         }
       })
     ])
@@ -99,40 +99,40 @@ describe('getTaskProjectPickerRepos', () => {
   it('shows one picker row per logical GitHub project', () => {
     const pickerRepos = getTaskProjectPickerRepos([
       repo({
-        id: 'local-orca',
-        upstream: { owner: 'StablyAI', repo: 'Orca' }
+        id: 'local-pebble',
+        upstream: { owner: 'Nebutra', repo: 'Pebble' }
       }),
       repo({
-        id: 'ssh-orca',
+        id: 'ssh-pebble',
         connectionId: 'builder',
-        upstream: { owner: 'stablyai', repo: 'orca' }
+        upstream: { owner: 'nebutra', repo: 'pebble' }
       }),
       repo({
         id: 'other',
-        upstream: { owner: 'stablyai', repo: 'other' }
+        upstream: { owner: 'nebutra', repo: 'other' }
       })
     ])
 
-    expect(pickerRepos.map((candidate) => candidate.id)).toEqual(['local-orca', 'other'])
+    expect(pickerRepos.map((candidate) => candidate.id)).toEqual(['local-pebble', 'other'])
   })
 
   it('uses an explicitly selected remote source as the visible project row', () => {
     const pickerRepos = getTaskProjectPickerRepos(
       [
         repo({
-          id: 'local-orca',
-          upstream: { owner: 'stablyai', repo: 'orca' }
+          id: 'local-pebble',
+          upstream: { owner: 'nebutra', repo: 'pebble' }
         }),
         repo({
-          id: 'ssh-orca',
+          id: 'ssh-pebble',
           connectionId: 'builder',
-          upstream: { owner: 'stablyai', repo: 'orca' }
+          upstream: { owner: 'nebutra', repo: 'pebble' }
         })
       ],
-      new Set(['ssh-orca'])
+      new Set(['ssh-pebble'])
     )
 
-    expect(pickerRepos.map((candidate) => candidate.id)).toEqual(['ssh-orca'])
+    expect(pickerRepos.map((candidate) => candidate.id)).toEqual(['ssh-pebble'])
   })
 
   it('collapses legacy local and SSH rows that share a GitHub repo icon identity', () => {
@@ -142,9 +142,9 @@ describe('getTaskProjectPickerRepos', () => {
         displayName: 'claude-swap',
         repoIcon: {
           type: 'image',
-          src: 'https://github.com/stablyai.png?size=64',
+          src: 'https://github.com/nebutra.png?size=64',
           source: 'github',
-          label: 'stablyai/claude-swap'
+          label: 'nebutra/claude-swap'
         }
       }),
       repo({
@@ -153,9 +153,9 @@ describe('getTaskProjectPickerRepos', () => {
         connectionId: 'builder',
         repoIcon: {
           type: 'image',
-          src: 'https://github.com/stablyai.png?size=64',
+          src: 'https://github.com/nebutra.png?size=64',
           source: 'github',
-          label: 'StablyAI/claude-swap'
+          label: 'Nebutra/claude-swap'
         }
       })
     ])
@@ -168,28 +168,28 @@ describe('getTaskProjectPickerGroups', () => {
   it('keeps all host sources under one logical project row', () => {
     const groups = getTaskProjectPickerGroups([
       repo({
-        id: 'local-orca',
-        upstream: { owner: 'stablyai', repo: 'orca' }
+        id: 'local-pebble',
+        upstream: { owner: 'nebutra', repo: 'pebble' }
       }),
       repo({
-        id: 'ssh-orca',
+        id: 'ssh-pebble',
         connectionId: 'builder',
-        upstream: { owner: 'stablyai', repo: 'orca' }
+        upstream: { owner: 'nebutra', repo: 'pebble' }
       }),
       repo({
         id: 'docs',
-        upstream: { owner: 'stablyai', repo: 'docs' }
+        upstream: { owner: 'nebutra', repo: 'docs' }
       })
     ])
 
     expect(groups).toHaveLength(2)
     expect(groups[0]).toMatchObject({
-      projectKey: 'github:stablyai/orca',
-      repo: { id: 'local-orca' }
+      projectKey: 'github:nebutra/pebble',
+      repo: { id: 'local-pebble' }
     })
-    expect(groups[0]?.sources.map((source) => source.id)).toEqual(['local-orca', 'ssh-orca'])
+    expect(groups[0]?.sources.map((source) => source.id)).toEqual(['local-pebble', 'ssh-pebble'])
     expect(groups[1]).toMatchObject({
-      projectKey: 'github:stablyai/docs',
+      projectKey: 'github:nebutra/docs',
       repo: { id: 'docs' }
     })
   })
@@ -198,20 +198,20 @@ describe('getTaskProjectPickerGroups', () => {
     const groups = getTaskProjectPickerGroups(
       [
         repo({
-          id: 'local-orca',
-          upstream: { owner: 'stablyai', repo: 'orca' }
+          id: 'local-pebble',
+          upstream: { owner: 'nebutra', repo: 'pebble' }
         }),
         repo({
-          id: 'ssh-orca',
+          id: 'ssh-pebble',
           connectionId: 'builder',
-          upstream: { owner: 'stablyai', repo: 'orca' }
+          upstream: { owner: 'nebutra', repo: 'pebble' }
         })
       ],
-      new Set(['ssh-orca'])
+      new Set(['ssh-pebble'])
     )
 
-    expect(groups[0]?.repo.id).toBe('ssh-orca')
-    expect(groups[0]?.sources.map((source) => source.id)).toEqual(['local-orca', 'ssh-orca'])
+    expect(groups[0]?.repo.id).toBe('ssh-pebble')
+    expect(groups[0]?.sources.map((source) => source.id)).toEqual(['local-pebble', 'ssh-pebble'])
   })
 })
 
@@ -220,60 +220,60 @@ describe('normalizeTaskRepoSelection', () => {
     const selection = normalizeTaskRepoSelection(
       [
         repo({
-          id: 'local-orca',
-          upstream: { owner: 'stablyai', repo: 'orca' }
+          id: 'local-pebble',
+          upstream: { owner: 'nebutra', repo: 'pebble' }
         }),
         repo({
-          id: 'ssh-orca',
+          id: 'ssh-pebble',
           connectionId: 'builder',
-          upstream: { owner: 'stablyai', repo: 'orca' }
+          upstream: { owner: 'nebutra', repo: 'pebble' }
         })
       ],
-      new Set(['local-orca', 'ssh-orca'])
+      new Set(['local-pebble', 'ssh-pebble'])
     )
 
-    expect([...selection]).toEqual(['local-orca'])
+    expect([...selection]).toEqual(['local-pebble'])
   })
 
   it('preserves a single explicit remote source selection', () => {
     const selection = normalizeTaskRepoSelection(
       [
         repo({
-          id: 'local-orca',
-          upstream: { owner: 'stablyai', repo: 'orca' }
+          id: 'local-pebble',
+          upstream: { owner: 'nebutra', repo: 'pebble' }
         }),
         repo({
-          id: 'ssh-orca',
+          id: 'ssh-pebble',
           connectionId: 'builder',
-          upstream: { owner: 'stablyai', repo: 'orca' }
+          upstream: { owner: 'nebutra', repo: 'pebble' }
         })
       ],
-      new Set(['ssh-orca'])
+      new Set(['ssh-pebble'])
     )
 
-    expect([...selection]).toEqual(['ssh-orca'])
+    expect([...selection]).toEqual(['ssh-pebble'])
   })
 
   it('normalizes raw all-host selection to one source per logical project', () => {
     const selection = normalizeTaskRepoSelection(
       [
         repo({
-          id: 'local-orca',
-          upstream: { owner: 'stablyai', repo: 'orca' }
+          id: 'local-pebble',
+          upstream: { owner: 'nebutra', repo: 'pebble' }
         }),
         repo({
-          id: 'ssh-orca',
+          id: 'ssh-pebble',
           connectionId: 'builder',
-          upstream: { owner: 'stablyai', repo: 'orca' }
+          upstream: { owner: 'nebutra', repo: 'pebble' }
         }),
         repo({
           id: 'docs',
-          upstream: { owner: 'stablyai', repo: 'docs' }
+          upstream: { owner: 'nebutra', repo: 'docs' }
         })
       ],
-      new Set(['local-orca', 'ssh-orca', 'docs'])
+      new Set(['local-pebble', 'ssh-pebble', 'docs'])
     )
 
-    expect([...selection].sort()).toEqual(['docs', 'local-orca'])
+    expect([...selection].sort()).toEqual(['docs', 'local-pebble'])
   })
 })

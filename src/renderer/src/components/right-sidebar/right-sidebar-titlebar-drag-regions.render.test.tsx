@@ -18,6 +18,7 @@ const mockAppState = vi.hoisted(() => ({
   rightSidebarRouteRequestId: 0,
   setRightSidebarTab: vi.fn(),
   showRightSidebarFiles: vi.fn(),
+  setContextualToursBlockingSurfaceVisible: vi.fn(),
   activityBarPosition: 'top' as 'top' | 'side',
   activeWorktreeId: 'worktree-1',
   activeRepo: { id: 'repo-1', kind: 'git', connectionId: null } as {
@@ -75,6 +76,8 @@ vi.mock('@/store', async () => {
       setRightSidebarTab: mockAppState.setRightSidebarTab,
       showRightSidebarFiles: mockAppState.showRightSidebarFiles,
       toggleRightSidebar: vi.fn(),
+      setContextualToursBlockingSurfaceVisible:
+        mockAppState.setContextualToursBlockingSurfaceVisible,
       activeWorktreeId: mockAppState.activeWorktreeId,
       getKnownWorktreeById: getMockKnownWorktree,
       activityBarPosition: mockAppState.activityBarPosition,
@@ -168,9 +171,19 @@ vi.mock('./SourceControl', () => ({
   default: () => <div data-source-control />
 }))
 
-vi.mock('./ChecksPanel', () => ({
-  default: () => <div data-checks-panel />
-}))
+vi.mock('./ChecksPanel', async () => {
+  const { useConfirmationDialog } =
+    await vi.importActual<typeof import('@/components/confirmation-dialog')>(
+      '@/components/confirmation-dialog'
+    )
+
+  return {
+    default: () => {
+      useConfirmationDialog()
+      return <div data-checks-panel />
+    }
+  }
+})
 
 vi.mock('./PortsPanel', () => ({
   default: () => <div data-ports-panel />
@@ -211,7 +224,7 @@ function setRendererPlatform(platform: NodeJS.Platform): void {
 describe('rendered right sidebar titlebar drag regions', () => {
   beforeEach(() => {
     ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-    ;(globalThis as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__ = false
+    ;(globalThis as { __PEBBLE_WEB_CLIENT__?: boolean }).__PEBBLE_WEB_CLIENT__ = false
     setRendererPlatform('darwin')
     mockAppState.rightSidebarOpen = true
     mockAppState.rightSidebarTab = 'explorer'
@@ -220,6 +233,7 @@ describe('rendered right sidebar titlebar drag regions', () => {
       mockAppState.rightSidebarRouteRequestId += 1
       notifyAppStore()
     })
+    mockAppState.setContextualToursBlockingSurfaceVisible = vi.fn()
     mockAppState.showRightSidebarFiles = vi.fn(() => {
       mockAppState.rightSidebarTab = 'explorer'
       mockAppState.rightSidebarRouteRequestId += 1
@@ -264,7 +278,7 @@ describe('rendered right sidebar titlebar drag regions', () => {
 
   it('keeps paired Linux web clients on the browser-style top strip', () => {
     setRendererPlatform('linux')
-    ;(globalThis as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__ = true
+    ;(globalThis as { __PEBBLE_WEB_CLIENT__?: boolean }).__PEBBLE_WEB_CLIENT__ = true
 
     const markup = renderToStaticMarkup(<RightSidebar />)
     const activityStrip = openingTag(markup, 'right-sidebar-activity-strip')
@@ -406,5 +420,23 @@ describe('rendered right sidebar titlebar drag regions', () => {
     expect(markup).not.toContain('data-source-control')
     expect(markup).not.toContain('data-checks-panel')
     expect(markup).not.toContain('data-ports-panel')
+  })
+
+  it('provides confirmation dialog context to lazy checks panel content', async () => {
+    mockAppState.rightSidebarTab = 'checks'
+    const container = document.createElement('div')
+    const root: Root = createRoot(container)
+
+    await act(async () => {
+      root.render(<RightSidebar />)
+    })
+
+    await vi.waitFor(() => {
+      expect(container.innerHTML).toContain('data-checks-panel')
+    })
+
+    await act(async () => {
+      root.unmount()
+    })
   })
 })

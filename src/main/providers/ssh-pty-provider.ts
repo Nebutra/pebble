@@ -109,10 +109,10 @@ export class SshPtyProvider implements IPtyProvider {
       try {
         // Why: pass the pane's expected identity so the relay can reject a
         // cross-generation id collision (see pty-handler attach) instead of
-        // replaying the wrong shell into this pane. ORCA_PANE_KEY is the
-        // renderer's per-pane identity; ORCA_TAB_ID is the coarser fallback.
-        const expectedPaneKey = opts.paneKey ?? opts.env?.ORCA_PANE_KEY
-        const expectedTabId = opts.tabId ?? opts.env?.ORCA_TAB_ID
+        // replaying the wrong shell into this pane. PEBBLE_PANE_KEY is the
+        // renderer's per-pane identity; PEBBLE_TAB_ID is the coarser fallback.
+        const expectedPaneKey = opts.paneKey ?? opts.env?.PEBBLE_PANE_KEY
+        const expectedTabId = opts.tabId ?? opts.env?.PEBBLE_TAB_ID
         const attachResult = (await this.mux.request('pty.attach', {
           id: relaySessionId,
           cols: opts.cols,
@@ -161,7 +161,7 @@ export class SshPtyProvider implements IPtyProvider {
       ...(opts.startupCommandDelivery
         ? { startupCommandDelivery: opts.startupCommandDelivery }
         : {}),
-      // Why: main may strip ORCA_PANE_KEY/ORCA_TAB_ID from the shell env when
+      // Why: main may strip PEBBLE_PANE_KEY/PEBBLE_TAB_ID from the shell env when
       // remote hooks are disabled, but the relay still needs attach identity
       // metadata to reject cross-generation PTY id collisions.
       ...(opts.paneKey ? { paneKey: opts.paneKey } : {}),
@@ -196,10 +196,10 @@ export class SshPtyProvider implements IPtyProvider {
           ? `${this.remoteCliBridgeEnv.binDir}${pathDelimiter}${pathValue}`
           : this.remoteCliBridgeEnv.binDir
     }
-    merged.ORCA_REMOTE_CLI_BIN_DIR = this.remoteCliBridgeEnv.binDir
-    merged.ORCA_RELAY_DIR = this.remoteCliBridgeEnv.relayDir
-    merged.ORCA_RELAY_NODE_PATH = this.remoteCliBridgeEnv.nodePath
-    merged.ORCA_RELAY_SOCKET_PATH = this.remoteCliBridgeEnv.sockPath
+    merged.PEBBLE_REMOTE_CLI_BIN_DIR = this.remoteCliBridgeEnv.binDir
+    merged.PEBBLE_RELAY_DIR = this.remoteCliBridgeEnv.relayDir
+    merged.PEBBLE_RELAY_NODE_PATH = this.remoteCliBridgeEnv.nodePath
+    merged.PEBBLE_RELAY_SOCKET_PATH = this.remoteCliBridgeEnv.sockPath
     return merged
   }
 

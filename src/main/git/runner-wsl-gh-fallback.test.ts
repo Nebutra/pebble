@@ -60,8 +60,8 @@ describe('ghExecFileAsync WSL fallback', () => {
     })
 
     await expect(
-      ghExecFileAsync(['issue', 'list', '--repo', 'stablyhq/noqa', '--json', 'number,title'], {
-        cwd: String.raw`\\wsl.localhost\Ubuntu\home\jinwoo\stably\noqa`
+      ghExecFileAsync(['issue', 'list', '--repo', 'nebutra/noqa', '--json', 'number,title'], {
+        cwd: String.raw`\\wsl.localhost\Ubuntu\home\jinwoo\nebutra\noqa`
       })
     ).resolves.toEqual({ stdout: '[]', stderr: '' })
 
@@ -74,7 +74,7 @@ describe('ghExecFileAsync WSL fallback', () => {
         '--',
         'bash',
         '-c',
-        "cd '/home/jinwoo/stably/noqa' && 'gh' 'issue' 'list' '--repo' 'stablyhq/noqa' '--json' 'number,title'"
+        "cd '/home/jinwoo/nebutra/noqa' && 'gh' 'issue' 'list' '--repo' 'nebutra/noqa' '--json' 'number,title'"
       ],
       expect.objectContaining({ cwd: undefined }),
       expect.any(Function)
@@ -82,7 +82,7 @@ describe('ghExecFileAsync WSL fallback', () => {
     expect(execFileMock).toHaveBeenNthCalledWith(
       2,
       'gh',
-      ['issue', 'list', '--repo', 'stablyhq/noqa', '--json', 'number,title'],
+      ['issue', 'list', '--repo', 'nebutra/noqa', '--json', 'number,title'],
       expect.objectContaining({ cwd: undefined }),
       expect.any(Function)
     )
@@ -100,7 +100,7 @@ describe('ghExecFileAsync WSL fallback', () => {
 
     await expect(
       ghExecFileAsync(['issue', 'list'], {
-        cwd: String.raw`\\wsl.localhost\Ubuntu\home\jinwoo\stably\noqa`
+        cwd: String.raw`\\wsl.localhost\Ubuntu\home\jinwoo\nebutra\noqa`
       })
     ).rejects.toThrow('Command failed: wsl.exe')
 
@@ -125,15 +125,15 @@ describe('ghExecFileAsync WSL fallback', () => {
     })
 
     await expect(
-      ghExecFileAsync(['issue', 'list', '-R', 'stablyhq/noqa'], {
-        cwd: String.raw`\\wsl.localhost\Ubuntu\home\jinwoo\stably\noqa`
+      ghExecFileAsync(['issue', 'list', '-R', 'nebutra/noqa'], {
+        cwd: String.raw`\\wsl.localhost\Ubuntu\home\jinwoo\nebutra\noqa`
       })
     ).resolves.toEqual({ stdout: '[]', stderr: '' })
 
     expect(execFileMock).toHaveBeenNthCalledWith(
       2,
       'gh',
-      ['issue', 'list', '-R', 'stablyhq/noqa'],
+      ['issue', 'list', '-R', 'nebutra/noqa'],
       expect.objectContaining({ cwd: undefined }),
       expect.any(Function)
     )
@@ -157,15 +157,15 @@ describe('ghExecFileAsync WSL fallback', () => {
     })
 
     await expect(
-      ghExecFileAsync(['issue', 'list', '-Rstablyhq/noqa'], {
-        cwd: String.raw`\\wsl.localhost\Ubuntu\home\jinwoo\stably\noqa`
+      ghExecFileAsync(['issue', 'list', '-Rnebutra/noqa'], {
+        cwd: String.raw`\\wsl.localhost\Ubuntu\home\jinwoo\nebutra\noqa`
       })
     ).resolves.toEqual({ stdout: '[]', stderr: '' })
 
     expect(execFileMock).toHaveBeenNthCalledWith(
       2,
       'gh',
-      ['issue', 'list', '-Rstablyhq/noqa'],
+      ['issue', 'list', '-Rnebutra/noqa'],
       expect.objectContaining({ cwd: undefined }),
       expect.any(Function)
     )
@@ -182,8 +182,8 @@ describe('ghExecFileAsync WSL fallback', () => {
     })
 
     await expect(
-      ghExecFileAsync(['api', 'repos/stablyhq/noqa/branches/{branch}'], {
-        cwd: String.raw`\\wsl.localhost\Ubuntu\home\jinwoo\stably\noqa`
+      ghExecFileAsync(['api', 'repos/nebutra/noqa/branches/{branch}'], {
+        cwd: String.raw`\\wsl.localhost\Ubuntu\home\jinwoo\nebutra\noqa`
       })
     ).rejects.toThrow('Command failed: wsl.exe')
 
@@ -222,7 +222,7 @@ describe('ghExecFileAsync WSL fallback', () => {
     })
 
     await expect(
-      ghExecFileAsync(['api', '-X', 'POST', 'repos/stablyai/orca/issues'])
+      ghExecFileAsync(['api', '-X', 'POST', 'repos/nebutra/pebble/issues'])
     ).rejects.toThrow('HTTP 502 Bad Gateway')
 
     expect(execFileMock).toHaveBeenCalledTimes(1)
@@ -261,7 +261,7 @@ describe('ghExecFileAsync WSL fallback', () => {
     })
 
     await expect(
-      ghExecFileAsync(['issue', 'edit', '5', '--repo', 'stablyai/orca'])
+      ghExecFileAsync(['issue', 'edit', '5', '--repo', 'nebutra/pebble'])
     ).rejects.toThrow('HTTP 502 Bad Gateway')
 
     expect(execFileMock).toHaveBeenCalledTimes(1)
@@ -302,7 +302,7 @@ describe('ghExecFileAsync WSL fallback', () => {
     })
 
     await expect(
-      glabExecFileAsync(['api', '-X', 'POST', 'projects/stablyai%2Forca/issues/5/notes'], {
+      glabExecFileAsync(['api', '-X', 'POST', 'projects/nebutra%2Fpebble/issues/5/notes'], {
         cwd: String.raw`C:\repo`
       })
     ).rejects.toThrow('HTTP 502 Bad Gateway')
@@ -321,7 +321,7 @@ describe('ghExecFileAsync WSL fallback', () => {
     })
 
     await expect(
-      glabExecFileAsync(['issue', 'update', '5', '-R', 'stablyai/orca'], {
+      glabExecFileAsync(['issue', 'update', '5', '-R', 'nebutra/pebble'], {
         cwd: String.raw`C:\repo`
       })
     ).rejects.toThrow('HTTP 502 Bad Gateway')
@@ -368,7 +368,7 @@ describe('ghExecFileAsync WSL fallback', () => {
       })
 
     await expect(
-      glabExecFileAsync(['api', 'projects/stablyai%2Forca/issues'], {
+      glabExecFileAsync(['api', 'projects/nebutra%2Fpebble/issues'], {
         cwd: String.raw`C:\repo`
       })
     ).resolves.toEqual({ stdout: '[]', stderr: '' })

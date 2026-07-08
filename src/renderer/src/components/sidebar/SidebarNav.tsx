@@ -16,9 +16,11 @@ import { translate } from '@/i18n/i18n'
 export { getSetupGuideSidebarEntryReady, shouldShowSetupGuideEntry } from './SetupGuideSidebarEntry'
 
 export function shouldShowAgentsButton(
-  settings: Pick<GlobalSettings, 'experimentalActivity'> | null | undefined
+  _settings: Pick<GlobalSettings, 'experimentalActivity'> | null | undefined
 ): boolean {
-  return settings?.experimentalActivity === true
+  // Why: the Agents view is part of the replicated primary navigation now;
+  // the legacy experimental flag must not hide the original sidebar entry.
+  return true
 }
 
 export function shouldShowMobileButton(
@@ -146,7 +148,7 @@ const SidebarNav = React.memo(function SidebarNav() {
                 strokeWidth={mobileActive ? 2.25 : 1.75}
               />
               <span className="flex-1">
-                {translate('auto.components.sidebar.SidebarNav.1b5c41caee', 'Orca Mobile')}
+                {translate('auto.components.sidebar.SidebarNav.1b5c41caee', 'Pebble Mobile')}
               </span>
               {mobileOnboardingBadge.visible ? (
                 <span className="rounded-full bg-primary px-1.5 py-px text-[10px] font-semibold text-primary-foreground">

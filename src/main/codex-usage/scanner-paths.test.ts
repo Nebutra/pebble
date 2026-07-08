@@ -89,10 +89,10 @@ function totalOnlyUsageRecord(timestamp: string, totalInputTokens: number): stri
 
 beforeEach(() => {
   delete process.env.CODEX_HOME
-  fakeHomeDir = mkdtempSync(join(tmpdir(), 'orca-codex-usage-home-'))
-  userDataDir = mkdtempSync(join(tmpdir(), 'orca-codex-usage-user-data-'))
-  previousUserDataPath = process.env.ORCA_USER_DATA_PATH
-  process.env.ORCA_USER_DATA_PATH = userDataDir
+  fakeHomeDir = mkdtempSync(join(tmpdir(), 'pebble-codex-usage-home-'))
+  userDataDir = mkdtempSync(join(tmpdir(), 'pebble-codex-usage-user-data-'))
+  previousUserDataPath = process.env.PEBBLE_USER_DATA_PATH
+  process.env.PEBBLE_USER_DATA_PATH = userDataDir
   homedirMock.mockReturnValue(fakeHomeDir)
   getPathMock.mockImplementation((name: string) => {
     if (name === 'userData') {
@@ -111,15 +111,15 @@ afterEach(() => {
     process.env.CODEX_HOME = originalCodexHome
   }
   if (previousUserDataPath === undefined) {
-    delete process.env.ORCA_USER_DATA_PATH
+    delete process.env.PEBBLE_USER_DATA_PATH
   } else {
-    process.env.ORCA_USER_DATA_PATH = previousUserDataPath
+    process.env.PEBBLE_USER_DATA_PATH = previousUserDataPath
   }
   vi.clearAllMocks()
 })
 
 describe('getCodexSessionsDirectory', () => {
-  it('defaults to Orca-managed Codex runtime sessions', () => {
+  it('defaults to Pebble-managed Codex runtime sessions', () => {
     expect(getCodexSessionsDirectory()).toBe(
       join(userDataDir, 'codex-runtime-home', 'home', 'sessions')
     )
@@ -135,7 +135,7 @@ describe('getCodexSessionsDirectory', () => {
 })
 
 describe('listCodexSessionFiles', () => {
-  it('scans both Orca-managed and system Codex session homes', async () => {
+  it('scans both Pebble-managed and system Codex session homes', async () => {
     const runtimeSessionsDir = join(userDataDir, 'codex-runtime-home', 'home', 'sessions')
     const systemSessionsDir = join(fakeHomeDir, '.codex', 'sessions')
     mkdirSync(runtimeSessionsDir, { recursive: true })
@@ -171,7 +171,7 @@ describe('listCodexSessionFiles', () => {
       userDataDir,
       'codex-runtime-home',
       'home',
-      '.orca-session-copies'
+      '.pebble-session-copies'
     )
     const systemSessionsDir = join(fakeHomeDir, '.codex', 'sessions')
     mkdirSync(runtimeSessionsDir, { recursive: true })
@@ -209,7 +209,7 @@ describe('listCodexSessionFiles', () => {
       userDataDir,
       'codex-runtime-home',
       'home',
-      '.orca-session-copies'
+      '.pebble-session-copies'
     )
     const systemSessionsDir = join(fakeHomeDir, '.codex', 'sessions')
     mkdirSync(runtimeSessionsDir, { recursive: true })
@@ -248,7 +248,7 @@ describe('listCodexSessionFiles', () => {
       userDataDir,
       'codex-runtime-home',
       'home',
-      '.orca-session-copies'
+      '.pebble-session-copies'
     )
     const systemSessionsDir = join(fakeHomeDir, '.codex', 'sessions')
     mkdirSync(runtimeSessionsDir, { recursive: true })
@@ -307,7 +307,7 @@ describe('listCodexSessionFiles', () => {
       userDataDir,
       'codex-runtime-home',
       'home',
-      '.orca-session-copies'
+      '.pebble-session-copies'
     )
     const systemSessionsDir = join(fakeHomeDir, '.codex', 'sessions')
     mkdirSync(runtimeSessionsDir, { recursive: true })

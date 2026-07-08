@@ -36,7 +36,7 @@ describe('orchestration skill guidance', () => {
 
     expect(skill).toContain('Full handoff means ownership transfer, not supervised dispatch.')
     expect(fullHandoffs).toContain(
-      'Do not run `orca orchestration task-create`, `orca orchestration dispatch --inject`, or `orca orchestration check --wait` for full handoffs.'
+      'Do not run `pebble orchestration task-create`, `pebble orchestration dispatch --inject`, or `pebble orchestration check --wait` for full handoffs.'
     )
     expect(fullHandoffs).toContain(
       '`task-create` is also forbidden because it records coordinator-owned tracking state'
@@ -46,13 +46,13 @@ describe('orchestration skill guidance', () => {
       'read the worker terminal after prompt delivery except to avoid losing the initial prompt'
     )
     expect(skill).toContain(
-      '`--no-parent` only controls Orca lineage; it does not choose the Git base.'
+      '`--no-parent` only controls Pebble lineage; it does not choose the Git base.'
     )
     expect(skill).toContain(
       'never base it on the current feature branch unless the user explicitly asks'
     )
     expect(skill).toContain(
-      'orca worktree create --name <task-name> --no-parent --agent codex --prompt'
+      'pebble worktree create --name <task-name> --no-parent --agent codex --prompt'
     )
   })
 

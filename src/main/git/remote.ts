@@ -226,7 +226,7 @@ async function gitPullWithArgs(
       gitExecFileAsync(args, gitOptionsForWorktree(worktreePath, options))
     )
     if (upstream && !upstream.isConfiguredUpstream) {
-      // Why: legacy Orca branches may still track origin/main while pushes
+      // Why: legacy Pebble branches may still track origin/main while pushes
       // target origin/<branch>. Pull the same effective branch the UI reports.
       await gitExecFileAsync(
         ['pull', ...pullArgs, upstream.remoteName, upstream.branchName],

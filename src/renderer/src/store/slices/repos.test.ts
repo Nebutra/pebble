@@ -26,7 +26,7 @@ const remoteRepo: Repo = {
 
 const sshRepo: Repo = {
   id: 'ssh-repo',
-  path: '/home/orca/project',
+  path: '/home/pebble/project',
   displayName: 'SSH',
   badgeColor: '#222',
   addedAt: 3,
@@ -428,7 +428,7 @@ describe('repo slice runtime routing', () => {
       store.getState().setupProjectClone({
         projectId: project.id,
         hostId: 'local',
-        url: 'https://github.com/stablyai/orca.git',
+        url: 'https://github.com/nebutra/pebble.git',
         destination: '/workspace',
         displayName: 'Project'
       })
@@ -439,7 +439,7 @@ describe('repo slice runtime routing', () => {
     })
 
     expect(reposClone).toHaveBeenCalledWith({
-      url: 'https://github.com/stablyai/orca.git',
+      url: 'https://github.com/nebutra/pebble.git',
       destination: '/workspace'
     })
     expect(projectsSetupExistingFolder).toHaveBeenCalledWith({
@@ -493,7 +493,7 @@ describe('repo slice runtime routing', () => {
       store.getState().setupProjectClone({
         projectId: project.id,
         hostId: 'runtime:env-1',
-        url: 'https://github.com/stablyai/orca.git',
+        url: 'https://github.com/nebutra/pebble.git',
         destination: '/srv',
         displayName: 'Project'
       })
@@ -507,7 +507,7 @@ describe('repo slice runtime routing', () => {
       selector: 'env-1',
       method: 'repo.clone',
       params: {
-        url: 'https://github.com/stablyai/orca.git',
+        url: 'https://github.com/nebutra/pebble.git',
         destination: '/srv'
       },
       timeoutMs: 10 * 60_000
@@ -557,7 +557,7 @@ describe('repo slice runtime routing', () => {
       store.getState().setupProjectClone({
         projectId: project.id,
         hostId: 'ssh:ssh-1',
-        url: 'https://github.com/stablyai/orca.git',
+        url: 'https://github.com/nebutra/pebble.git',
         destination: '/srv',
         displayName: 'Project'
       })
@@ -569,7 +569,7 @@ describe('repo slice runtime routing', () => {
 
     expect(reposCloneRemote).toHaveBeenCalledWith({
       connectionId: 'ssh-1',
-      url: 'https://github.com/stablyai/orca.git',
+      url: 'https://github.com/nebutra/pebble.git',
       destination: '/srv'
     })
     expect(projectsSetupExistingFolder).toHaveBeenCalledWith({
@@ -650,7 +650,7 @@ describe('repo slice runtime routing', () => {
 
   it('removes SSH-owned repos through local IPC even when a runtime is focused', async () => {
     const store = createTestStore()
-    const worktreeId = `${sshRepo.id}::/home/orca/wt`
+    const worktreeId = `${sshRepo.id}::/home/pebble/wt`
     store.setState({
       settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
       repos: [sshRepo],
@@ -670,7 +670,7 @@ describe('repo slice runtime routing', () => {
 
   it('drops persisted visit timestamps for removed unhydrated SSH repos', async () => {
     const store = createTestStore()
-    const sshWorktreeId = `${sshRepo.id}::/home/orca/wt`
+    const sshWorktreeId = `${sshRepo.id}::/home/pebble/wt`
     const localWorktreeId = `${localRepo.id}::/local/wt`
     store.setState({
       repos: [sshRepo, localRepo],
@@ -696,7 +696,7 @@ describe('repo slice runtime routing', () => {
       _meta: { runtimeId: 'runtime-remote' }
     })
     const store = createTestStore()
-    const remoteWorktreeId = `${remoteRepo.id}::/srv/orca/wt`
+    const remoteWorktreeId = `${remoteRepo.id}::/srv/pebble/wt`
     const localWorktreeId = `${localRepo.id}::/local/wt`
     store.setState({
       settings: { activeRuntimeEnvironmentId: 'env-1' } as never,

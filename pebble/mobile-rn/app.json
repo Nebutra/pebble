@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Pebble Mobile",
+    "slug": "pebble-mobile",
+    "version": "0.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "scheme": "pebble",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "nebutra.pebble.mobile",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Pebble connects to the paired desktop runtime on your local network.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "nebutra.pebble.mobile",
+      "usesCleartextTraffic": true
+    },
+    "plugins": []
+  }
+}

@@ -2,7 +2,7 @@
    writing, and assistant-message retry state are one lifecycle unit; splitting
    them would obscure cleanup ordering across remote PTY reconnects. */
 // Why: relay-side adapter for the shared agent-hook listener pipeline. Hosts
-// a loopback HTTP server (same shape as Orca's main-process server: bind
+// a loopback HTTP server (same shape as Pebble's main-process server: bind
 // 127.0.0.1:0, bearer-token auth, /hook/<source> routing) and forwards every
 // parsed payload via a callback so `relay.ts` can re-emit it as an
 // `agent.hook` JSON-RPC notification across the existing SSH channel.
@@ -16,7 +16,7 @@ import { randomUUID } from 'node:crypto'
 import { basename, dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 
-import { ORCA_HOOK_PROTOCOL_VERSION } from '../shared/agent-hook-types'
+import { PEBBLE_HOOK_PROTOCOL_VERSION } from '../shared/agent-hook-types'
 import {
   clearAllListenerCaches,
   clearPaneCacheState,
@@ -43,7 +43,7 @@ export type RelayHookForward = (envelope: AgentHookRelayEnvelope) => void
 // shared dev box gets their own dir, owned 0o700. Mirrors RELAY_REMOTE_DIR
 // from `ssh-relay-deploy.ts` but stays local to this module — the hook
 // server is the only consumer.
-const RELAY_HOOKS_DIR_NAME = '.orca-relay'
+const RELAY_HOOKS_DIR_NAME = '.pebble-relay'
 const RELAY_HOOKS_SUBDIR = 'agent-hooks'
 const ASSISTANT_MESSAGE_RETRY_ATTEMPTS = 5
 const ASSISTANT_MESSAGE_RETRY_MS = 50
@@ -80,7 +80,7 @@ export function endpointDirForRelaySocket(sockPath: string): string {
 }
 
 export type RelayHookServerOptions = {
-  /** Where to put endpoint.env / endpoint.cmd. Defaults to `$HOME/.orca-relay/agent-hooks`. */
+  /** Where to put endpoint.env / endpoint.cmd. Defaults to `$HOME/.pebble-relay/agent-hooks`. */
   endpointDir?: string
   /** Env tag forwarded into hook payloads. Defaults to "remote", a relay
    *  location marker that main excludes from dev-vs-prod mismatch warnings. */
@@ -105,7 +105,7 @@ export class RelayAgentHookServer {
   private state: HookListenerState = createHookListenerState()
   // Why: the shared `HookListenerState.lastStatusByPaneKey` cache only stores
   // `AgentHookEventPayload` (no wire-envelope fields). Replay must still emit
-  // the original `source`/`env`/`version` so Orca's warn-once diagnostics fire
+  // the original `source`/`env`/`version` so Pebble's warn-once diagnostics fire
   // identically to the live POST path. Keep this as a per-instance sidecar map
   // so the shared listener type stays unchanged. Invariant: every key present
   // in `state.lastStatusByPaneKey` must also be present here — populated and
@@ -172,7 +172,7 @@ export class RelayAgentHookServer {
       port: this.port,
       token: this.token,
       env: this.env,
-      version: ORCA_HOOK_PROTOCOL_VERSION
+      version: PEBBLE_HOOK_PROTOCOL_VERSION
     })
     return this.endpointFileWritten
   }
@@ -192,7 +192,7 @@ export class RelayAgentHookServer {
   }
 
   /** Request-driven replay: walks the per-paneKey last-payload cache and
-   *  forwards each entry as a fresh notification. Called after Orca has
+   *  forwards each entry as a fresh notification. Called after Pebble has
    *  re-wired its `agent.hook` handler on the new mux post-`--connect`.
    *  The relay-driver issues the replay forwards BEFORE returning from the
    *  request handler so the response strictly trails all replayed
@@ -230,13 +230,13 @@ export class RelayAgentHookServer {
       return {}
     }
     const env: Record<string, string> = {
-      ORCA_AGENT_HOOK_PORT: String(this.port),
-      ORCA_AGENT_HOOK_TOKEN: this.token,
-      ORCA_AGENT_HOOK_ENV: this.env,
-      ORCA_AGENT_HOOK_VERSION: ORCA_HOOK_PROTOCOL_VERSION
+      PEBBLE_AGENT_HOOK_PORT: String(this.port),
+      PEBBLE_AGENT_HOOK_TOKEN: this.token,
+      PEBBLE_AGENT_HOOK_ENV: this.env,
+      PEBBLE_AGENT_HOOK_VERSION: PEBBLE_HOOK_PROTOCOL_VERSION
     }
     if (this.endpointFileWritten) {
-      env.ORCA_AGENT_HOOK_ENDPOINT = this.endpointFilePath
+      env.PEBBLE_AGENT_HOOK_ENDPOINT = this.endpointFilePath
     }
     return env
   }
@@ -254,7 +254,7 @@ export class RelayAgentHookServer {
       res.end()
       return
     }
-    if (req.headers['x-orca-agent-hook-token'] !== this.token) {
+    if (req.headers['x-pebble-agent-hook-token'] !== this.token) {
       res.writeHead(403)
       res.end()
       return

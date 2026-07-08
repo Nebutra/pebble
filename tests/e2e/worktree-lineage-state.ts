@@ -1,4 +1,4 @@
-import type { Page } from '@stablyai/playwright-test'
+import type { Page } from '@nebutra/playwright-test'
 
 export type LineageScenario = {
   parentId: string

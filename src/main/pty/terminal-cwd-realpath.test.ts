@@ -8,7 +8,7 @@ import {
 } from './terminal-cwd-realpath'
 
 describe('canonicalizeLocalTerminalPath', () => {
-  const root = mkdtempSync(join(tmpdir(), 'orca-cwd-realpath-'))
+  const root = mkdtempSync(join(tmpdir(), 'pebble-cwd-realpath-'))
 
   afterAll(() => {
     rmSync(root, { recursive: true, force: true })

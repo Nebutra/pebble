@@ -3,34 +3,34 @@
 import PackageDescription
 
 let package = Package(
-    name: "OrcaComputerUseMacOS",
+    name: "PebbleComputerUseMacOS",
     platforms: [
         .macOS(.v14)
     ],
     products: [
         .library(
-            name: "OrcaComputerUseMacOSCore",
-            targets: ["OrcaComputerUseMacOSCore"]
+            name: "PebbleComputerUseMacOSCore",
+            targets: ["PebbleComputerUseMacOSCore"]
         ),
         .executable(
-            name: "orca-computer-use-macos",
-            targets: ["OrcaComputerUseMacOS"]
+            name: "pebble-computer-use-macos",
+            targets: ["PebbleComputerUseMacOS"]
         )
     ],
     targets: [
         .target(
-            name: "OrcaComputerUseMacOSCore",
-            path: "Sources/OrcaComputerUseMacOSCore"
+            name: "PebbleComputerUseMacOSCore",
+            path: "Sources/PebbleComputerUseMacOSCore"
         ),
         .executableTarget(
-            name: "OrcaComputerUseMacOS",
-            dependencies: ["OrcaComputerUseMacOSCore"],
-            path: "Sources/OrcaComputerUseMacOS"
+            name: "PebbleComputerUseMacOS",
+            dependencies: ["PebbleComputerUseMacOSCore"],
+            path: "Sources/PebbleComputerUseMacOS"
         ),
         .testTarget(
-            name: "OrcaComputerUseMacOSTests",
-            dependencies: ["OrcaComputerUseMacOSCore"],
-            path: "Tests/OrcaComputerUseMacOSTests"
+            name: "PebbleComputerUseMacOSTests",
+            dependencies: ["PebbleComputerUseMacOSCore"],
+            path: "Tests/PebbleComputerUseMacOSTests"
         )
     ]
 )

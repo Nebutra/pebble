@@ -15,7 +15,7 @@ let uuidIndex = 0
 
 const setupLaunch = {
   runnerScriptPath: '/tmp/setup.sh',
-  envVars: { ORCA_WORKTREE_PATH: '/repo/worktree' }
+  envVars: { PEBBLE_WORKTREE_PATH: '/repo/worktree' }
 }
 
 const state = {
@@ -132,7 +132,7 @@ describe('launchWorktreeBackgroundTerminals', () => {
       2,
       expect.objectContaining({
         command: 'bash /tmp/setup.sh',
-        env: expect.objectContaining({ ORCA_WORKTREE_PATH: '/repo/worktree' }),
+        env: expect.objectContaining({ PEBBLE_WORKTREE_PATH: '/repo/worktree' }),
         tabId: 'tab-2',
         leafId: '00000000-0000-4000-8000-000000000002'
       })
@@ -225,15 +225,15 @@ describe('launchWorktreeBackgroundTerminals', () => {
     await launchWorktreeBackgroundTerminals({
       worktreeId: 'wt-1',
       setup: {
-        runnerScriptPath: 'C:\\repo\\.git\\worktrees\\wt\\orca\\setup-runner.cmd',
-        envVars: { ORCA_WORKTREE_PATH: 'C:\\repo\\worktree' }
+        runnerScriptPath: 'C:\\repo\\.git\\worktrees\\wt\\pebble\\setup-runner.cmd',
+        envVars: { PEBBLE_WORKTREE_PATH: 'C:\\repo\\worktree' }
       }
     })
 
     expect(mockSpawn).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        command: 'cmd.exe /c "C:\\repo\\.git\\worktrees\\wt\\orca\\setup-runner.cmd"',
+        command: 'cmd.exe /c "C:\\repo\\.git\\worktrees\\wt\\pebble\\setup-runner.cmd"',
         connectionId: 'ssh-windows'
       })
     )

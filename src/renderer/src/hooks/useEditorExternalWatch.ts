@@ -24,7 +24,7 @@ import type { OpenFile } from '@/store/slices/editor'
 import { readRuntimeFileContent, subscribeRuntimeFileChanges } from '@/runtime/runtime-file-client'
 import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 import {
-  ORCA_WORKTREE_FILE_CHANGE_EVENT,
+  PEBBLE_WORKTREE_FILE_CHANGE_EVENT,
   type WorktreeFileChangeEventDetail
 } from './worktree-file-change-event'
 import { isGitRepoKind } from '../../../shared/repo-kind'
@@ -32,7 +32,7 @@ import { isGitRepoKind } from '../../../shared/repo-kind'
 // Why: atomic-write patterns (Claude Code's Edit tool, editors like vim,
 // VSCode) land as a short burst of `update` events — or `delete + create` on
 // renamers — within a few milliseconds for the same path. Dispatching an
-// `ORCA_EDITOR_EXTERNAL_FILE_CHANGE_EVENT` per raw event fan-outs into N full
+// `PEBBLE_EDITOR_EXTERNAL_FILE_CHANGE_EVENT` per raw event fan-outs into N full
 // `setContent` + document-repair rebuilds per mounted EditorPanel,
 // which under split-pane + large markdown is enough to wedge the renderer
 // and black out the window (issue #826). Coalescing per (worktreeId + path)
@@ -443,7 +443,7 @@ export function createExternalWatchEventHandler(
     // consumers listen here so they do not fight over watch/unwatch ownership.
     if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
       window.dispatchEvent(
-        new CustomEvent<WorktreeFileChangeEventDetail>(ORCA_WORKTREE_FILE_CHANGE_EVENT, {
+        new CustomEvent<WorktreeFileChangeEventDetail>(PEBBLE_WORKTREE_FILE_CHANGE_EVENT, {
           detail: { payload, runtimeEnvironmentId: target.runtimeEnvironmentId }
         })
       )
@@ -679,7 +679,7 @@ function scheduleSelfWriteAwareExternalReload(
   const runtimeEnvironmentId = file.runtimeEnvironmentId ?? target.runtimeEnvironmentId
   // Why: a recent self-write stamp only proves the path changed recently; an
   // agent can write a newer version inside the same TTL. Compare disk content
-  // with the saved text so we suppress only the echo of Orca's own write.
+  // with the saved text so we suppress only the echo of Pebble's own write.
   void readRuntimeFileContent({
     settings: runtimeEnvironmentId ? { activeRuntimeEnvironmentId: runtimeEnvironmentId } : null,
     filePath: file.filePath,

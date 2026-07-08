@@ -1,6 +1,6 @@
 // Diagnostic bundle collection + upload (Mode 3 from
 // telemetry-error-tracking.md). The single user-initiated network path from
-// the error-tracking lane to Orca infrastructure. Every step here implements
+// the error-tracking lane to Pebble infrastructure. Every step here implements
 // a hardening requirement from §Endpoint contract — the comments name the
 // requirement number when they apply.
 //
@@ -44,7 +44,7 @@ export type CollectBundleOptions = {
   readonly platform: string
   readonly arch: string
   readonly osRelease: string
-  readonly orcaChannel: 'stable' | 'rc' | 'dev'
+  readonly pebbleChannel: 'stable' | 'rc' | 'dev'
 }
 
 export type CollectedBundle = {
@@ -65,7 +65,7 @@ type BundleHeader = {
   readonly platform: string
   readonly arch: string
   readonly os_release: string
-  readonly orca_channel: 'stable' | 'rc' | 'dev'
+  readonly pebble_channel: 'stable' | 'rc' | 'dev'
   readonly collected_at: string
   readonly schema_version: 1
 }
@@ -103,7 +103,7 @@ export function collectBundle(opts: CollectBundleOptions): CollectedBundle {
     platform: opts.platform,
     arch: opts.arch,
     os_release: opts.osRelease,
-    orca_channel: opts.orcaChannel,
+    pebble_channel: opts.pebbleChannel,
     collected_at: new Date().toISOString(),
     schema_version: 1
   }

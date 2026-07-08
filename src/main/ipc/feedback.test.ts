@@ -139,15 +139,12 @@ describe('submitFeedback', () => {
     expect(JSON.parse(String(feedbackInit?.body))).not.toHaveProperty('diagnosticBundle')
   })
 
-  it('falls back when the primary feedback request stalls', async () => {
+  it('returns an error when the Nebutra feedback request stalls', async () => {
     vi.useFakeTimers()
-    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
-      if (url.includes('www.onorca.dev')) {
-        return new Promise((_resolve, reject) => {
-          init?.signal?.addEventListener('abort', () => reject(new Error('request aborted')))
-        })
-      }
-      return Promise.resolve(okResponse())
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('request aborted')))
+      })
     })
 
     const result = submitFeedback({
@@ -158,38 +155,33 @@ describe('submitFeedback', () => {
     })
     await vi.advanceTimersByTimeAsync(10_000)
 
-    await expect(Promise.race([result, Promise.resolve('pending')])).resolves.toEqual({ ok: true })
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    await expect(Promise.race([result, Promise.resolve('pending')])).resolves.toEqual({
+      ok: false,
+      status: null,
+      error: 'request aborted'
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('does not retry the fallback when the fallback fails after a primary server error', async () => {
-    vi.useFakeTimers()
-    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
-      if (url.includes('www.onorca.dev')) {
-        return Promise.resolve({ ok: false, status: 500 } as Response)
-      }
-      return new Promise((_resolve, reject) => {
-        init?.signal?.addEventListener('abort', () => reject(new Error('fallback aborted')))
-      })
-    })
+  it('returns server errors from the Nebutra feedback route without legacy retry', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 500 } as Response)
 
     const result = submitFeedback({
-      feedback: 'primary 500 and fallback stalled',
+      feedback: 'server error',
       submitAnonymously: false,
       githubLogin: 'trusted-user',
       githubEmail: 'trusted@example.com'
     })
-    await vi.advanceTimersByTimeAsync(10_000)
 
-    await expect(Promise.race([result, Promise.resolve('pending')])).resolves.toEqual({
+    await expect(result).resolves.toEqual({
       ok: false,
-      status: null,
-      error: 'fallback aborted'
+      status: 500,
+      error: 'status 500'
     })
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('posts to the website API first so crash reports use the snippet-capable route', async () => {
+  it('posts crash reports to the Nebutra feedback route', async () => {
     await submitFeedback({
       feedback: '[Crash Report]',
       submissionType: 'crash',
@@ -198,7 +190,7 @@ describe('submitFeedback', () => {
       githubEmail: null
     } as Parameters<typeof submitFeedback>[0])
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://www.onorca.dev/v1/feedback')
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://www.nebutra.com/pebble/v1/feedback')
   })
 
   it('forces renderer IPC submissions onto the feedback lane', async () => {

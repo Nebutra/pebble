@@ -14,7 +14,7 @@ import {
   shouldOfferNewExternalWorktreeInbox
 } from './external-worktree-inbox'
 import {
-  buildKnownOrcaWorkspaceLayouts,
+  buildKnownPebbleWorkspaceLayouts,
   EXTERNAL_WORKTREE_VISIBILITY_ROLLOUT_AT,
   toDetectedWorktree
 } from './worktree-ownership'
@@ -22,7 +22,7 @@ import {
 const repo: Repo = {
   id: 'repo-1',
   path: '/repo',
-  displayName: 'orca',
+  displayName: 'pebble',
   badgeColor: '#000000',
   addedAt: Date.UTC(2026, 4, 24),
   externalWorktreeVisibility: 'hide',
@@ -66,7 +66,7 @@ function detectedResult(worktrees: DetectedWorktree[]): DetectedWorktreeListResu
 
 function makeSettings(): GlobalSettings {
   return {
-    workspaceDir: '/orca/workspaces',
+    workspaceDir: '/pebble/workspaces',
     nestWorkspaces: true,
     workspaceDirHistory: [],
     refreshLocalBaseRefOnWorktreeCreate: false,
@@ -150,7 +150,7 @@ describe('external worktree inbox', () => {
       hidden,
       baselined,
       detectedWorktree({ id: 'visible', visible: true }),
-      detectedWorktree({ id: 'orca-managed', ownership: 'orca-managed' })
+      detectedWorktree({ id: 'pebble-managed', ownership: 'pebble-managed' })
     ])
 
     expect(getHiddenExternalWorktrees(detected)).toEqual([hidden, baselined])
@@ -162,18 +162,18 @@ describe('external worktree inbox', () => {
     ).toEqual([hidden])
   })
 
-  it('offers metadata-free nested Orca workspace worktrees through the inbox', () => {
+  it('offers metadata-free nested Pebble workspace worktrees through the inbox', () => {
     const settings = makeSettings()
     const manual = toDetectedWorktree({
       repo,
       settings,
       worktree: makeGitWorktree({
-        path: '/orca/workspaces/orca/manual-from-git',
+        path: '/pebble/workspaces/pebble/manual-from-git',
         displayName: 'manual-from-git',
         branch: 'refs/heads/manual-from-git',
         isMainWorktree: false
       }),
-      knownOrcaLayouts: buildKnownOrcaWorkspaceLayouts(settings, repo)
+      knownPebbleLayouts: buildKnownPebbleWorkspaceLayouts(settings, repo)
     })
 
     expect(manual.ownership).toBe('external')

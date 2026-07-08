@@ -12,7 +12,7 @@ import {
   detachPaneFitResizeObserver
 } from './pane-fit-resize-observer'
 import { clearPendingSplitScrollRestore } from './pane-split-scroll'
-import { activateOrcaTerminalUnicodeProvider } from '../../../../shared/terminal-unicode-provider'
+import { activatePebbleTerminalUnicodeProvider } from '../../../../shared/terminal-unicode-provider'
 import { attachTerminalMouseWheelMultiplier } from './pane-terminal-mouse-wheel'
 import { attachTerminalScrollIntentTracking } from './terminal-scroll-intent'
 import { attachDomRendererFocusClassSync } from './pane-dom-focus-class-sync'
@@ -61,7 +61,7 @@ export function openTerminal(pane: ManagedPaneInternal): void {
     pane.leafId
   )
 
-  // Activate Orca's Unicode 11 width shim *before* any caller-driven write. CJK / emoji /
+  // Activate Pebble's Unicode 11 width shim *before* any caller-driven write. CJK / emoji /
   // ZWJ codepoints get baked into the buffer at the active unicode version on
   // write — if a restore (snapshot, scrollback, cold-restore) writes bytes
   // through xterm while the default v6 width tables are still active, wide
@@ -70,7 +70,7 @@ export function openTerminal(pane: ManagedPaneInternal): void {
   // (replayTerminalLayout → splitPane/createInitialPane → openTerminal,
   // restoreScrollbackBuffers, handleReattachResult) run after openTerminal,
   // so the activation must stay at this position.
-  activateOrcaTerminalUnicodeProvider(terminal)
+  activatePebbleTerminalUnicodeProvider(terminal)
 
   // Why: the OS reads the focused textarea's screen rect at compositionstart to
   // decide where to display the IME candidate window. xterm positions that

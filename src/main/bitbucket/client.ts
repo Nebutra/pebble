@@ -42,10 +42,10 @@ function envValue(name: string): string | null {
 
 function getAuthConfig(): BitbucketAuthConfig {
   return {
-    baseUrl: envValue('ORCA_BITBUCKET_API_BASE_URL') ?? DEFAULT_API_BASE_URL,
-    accessToken: envValue('ORCA_BITBUCKET_ACCESS_TOKEN'),
-    email: envValue('ORCA_BITBUCKET_EMAIL'),
-    apiToken: envValue('ORCA_BITBUCKET_API_TOKEN')
+    baseUrl: envValue('PEBBLE_BITBUCKET_API_BASE_URL') ?? DEFAULT_API_BASE_URL,
+    accessToken: envValue('PEBBLE_BITBUCKET_ACCESS_TOKEN'),
+    email: envValue('PEBBLE_BITBUCKET_EMAIL'),
+    apiToken: envValue('PEBBLE_BITBUCKET_API_TOKEN')
   }
 }
 

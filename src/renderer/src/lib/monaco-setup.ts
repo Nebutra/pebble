@@ -79,7 +79,7 @@ registerNimLanguage(monaco)
 installMonacoDelayerCancellationGuard()
 installMonacoDiffEditorDisposalGuard(monaco)
 // Why: Monaco's built-in context-menu Paste reads navigator.clipboard, which is
-// blocked in Orca's sandboxed renderer. Route it through the trusted IPC bridge
+// blocked in Pebble's sandboxed renderer. Route it through the trusted IPC bridge
 // so right-click Paste works like Cmd+V (which already works via native events).
 installMonacoContextMenuPaste(monaco)
 

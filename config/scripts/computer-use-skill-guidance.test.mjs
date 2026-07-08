@@ -9,12 +9,12 @@ describe('computer-use skill guidance', () => {
   it('keeps web-app targeting on the computer-use surface', () => {
     const skill = readFileSync(skillPath, 'utf8')
 
-    expect(skill).toContain('Use this skill for desktop UI through `orca computer`')
+    expect(skill).toContain('Use this skill for desktop UI through `pebble computer`')
     expect(skill).toContain('operate the desktop browser app/window that contains the page')
-    expect(skill).not.toContain('orca goto')
-    expect(skill).not.toContain('orca snapshot')
-    expect(skill).not.toContain('orca click')
-    expect(skill).not.toContain('orca fill')
+    expect(skill).not.toContain('pebble goto')
+    expect(skill).not.toContain('pebble snapshot')
+    expect(skill).not.toContain('pebble click')
+    expect(skill).not.toContain('pebble fill')
     expect(skill).not.toContain('Routing:')
   })
 

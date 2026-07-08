@@ -17,7 +17,7 @@ function jsonLines(records: unknown[]): string {
 
 describe('parseCodexSessionFile', () => {
   it('does not double-count usage when token count formats switch', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'orca-ai-vault-codex-token-switch-'))
+    const root = await mkdtemp(join(tmpdir(), 'pebble-ai-vault-codex-token-switch-'))
     tempRoots.push(root)
     const sessionPath = join(root, 'sessions', '2026', '06', '18', 'rollout-token-switch.jsonl')
     await mkdir(dirname(sessionPath), { recursive: true })

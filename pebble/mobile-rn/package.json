@@ -1,0 +1,31 @@
+{
+  "name": "@pebble/mobile-rn",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "verify:native-crypto": "node scripts/verify-native-crypto.mjs"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "expo": "^55.0.23",
+    "expo-secure-store": "^57.0.0",
+    "expo-status-bar": "^55.0.6",
+    "lucide-react-native": "^1.14.0",
+    "@pebble/relay-crypto-native": "file:modules/pebble-relay-crypto",
+    "react": "^19.2.6",
+    "react-native": "^0.83.9",
+    "react-native-safe-area-context": "^5.7.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}

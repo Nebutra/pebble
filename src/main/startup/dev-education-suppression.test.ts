@@ -82,10 +82,11 @@ describe('shouldSuppressDevEducation', () => {
     expect(
       shouldSuppressDevEducation({
         isDev: true,
-        env: { ORCA_E2E_USER_DATA_DIR: '/tmp/orca-e2e' }
+        env: { PEBBLE_E2E_USER_DATA_DIR: '/tmp/pebble-e2e' }
       })
     ).toBe(false)
   })
+
 })
 
 describe('suppressDevEducationForStore', () => {
@@ -132,7 +133,7 @@ describe('suppressDevEducationForStore', () => {
       outcome: 'dismissed',
       lastCompletedStep: 1
     })
-    expect(state.ui.featureTipsSeenIds).toEqual(['voice-dictation', 'orca-cli', 'cmd-j-palette'])
+    expect(state.ui.featureTipsSeenIds).toEqual(['voice-dictation', 'pebble-cli', 'cmd-j-palette'])
     expect(state.ui.contextualToursSeenIds).toEqual([
       'tasks',
       ...CONTEXTUAL_TOUR_IDS.filter((id) => id !== 'tasks')

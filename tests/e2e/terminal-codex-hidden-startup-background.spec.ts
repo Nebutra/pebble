@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { PNG } from 'pngjs'
-import type { Page } from '@stablyai/playwright-test'
-import { test, expect } from './helpers/orca-app'
+import type { Page } from '@nebutra/playwright-test'
+import { test, expect } from './helpers/pebble-app'
 import {
   ensureTerminalVisible,
   getActiveWorktreeId,
@@ -249,14 +249,14 @@ async function countVisibleBackgroundPixels(
 
 test.describe('Codex hidden startup composer background', () => {
   test('restores the input background when a Codex worktree first becomes visible', async ({
-    orcaPage
+    pebblePage
   }) => {
-    await waitForSessionReady(orcaPage)
-    const firstWorktreeId = await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
-    await waitForActiveTerminalManager(orcaPage, 30_000)
+    await waitForSessionReady(pebblePage)
+    const firstWorktreeId = await waitForActiveWorktree(pebblePage)
+    await ensureTerminalVisible(pebblePage)
+    await waitForActiveTerminalManager(pebblePage, 30_000)
 
-    const secondWorktreeId = (await getAllWorktreeIds(orcaPage)).find(
+    const secondWorktreeId = (await getAllWorktreeIds(pebblePage)).find(
       (id) => id !== firstWorktreeId
     )
     test.skip(!secondWorktreeId, 'Codex hidden startup background repro needs a second worktree')
@@ -266,8 +266,8 @@ test.describe('Codex hidden startup composer background', () => {
 
     const marker = `CODEX_STARTUP_BG_${Date.now()}`
     const command = codexLikeStartupCommand(marker)
-    await resetHiddenOutputDebug(orcaPage)
-    const hiddenTabId = await orcaPage.evaluate(
+    await resetHiddenOutputDebug(pebblePage)
+    const hiddenTabId = await pebblePage.evaluate(
       ({ worktreeId, command, eventName }) => {
         const store = window.__store
         if (!store) {
@@ -305,28 +305,28 @@ test.describe('Codex hidden startup composer background', () => {
       }
     )
 
-    const hiddenPtyId = await waitForHiddenTabPtyId(orcaPage, hiddenTabId)
+    const hiddenPtyId = await waitForHiddenTabPtyId(pebblePage, hiddenTabId)
     await expect
-      .poll(() => mainSnapshotContains(orcaPage, hiddenPtyId, marker), {
+      .poll(() => mainSnapshotContains(pebblePage, hiddenPtyId, marker), {
         timeout: 20_000,
         message: 'Hidden Codex startup background never reached the main buffer snapshot'
       })
       .toBe(true)
     await expect
-      .poll(async () => (await readHiddenOutputDebug(orcaPage))?.hiddenRendererSkipCount ?? 0, {
+      .poll(async () => (await readHiddenOutputDebug(pebblePage))?.hiddenRendererSkipCount ?? 0, {
         timeout: 10_000,
         message: 'Codex-marked hidden startup did not take the skipped renderer path'
       })
       .toBeGreaterThan(0)
 
-    await switchToWorktree(orcaPage, secondWorktreeId)
+    await switchToWorktree(pebblePage, secondWorktreeId)
     await expect
-      .poll(() => getActiveWorktreeId(orcaPage), {
+      .poll(() => getActiveWorktreeId(pebblePage), {
         timeout: 10_000,
         message: 'Hidden Codex worktree did not become active'
       })
       .toBe(secondWorktreeId)
-    await orcaPage.evaluate((tabId) => {
+    await pebblePage.evaluate((tabId) => {
       const store = window.__store
       if (!store) {
         throw new Error('Store unavailable')
@@ -335,10 +335,10 @@ test.describe('Codex hidden startup composer background', () => {
       state.setActiveTab(tabId)
       state.setActiveTabType('terminal')
     }, hiddenTabId)
-    await ensureTerminalVisible(orcaPage)
-    await waitForActiveTerminalManager(orcaPage, 30_000)
+    await ensureTerminalVisible(pebblePage)
+    await waitForActiveTerminalManager(pebblePage, 30_000)
     await expect
-      .poll(() => getTerminalContent(orcaPage, 8_000), {
+      .poll(() => getTerminalContent(pebblePage, 8_000), {
         timeout: 10_000,
         message: 'First visible mount did not restore hidden Codex startup content'
       })
@@ -349,7 +349,7 @@ test.describe('Codex hidden startup composer background', () => {
       .poll(
         async () => {
           try {
-            const nextTarget = await readCodexStartupBackgroundTarget(orcaPage, marker)
+            const nextTarget = await readCodexStartupBackgroundTarget(pebblePage, marker)
             target = nextTarget
             return nextTarget.modelBackgroundCells >= Math.min(40, nextTarget.cols)
           } catch {
@@ -366,7 +366,7 @@ test.describe('Codex hidden startup composer background', () => {
     if (!target) {
       throw new Error('Codex startup background target was not captured')
     }
-    const visibleBackgroundPixels = await countVisibleBackgroundPixels(orcaPage, target)
+    const visibleBackgroundPixels = await countVisibleBackgroundPixels(pebblePage, target)
     const minimumVisiblePixels = Math.round(
       target.modelBackgroundCells * target.cellWidth * target.cellHeight * 0.2
     )

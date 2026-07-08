@@ -1,18 +1,20 @@
 #!/bin/bash
 # Why: remove the PATH symlink that after-install.sh created, but only if it
-# still points into an Orca install dir — never delete an unrelated
-# /usr/bin/orca-ide a user or other package may own.
+# still points into a Pebble/legacy Pebble install dir — never delete unrelated
+# commands a user or another package may own.
 set -e
 
-link="/usr/bin/orca-ide"
+for link in /usr/bin/pebble-ide /usr/bin/pebble-ide; do
+  if [ ! -L "$link" ]; then
+    continue
+  fi
 
-if [ -L "$link" ]; then
   target="$(readlink "$link" || true)"
   case "$target" in
-    /opt/Orca/*|/opt/orca-ide/*|/opt/orca/*)
+    /opt/Pebble/*|/opt/pebble-ide/*|/opt/pebble/*|/opt/Pebble/*|/opt/pebble-ide/*|/opt/pebble/*)
       rm -f "$link"
       ;;
   esac
-fi
+done
 
 exit 0

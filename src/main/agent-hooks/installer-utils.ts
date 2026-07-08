@@ -37,7 +37,7 @@ export type HooksConfig = {
   [key: string]: unknown
 }
 
-// Why: host-level backstop (seconds) for Orca-managed status hooks. The shell
+// Why: host-level backstop (seconds) for Pebble-managed status hooks. The shell
 // wrapper's curl `--max-time 1.5` is the normal dead-endpoint bound; this caps a
 // hook the agent host itself runs in case that transport budget is bypassed.
 // Intentionally independent of Copilot's `timeoutSec: 5` — both managed budgets
@@ -88,7 +88,7 @@ export function createManagedCommandMatcher(
 ): (command: string | undefined) => boolean {
   const scriptStem = scriptFileName.replace(/\.(?:cmd|sh)$/, '')
   // Why: local Windows installs use .cmd, while SSH/POSIX installs and older
-  // entries use .sh. A platform switch should still sweep stale Orca hooks.
+  // entries use .sh. A platform switch should still sweep stale Pebble hooks.
   const needles = [
     `agent-hooks/${scriptFileName}`,
     `agent-hooks/${scriptStem}.cmd`,
@@ -117,10 +117,10 @@ function decodePowerShellEncodedCommand(command: string): string | null {
   }
 }
 
-// Why: prod, dev, and parallel Orca instances must write the same managed
+// Why: prod, dev, and parallel Pebble instances must write the same managed
 // settings entry instead of racing between per-userData script paths.
 export function getSharedManagedScriptPath(scriptFileName: string): string {
-  return join(homedir(), '.orca', 'agent-hooks', scriptFileName)
+  return join(homedir(), '.pebble', 'agent-hooks', scriptFileName)
 }
 
 // Why: a stale managed hook entry (left over after the user wiped userData,
@@ -186,16 +186,16 @@ export function buildWindowsAgentHookPostCommand(source: AgentHookSource): strin
   // makes trusted Windows hooks visibly slow, so mirror the POSIX curl path.
   // Qualify curl so a repo-local curl.exe cannot hijack hook payloads.
   return [
-    `"%SystemRoot%\\System32\\curl.exe" -sS -X POST "http://127.0.0.1:%ORCA_AGENT_HOOK_PORT%/hook/${source}" ^`,
+    `"%SystemRoot%\\System32\\curl.exe" -sS -X POST "http://127.0.0.1:%PEBBLE_AGENT_HOOK_PORT%/hook/${source}" ^`,
     '  --connect-timeout 0.5 --max-time 1.5 ^',
     '  -H "Content-Type: application/x-www-form-urlencoded" ^',
-    '  -H "X-Orca-Agent-Hook-Token: %ORCA_AGENT_HOOK_TOKEN%" ^',
-    '  --data-urlencode "paneKey=%ORCA_PANE_KEY%" ^',
-    '  --data-urlencode "tabId=%ORCA_TAB_ID%" ^',
-    '  --data-urlencode "launchToken=%ORCA_AGENT_LAUNCH_TOKEN%" ^',
-    '  --data-urlencode "worktreeId=%ORCA_WORKTREE_ID%" ^',
-    '  --data-urlencode "env=%ORCA_AGENT_HOOK_ENV%" ^',
-    '  --data-urlencode "version=%ORCA_AGENT_HOOK_VERSION%" ^',
+    '  -H "X-Pebble-Agent-Hook-Token: %PEBBLE_AGENT_HOOK_TOKEN%" ^',
+    '  --data-urlencode "paneKey=%PEBBLE_PANE_KEY%" ^',
+    '  --data-urlencode "tabId=%PEBBLE_TAB_ID%" ^',
+    '  --data-urlencode "launchToken=%PEBBLE_AGENT_LAUNCH_TOKEN%" ^',
+    '  --data-urlencode "worktreeId=%PEBBLE_WORKTREE_ID%" ^',
+    '  --data-urlencode "env=%PEBBLE_AGENT_HOOK_ENV%" ^',
+    '  --data-urlencode "version=%PEBBLE_AGENT_HOOK_VERSION%" ^',
     '  --data-urlencode "payload@-" >nul 2>nul'
   ].join('\r\n')
 }
@@ -209,16 +209,16 @@ export function buildWindowsAgentHookPostCommand(source: AgentHookSource): strin
 export function buildWindowsAgentHookCurlPostCommand(source: AgentHookSource): string {
   return [
     '"%SystemRoot%\\System32\\curl.exe" -sS -X POST',
-    `"http://127.0.0.1:%ORCA_AGENT_HOOK_PORT%/hook/${source}"`,
+    `"http://127.0.0.1:%PEBBLE_AGENT_HOOK_PORT%/hook/${source}"`,
     '--connect-timeout 0.5 --max-time 1.5',
     '-H "Content-Type: application/x-www-form-urlencoded"',
-    '-H "X-Orca-Agent-Hook-Token: %ORCA_AGENT_HOOK_TOKEN%"',
-    '--data-urlencode "paneKey=%ORCA_PANE_KEY%"',
-    '--data-urlencode "tabId=%ORCA_TAB_ID%"',
-    '--data-urlencode "launchToken=%ORCA_AGENT_LAUNCH_TOKEN%"',
-    '--data-urlencode "worktreeId=%ORCA_WORKTREE_ID%"',
-    '--data-urlencode "env=%ORCA_AGENT_HOOK_ENV%"',
-    '--data-urlencode "version=%ORCA_AGENT_HOOK_VERSION%"',
+    '-H "X-Pebble-Agent-Hook-Token: %PEBBLE_AGENT_HOOK_TOKEN%"',
+    '--data-urlencode "paneKey=%PEBBLE_PANE_KEY%"',
+    '--data-urlencode "tabId=%PEBBLE_TAB_ID%"',
+    '--data-urlencode "launchToken=%PEBBLE_AGENT_LAUNCH_TOKEN%"',
+    '--data-urlencode "worktreeId=%PEBBLE_WORKTREE_ID%"',
+    '--data-urlencode "env=%PEBBLE_AGENT_HOOK_ENV%"',
+    '--data-urlencode "version=%PEBBLE_AGENT_HOOK_VERSION%"',
     '--data-urlencode "payload@-"',
     '>nul 2>&1'
   ].join(' ')
@@ -277,7 +277,7 @@ export function hookDefinitionHasManagedCommand(
   )
 }
 
-// Why: temp+rename so concurrent Orca instances writing this shared path can't
+// Why: temp+rename so concurrent Pebble instances writing this shared path can't
 // produce a torn script that an in-flight `/bin/sh <scriptPath>` would source.
 export function writeManagedScript(scriptPath: string, content: string): void {
   const dir = dirname(scriptPath)

@@ -20,8 +20,8 @@ describe('getRenderedSetupScriptPromptState', () => {
       getRenderedSetupScriptPromptState({
         promptState: current,
         activeRepoId: 'repo-local',
-        activeProjectId: 'github:stablyai/orca',
-        lastVisiblePrompt: { state: prompt('repo-ssh'), projectId: 'github:stablyai/orca' }
+        activeProjectId: 'github:nebutra/pebble',
+        lastVisiblePrompt: { state: prompt('repo-ssh'), projectId: 'github:nebutra/pebble' }
       })
     ).toBe(current)
   })
@@ -33,8 +33,8 @@ describe('getRenderedSetupScriptPromptState', () => {
       getRenderedSetupScriptPromptState({
         promptState: null,
         activeRepoId: 'repo-ssh',
-        activeProjectId: 'github:stablyai/orca',
-        lastVisiblePrompt: { state: previous, projectId: 'github:stablyai/orca' }
+        activeProjectId: 'github:nebutra/pebble',
+        lastVisiblePrompt: { state: previous, projectId: 'github:nebutra/pebble' }
       })
     ).toBe(previous)
   })
@@ -44,8 +44,8 @@ describe('getRenderedSetupScriptPromptState', () => {
       getRenderedSetupScriptPromptState({
         promptState: null,
         activeRepoId: 'repo-other',
-        activeProjectId: 'github:stablyai/other',
-        lastVisiblePrompt: { state: prompt('repo-local'), projectId: 'github:stablyai/orca' }
+        activeProjectId: 'github:nebutra/other',
+        lastVisiblePrompt: { state: prompt('repo-local'), projectId: 'github:nebutra/pebble' }
       })
     ).toBeNull()
   })

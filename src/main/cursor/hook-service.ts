@@ -72,13 +72,13 @@ function getManagedScript(target: 'local' | 'posix' = 'local'): string {
       '@echo off',
       'setlocal',
       // Why: see claude/hook-service.ts for rationale. The endpoint file holds
-      // the live port/token for this Orca install; sourcing it here lets a
+      // the live port/token for this Pebble install; sourcing it here lets a
       // surviving PTY reach the current server even though its env points at
-      // the prior Orca's coordinates.
-      'if defined ORCA_AGENT_HOOK_ENDPOINT if exist "%ORCA_AGENT_HOOK_ENDPOINT%" call "%ORCA_AGENT_HOOK_ENDPOINT%" 2>nul',
-      'if "%ORCA_AGENT_HOOK_PORT%"=="" exit /b 0',
-      'if "%ORCA_AGENT_HOOK_TOKEN%"=="" exit /b 0',
-      'if "%ORCA_PANE_KEY%"=="" exit /b 0',
+      // the prior Pebble's coordinates.
+      'if defined PEBBLE_AGENT_HOOK_ENDPOINT if exist "%PEBBLE_AGENT_HOOK_ENDPOINT%" call "%PEBBLE_AGENT_HOOK_ENDPOINT%" 2>nul',
+      'if "%PEBBLE_AGENT_HOOK_PORT%"=="" exit /b 0',
+      'if "%PEBBLE_AGENT_HOOK_TOKEN%"=="" exit /b 0',
+      'if "%PEBBLE_PANE_KEY%"=="" exit /b 0',
       buildWindowsAgentHookPostCommand('cursor'),
       'exit /b 0',
       ''
@@ -88,12 +88,12 @@ function getManagedScript(target: 'local' | 'posix' = 'local'): string {
   return [
     '#!/bin/sh',
     // Why: see claude/hook-service.ts for rationale. Sourcing refreshes
-    // PORT/TOKEN/ENV/VERSION from the current Orca so a surviving PTY keeps
+    // PORT/TOKEN/ENV/VERSION from the current Pebble so a surviving PTY keeps
     // reporting after a restart.
-    'if [ -n "$ORCA_AGENT_HOOK_ENDPOINT" ] && [ -r "$ORCA_AGENT_HOOK_ENDPOINT" ]; then',
-    '  . "$ORCA_AGENT_HOOK_ENDPOINT" 2>/dev/null || :',
+    'if [ -n "$PEBBLE_AGENT_HOOK_ENDPOINT" ] && [ -r "$PEBBLE_AGENT_HOOK_ENDPOINT" ]; then',
+    '  . "$PEBBLE_AGENT_HOOK_ENDPOINT" 2>/dev/null || :',
     'fi',
-    'if [ -z "$ORCA_AGENT_HOOK_PORT" ] || [ -z "$ORCA_AGENT_HOOK_TOKEN" ] || [ -z "$ORCA_PANE_KEY" ]; then',
+    'if [ -z "$PEBBLE_AGENT_HOOK_PORT" ] || [ -z "$PEBBLE_AGENT_HOOK_TOKEN" ] || [ -z "$PEBBLE_PANE_KEY" ]; then',
     '  exit 0',
     'fi',
     'payload=$(cat)',
@@ -107,16 +107,16 @@ function getManagedScript(target: 'local' | 'posix' = 'local'): string {
     // Why: pipe payload to curl's stdin (`payload@-`) instead of an inline
     // `payload=$VALUE` arg, so tens-of-KB tool output stays off the curl
     // command line (EDR command-line false positives). Wire body is identical.
-    'printf \'%s\' "$payload" | curl -sS -X POST "http://127.0.0.1:${ORCA_AGENT_HOOK_PORT}/hook/cursor" \\',
+    'printf \'%s\' "$payload" | curl -sS -X POST "http://127.0.0.1:${PEBBLE_AGENT_HOOK_PORT}/hook/cursor" \\',
     '  --connect-timeout 0.5 --max-time 1.5 \\',
     '  -H "Content-Type: application/x-www-form-urlencoded" \\',
-    '  -H "X-Orca-Agent-Hook-Token: ${ORCA_AGENT_HOOK_TOKEN}" \\',
-    '  --data-urlencode "paneKey=${ORCA_PANE_KEY}" \\',
-    '  --data-urlencode "tabId=${ORCA_TAB_ID}" \\',
-    '  --data-urlencode "launchToken=${ORCA_AGENT_LAUNCH_TOKEN}" \\',
-    '  --data-urlencode "worktreeId=${ORCA_WORKTREE_ID}" \\',
-    '  --data-urlencode "env=${ORCA_AGENT_HOOK_ENV}" \\',
-    '  --data-urlencode "version=${ORCA_AGENT_HOOK_VERSION}" \\',
+    '  -H "X-Pebble-Agent-Hook-Token: ${PEBBLE_AGENT_HOOK_TOKEN}" \\',
+    '  --data-urlencode "paneKey=${PEBBLE_PANE_KEY}" \\',
+    '  --data-urlencode "tabId=${PEBBLE_TAB_ID}" \\',
+    '  --data-urlencode "launchToken=${PEBBLE_AGENT_LAUNCH_TOKEN}" \\',
+    '  --data-urlencode "worktreeId=${PEBBLE_WORKTREE_ID}" \\',
+    '  --data-urlencode "env=${PEBBLE_AGENT_HOOK_ENV}" \\',
+    '  --data-urlencode "version=${PEBBLE_AGENT_HOOK_VERSION}" \\',
     '  --data-urlencode "payload@-" >/dev/null 2>&1 || true',
     'exit 0',
     ''
@@ -252,7 +252,7 @@ export class CursorHookService {
     return this.getStatus()
   }
 
-  // Why: install Orca's managed Cursor hooks on the remote box. Mirrors
+  // Why: install Pebble's managed Cursor hooks on the remote box. Mirrors
   // ClaudeHookService.installRemote — POSIX-only, uses the same SFTP-backed
   // primitives, and emits Cursor's documented schema (top-level `command`
   // on each definition + top-level `version: 1`) so cursor-agent on the
@@ -260,7 +260,7 @@ export class CursorHookService {
   // §8.
   async installRemote(sftp: SFTPWrapper, remoteHome: string): Promise<AgentHookInstallStatus> {
     const remoteConfigPath = `${remoteHome.replace(/\/$/, '')}/.cursor/hooks.json`
-    const remoteScriptPath = `${remoteHome.replace(/\/$/, '')}/.orca/agent-hooks/cursor-hook.sh`
+    const remoteScriptPath = `${remoteHome.replace(/\/$/, '')}/.pebble/agent-hooks/cursor-hook.sh`
     try {
       const config = await readHooksJsonRemote(sftp, remoteConfigPath)
       if (!config) {
@@ -296,7 +296,7 @@ export class CursorHookService {
       // Why: script-then-config order so a partial-failure mid-install at
       // worst leaves a working script no settings.json points at — see
       // ClaudeHookService.installRemote.
-      // Why: SSH remotes use POSIX `.sh` hook paths even when Orca itself is
+      // Why: SSH remotes use POSIX `.sh` hook paths even when Pebble itself is
       // running on Windows; never derive remote script syntax from local OS.
       await writeManagedScriptRemote(sftp, remoteScriptPath, getManagedScript('posix'))
       await writeHooksJsonRemote(sftp, remoteConfigPath, nextConfig)

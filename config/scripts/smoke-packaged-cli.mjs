@@ -12,7 +12,7 @@ function readAppDirArg(argv) {
     return explicit.slice('--app-dir='.length)
   }
   if (process.platform === 'darwin') {
-    return 'dist/mac-arm64/Orca.app'
+    return 'dist/mac-arm64/Pebble.app'
   }
   if (process.platform === 'win32') {
     return 'dist/win-unpacked'
@@ -22,16 +22,16 @@ function readAppDirArg(argv) {
 
 function getPackagedCliPath(appDir) {
   if (process.platform === 'darwin' || appDir.endsWith('.app')) {
-    return join(appDir, 'Contents', 'Resources', 'bin', 'orca')
+    return join(appDir, 'Contents', 'Resources', 'bin', 'pebble')
   }
   if (process.platform === 'win32') {
-    return join(appDir, 'resources', 'bin', 'orca.cmd')
+    return join(appDir, 'resources', 'bin', 'pebble.cmd')
   }
-  return join(appDir, 'resources', 'bin', 'orca-ide')
+  return join(appDir, 'resources', 'bin', 'pebble-ide')
 }
 
 const appDir = resolve(readAppDirArg(process.argv.slice(2)))
-const tempRoot = await mkdtemp(join(tmpdir(), 'orca-packaged-cli-smoke-'))
+const tempRoot = await mkdtemp(join(tmpdir(), 'pebble-packaged-cli-smoke-'))
 const copiedAppDir = join(tempRoot, basename(appDir))
 
 try {

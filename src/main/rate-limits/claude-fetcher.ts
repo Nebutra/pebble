@@ -25,6 +25,8 @@ import {
   writeActiveClaudeKeychainCredentials
 } from '../claude-accounts/keychain'
 import {
+  LEGACY_MANAGED_AUTH_MARKER,
+  MANAGED_AUTH_MARKER,
   readClaudeManagedAuthFile,
   resolveOwnedClaudeManagedAuthPath,
   writeClaudeManagedAuthFile
@@ -50,6 +52,8 @@ const CLAUDE_CODE_USER_AGENT = 'claude-code/2.1.0'
 const API_TIMEOUT_MS = 10_000
 const LIVE_CLAUDE_REFRESH_DEFERRED_MESSAGE =
   'Claude usage refresh is waiting for the live Claude terminal to rotate its credentials.'
+const MANAGED_WSL_CLAUDE_ACCOUNTS_ROOT = '/.local/share/pebble/claude-accounts'
+const LEGACY_MANAGED_WSL_CLAUDE_ACCOUNTS_ROOT = '/.local/share/pebble/claude-accounts'
 
 /**
  * Bridge standard HTTP proxy env vars into Electron's session proxy config.
@@ -424,7 +428,7 @@ async function fetchViaOAuth(token: string, signal?: AbortSignal): Promise<Provi
         Authorization: `Bearer ${token}`,
         'anthropic-beta': OAUTH_BETA_HEADER,
         // Why: Claude's OAuth usage endpoint is the Claude Code usage API;
-        // matching the CLI user-agent keeps Orca aligned with that contract.
+        // matching the CLI user-agent keeps Pebble aligned with that contract.
         'User-Agent': CLAUDE_CODE_USER_AGENT
       },
       signal: controller.signal
@@ -1033,23 +1037,50 @@ function resolveOwnedWslClaudeManagedAuthPath(account: InactiveClaudeAccountInfo
   }
   const linuxPath = account.wslLinuxAuthPath ?? wslInfo.linuxPath
   if (
-    !linuxPath.includes('/.local/share/orca/claude-accounts/') ||
+    !managedWslClaudeAccountsRootForPath(linuxPath) ||
     !linuxPath.endsWith(`/${account.id}/auth`)
   ) {
     return null
   }
   try {
-    const markerPath = path.join(account.managedAuthPath, '.orca-managed-claude-auth')
-    if (
-      !existsSync(markerPath) ||
-      lstatSync(markerPath).isSymbolicLink() ||
-      readFileSync(markerPath, 'utf-8').trim() !== account.id
-    ) {
+    if (!hasValidClaudeManagedAuthMarker(account.managedAuthPath, account.id)) {
       return null
     }
     return account.managedAuthPath
   } catch {
     return null
+  }
+}
+
+function managedWslClaudeAccountsRootForPath(linuxPath: string): string | null {
+  if (linuxPath.includes(`${MANAGED_WSL_CLAUDE_ACCOUNTS_ROOT}/`)) {
+    return MANAGED_WSL_CLAUDE_ACCOUNTS_ROOT
+  }
+  if (linuxPath.includes(`${LEGACY_MANAGED_WSL_CLAUDE_ACCOUNTS_ROOT}/`)) {
+    return LEGACY_MANAGED_WSL_CLAUDE_ACCOUNTS_ROOT
+  }
+  return null
+}
+
+function hasValidClaudeManagedAuthMarker(managedAuthPath: string, accountId: string): boolean {
+  return (
+    isClaudeManagedAuthMarkerValid(path.join(managedAuthPath, MANAGED_AUTH_MARKER), accountId) ||
+    isClaudeManagedAuthMarkerValid(
+      path.join(managedAuthPath, LEGACY_MANAGED_AUTH_MARKER),
+      accountId
+    )
+  )
+}
+
+function isClaudeManagedAuthMarkerValid(markerPath: string, accountId: string): boolean {
+  try {
+    return (
+      existsSync(markerPath) &&
+      !lstatSync(markerPath).isSymbolicLink() &&
+      readFileSync(markerPath, 'utf-8').trim() === accountId
+    )
+  } catch {
+    return false
   }
 }
 

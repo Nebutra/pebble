@@ -38,7 +38,7 @@ import { classifyConnection } from '../src/transport/connection-health'
 import { subscribeToDesktopNotifications } from '../src/notifications/mobile-notifications'
 import type { ConnectionState, HostProfile } from '../src/transport/types'
 import { triggerMediumImpact } from '../src/platform/haptics'
-import { OrcaLogo } from '../src/components/OrcaLogo'
+import { PebbleLogo } from '../src/components/PebbleLogo'
 import { StatusDot } from '../src/components/StatusDot'
 import { TaskProviderLogo } from '../src/components/TaskProviderLogo'
 import { TextInputModal } from '../src/components/TextInputModal'
@@ -396,7 +396,7 @@ export default function HomeScreen() {
           setHosts(h)
         }
       })
-      void AsyncStorage.getItem('orca:last-visited-worktree').then((raw) => {
+      void AsyncStorage.getItem('pebble:last-visited-worktree').then((raw) => {
         if (stale || !raw) {
           return
         }
@@ -613,7 +613,7 @@ export default function HomeScreen() {
         continue
       }
       // Why: also show hosts whose only usage is the system-default login
-      // (no Orca-managed accounts but live rate-limit data for the active
+      // (no Pebble-managed accounts but live rate-limit data for the active
       // target), otherwise system-default users see no usage section at all.
       if (hasRenderableUsage(snap, 'claude') || hasRenderableUsage(snap, 'codex')) {
         items.push({ host, snapshot: snap })
@@ -728,9 +728,9 @@ export default function HomeScreen() {
       <View style={styles.topBar}>
         <View style={styles.brandLockup}>
           <View style={styles.logoMark}>
-            <OrcaLogo size={18} />
+            <PebbleLogo size={18} />
           </View>
-          <Text style={styles.brandName}>Orca</Text>
+          <Text style={styles.brandName}>Pebble</Text>
         </View>
         <Pressable
           style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
@@ -752,7 +752,7 @@ export default function HomeScreen() {
           <View style={styles.emptyHero}>
             <Text style={styles.emptyTitle}>Connect your desktop</Text>
             <Text style={styles.emptyBody}>
-              Pair with Orca on your computer to check on your agents, jump into any terminal, and
+              Pair with Pebble on your computer to check on your agents, jump into any terminal, and
               drive work from your phone.
             </Text>
             <Pressable style={styles.primaryButton} onPress={() => router.push('/pair-scan')}>
@@ -1125,7 +1125,7 @@ function CardGap() {
 
 const ONBOARDING_STEPS = [
   {
-    title: 'Open Orca desktop',
+    title: 'Open Pebble desktop',
     desc: 'Go to Settings → Mobile and generate a pairing QR code.'
   },
   {

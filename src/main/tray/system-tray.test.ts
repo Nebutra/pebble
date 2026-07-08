@@ -64,7 +64,7 @@ afterEach(() => {
 })
 
 describe('createSystemTray', () => {
-  it('creates a tray with an Orca tooltip and Open/Quit menu on win32', async () => {
+  it('creates a tray with an Pebble tooltip and Open/Quit menu on win32', async () => {
     setPlatform('win32')
     const { createSystemTray } = await loadModule()
     const onOpen = vi.fn()
@@ -75,13 +75,13 @@ describe('createSystemTray', () => {
     expect(tray).not.toBeNull()
     expect(trayInstances).toHaveLength(1)
     expect(trayInstances[0].image).toBe(resizedImage)
-    expect(trayInstances[0].setToolTip).toHaveBeenCalledWith('Orca')
+    expect(trayInstances[0].setToolTip).toHaveBeenCalledWith('Pebble')
     const items = builtMenuItems()
-    expect(items.map((i) => i.label)).toEqual(['Open Orca', undefined, 'Quit'])
+    expect(items.map((i) => i.label)).toEqual(['Open Pebble', undefined, 'Quit'])
     expect(items[1].type).toBe('separator')
   })
 
-  it('wires Open Orca, the tray click, and Quit to their callbacks', async () => {
+  it('wires Open Pebble, the tray click, and Quit to their callbacks', async () => {
     setPlatform('win32')
     const { createSystemTray } = await loadModule()
     const onOpen = vi.fn()
@@ -90,7 +90,7 @@ describe('createSystemTray', () => {
     createSystemTray({ appIcon: 'classic', onOpen, onQuit })
 
     const items = builtMenuItems()
-    items.find((i) => i.label === 'Open Orca')?.click?.()
+    items.find((i) => i.label === 'Open Pebble')?.click?.()
     expect(onOpen).toHaveBeenCalledTimes(1)
 
     const clickHandler = trayInstances[0].on.mock.calls.find((c) => c[0] === 'click')?.[1] as

@@ -1,0 +1,16 @@
+[package]
+name = "pebble-rust-host"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "pebble_rust_host"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pebble-runtime-status"
+path = "src/bin/pebble-runtime-status.rs"
+
+[dependencies]
+serde_json = "1"

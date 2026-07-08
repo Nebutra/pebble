@@ -83,14 +83,14 @@ describe('resolveExternalEditorLaunchSpec', () => {
     expect(
       resolveExternalEditorLaunchSpec(
         'C:\\Program Files\\Neovim\\bin\\nvim.exe',
-        'C:\\workspaces\\orca',
+        'C:\\workspaces\\pebble',
         { platform: 'win32' }
       )
     ).toEqual({
       kind: 'executable',
       hideWindowsConsole: false,
       spawnCmd: 'C:\\Program Files\\Neovim\\bin\\nvim.exe',
-      spawnArgs: ['C:\\workspaces\\orca']
+      spawnArgs: ['C:\\workspaces\\pebble']
     })
   })
 
@@ -98,27 +98,27 @@ describe('resolveExternalEditorLaunchSpec', () => {
     expect(
       resolveExternalEditorLaunchSpec(
         '"C:\\Program Files\\Neovim\\bin\\nvim.exe"',
-        'C:\\workspaces\\orca',
+        'C:\\workspaces\\pebble',
         { platform: 'win32' }
       )
     ).toEqual({
       kind: 'executable',
       hideWindowsConsole: false,
       spawnCmd: 'C:\\Program Files\\Neovim\\bin\\nvim.exe',
-      spawnArgs: ['C:\\workspaces\\orca']
+      spawnArgs: ['C:\\workspaces\\pebble']
     })
   })
 
   it('shows the Windows console for NeoVim shell commands with arguments', () => {
     expect(
-      resolveExternalEditorLaunchSpec('nvim --clean', 'C:\\workspaces\\orca', {
+      resolveExternalEditorLaunchSpec('nvim --clean', 'C:\\workspaces\\pebble', {
         platform: 'win32'
       })
     ).toEqual({
       kind: 'shell',
       hideWindowsConsole: false,
       spawnCmd: getCmdExePath(),
-      spawnArgs: ['/d', '/s', '/c', 'nvim --clean C:\\workspaces\\orca']
+      spawnArgs: ['/d', '/s', '/c', 'nvim --clean C:\\workspaces\\pebble']
     })
   })
 })

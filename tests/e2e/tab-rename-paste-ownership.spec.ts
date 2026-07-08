@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import type { Page } from '@stablyai/playwright-test'
-import { test, expect } from './helpers/orca-app'
+import type { Page } from '@nebutra/playwright-test'
+import { test, expect } from './helpers/pebble-app'
 import {
   getActiveTabId,
   getActiveWorktreeId,
@@ -47,37 +47,37 @@ function tabLocatorByTitle(page: Page, title: string): ReturnType<Page['locator'
 test.describe('tab rename paste ownership', () => {
   test('keyboard paste into rename textbox does not also write to the active terminal', async ({
     electronApp,
-    orcaPage
+    pebblePage
   }) => {
-    await waitForSessionReady(orcaPage)
-    await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
-    await waitForActiveTerminalManager(orcaPage, 30_000)
+    await waitForSessionReady(pebblePage)
+    await waitForActiveWorktree(pebblePage)
+    await ensureTerminalVisible(pebblePage)
+    await waitForActiveTerminalManager(pebblePage, 30_000)
     await installTerminalPtyWriteSpy(electronApp)
 
-    const worktreeId = (await getActiveWorktreeId(orcaPage))!
-    const originalTitle = await getActiveTabTitle(orcaPage, worktreeId)
-    const renameInput = orcaPage.getByRole('textbox', {
+    const worktreeId = (await getActiveWorktreeId(pebblePage))!
+    const originalTitle = await getActiveTabTitle(pebblePage, worktreeId)
+    const renameInput = pebblePage.getByRole('textbox', {
       name: `Rename tab ${originalTitle}`,
       exact: true
     })
 
-    await tabLocatorByTitle(orcaPage, originalTitle).dblclick()
+    await tabLocatorByTitle(pebblePage, originalTitle).dblclick()
     await expect(renameInput).toBeVisible()
     await renameInput.fill('')
 
-    const payload = `ORCA_E2E_TEXTBOX_PASTE_${randomUUID()}`
-    await orcaPage.evaluate((text) => window.api.ui.writeClipboardText(text), payload)
+    const payload = `PEBBLE_E2E_TEXTBOX_PASTE_${randomUUID()}`
+    await pebblePage.evaluate((text) => window.api.ui.writeClipboardText(text), payload)
     await clearTerminalPtyWriteLog(electronApp)
     await expect(renameInput).toBeFocused()
 
-    await orcaPage.keyboard.press(editablePasteChord())
+    await pebblePage.keyboard.press(editablePasteChord())
 
     await expect(renameInput).toHaveValue(payload)
     expect(countOccurrences(await renameInput.inputValue(), payload)).toBe(1)
     expect((await readTerminalPtyWrites(electronApp)).join('')).not.toContain(payload)
 
     await renameInput.press('Escape')
-    await expect(tabLocatorByTitle(orcaPage, originalTitle)).toBeVisible()
+    await expect(tabLocatorByTitle(pebblePage, originalTitle)).toBeVisible()
   })
 })

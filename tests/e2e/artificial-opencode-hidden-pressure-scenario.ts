@@ -1,5 +1,5 @@
-import type { Page, TestInfo } from '@stablyai/playwright-test'
-import { expect } from '@stablyai/playwright-test'
+import type { Page, TestInfo } from '@nebutra/playwright-test'
+import { expect } from '@nebutra/playwright-test'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -126,7 +126,7 @@ export async function runHiddenRealPtyPressureScenario<
   pressureStartDelayMs,
   testInfo,
   testRepoPath,
-  orcaPage
+  pebblePage
 }: {
   deps: HiddenPressureDeps<TMeasurement, TDebug, TScheduler, TMainPressure, TAckGate>
   annotationSuffix?: string
@@ -135,11 +135,11 @@ export async function runHiddenRealPtyPressureScenario<
   pressureStartDelayMs: number
   testInfo: TestInfo
   testRepoPath: string
-  orcaPage: Page
+  pebblePage: Page
 }): Promise<void> {
-  await waitForSessionReady(orcaPage)
-  const firstWorktreeId = await waitForActiveWorktree(orcaPage)
-  const allWorktreeIds = await getAllWorktreeIds(orcaPage)
+  await waitForSessionReady(pebblePage)
+  const firstWorktreeId = await waitForActiveWorktree(pebblePage)
+  const allWorktreeIds = await getAllWorktreeIds(pebblePage)
   const secondWorktreeId = allWorktreeIds.find((id) => id !== firstWorktreeId)
   expect(Boolean(secondWorktreeId), 'OpenCode hidden PTY pressure needs a second worktree').toBe(
     true
@@ -148,54 +148,54 @@ export async function runHiddenRealPtyPressureScenario<
     return
   }
 
-  await switchToWorktree(orcaPage, secondWorktreeId)
-  const hiddenPanes = await deps.ensureActiveWorktreePaneLoad(orcaPage, hiddenPaneCount)
+  await switchToWorktree(pebblePage, secondWorktreeId)
+  const hiddenPanes = await deps.ensureActiveWorktreePaneLoad(pebblePage, hiddenPaneCount)
 
   const runId = randomUUID()
   const typingScriptPath = path.join(
     testRepoPath,
-    `.orca-opencode-hidden-pressure-typing-${runId}.mjs`
+    `.pebble-opencode-hidden-pressure-typing-${runId}.mjs`
   )
   const pressureScriptPath = path.join(
     testRepoPath,
-    `.orca-opencode-hidden-pressure-load-${runId}.mjs`
+    `.pebble-opencode-hidden-pressure-load-${runId}.mjs`
   )
   deps.writeInteractivePromptScript(typingScriptPath, runId)
   writePressureOutputScript(pressureScriptPath, runId)
 
-  await deps.resetTerminalPtyOutputDebug(orcaPage)
+  await deps.resetTerminalPtyOutputDebug(pebblePage)
   await deps.holdTerminalAckGate(
-    orcaPage,
+    pebblePage,
     hiddenPanes.map((pane) => pane.ptyId)
   )
   try {
     await startHiddenPressureCommands({
       hiddenPanes,
-      orcaPage,
+      pebblePage,
       pressureOutputChars,
       pressureScriptPath,
       pressureStartDelayMs
     })
-    await switchToTypingWorkspace(orcaPage, firstWorktreeId)
-    const typingPtyId = await waitForActivePanePtyId(orcaPage)
+    await switchToTypingWorkspace(pebblePage, firstWorktreeId)
+    const typingPtyId = await waitForActivePanePtyId(pebblePage)
 
-    const pressureBeforeTyping = await deps.waitForMainPtyPressureBacklog(orcaPage)
+    const pressureBeforeTyping = await deps.waitForMainPtyPressureBacklog(pebblePage)
     const measurement = await deps.measureTypingDuringLoad(
-      orcaPage,
+      pebblePage,
       typingScriptPath,
       typingPtyId,
       runId
     )
-    const debug = await deps.readTerminalPtyOutputDebug(orcaPage)
-    const mainPressure = await deps.readMainPtyPressureDebug(orcaPage)
-    const ackGate = await deps.readTerminalAckGateDebug(orcaPage)
+    const debug = await deps.readTerminalPtyOutputDebug(pebblePage)
+    const mainPressure = await deps.readMainPtyPressureDebug(pebblePage)
+    const ackGate = await deps.readTerminalAckGateDebug(pebblePage)
     deps.annotateTypingMeasurement(
       testInfo,
       `opencode-hidden-real-pty-pressure-typing${annotationSuffix ?? ''}`,
       hiddenPanes.length + 1,
       measurement,
       debug,
-      await deps.readTerminalOutputSchedulerDebug(orcaPage),
+      await deps.readTerminalOutputSchedulerDebug(pebblePage),
       mainPressure,
       ackGate
     )
@@ -221,9 +221,9 @@ export async function runHiddenRealPtyPressureScenario<
     // terminal-load suite's MAX_TIMER_DRIFT_MS.
     expect(measurement.maxTimerDriftMs).toBeLessThan(250)
 
-    await deps.releaseTerminalAckGate(orcaPage)
+    await deps.releaseTerminalAckGate(pebblePage)
     const restoreLatencyMs = await measureHiddenOutputRestoreLatency(
-      orcaPage,
+      pebblePage,
       secondWorktreeId,
       runId
     )
@@ -241,7 +241,7 @@ export async function runHiddenRealPtyPressureScenario<
       deps,
       firstWorktreeId,
       hiddenPanes,
-      orcaPage,
+      pebblePage,
       pressureScriptPath,
       secondWorktreeId,
       typingScriptPath
@@ -250,14 +250,14 @@ export async function runHiddenRealPtyPressureScenario<
 }
 
 async function measureHiddenOutputRestoreLatency(
-  orcaPage: Page,
+  pebblePage: Page,
   worktreeId: string,
   runId: string
 ): Promise<number> {
   const restoreStart = performance.now()
-  await switchToWorktree(orcaPage, worktreeId)
+  await switchToWorktree(pebblePage, worktreeId)
   await expect
-    .poll(() => getTerminalContent(orcaPage, 20_000), {
+    .poll(() => getTerminalContent(pebblePage, 20_000), {
       timeout: 20_000,
       message: 'Hidden PTY output was not restored from main buffer on return'
     })
@@ -267,13 +267,13 @@ async function measureHiddenOutputRestoreLatency(
 
 async function startHiddenPressureCommands({
   hiddenPanes,
-  orcaPage,
+  pebblePage,
   pressureOutputChars,
   pressureScriptPath,
   pressureStartDelayMs
 }: {
   hiddenPanes: HiddenPressurePane[]
-  orcaPage: Page
+  pebblePage: Page
   pressureOutputChars: number
   pressureScriptPath: string
   pressureStartDelayMs: number
@@ -281,7 +281,7 @@ async function startHiddenPressureCommands({
   await Promise.all(
     hiddenPanes.map((pane, paneIndex) =>
       sendToTerminal(
-        orcaPage,
+        pebblePage,
         pane.ptyId,
         `node ${JSON.stringify(pressureScriptPath)} ${paneIndex} ${pressureOutputChars} ${pressureStartDelayMs}\r`
       )
@@ -289,11 +289,11 @@ async function startHiddenPressureCommands({
   )
 }
 
-async function switchToTypingWorkspace(orcaPage: Page, worktreeId: string): Promise<void> {
-  await switchToWorktree(orcaPage, worktreeId)
-  await expect.poll(() => getActiveWorktreeId(orcaPage), { timeout: 10_000 }).toBe(worktreeId)
-  await ensureTerminalVisible(orcaPage)
-  await waitForActiveTerminalManager(orcaPage, 30_000)
+async function switchToTypingWorkspace(pebblePage: Page, worktreeId: string): Promise<void> {
+  await switchToWorktree(pebblePage, worktreeId)
+  await expect.poll(() => getActiveWorktreeId(pebblePage), { timeout: 10_000 }).toBe(worktreeId)
+  await ensureTerminalVisible(pebblePage)
+  await waitForActiveTerminalManager(pebblePage, 30_000)
 }
 
 async function cleanupHiddenPressureScenario<
@@ -306,7 +306,7 @@ async function cleanupHiddenPressureScenario<
   deps,
   firstWorktreeId,
   hiddenPanes,
-  orcaPage,
+  pebblePage,
   pressureScriptPath,
   secondWorktreeId,
   typingScriptPath
@@ -314,19 +314,19 @@ async function cleanupHiddenPressureScenario<
   deps: HiddenPressureDeps<TMeasurement, TDebug, TScheduler, TMainPressure, TAckGate>
   firstWorktreeId: string
   hiddenPanes: HiddenPressurePane[]
-  orcaPage: Page
+  pebblePage: Page
   pressureScriptPath: string
   secondWorktreeId: string
   typingScriptPath: string
 }): Promise<void> {
-  await deps.releaseTerminalAckGate(orcaPage)
-  await switchToWorktree(orcaPage, firstWorktreeId).catch(() => undefined)
-  await waitForActivePanePtyId(orcaPage)
-    .then((ptyId) => sendToTerminal(orcaPage, ptyId, '\x03'))
+  await deps.releaseTerminalAckGate(pebblePage)
+  await switchToWorktree(pebblePage, firstWorktreeId).catch(() => undefined)
+  await waitForActivePanePtyId(pebblePage)
+    .then((ptyId) => sendToTerminal(pebblePage, ptyId, '\x03'))
     .catch(() => undefined)
-  await switchToWorktree(orcaPage, secondWorktreeId).catch(() => undefined)
+  await switchToWorktree(pebblePage, secondWorktreeId).catch(() => undefined)
   await Promise.all(
-    hiddenPanes.map((pane) => sendToTerminal(orcaPage, pane.ptyId, '\x03').catch(() => undefined))
+    hiddenPanes.map((pane) => sendToTerminal(pebblePage, pane.ptyId, '\x03').catch(() => undefined))
   )
   rmSync(typingScriptPath, { force: true })
   rmSync(pressureScriptPath, { force: true })

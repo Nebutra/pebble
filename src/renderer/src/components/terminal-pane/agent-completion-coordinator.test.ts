@@ -309,7 +309,7 @@ describe('agent completion coordinator', () => {
     })
 
     coordinator.observeTitle('Codex working')
-    coordinator.observeTitle('/tmp/orca-e2e-repo')
+    coordinator.observeTitle('/tmp/pebble-e2e-repo')
     await flushAsyncTicks()
 
     expect(dispatchCompletion).not.toHaveBeenCalled()
@@ -337,17 +337,17 @@ describe('agent completion coordinator', () => {
     await flushAsyncTicks()
 
     coordinator.observeTitle('Codex working')
-    coordinator.observeTitle('/tmp/orca-e2e-repo')
+    coordinator.observeTitle('/tmp/pebble-e2e-repo')
     staleInspection.resolve(processResult('codex'))
     await flushAsyncTicks()
 
     expect(inspectProcess).toHaveBeenCalledTimes(2)
-    expect(dispatchCompletion).not.toHaveBeenCalledWith('/tmp/orca-e2e-repo')
+    expect(dispatchCompletion).not.toHaveBeenCalledWith('/tmp/pebble-e2e-repo')
 
     freshInspection.resolve(processResult('zsh'))
     await flushAsyncTicks()
 
-    expect(dispatchCompletion).not.toHaveBeenCalledWith('/tmp/orca-e2e-repo')
+    expect(dispatchCompletion).not.toHaveBeenCalledWith('/tmp/pebble-e2e-repo')
   })
 
   it('does not validate a replaced pending title with an older pending-title inspection', async () => {
@@ -433,7 +433,7 @@ describe('agent completion coordinator', () => {
     })
 
     coordinator.observeTitle('Codex working')
-    coordinator.observeTitle('/tmp/orca-e2e-repo')
+    coordinator.observeTitle('/tmp/pebble-e2e-repo')
     inspection.reject(new Error('inspection failed'))
     await flushAsyncTicks()
 
@@ -453,7 +453,7 @@ describe('agent completion coordinator', () => {
     })
 
     coordinator.observeTitle('Codex working')
-    coordinator.observeTitle('/tmp/orca-e2e-repo')
+    coordinator.observeTitle('/tmp/pebble-e2e-repo')
     coordinator.observeTitle('Codex done')
     inspection.resolve(processResult('zsh'))
     await flushAsyncTicks()

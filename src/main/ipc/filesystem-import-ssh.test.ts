@@ -270,12 +270,12 @@ describe('fs:importExternalPaths — SSH routing & connection', () => {
 
     await invoke({
       sourcePaths: ['/tmp/dropped/file.txt'],
-      destDir: '/home/user/project/.orca/drops',
+      destDir: '/home/user/project/.pebble/drops',
       connectionId: connId,
       ensureDir: true
     })
 
-    expect(mockSftp.createWriteStream).toHaveBeenCalledWith('/home/user/project/.orca/.gitignore')
+    expect(mockSftp.createWriteStream).toHaveBeenCalledWith('/home/user/project/.pebble/.gitignore')
     expect(sftpWriteStreams[0]!.listenerCount('close')).toBe(0)
     expect(sftpWriteStreams[0]!.listenerCount('error')).toBe(0)
     expect(sftpWriteStreams[0]!.destroy).toHaveBeenCalledOnce()

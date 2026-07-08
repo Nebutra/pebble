@@ -121,12 +121,12 @@ function getDefaultState(): ClaudeUsagePersistedState {
 }
 
 export function initClaudeUsagePath(): void {
-  _claudeUsageFile = join(app.getPath('userData'), 'orca-claude-usage.json')
+  _claudeUsageFile = join(app.getPath('userData'), 'pebble-claude-usage.json')
 }
 
 function getClaudeUsageFile(): string {
   if (!_claudeUsageFile) {
-    _claudeUsageFile = join(app.getPath('userData'), 'orca-claude-usage.json')
+    _claudeUsageFile = join(app.getPath('userData'), 'pebble-claude-usage.json')
   }
   return _claudeUsageFile
 }
@@ -352,7 +352,7 @@ export class ClaudeUsageStore {
     } catch (error) {
       // Why: Claude usage is a local analytics feature, not primary workspace
       // state. A corrupt cache should degrade to a fresh rebuild instead of
-      // preventing Orca from booting, but we leave the file on disk for debugging.
+      // preventing Pebble from booting, but we leave the file on disk for debugging.
       console.error('[claude-usage] Failed to load persisted state, starting fresh:', error)
       return getDefaultState()
     }
@@ -522,8 +522,8 @@ export class ClaudeUsageStore {
       topModel,
       topProject,
       // Why: the empty-state UX is scope/range specific. Using global persisted
-      // data here makes the Orca-only view render empty charts instead of the
-      // intended "no usage for this scope" message when only off-Orca logs exist.
+      // data here makes the Pebble-only view render empty charts instead of the
+      // intended "no usage for this scope" message when only off-Pebble logs exist.
       hasAnyClaudeData: filteredSessions.length > 0 || filteredDaily.length > 0
     }
   }
@@ -809,7 +809,7 @@ export class ClaudeUsageStore {
       estimatedCostUsd,
       estimatedCostSource: estimatedCostUsd === null ? null : 'api_equivalent',
       providerSessionId: session.sessionId,
-      // Why: Orca terminal tab ids and Claude usage session ids are different
+      // Why: Pebble terminal tab ids and Claude usage session ids are different
       // systems today, so attribution is intentionally limited to one local
       // provider session in the run's worktree/time window.
       attribution: 'provider_session_time_window',
@@ -825,7 +825,7 @@ export class ClaudeUsageStore {
       if (cutoff && entry.day < cutoff) {
         return false
       }
-      if (scope === 'orca' && entry.worktreeId === null) {
+      if (scope === 'pebble' && entry.worktreeId === null) {
         return false
       }
       return true
@@ -845,7 +845,7 @@ export class ClaudeUsageStore {
       if (cutoff && day < cutoff) {
         return false
       }
-      if (scope === 'orca') {
+      if (scope === 'pebble') {
         return session.locationBreakdown.some((entry) => entry.worktreeId !== null)
       }
       return true

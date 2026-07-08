@@ -10,7 +10,13 @@ type ChangelogEntry = {
   releaseNotesUrl: string
 }
 
-const CHANGELOG_URL = 'https://onorca.dev/changelog'
+const CHANGELOG_URL = 'https://github.com/nebutra/pebble/releases'
+const PEBBLE_RELEASE_TAG_URL_PREFIX = 'https://github.com/nebutra/pebble/releases/tag/'
+const PRODUCT_CHANGELOG_HOSTS = new Set(['nebutra.com', 'www.nebutra.com'])
+
+function releaseTagFromVersion(version: string): string {
+  return version.startsWith('v') ? version : `v${version}`
+}
 
 function isValidEntry(entry: ChangelogEntry): boolean {
   return (
@@ -23,6 +29,48 @@ function isValidEntry(entry: ChangelogEntry): boolean {
 /** Returns true when the entry has showcase media (gif/screenshot) worth demoing. */
 function hasRichContent(entry: ChangelogEntry): boolean {
   return Boolean(entry.mediaUrl)
+}
+
+function canonicalReleaseNotesUrl(releaseNotesUrl: string): string {
+  try {
+    const url = new URL(releaseNotesUrl)
+    const host = url.hostname.toLowerCase()
+    const parts = url.pathname.split('/').filter(Boolean)
+
+    if (
+      PRODUCT_CHANGELOG_HOSTS.has(host) &&
+      parts[0] === 'pebble' &&
+      parts[1] === 'changelog'
+    ) {
+      const version = parts[2]
+      return version
+        ? `${PEBBLE_RELEASE_TAG_URL_PREFIX}${releaseTagFromVersion(version)}`
+        : CHANGELOG_URL
+    }
+
+    if (host !== 'github.com') {
+      return releaseNotesUrl
+    }
+
+    const releasesIndex = parts.findIndex(
+      (part, index) => part === 'releases' && parts[index + 1] === 'tag'
+    )
+    const tag = releasesIndex === -1 ? '' : parts.slice(releasesIndex + 2).join('/')
+    if (!tag) {
+      return releaseNotesUrl
+    }
+
+    // Why: the changelog endpoint can lag behind product renames. Canonicalize
+    // GitHub release links so the update card always exits through Pebble.
+    return `${PEBBLE_RELEASE_TAG_URL_PREFIX}${tag}`
+  } catch {
+    return releaseNotesUrl
+  }
+}
+
+function releaseFromEntry(entry: ChangelogEntry): Omit<ChangelogEntry, 'version'> {
+  const { version: _, ...release } = entry
+  return { ...release, releaseNotesUrl: canonicalReleaseNotesUrl(release.releaseNotesUrl) }
 }
 
 /**
@@ -46,7 +94,7 @@ export async function fetchChangelog(
   const timeout = setTimeout(() => controller.abort(), 5000)
 
   try {
-    const res = await net.fetch('https://onorca.dev/whats-new/changelog.json', {
+    const res = await net.fetch('https://www.nebutra.com/pebble/whats-new/changelog.json', {
       signal: controller.signal
     })
     if (!res.ok) {
@@ -75,7 +123,7 @@ export async function fetchChangelog(
             : localIndex - incomingIndex > 0
               ? localIndex - incomingIndex
               : null
-        const { version: _, ...release } = entry
+        const release = releaseFromEntry(entry)
         return { release, releasesBehind }
       }
     }
@@ -128,7 +176,7 @@ export async function fetchChangelog(
           : localIndex - effectiveIncomingIndex > 0
             ? localIndex - effectiveIncomingIndex
             : null
-      const { version: _, ...release } = candidate
+      const release = releaseFromEntry(candidate)
       // Why: the shown content is from an older entry, not the incoming version.
       // Point to the generic changelog page so the link doesn't mislead.
       return { release: { ...release, releaseNotesUrl: CHANGELOG_URL }, releasesBehind }

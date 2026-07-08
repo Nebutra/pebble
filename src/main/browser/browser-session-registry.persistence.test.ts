@@ -35,7 +35,7 @@ function installModuleMocks(
   const sessionFromPartitionMock = vi.fn((partition: string) => ({
     partition,
     setUserAgent: vi.fn(),
-    getUserAgent: vi.fn(() => 'Mozilla/5.0 Electron/31 Orca'),
+    getUserAgent: vi.fn(() => 'Mozilla/5.0 Electron/31 Pebble'),
     setPermissionRequestHandler: vi.fn(),
     setPermissionCheckHandler: vi.fn(),
     setDevicePermissionHandler: vi.fn(),
@@ -154,7 +154,7 @@ describe('BrowserSessionRegistry persistence', () => {
     const written = JSON.parse(fsState.files.get(META_PATH) ?? '{}')
     expect(written.pendingCookieDbPath).toBeNull()
     expect(written.pendingCookieImports).toEqual({})
-    expect(fsState.present.has('/user-data/Partitions/orca-browser/Cookies')).toBe(true)
+    expect(fsState.present.has('/user-data/Partitions/pebble-browser/Cookies')).toBe(true)
   })
 
   it('merges partition-keyed pending entries without clobbering unrelated entries', async () => {
@@ -171,22 +171,22 @@ describe('BrowserSessionRegistry persistence', () => {
     installModuleMocks(fsState)
     const { browserSessionRegistry } = await import('./browser-session-registry')
 
-    browserSessionRegistry.setPendingCookieImport('persist:orca-browser', '/staged/default')
+    browserSessionRegistry.setPendingCookieImport('persist:pebble-browser', '/staged/default')
     browserSessionRegistry.setPendingCookieImport(
-      'persist:orca-browser-session-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'persist:pebble-browser-session-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       '/staged/imported'
     )
 
     const written = JSON.parse(fsState.files.get(META_PATH) ?? '{}')
     expect(written.pendingCookieDbPath).toBe('/staged/default')
     expect(written.pendingCookieImports).toEqual({
-      'persist:orca-browser': '/staged/default',
-      'persist:orca-browser-session-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa': '/staged/imported'
+      'persist:pebble-browser': '/staged/default',
+      'persist:pebble-browser-session-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa': '/staged/imported'
     })
   })
 
   it('restores persisted UA for non-default partitions', async () => {
-    const importedPartition = 'persist:orca-browser-session-11111111-1111-4111-8111-111111111111'
+    const importedPartition = 'persist:pebble-browser-session-11111111-1111-4111-8111-111111111111'
     const importedUa = 'Mozilla/5.0 Chrome/120.0.0.0 Safari/537.36'
     const defaultUa = 'Mozilla/5.0 Chrome/119.0.0.0 Safari/537.36'
     const fsState = createFsState()
@@ -194,7 +194,7 @@ describe('BrowserSessionRegistry persistence', () => {
       defaultSource: null,
       userAgent: defaultUa,
       userAgentByPartition: {
-        'persist:orca-browser': defaultUa,
+        'persist:pebble-browser': defaultUa,
         [importedPartition]: importedUa
       },
       pendingCookieDbPath: null,
@@ -254,7 +254,7 @@ describe('BrowserSessionRegistry persistence', () => {
     browserSessionRegistry.initializeBrowserSessionsFromPersistedState()
 
     const defaultSessions = sessionFromPartitionMock.mock.results
-      .filter((_, idx) => sessionFromPartitionMock.mock.calls[idx]?.[0] === 'persist:orca-browser')
+      .filter((_, idx) => sessionFromPartitionMock.mock.calls[idx]?.[0] === 'persist:pebble-browser')
       .map((r) => r.value)
     expect(defaultSessions.length).toBeGreaterThan(0)
     const defaultSession = defaultSessions[0]
@@ -386,7 +386,7 @@ describe('BrowserSessionRegistry persistence', () => {
     browserSessionRegistry.initializeBrowserSessionsFromPersistedState()
 
     const defaultSessions = sessionFromPartitionMock.mock.results
-      .filter((_, idx) => sessionFromPartitionMock.mock.calls[idx]?.[0] === 'persist:orca-browser')
+      .filter((_, idx) => sessionFromPartitionMock.mock.calls[idx]?.[0] === 'persist:pebble-browser')
       .map((r) => r.value)
     const policySessions = defaultSessions.filter(
       (s) => s.setPermissionRequestHandler.mock.calls.length > 0
@@ -431,7 +431,7 @@ describe('BrowserSessionRegistry persistence', () => {
     browserSessionRegistry.initializeBrowserSessionsFromPersistedState()
 
     const defaultSession = sessionFromPartitionMock.mock.results.find(
-      (_, idx) => sessionFromPartitionMock.mock.calls[idx]?.[0] === 'persist:orca-browser'
+      (_, idx) => sessionFromPartitionMock.mock.calls[idx]?.[0] === 'persist:pebble-browser'
     )?.value
     const requestHandler = defaultSession.setPermissionRequestHandler.mock.calls[0][0]
     const guestWc = { id: 403, getURL: vi.fn(() => 'https://example.com/camera') }
@@ -448,7 +448,7 @@ describe('BrowserSessionRegistry persistence', () => {
   })
 
   it('keeps failed partition replay pending and removes unrelated missing entries', async () => {
-    const importedPartition = 'persist:orca-browser-session-22222222-2222-4222-8222-222222222222'
+    const importedPartition = 'persist:pebble-browser-session-22222222-2222-4222-8222-222222222222'
     const fsState = createFsState()
     seedMeta(fsState, {
       defaultSource: null,
@@ -457,7 +457,7 @@ describe('BrowserSessionRegistry persistence', () => {
       pendingCookieDbPath: null,
       pendingCookieImports: {
         [importedPartition]: '/staged/imported',
-        'persist:orca-browser': '/staged/missing'
+        'persist:pebble-browser': '/staged/missing'
       },
       profiles: [
         {

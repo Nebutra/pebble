@@ -45,10 +45,10 @@ function getRuntimeConfigPath(): string {
 }
 
 beforeEach(() => {
-  fakeHomeDir = mkdtempSync(join(tmpdir(), 'orca-codex-config-home-'))
-  userDataDir = mkdtempSync(join(tmpdir(), 'orca-codex-config-user-data-'))
-  previousUserDataPath = process.env.ORCA_USER_DATA_PATH
-  process.env.ORCA_USER_DATA_PATH = userDataDir
+  fakeHomeDir = mkdtempSync(join(tmpdir(), 'pebble-codex-config-home-'))
+  userDataDir = mkdtempSync(join(tmpdir(), 'pebble-codex-config-user-data-'))
+  previousUserDataPath = process.env.PEBBLE_USER_DATA_PATH
+  process.env.PEBBLE_USER_DATA_PATH = userDataDir
   homedirMock.mockReturnValue(fakeHomeDir)
   getPathMock.mockImplementation((name: string) => {
     if (name === 'userData') {
@@ -63,9 +63,9 @@ afterEach(() => {
   rmSync(fakeHomeDir, { recursive: true, force: true })
   rmSync(userDataDir, { recursive: true, force: true })
   if (previousUserDataPath === undefined) {
-    delete process.env.ORCA_USER_DATA_PATH
+    delete process.env.PEBBLE_USER_DATA_PATH
   } else {
-    process.env.ORCA_USER_DATA_PATH = previousUserDataPath
+    process.env.PEBBLE_USER_DATA_PATH = previousUserDataPath
   }
   vi.clearAllMocks()
 })

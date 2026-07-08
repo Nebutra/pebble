@@ -3,9 +3,9 @@ import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { mkdtemp } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { test, expect } from './helpers/orca-app'
+import { test, expect } from './helpers/pebble-app'
 import { waitForSessionReady } from './helpers/store'
-import type { Page } from '@stablyai/playwright-test'
+import type { Page } from '@nebutra/playwright-test'
 
 const GROUP_NAMES = [
   'E2E Manual Group Alpha',
@@ -51,7 +51,7 @@ function initializeGitRepo(repoPath: string): void {
 async function createProjectHeaderSortFixture(): Promise<string[]> {
   // Why: match the app's canonical repo.path on macOS, where os.tmpdir()
   // can resolve through /var -> /private/var.
-  const root = realpathSync(await mkdtemp(path.join(os.tmpdir(), 'orca-e2e-project-sort-')))
+  const root = realpathSync(await mkdtemp(path.join(os.tmpdir(), 'pebble-e2e-project-sort-')))
   tempRoots.push(root)
   const repoPaths = PROJECT_NAMES.map((name) => path.join(root, name))
   for (const repoPath of repoPaths) {
@@ -273,27 +273,27 @@ test.afterEach(() => {
 
 test.describe('Project Group manual sorting', () => {
   test('dragging a project header body reorders the visible project headers', async ({
-    orcaPage
+    pebblePage
   }) => {
-    await waitForSessionReady(orcaPage)
+    await waitForSessionReady(pebblePage)
     const repoPaths = await createProjectHeaderSortFixture()
-    const projects = await seedProjectHeaderSortScenario(orcaPage, repoPaths)
+    const projects = await seedProjectHeaderSortScenario(pebblePage, repoPaths)
 
     await expect
-      .poll(() => getProjectHeaderOrder(orcaPage, projects), {
+      .poll(() => getProjectHeaderOrder(pebblePage, projects), {
         timeout: 12_000,
         message: 'Project headers did not render in manual order'
       })
       .toEqual([projects.alphaId, projects.bravoId, projects.charlieId])
 
     await dragProjectBefore({
-      page: orcaPage,
+      page: pebblePage,
       draggedProjectId: projects.charlieId,
       targetProjectId: projects.bravoId
     })
 
     await expect
-      .poll(() => getProjectHeaderOrder(orcaPage, projects), {
+      .poll(() => getProjectHeaderOrder(pebblePage, projects), {
         timeout: 12_000,
         message: 'Dragged project header body did not persist the requested visible order'
       })
@@ -301,27 +301,27 @@ test.describe('Project Group manual sorting', () => {
   })
 
   test('dropping a project over another project body does not reorder projects', async ({
-    orcaPage
+    pebblePage
   }) => {
-    await waitForSessionReady(orcaPage)
+    await waitForSessionReady(pebblePage)
     const repoPaths = await createProjectHeaderSortFixture()
-    const projects = await seedProjectHeaderSortScenario(orcaPage, repoPaths)
+    const projects = await seedProjectHeaderSortScenario(pebblePage, repoPaths)
 
     await expect
-      .poll(() => getProjectHeaderOrder(orcaPage, projects), {
+      .poll(() => getProjectHeaderOrder(pebblePage, projects), {
         timeout: 12_000,
         message: 'Project headers did not render in manual order'
       })
       .toEqual([projects.alphaId, projects.bravoId, projects.charlieId])
 
     await dragProjectIntoProjectBody({
-      page: orcaPage,
+      page: pebblePage,
       draggedProjectId: projects.alphaId,
       targetProjectId: projects.bravoId
     })
 
     await expect
-      .poll(() => getProjectHeaderOrder(orcaPage, projects), {
+      .poll(() => getProjectHeaderOrder(pebblePage, projects), {
         timeout: 12_000,
         message: 'Dropping on a project body should not persist a project reorder'
       })
@@ -329,26 +329,26 @@ test.describe('Project Group manual sorting', () => {
   })
 
   test('dragging a duplicate-ranked Project Group header reorders the visible headers', async ({
-    orcaPage
+    pebblePage
   }) => {
-    await waitForSessionReady(orcaPage)
-    const groups = await seedDuplicateTabOrderProjectGroups(orcaPage)
+    await waitForSessionReady(pebblePage)
+    const groups = await seedDuplicateTabOrderProjectGroups(pebblePage)
 
     await expect
-      .poll(() => getProjectGroupHeaderOrder(orcaPage, groups), {
+      .poll(() => getProjectGroupHeaderOrder(pebblePage, groups), {
         timeout: 12_000,
         message: 'Project Group headers did not render in duplicate-rank name order'
       })
       .toEqual([groups.alphaId, groups.bravoId, groups.charlieId, groups.deltaId])
 
     await dragProjectGroupBefore({
-      page: orcaPage,
+      page: pebblePage,
       draggedGroupId: groups.deltaId,
       targetGroupId: groups.charlieId
     })
 
     await expect
-      .poll(() => getProjectGroupHeaderOrder(orcaPage, groups), {
+      .poll(() => getProjectGroupHeaderOrder(pebblePage, groups), {
         timeout: 12_000,
         message: 'Dragged Project Group header did not persist the requested visible order'
       })

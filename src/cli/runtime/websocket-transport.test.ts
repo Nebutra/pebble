@@ -57,7 +57,7 @@ describe('CLI remote WebSocket transport', () => {
     )
   })
 
-  it('accepts a bare pairing payload as well as the orca URL wrapper', async () => {
+  it('accepts a bare pairing payload as well as the pebble URL wrapper', async () => {
     const runtime = await startTestRuntime('runtime-ws-2')
     servers.push(runtime)
     const offer: PairingOffer = {
@@ -82,7 +82,7 @@ describe('CLI remote WebSocket transport', () => {
   it('connects through a saved environment selector', async () => {
     const runtime = await startTestRuntime('runtime-env-1')
     servers.push(runtime)
-    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-cli-env-'))
+    const userDataPath = mkdtempSync(join(tmpdir(), 'pebble-cli-env-'))
     addEnvironmentFromPairingCode(userDataPath, {
       name: 'remote-dev',
       pairingCode: encodePairingOffer({

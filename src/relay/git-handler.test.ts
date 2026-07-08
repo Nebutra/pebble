@@ -855,6 +855,7 @@ describe('GitHandler', () => {
       gitInit(tmpDir)
       writeFileSync(path.join(tmpDir, '[k]eep.log'), 'selected')
       writeFileSync(path.join(tmpDir, 'keep.log'), 'keep')
+      execFileSync('git', ['add', '-f', '[k]eep.log', 'keep.log'], { cwd: tmpDir })
       gitCommit(tmpDir, 'track log fixtures')
       writeFileSync(path.join(tmpDir, '[k]eep.log'), 'selected modified')
       writeFileSync(path.join(tmpDir, 'keep.log'), 'keep modified')
@@ -1706,7 +1707,7 @@ describe('GitHandler', () => {
       await expect(
         dispatcher.callRequest('git.forkSync', {
           worktreePath: tmpDir,
-          expectedUpstream: { owner: '   ', repo: 'orca' }
+          expectedUpstream: { owner: '   ', repo: 'pebble' }
         })
       ).rejects.toThrow('Invalid expected upstream.')
     })
@@ -1727,7 +1728,7 @@ describe('GitHandler', () => {
       await expect(
         dispatcher.callRequest(
           'git.forkSync',
-          { worktreePath: tmpDir, expectedUpstream: { owner: 'stablyai', repo: 'orca' } },
+          { worktreePath: tmpDir, expectedUpstream: { owner: 'nebutra', repo: 'pebble' } },
           { isStale: () => false, signal: controller.signal }
         )
       ).rejects.toThrow(/abort/i)

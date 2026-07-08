@@ -61,7 +61,7 @@ describe('readNativeChatTranscript (claude)', () => {
       }
     })
 
-    const filePath = await writeFixture('orca-native-chat-claude-', records)
+    const filePath = await writeFixture('pebble-native-chat-claude-', records)
     const result = await readNativeChatTranscript('claude', 'sess', { filePath })
     expect('messages' in result).toBe(true)
     if (!('messages' in result)) {
@@ -88,7 +88,7 @@ describe('readNativeChatTranscript (claude)', () => {
   })
 
   it('marks thinking-only assistant content as a reasoning surface', async () => {
-    const filePath = await writeFixture('orca-native-chat-claude-think-', [
+    const filePath = await writeFixture('pebble-native-chat-claude-think-', [
       {
         type: 'assistant',
         uuid: 'a-think',
@@ -106,7 +106,7 @@ describe('readNativeChatTranscript (claude)', () => {
 
 describe('readNativeChatTranscript (codex)', () => {
   it('maps tool calls and results to tool-call/tool-result blocks', async () => {
-    const filePath = await writeFixture('orca-native-chat-codex-', [
+    const filePath = await writeFixture('pebble-native-chat-codex-', [
       {
         type: 'session_meta',
         timestamp: '2026-06-01T10:00:00.000Z',
@@ -176,13 +176,13 @@ describe('readNativeChatTranscript (codex)', () => {
 describe('readNativeChatTranscript (errors)', () => {
   it('returns an error for an unreadable/missing file without throwing', async () => {
     const result = await readNativeChatTranscript('claude', 'sess', {
-      filePath: join(tmpdir(), 'orca-native-chat-does-not-exist.jsonl')
+      filePath: join(tmpdir(), 'pebble-native-chat-does-not-exist.jsonl')
     })
     expect('error' in result).toBe(true)
   })
 
   it('returns an error when no transcript can be resolved', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'orca-native-chat-noresolve-'))
+    const root = await mkdtemp(join(tmpdir(), 'pebble-native-chat-noresolve-'))
     tempRoots.push(root)
     const result = await readNativeChatTranscript('claude', 'missing', {
       claudeProjectsDir: join(root, 'empty')

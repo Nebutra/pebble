@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_PR_COMMENT_PRESENTATION_VARIANT,
   getPRCommentPresentationClasses,
@@ -8,6 +8,22 @@ import {
 } from './pr-comment-presentation'
 
 describe('pr-comment-presentation', () => {
+  beforeEach(() => {
+    const storage = new Map<string, string>()
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        removeItem: (key: string) => {
+          storage.delete(key)
+        },
+        setItem: (key: string, value: string) => {
+          storage.set(key, value)
+        }
+      }
+    })
+  })
+
   it('defaults to cards layout', () => {
     expect(DEFAULT_PR_COMMENT_PRESENTATION_VARIANT).toBe('cards')
   })
@@ -47,7 +63,8 @@ describe('pr-comment-presentation', () => {
   })
 
   it('falls back to the default variant when localStorage is unset', () => {
-    window.localStorage.removeItem('orca:pr-comment-presentation')
+    window.localStorage.removeItem('pebble:pr-comment-presentation')
     expect(resolvePRCommentPresentationVariant()).toBe(DEFAULT_PR_COMMENT_PRESENTATION_VARIANT)
   })
+
 })

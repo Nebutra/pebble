@@ -14,7 +14,7 @@
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import type * as GitUsernameModule from '../git/git-username'
-import { OrcaRuntimeService } from './orca-runtime'
+import { PebbleRuntimeService } from './pebble-runtime'
 
 vi.mock('../git/worktree', () => ({
   listWorktrees: vi.fn().mockResolvedValue([]),
@@ -75,7 +75,7 @@ const store = {
 }
 
 function createRuntime() {
-  const runtime = new OrcaRuntimeService(store)
+  const runtime = new PebbleRuntimeService(store)
   const ptySizes = new Map<string, { cols: number; rows: number }>([
     ['pty-1', { cols: 150, rows: 40 }]
   ])

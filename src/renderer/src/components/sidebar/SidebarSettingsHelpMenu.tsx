@@ -35,11 +35,11 @@ import { SidebarFeedbackDialog } from './SidebarFeedbackDialog'
 import { translate } from '@/i18n/i18n'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
 
-const DOCS_URL = 'https://www.onorca.dev/docs'
-const CHANGELOG_URL = 'https://onorca.dev/changelog'
-const GITHUB_URL = 'https://github.com/stablyai/orca'
+const DOCS_URL = 'https://www.nebutra.com/pebble/docs'
+const CHANGELOG_URL = 'https://github.com/nebutra/pebble/releases'
+const GITHUB_URL = 'https://github.com/nebutra/pebble'
 const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'
-const X_URL = 'https://x.com/orca_build'
+const X_URL = 'https://x.com/pebble_build'
 const NO_UPDATE_CHECK_MODIFIERS = { ctrlKey: false, metaKey: false, shiftKey: false }
 
 function openExternalUrl(url: string): void {
@@ -91,7 +91,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [showAdminOptions, setShowAdminOptions] = useState(false)
-  const [isRestartingOrca, setIsRestartingOrca] = useState(false)
+  const [isRestartingPebble, setIsRestartingPebble] = useState(false)
   const lastShowOnboardingAtRef = React.useRef(0)
   const updateCheckModifiersRef = React.useRef(NO_UPDATE_CHECK_MODIFIERS)
   const mountedRef = useMountedRef()
@@ -123,21 +123,21 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
     void showOnboardingFromRenderer()
   }
 
-  const handleRestartOrca = (): void => {
-    if (isRestartingOrca) {
+  const handleRestartPebble = (): void => {
+    if (isRestartingPebble) {
       return
     }
-    setIsRestartingOrca(true)
+    setIsRestartingPebble(true)
     toast.info(
-      translate('auto.components.sidebar.SidebarSettingsHelpMenu.5161eef55d', 'Restarting Orca…')
+      translate('auto.components.sidebar.SidebarSettingsHelpMenu.5161eef55d', 'Restarting Pebble…')
     )
     void window.api.app.restart().catch((error) => {
       if (mountedRef.current) {
-        setIsRestartingOrca(false)
+        setIsRestartingPebble(false)
         toast.error(
           translate(
             'auto.components.sidebar.SidebarSettingsHelpMenu.4e8f5710d3',
-            "Couldn't restart Orca."
+            "Couldn't restart Pebble."
           ),
           {
             description: error instanceof Error ? error.message : undefined
@@ -330,11 +330,11 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
             {showAdminOptions ? (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={handleRestartOrca} disabled={isRestartingOrca}>
+                <DropdownMenuItem onSelect={handleRestartPebble} disabled={isRestartingPebble}>
                   <RotateCw className="size-3.5" />
                   {translate(
                     'auto.components.sidebar.SidebarSettingsHelpMenu.ad3d3ed7f1',
-                    'Restart Orca'
+                    'Restart Pebble'
                   )}
                 </DropdownMenuItem>
               </>

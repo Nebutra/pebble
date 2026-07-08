@@ -52,7 +52,7 @@ export function getDevinRemoteConfigPath(remoteHome: string): string {
 export function getDevinManagedCommand(scriptPath: string): string {
   if (process.platform === 'win32') {
     // Why: Devin runs hooks through the platform shell on Windows; invoking the
-    // .cmd via cmd.exe preserves spaces in the shared ~/.orca script path.
+    // .cmd via cmd.exe preserves spaces in the shared ~/.pebble script path.
     return `cmd /d /s /c ""${scriptPath.replaceAll('"', '""')}""`
   }
   return wrapPosixHookCommand(scriptPath)

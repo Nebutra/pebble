@@ -43,7 +43,7 @@ function makeUIEvent(senderOverrides: Record<string, unknown> = {}): {
     sender: {
       id: 17,
       getType: () => 'window',
-      getURL: () => 'file:///orca/index.html',
+      getURL: () => 'file:///pebble/index.html',
       isDestroyed: () => false,
       ...senderOverrides
     }
@@ -180,7 +180,7 @@ describe('registerUIHandlers', () => {
     fromWebContentsMock.mockClear()
     paste.mockClear()
     nativePasteHandler?.(makeUIEvent({ getURL: () => 'http://127.0.0.1:5173/workspace' }))
-    nativePasteHandler?.(makeUIEvent({ getURL: () => 'file:///orca/index.html' }))
+    nativePasteHandler?.(makeUIEvent({ getURL: () => 'file:///pebble/index.html' }))
     nativePasteHandler?.(makeUIEvent({ getURL: () => 'not a url' }))
 
     expect(fromWebContentsMock).not.toHaveBeenCalled()

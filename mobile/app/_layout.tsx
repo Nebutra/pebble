@@ -6,7 +6,7 @@ import * as SplashScreen from 'expo-splash-screen'
 import * as Notifications from 'expo-notifications'
 import * as Linking from 'expo-linking'
 import { colors } from '../src/theme/mobile-theme'
-import { OrcaLogo } from '../src/components/OrcaLogo'
+import { PebbleLogo } from '../src/components/PebbleLogo'
 import { RpcClientProvider } from '../src/transport/client-context'
 import { getNotificationNavigationPath } from '../src/notifications/notification-routing'
 import { loadHosts } from '../src/transport/host-store'
@@ -35,7 +35,7 @@ export default function RootLayout() {
   const router = useRouter()
   const handledNotificationIdsRef = useRef<Set<string>>(new Set())
 
-  // Why: route `orca://pair?...` deep links to the confirm screen so
+  // Why: route `pebble://pair?...` deep links to the confirm screen so
   // the same pairing flow runs whether the link arrived via QR scan,
   // paste, AirDrop, Messages, or `xcrun simctl openurl`. getInitialURL
   // covers cold-start (link tapped while app was closed); the listener
@@ -45,7 +45,7 @@ export default function RootLayout() {
       const code = extractPairingCodeFromUrl(url)
       if (code) {
         // Why: Android camera launches can leave Expo Router's unmatched
-        // `orca://pair` route underneath this screen; replacing keeps cancel
+        // `pebble://pair` route underneath this screen; replacing keeps cancel
         // and edge-back from revealing the router error page.
         router.replace({ pathname: '/pair-confirm', params: { code } })
       }
@@ -157,7 +157,7 @@ export default function RootLayout() {
             name="index"
             options={{
               headerShown: false,
-              headerTitle: () => <OrcaLogo size={22} />
+              headerTitle: () => <PebbleLogo size={22} />
             }}
           />
           <Stack.Screen name="pair-scan" options={{ headerShown: false }} />

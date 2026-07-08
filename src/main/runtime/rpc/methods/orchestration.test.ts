@@ -4,7 +4,7 @@ import { ORCHESTRATION_METHODS } from './orchestration'
 import { RpcDispatcher } from '../dispatcher'
 import { buildRegistry, type RpcContext, type RpcRequest } from '../core'
 import { OrchestrationDb } from '../../orchestration/db'
-import { OrcaRuntimeService } from '../../orca-runtime'
+import { PebbleRuntimeService } from '../../pebble-runtime'
 import type { RuntimeTerminalSummary } from '../../../../shared/runtime-types'
 
 function lifecycleGroupRecipientError(type: 'worker_done' | 'heartbeat'): string {
@@ -14,13 +14,13 @@ function lifecycleGroupRecipientError(type: 'worker_done' | 'heartbeat'): string
 describe('orchestration RPC methods', () => {
   let db: OrchestrationDb
   let dbOpen = false
-  let runtime: OrcaRuntimeService
+  let runtime: PebbleRuntimeService
   let ctx: RpcContext
 
   function setup(): void {
     db = new OrchestrationDb(':memory:')
     dbOpen = true
-    runtime = new OrcaRuntimeService()
+    runtime = new PebbleRuntimeService()
     runtime.setOrchestrationDb(db)
     ctx = { runtime }
   }
@@ -1098,7 +1098,7 @@ describe('orchestration RPC methods', () => {
         devMode: true
       })
 
-      expect(send.mock.calls[0]?.[1].text).toContain('orca-dev orchestration send')
+      expect(send.mock.calls[0]?.[1].text).toContain('pebble-dev orchestration send')
     })
 
     it('rejects inject to terminal without recognized agent', async () => {

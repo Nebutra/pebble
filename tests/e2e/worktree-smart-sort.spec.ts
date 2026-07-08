@@ -1,5 +1,5 @@
-import { test, expect } from './helpers/orca-app'
-import type { Page } from '@stablyai/playwright-test'
+import { test, expect } from './helpers/pebble-app'
+import type { Page } from '@nebutra/playwright-test'
 import type { TerminalPaneLayoutNode } from '../../src/shared/types'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { worktreeRow } from './worktree-row-locators'
@@ -211,20 +211,20 @@ async function getSmartSortScenarioReadiness(
 }
 
 test.describe('Worktree Smart Sort', () => {
-  test.beforeEach(async ({ orcaPage }) => {
-    await waitForSessionReady(orcaPage)
-    await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
+  test.beforeEach(async ({ pebblePage }) => {
+    await waitForSessionReady(pebblePage)
+    await waitForActiveWorktree(pebblePage)
+    await ensureTerminalVisible(pebblePage)
   })
 
   test('renders attention-needed worktrees above finished agents in Smart mode', async ({
-    orcaPage
+    pebblePage
   }) => {
-    const scenario = await seedSmartSortScenario(orcaPage)
+    const scenario = await seedSmartSortScenario(pebblePage)
     const { blockedId, doneId } = scenario
 
     await expect
-      .poll(() => getSmartSortScenarioReadiness(orcaPage, scenario), {
+      .poll(() => getSmartSortScenarioReadiness(pebblePage, scenario), {
         timeout: 8_000,
         message: 'Smart sort scenario did not seed live PTYs and fresh agent statuses'
       })
@@ -237,13 +237,13 @@ test.describe('Worktree Smart Sort', () => {
       })
 
     await expect
-      .poll(async () => (await getVisibleWorktreeIdsByTop(orcaPage)).slice(0, 2), {
+      .poll(async () => (await getVisibleWorktreeIdsByTop(pebblePage)).slice(0, 2), {
         timeout: 12_000,
         message: 'Smart sort did not promote the blocked worktree in the visible sidebar'
       })
       .toEqual([blockedId, doneId])
 
-    await expect(worktreeRow(orcaPage, blockedId)).toBeVisible()
-    await expect(worktreeRow(orcaPage, doneId)).toBeVisible()
+    await expect(worktreeRow(pebblePage, blockedId)).toBeVisible()
+    await expect(worktreeRow(pebblePage, doneId)).toBeVisible()
   })
 })

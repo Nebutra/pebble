@@ -133,7 +133,7 @@ export class CdpWsProxy {
   private buildTargetInfo(): Record<string, unknown> {
     const destroyed = this.webContents.isDestroyed()
     return {
-      targetId: 'orca-proxy-target',
+      targetId: 'pebble-proxy-target',
       type: 'page',
       title: destroyed ? '' : this.webContents.getTitle(),
       url: destroyed ? '' : this.webContents.getURL(),
@@ -147,7 +147,7 @@ export class CdpWsProxy {
     if (url === '/json/version' || url === '/json/version/') {
       res.writeHead(200, { 'Content-Type': 'application/json' })
       // Why: agent-browser reads this endpoint to identify the browser. Returning
-      // "Orca/CdpWsProxy" leaks that this is an embedded automation surface, which
+      // "Pebble/CdpWsProxy" leaks that this is an embedded automation surface, which
       // could affect downstream detection heuristics.
       // Why: process.versions.chrome contains the exact Chromium version
       // bundled with Electron, producing a realistic version string.
@@ -167,7 +167,7 @@ export class CdpWsProxy {
         JSON.stringify([
           {
             ...this.buildTargetInfo(),
-            id: 'orca-proxy-target',
+            id: 'pebble-proxy-target',
             webSocketDebuggerUrl: `ws://127.0.0.1:${this.port}`
           }
         ])
@@ -270,12 +270,12 @@ export class CdpWsProxy {
       return
     }
     if (msg.method === 'Target.attachToTarget') {
-      this.clientSessionId = 'orca-proxy-session'
+      this.clientSessionId = 'pebble-proxy-session'
       this.sendResult(clientId, { sessionId: this.clientSessionId }, client)
       return
     }
     if (msg.method === 'Browser.getVersion') {
-      // Why: returning "Orca/Electron" identifies this as an embedded automation
+      // Why: returning "Pebble/Electron" identifies this as an embedded automation
       // surface to agent-browser. Use a generic Chrome product string instead.
       const chromeVersion = process.versions.chrome ?? '134.0.0.0'
       this.sendResult(
@@ -354,7 +354,7 @@ export class CdpWsProxy {
       return
     }
     // Why: CDP Page.reload can destroy Electron webview targets during process swaps.
-    // Use the same direct webContents reload path as Orca's own browser.reload.
+    // Use the same direct webContents reload path as Pebble's own browser.reload.
     if (msg.method === 'Page.reload' && !this.webContents.isDestroyed()) {
       void this.reloadWithLifecycle(client, clientId, msg.params ?? {}, msg.sessionId)
       return
@@ -430,7 +430,7 @@ export class CdpWsProxy {
     if (unsupportedParam) {
       this.sendError(
         clientId,
-        `Page.reload parameter "${unsupportedParam}" is not supported for Orca tab reloads`,
+        `Page.reload parameter "${unsupportedParam}" is not supported for Pebble tab reloads`,
         client
       )
       return

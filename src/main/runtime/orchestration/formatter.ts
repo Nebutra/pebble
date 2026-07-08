@@ -25,7 +25,7 @@ export function formatMessageBanner(msg: MessageRow): string {
     lines.push(`[Payload: ${msg.payload}]`)
   }
 
-  lines.push(`[Reply: orca orchestration reply --id ${msg.id} --body "..."]`)
+  lines.push(`[Reply: pebble orchestration reply --id ${msg.id} --body "..."]`)
   lines.push(SEPARATOR)
 
   return lines.join('\n')

@@ -5,7 +5,7 @@ import { getVersionManagerBinPaths } from '../codex-cli/command'
 import { getMainE2EConfig } from '../e2e-config'
 
 const DEV_PARENT_SHUTDOWN_GRACE_MS = 3000
-const HTTP1_COMPATIBILITY_ENV_VAR = 'ORCA_DISABLE_HTTP2'
+const HTTP1_COMPATIBILITY_ENV_VAR = 'PEBBLE_DISABLE_HTTP2'
 const TRUE_ENV_VALUES = new Set(['1', 'true', 'yes', 'on'])
 const FALSE_ENV_VALUES = new Set(['0', 'false', 'no', 'off'])
 let devParentShutdownRequested = false
@@ -30,13 +30,15 @@ function parseBooleanEnvFlag(value: string | undefined): boolean | null {
 }
 
 function readPersistedHttp1CompatibilityMode(userDataPath: string): boolean {
-  const dataFile = join(userDataPath, 'orca-data.json')
-  if (!existsSync(dataFile)) {
+  const dataFile = join(userDataPath, 'pebble-data.json')
+  const legacyDataFile = join(userDataPath, 'pebble-data.json')
+  const readableDataFile = existsSync(dataFile) ? dataFile : legacyDataFile
+  if (!existsSync(readableDataFile)) {
     return false
   }
 
   try {
-    const parsed = JSON.parse(readFileSync(dataFile, 'utf-8')) as {
+    const parsed = JSON.parse(readFileSync(readableDataFile, 'utf-8')) as {
       settings?: { electronHttp1CompatibilityMode?: unknown }
     }
     return parsed.settings?.electronHttp1CompatibilityMode === true
@@ -48,7 +50,8 @@ function readPersistedHttp1CompatibilityMode(userDataPath: string): boolean {
 export function shouldDisableHttp2ForElectronNetworking(
   options: NetworkCompatibilityOptions = {}
 ): boolean {
-  const envValue = parseBooleanEnvFlag(options.env?.[HTTP1_COMPATIBILITY_ENV_VAR])
+  const env = options.env ?? process.env
+  const envValue = parseBooleanEnvFlag(env[HTTP1_COMPATIBILITY_ENV_VAR])
   if (envValue !== null) {
     return envValue
   }
@@ -78,7 +81,7 @@ function requestDevParentShutdown(): void {
     // Why: in dev, losing the supervising parent means this Electron process is
     // already orphaned from the terminal session. We try app.quit() first so
     // normal cleanup still runs, but fall back to app.exit() when macOS quit
-    // handlers or window-close guards stall and would otherwise leave Orca
+    // handlers or window-close guards stall and would otherwise leave Pebble
     // hanging after Ctrl+C ends `pnpm dev`.
     app.exit(0)
   }, DEV_PARENT_SHUTDOWN_GRACE_MS)
@@ -147,7 +150,7 @@ export function patchPackagedProcessPath(): void {
         // Pi's vite-plus installer). GUI-launched Electron inherits a minimal PATH
         // without shell rc files, so these stay invisible to `which` probes — and
         // the Agents settings page reports them as "Not installed" even when the
-        // user can run them from Terminal. See stablyai/orca#829.
+        // user can run them from Terminal. See nebutra/pebble#829.
         join(home, '.opencode/bin'),
         join(home, '.vite-plus/bin')
       )
@@ -190,31 +193,32 @@ export function configureDevUserDataPath(isDev: boolean): void {
   if (!isDev) {
     return
   }
-  const overrideUserDataPath = process.env.ORCA_DEV_USER_DATA_PATH
+  const overrideUserDataPath =
+    process.env.PEBBLE_DEV_USER_DATA_PATH ?? process.env.PEBBLE_DEV_USER_DATA_PATH
   if (overrideUserDataPath) {
     // Why: automated Electron repros need an isolated profile so persisted
-    // tabs/worktrees from the developer's normal `orca-dev` session do not
+    // tabs/worktrees from the developer's normal `pebble-dev` session do not
     // change startup behavior and hide or create window-management bugs.
     app.setPath('userData', overrideUserDataPath)
     return
   }
-  // Why: development runs share the same machine as packaged Orca, and both
+  // Why: development runs share the same machine as packaged Pebble, and both
   // publish runtime bootstrap files under userData. Without a dev-only path,
   // `pnpm dev` can overwrite the packaged app's runtime pointer and make the
-  // public `orca` CLI look broken even though the packaged app is still open.
-  app.setPath('userData', join(app.getPath('appData'), 'orca-dev'))
+  // public CLI look broken even though the packaged app is still open.
+  app.setPath('userData', join(app.getPath('appData'), 'pebble-dev'))
 }
 
-export function configureOrcaUserDataPathEnv(): void {
-  // Why: app relaunches can inherit an ORCA_USER_DATA_PATH from an older CLI or
+export function configurePebbleUserDataPathEnv(): void {
+  // Why: app relaunches can inherit userData from an older CLI or
   // updater process. Main must canonicalize it before CLI-shared modules build
-  // runtime-home paths, or migrations can bridge two Orca app-data directories.
-  process.env.ORCA_USER_DATA_PATH = app.getPath('userData')
+  // runtime-home paths, or migrations can bridge two Pebble app-data directories.
+  process.env.PEBBLE_USER_DATA_PATH = app.getPath('userData')
 }
 
 export function shouldInstallManagedHooks(isDev: boolean): boolean {
   void isDev
-  // Why: managed hook installation now targets Orca-owned, environment-scoped
+  // Why: managed hook installation now targets Pebble-owned, environment-scoped
   // homes for Codex rather than the user's default ~/.codex state, so plain
   // dev runs need the install path enabled to keep hook-backed agent statuses
   // accurate without an opt-in flag. The remaining agents still rely on the
@@ -270,7 +274,7 @@ export function installDevParentWatchdog(isDev: boolean): void {
       clearInterval(timer)
       // Why: electron-vite's dev runner starts Electron with plain spawn() and
       // inherited stdio, not an IPC channel. On macOS that means Ctrl+C can end
-      // the dev runner while leaving Orca open. Watching the original parent PID
+      // the dev runner while leaving Pebble open. Watching the original parent PID
       // keeps dev shutdown coupled to the terminal session without affecting the
       // packaged app, which is not supervised by electron-vite.
       requestDevParentShutdown()

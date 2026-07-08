@@ -232,9 +232,31 @@ describe('SidebarSettingsHelpMenu', () => {
     expect(html).toContain('Docs')
   })
 
+  it('opens Docs through the Nebutra Pebble docs route', async () => {
+    const container = await renderMenu()
+    const docsButton = findMenuItem(container, 'Docs')
+
+    await act(async () => {
+      docsButton.click()
+    })
+
+    expect(mocks.shellOpenUrl).toHaveBeenCalledWith('https://www.nebutra.com/pebble/docs')
+  })
+
   it('renders Changelog link', () => {
     const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
     expect(html).toContain('Changelog')
+  })
+
+  it('opens Changelog through GitHub releases', async () => {
+    const container = await renderMenu()
+    const changelogButton = findMenuItem(container, 'Changelog')
+
+    await act(async () => {
+      changelogButton.click()
+    })
+
+    expect(mocks.shellOpenUrl).toHaveBeenCalledWith('https://github.com/nebutra/pebble/releases')
   })
 
   it('renders GitHub link', () => {

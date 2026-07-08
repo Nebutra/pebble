@@ -34,7 +34,7 @@ import { removeAppImageRuntimeEnv } from '../pty/appimage-terminal-env'
 import { parseWslPath } from '../wsl'
 import { addWslEnvKeys } from '../wsl-env'
 import { getWslContextFromSessionId } from './wsl-session-context'
-import { addOrcaWslInteropEnv } from '../pty/wsl-orca-env'
+import { addPebbleWslInteropEnv } from '../pty/wsl-pebble-env'
 import {
   POWERLEVEL10K_WIZARD_DISABLE_ENV,
   seedPowerlevel10kWizardEnv
@@ -57,10 +57,10 @@ import { getAgentForegroundContextPaths } from '../providers/agent-foreground-co
 import { assertSafeAgentStartupCwd, resolveSafePtyDefaultCwd } from '../providers/pty-default-cwd'
 
 const PANE_IDENTITY_ENV_KEYS = [
-  'ORCA_PANE_KEY',
-  'ORCA_TAB_ID',
-  'ORCA_WORKTREE_ID',
-  'ORCA_AGENT_LAUNCH_TOKEN'
+  'PEBBLE_PANE_KEY',
+  'PEBBLE_TAB_ID',
+  'PEBBLE_WORKTREE_ID',
+  'PEBBLE_AGENT_LAUNCH_TOKEN'
 ] as const
 const FOREGROUND_AGENT_CACHE_TTL_MS = 1000
 const SHELL_FOREGROUND_REFRESH_RETRY_MS = 5_000
@@ -118,7 +118,7 @@ function promoteAgentTeamsShimPath(
   env: Record<string, string>,
   requestedPath: string | undefined
 ): void {
-  if (!env.ORCA_AGENT_TEAMS_TEAM_ID || !requestedPath) {
+  if (!env.PEBBLE_AGENT_TEAMS_TEAM_ID || !requestedPath) {
     return
   }
   const shimDir = requestedPath.split(delimiter)[0]
@@ -136,11 +136,14 @@ function removeInheritedDevAgentHookEndpoint(
   env: Record<string, string>,
   explicitEnv: Record<string, string> | undefined
 ): void {
-  if (explicitEnv?.ORCA_AGENT_HOOK_ENV === 'development' && !explicitEnv.ORCA_AGENT_HOOK_ENDPOINT) {
+  if (
+    explicitEnv?.PEBBLE_AGENT_HOOK_ENV === 'development' &&
+    !explicitEnv.PEBBLE_AGENT_HOOK_ENDPOINT
+  ) {
     // Why: the daemon inherits the app process env before per-PTY env is
     // merged. Strip only stale parent endpoints; a fresh explicit endpoint is
     // needed by hooks whose runners scrub token-like env vars before exec.
-    delete env.ORCA_AGENT_HOOK_ENDPOINT
+    delete env.PEBBLE_AGENT_HOOK_ENDPOINT
   }
 }
 
@@ -171,7 +174,7 @@ function formatMissingDaemonPathError(kind: 'helper' | 'cwd', path: string): Dae
   const step = kind === 'helper' ? 'posix_spawn' : 'daemon_cwd'
   return new DaemonProtocolError(
     `Daemon's ${kind === 'helper' ? 'node-pty install' : 'working directory'} is gone ` +
-      `(worktree deleted?). Restart Orca. node-pty: ${step} failed: ENOENT ` +
+      `(worktree deleted?). Restart Pebble. node-pty: ${step} failed: ENOENT ` +
       `(errno 2, No such file or directory) - ${detailName}='${path}'`
   )
 }
@@ -194,7 +197,7 @@ function isExistingDirectory(path: string | undefined): path is string {
  * Moves the daemon process to a stable cwd after its original cwd disappears.
  */
 function repairDaemonCwd(): string | null {
-  const candidates = [process.env.ORCA_USER_DATA_PATH]
+  const candidates = [process.env.PEBBLE_USER_DATA_PATH]
   try {
     candidates.push(getDefaultCwd())
   } catch {
@@ -332,9 +335,8 @@ function formatPtySpawnError(err: unknown, shellPath: string, spawnCwd: string):
  * Runs one short native PTY spawn probe (spawn `/bin/sh -c 'exit 0'`).
  */
 function runSinglePtySpawnHealthProbe(): Promise<void> {
-  const cwd = isExistingDirectory(process.env.ORCA_USER_DATA_PATH)
-    ? process.env.ORCA_USER_DATA_PATH
-    : getDefaultCwd()
+  const userDataPath = process.env.PEBBLE_USER_DATA_PATH
+  const cwd = isExistingDirectory(userDataPath) ? userDataPath : getDefaultCwd()
 
   let proc: pty.IPty
   try {
@@ -538,16 +540,16 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
     ...opts.env,
     TERM: 'xterm-256color',
     COLORTERM: 'truecolor',
-    TERM_PROGRAM: 'Orca',
+    TERM_PROGRAM: 'Pebble',
     // Why: TUIs feature-gate on TERM_PROGRAM_VERSION. The daemon is forked
-    // by main (daemon-init.ts:93) with the parent's env, so ORCA_APP_VERSION
+    // by main (daemon-init.ts:93) with the parent's env, so PEBBLE_APP_VERSION
     // — set in src/main/index.ts from app.getVersion() — is inherited here.
-    TERM_PROGRAM_VERSION: process.env.ORCA_APP_VERSION ?? '0.0.0-dev',
+    TERM_PROGRAM_VERSION: process.env.PEBBLE_APP_VERSION ?? '0.0.0-dev',
     // Why: opt tools (Claude Code, ls --hyperlink, etc.) into emitting OSC 8
     // hyperlinks. The `supports-hyperlinks` npm package gates on a hard-coded
     // TERM_PROGRAM allowlist (iTerm.app / WezTerm / vscode) and returns false
-    // for TERM_PROGRAM=Orca, so callers drop OSC 8 output entirely and emit
-    // bare text instead. xterm.js in Orca parses OSC 8 and the pane's
+    // for TERM_PROGRAM=Pebble, so callers drop OSC 8 output entirely and emit
+    // bare text instead. xterm.js in Pebble parses OSC 8 and the pane's
     // linkHandler routes clicks, so forcing the advertisement is safe and
     // restores clickable refs like `owner/repo#123` / `PR#123`.
     FORCE_HYPERLINK: '1'
@@ -674,12 +676,12 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
           cwdWslInfo?.distro ?? sessionWslContext?.distro ?? preferredWslContext?.distro
         if (launchWslDistro && launchWslDistro !== codexHomeWslInfo.distro) {
           delete env.CODEX_HOME
-          delete env.ORCA_CODEX_HOME
+          delete env.PEBBLE_CODEX_HOME
         } else {
           env.CODEX_HOME = codexHomeWslInfo.linuxPath
-          env.ORCA_CODEX_HOME = codexHomeWslInfo.linuxPath
+          env.PEBBLE_CODEX_HOME = codexHomeWslInfo.linuxPath
           // Why: wsl.exe only imports non-default env vars named in WSLENV.
-          addWslEnvKeys(env, ['CODEX_HOME', 'ORCA_CODEX_HOME'])
+          addWslEnvKeys(env, ['CODEX_HOME', 'PEBBLE_CODEX_HOME'])
           if (!launchWslDistro) {
             const resolved = resolveWindowsShellLaunchArgs(
               shellPath,
@@ -698,12 +700,12 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
           }
         }
       } else if (isHostCodexHomeForWsl(env.CODEX_HOME)) {
-        // Why: Orca's selected Codex runtime home is host-local. WSL Codex
+        // Why: Pebble's selected Codex runtime home is host-local. WSL Codex
         // must use its Linux-side ~/.codex instead of a Windows path.
         delete env.CODEX_HOME
-        delete env.ORCA_CODEX_HOME
+        delete env.PEBBLE_CODEX_HOME
       } else if (env.CODEX_HOME) {
-        addWslEnvKeys(env, ['CODEX_HOME', 'ORCA_CODEX_HOME'])
+        addWslEnvKeys(env, ['CODEX_HOME', 'PEBBLE_CODEX_HOME'])
       }
       if (env.CLAUDE_CONFIG_DIR) {
         // Why: managed WSL Claude accounts pass a Linux CLAUDE_CONFIG_DIR
@@ -712,13 +714,13 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
       }
     } else if (codexHomeWslInfo || isWslCodexHomeForHost(env.CODEX_HOME)) {
       // Why: WSL-managed Codex homes are Linux paths. Windows Codex cannot use
-      // them. ORCA_CODEX_HOME must go too because shell-ready scripts restore
+      // them. Pebble CODEX_HOME must go too because shell-ready scripts restore
       // CODEX_HOME from it after user profiles run.
       delete env.CODEX_HOME
-      delete env.ORCA_CODEX_HOME
+      delete env.PEBBLE_CODEX_HOME
     }
     if (pathWin32.basename(shellPath).toLowerCase() === 'wsl.exe') {
-      addOrcaWslInteropEnv(env)
+      addPebbleWslInteropEnv(env)
     }
   } else {
     // Why: relay-side launch modes can ask for host defaults to stay scrubbed
@@ -746,12 +748,12 @@ export function createPtySubprocess(opts: PtySubprocessOptions): SubprocessHandl
       shellLaunch = getShellReadyLaunchConfig(shellPath)
     } else {
       shellLaunch =
-        env.ORCA_ATTRIBUTION_SHIM_DIR ||
-        env.ORCA_OPENCODE_CONFIG_DIR ||
-        env.ORCA_MIMOCODE_HOME ||
-        env.ORCA_OMP_STATUS_EXTENSION ||
-        env.ORCA_CODEX_HOME ||
-        env.ORCA_AGENT_TEAMS_SHIM_DIR
+        env.PEBBLE_ATTRIBUTION_SHIM_DIR ||
+        env.PEBBLE_OPENCODE_CONFIG_DIR ||
+        env.PEBBLE_MIMOCODE_HOME ||
+        env.PEBBLE_OMP_STATUS_EXTENSION ||
+        env.PEBBLE_CODEX_HOME ||
+        env.PEBBLE_AGENT_TEAMS_SHIM_DIR
           ? getAttributionShellLaunchConfig(shellPath)
           : null
     }

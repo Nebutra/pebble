@@ -1,5 +1,5 @@
 // ─── Explicit agent status (reported via native agent hooks → IPC) ──────────
-// These types define the normalized status that Orca receives from Claude,
+// These types define the normalized status that Pebble receives from Claude,
 // Codex, and other explicit integrations. Agent state normally comes from
 // hooks; a narrow interrupt fallback may synthesize a final done state when an
 // agent misses its own cancellation hook. We still do not infer status from
@@ -52,7 +52,7 @@ export type AgentStateHistoryEntry = {
   /** When this state was first reported. */
   startedAt: number
   /** True when this `done` was a cancellation. May come from an agent hook
-   *  (for example Claude Code `is_interrupt`) or Orca's guarded interrupt
+   *  (for example Claude Code `is_interrupt`) or Pebble's guarded interrupt
    *  fallback. Always falsy for non-`done` states, so retention logic can
    *  preserve this signal. */
   interrupted?: boolean
@@ -117,7 +117,7 @@ export type AgentStatusEntry = {
   lastAssistantMessage?: string
   /** True when the current `done` state was reached via an interrupt rather
    *  than a normal turn completion. May be reported by the agent itself or
-   *  inferred by Orca's guarded interrupt fallback.
+   *  inferred by Pebble's guarded interrupt fallback.
    *  Orthogonal to `state`: the agent still finished the turn, but the user
    *  cancelled it. Undefined while the agent is working or when no interrupt
    *  signal was available. */
@@ -127,7 +127,7 @@ export type AgentStatusEntry = {
    *  lineage; workers often run in the same worktree as their coordinator. */
   orchestration?: AgentStatusOrchestrationContext
   /** Provider-owned conversation/session id captured from hook payloads.
-   *  Used only for exact CLI resume; Orca terminal ids are not agent-session ids. */
+   *  Used only for exact CLI resume; Pebble terminal ids are not agent-session ids. */
   providerSession?: AgentProviderSessionMetadata
 }
 
@@ -183,7 +183,7 @@ export type AgentStatusIpcPayload = ParsedAgentStatusPayload & {
   tabId?: string
   worktreeId?: string
   /** Identifies the SSH connection the event arrived on, or null for local.
-   *  Stamped only on the remote-ingest path (Orca's `ingestRemote`); the
+   *  Stamped only on the remote-ingest path (Pebble's `ingestRemote`); the
    *  HTTP path always sets null because it cannot know which mux a request
    *  came from. See docs/design/agent-status-over-ssh.md §5. */
   connectionId: string | null

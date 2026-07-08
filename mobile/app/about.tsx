@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { ChevronLeft, Globe } from 'lucide-react-native'
 import Svg, { Path } from 'react-native-svg'
 import Constants from 'expo-constants'
-import { OrcaLogo } from '../src/components/OrcaLogo'
+import { PebbleLogo } from '../src/components/PebbleLogo'
 import { colors, spacing, typography } from '../src/theme/mobile-theme'
 
 // Why: read version + native build identifier from expo-constants at
@@ -50,34 +50,34 @@ export default function AboutScreen() {
       </View>
 
       <View style={styles.brand}>
-        <OrcaLogo size={28} />
-        <Text style={styles.brandName}>Orca</Text>
+        <PebbleLogo size={28} />
+        <Text style={styles.brandName}>Pebble</Text>
         <Text style={styles.brandSub}>Open-source agent IDE for 100x builders</Text>
       </View>
 
       <View style={styles.section}>
         <Pressable
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => void Linking.openURL('https://onOrca.dev')}
+          onPress={() => void Linking.openURL('https://www.nebutra.com/pebble')}
         >
           <Globe size={16} color={colors.textSecondary} />
-          <Text style={styles.rowValue}>onOrca.dev</Text>
+          <Text style={styles.rowValue}>nebutra.com/pebble</Text>
         </Pressable>
         <View style={styles.separator} />
         <Pressable
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => void Linking.openURL('https://github.com/stablyai/orca')}
+          onPress={() => void Linking.openURL('https://github.com/nebutra/pebble')}
         >
           <GithubIcon />
-          <Text style={styles.rowValue}>stablyai/orca</Text>
+          <Text style={styles.rowValue}>nebutra/pebble</Text>
         </Pressable>
         <View style={styles.separator} />
         <Pressable
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => void Linking.openURL('https://x.com/orca_build')}
+          onPress={() => void Linking.openURL('https://x.com/pebble_build')}
         >
           <XIcon />
-          <Text style={styles.rowValue}>@orca_build</Text>
+          <Text style={styles.rowValue}>@pebble_build</Text>
         </Pressable>
       </View>
 

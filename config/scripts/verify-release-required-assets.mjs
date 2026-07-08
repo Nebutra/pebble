@@ -11,22 +11,22 @@ export function getRequiredReleaseAssetNames(tag) {
     'latest-linux-arm64.yml',
     'latest-mac.yml',
     'latest.yml',
-    'orca-linux.AppImage',
-    'orca-linux-arm64.AppImage',
-    `orca-ide_${version}_amd64.deb`,
-    `orca-ide_${version}_arm64.deb`,
-    `orca-ide-${version}.x86_64.rpm`,
-    `orca-ide-${version}.aarch64.rpm`,
-    'orca-windows-setup.exe',
-    'orca-windows-setup.exe.blockmap',
-    `Orca-${version}-mac.zip`,
-    `Orca-${version}-mac.zip.blockmap`,
-    `Orca-${version}-arm64-mac.zip`,
-    `Orca-${version}-arm64-mac.zip.blockmap`,
-    'orca-macos-x64.dmg',
-    'orca-macos-x64.dmg.blockmap',
-    'orca-macos-arm64.dmg',
-    'orca-macos-arm64.dmg.blockmap'
+    'pebble-linux.AppImage',
+    'pebble-linux-arm64.AppImage',
+    `pebble-ide_${version}_amd64.deb`,
+    `pebble-ide_${version}_arm64.deb`,
+    `pebble-ide-${version}.x86_64.rpm`,
+    `pebble-ide-${version}.aarch64.rpm`,
+    'pebble-windows-setup.exe',
+    'pebble-windows-setup.exe.blockmap',
+    `Pebble-${version}-mac.zip`,
+    `Pebble-${version}-mac.zip.blockmap`,
+    `Pebble-${version}-arm64-mac.zip`,
+    `Pebble-${version}-arm64-mac.zip.blockmap`,
+    'pebble-macos-x64.dmg',
+    'pebble-macos-x64.dmg.blockmap',
+    'pebble-macos-arm64.dmg',
+    'pebble-macos-arm64.dmg.blockmap'
   ]
 }
 
@@ -150,7 +150,7 @@ async function main() {
   if (!token) {
     throw new Error('GH_TOKEN or GITHUB_TOKEN must be set')
   }
-  const repo = process.env.GITHUB_REPOSITORY || 'stablyai/orca'
+  const repo = process.env.GITHUB_REPOSITORY || 'nebutra/pebble'
   const result = await verifyRequiredReleaseAssets({ repo, tag, token })
   console.log(`Verified ${result.checked.length} required release assets for ${repo}@${tag}`)
 }

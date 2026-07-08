@@ -43,10 +43,10 @@
       "coveredProviders": [],
       "coverageNotes": "Local macOS evidence over the reconcile guards that exist on main@1282f5c2d. Broader targeted-hasPty resume paths, no-hot listing counts, and live Electron survival arrive with the pending reliability stack.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/issues/6773",
-        "https://github.com/stablyai/orca/pull/6514",
-        "https://github.com/stablyai/orca/pull/6796",
-        "https://github.com/stablyai/orca/pull/6801"
+        "https://github.com/nebutra/pebble/issues/6773",
+        "https://github.com/nebutra/pebble/pull/6514",
+        "https://github.com/nebutra/pebble/pull/6796",
+        "https://github.com/nebutra/pebble/pull/6801"
       ],
       "invariant": "A local or daemon liveness snapshot requested before a pane binds a PTY cannot prove that newer binding dead or route it through exit teardown.",
       "oracle": "The decision layer rejects reconciliation when ptyBoundAt is greater than or equal to snapshotRequestedAt, still reconciles genuinely absent older local ids, and treats rejected provider listing as unknown.",
@@ -137,10 +137,10 @@
       "coveredProviders": [],
       "coverageNotes": "Local macOS evidence over the ownership/dedupe suite on main@1282f5c2d. Queued/pending resume-claim indexing, same-session and wrong-session hook proofs, and Electron repeat-activation coverage arrive with the pending stack (#7008).",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6800",
-        "https://github.com/stablyai/orca/pull/5240",
-        "https://github.com/stablyai/orca/pull/6411",
-        "https://github.com/stablyai/orca/pull/6833"
+        "https://github.com/nebutra/pebble/pull/6800",
+        "https://github.com/nebutra/pebble/pull/5240",
+        "https://github.com/nebutra/pebble/pull/6411",
+        "https://github.com/nebutra/pebble/pull/6833"
       ],
       "invariant": "Workspace activation, launch, restore, sleep, hibernate, dedupe, clearing, and reconnect code must not replay or resume a provider session id already owned, queued, pending, or live in that workspace.",
       "oracle": "The current renderer-state slice asserts provider-session claim keys are owned by preserved active tabs, inactive split leaves, visible non-focused split groups, live records, quit records, worktree-sleep records, queued startup payloads, time-bounded resume bridge claims, and same-session live hook evidence; duplicates clear without launching a second resume command. The provider list is the risk scope, not proof that every provider has a live integration gate.",
@@ -230,24 +230,24 @@
       "coveredProviders": [],
       "coverageNotes": "Local macOS evidence on main@1282f5c2d, including #7192's runtime-mirror geometry authority slice. Shell-visible size, SSH/remote geometry, Windows ConPTY readback, and resume-time reassertion coverage arrive with the pending stack and #7006.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6644",
-        "https://github.com/stablyai/orca/pull/6649",
-        "https://github.com/stablyai/orca/pull/6725",
-        "https://github.com/stablyai/orca/pull/6785",
-        "https://github.com/stablyai/orca/pull/6853",
-        "https://github.com/stablyai/orca/pull/6939",
-        "https://github.com/stablyai/orca/pull/7192"
+        "https://github.com/nebutra/pebble/pull/6644",
+        "https://github.com/nebutra/pebble/pull/6649",
+        "https://github.com/nebutra/pebble/pull/6725",
+        "https://github.com/nebutra/pebble/pull/6785",
+        "https://github.com/nebutra/pebble/pull/6853",
+        "https://github.com/nebutra/pebble/pull/6939",
+        "https://github.com/nebutra/pebble/pull/7192"
       ],
       "invariant": "A visible desktop-owned terminal cannot trust 0x0, stale requested size, or renderer-only size; xterm, fit/proposed size, applied PTY size, shell-visible size, and the runtime mirror's parse dimensions must converge or enter explicit degraded state, and mirror resize reflow must stay ordered with queued output writes.",
       "oracle": "The current executable slice uses deterministic frame schedulers and fake providers to force 0x0 first fit, delayed layout settle, dropped resize/readback drift, and hidden-to-visible activation, then asserts the renderer forwards a usable size, pty:getSize reports applied rather than merely requested size where available, and visibility resume reasserts real drift without hot listSessions. Shell-visible stty/echo-wrap convergence remains a live-gate follow-up.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts src/renderer/src/components/terminal-pane/split-right-white-screen.test.ts src/main/ipc/pty.test.ts src/main/runtime/orca-runtime.test.ts"
+        "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts src/renderer/src/components/terminal-pane/split-right-white-screen.test.ts src/main/ipc/pty.test.ts src/main/runtime/pebble-runtime.test.ts"
       ],
       "testFiles": [
         "src/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts",
         "src/renderer/src/components/terminal-pane/split-right-white-screen.test.ts",
         "src/main/ipc/pty.test.ts",
-        "src/main/runtime/orca-runtime.test.ts"
+        "src/main/runtime/pebble-runtime.test.ts"
       ],
       "assertionRefs": [
         {
@@ -274,7 +274,7 @@
           ]
         },
         {
-          "file": "src/main/runtime/orca-runtime.test.ts",
+          "file": "src/main/runtime/pebble-runtime.test.ts",
           "assertions": [
             "the headless mirror resizes after an accepted desktop PTY resize (#7192)",
             "headless mirror resizes are ordered behind queued PTY writes (#7192)"
@@ -286,7 +286,7 @@
           "date": "2026-07-03",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts src/renderer/src/components/terminal-pane/split-right-white-screen.test.ts src/main/ipc/pty.test.ts src/main/runtime/orca-runtime.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts src/renderer/src/components/terminal-pane/split-right-white-screen.test.ts src/main/ipc/pty.test.ts src/main/runtime/pebble-runtime.test.ts",
           "result": "passed",
           "durationSeconds": 8.4,
           "summary": "4 test file(s) passed, 777 tests passed on main@1282f5c2d in a clean checkout."
@@ -314,7 +314,7 @@
       ],
       "knownGaps": [
         "No live Electron geometry command yet beyond the local live PTY resize slice.",
-        "The runtime mirror geometry slice is unregistered: #7192's red tests (orca-runtime.test.ts headless-mirror resize and ordering, pty.test.ts desktop resize fan-out) exist on fresh main but not at this branch's merge-base, so they can only be registered during the rebase.",
+        "The runtime mirror geometry slice is unregistered: #7192's red tests (pebble-runtime.test.ts headless-mirror resize and ordering, pty.test.ts desktop resize fan-out) exist on fresh main but not at this branch's merge-base, so they can only be registered during the rebase.",
         "Does not yet prove shell-visible size, provider-applied size, and xterm size converge across SSH/remote paths.",
         "Does not yet prove Windows ConPTY geometry/readback.",
         "Current command uses deterministic fake providers for the main/renderer contracts, not a real remote PTY."
@@ -352,9 +352,9 @@
       "coveredProviders": [],
       "coverageNotes": "Local macOS evidence over the WebGL/link/search containment suites on main@1282f5c2d, adopting the #6949 atlas-recovery rename and #7133's reveal hardening tests. Core addon-load throw containment and live typed-input survival arrive with #7004 and a live follow-up.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6852",
-        "https://github.com/stablyai/orca/pull/6872",
-        "https://github.com/stablyai/orca/pull/6855"
+        "https://github.com/nebutra/pebble/pull/6852",
+        "https://github.com/nebutra/pebble/pull/6872",
+        "https://github.com/nebutra/pebble/pull/6855"
       ],
       "invariant": "Search, link, WebGL, decoration, input-protocol, or keyboard-navigation errors must not unmount the terminal surface, crash React/window, break focus, or stop PTY input/output.",
       "oracle": "The current executable slice injects a core addon load throw and asserts pane opening continues through later addons, covers link provider throws as pane-scoped no-link results, covers search decoration positive-integer failures as false results instead of renderer crashes, and covers WebGL attach/refresh/recovery containment. Focused typed input echo after addon failure still needs a live/component follow-up.",
@@ -460,7 +460,7 @@
     },
     {
       "id": "startup-upgrade.persisted-session-corpus",
-      "title": "Current Orca preserves or recovers old production persisted sessions",
+      "title": "Current Pebble preserves or recovers old production persisted sessions",
       "maturity": "experimental",
       "protection": "none",
       "owner": "startup-persistence",
@@ -486,12 +486,12 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap only; no executable coverage is wired yet.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/issues/5356",
-        "https://github.com/stablyai/orca/pull/5234",
-        "https://github.com/stablyai/orca/pull/5240"
+        "https://github.com/nebutra/pebble/issues/5356",
+        "https://github.com/nebutra/pebble/pull/5234",
+        "https://github.com/nebutra/pebble/pull/5240"
       ],
       "invariant": "Startup and restore fixes must preserve or explicitly recover sessions from the last affected production persisted-state schema, not only from state written by current code.",
-      "oracle": "Boot current Orca against immutable copied user-data fixtures from affected versions and reject blank replacement panes, duplicate resume tabs, silent session loss, or works-only-after-current-write behavior.",
+      "oracle": "Boot current Pebble against immutable copied user-data fixtures from affected versions and reject blank replacement panes, duplicate resume tabs, silent session loss, or works-only-after-current-write behavior.",
       "commands": [],
       "testFiles": [],
       "assertionRefs": [],
@@ -549,10 +549,10 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap on main. The live Electron Playwright slice exists only on the pending reliability stack. It registers here with its owning split PR.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6801",
-        "https://github.com/stablyai/orca/pull/6842",
-        "https://github.com/stablyai/orca/pull/6939",
-        "https://github.com/stablyai/orca/pull/6989"
+        "https://github.com/nebutra/pebble/pull/6801",
+        "https://github.com/nebutra/pebble/pull/6842",
+        "https://github.com/nebutra/pebble/pull/6939",
+        "https://github.com/nebutra/pebble/pull/6989"
       ],
       "invariant": "An active local Electron terminal has one active PTY id listed exactly once, accepts real keyboard input through focused xterm, renders process output visibly, keeps the same live PTY across repeated workspace hide/restore cycles, applies an actual size change, and removes the old PTY from liveness state after exit.",
       "oracle": "A deterministic raw-mode probe prints a ready marker, ordered key markers from real keyboard input, the active PTY id appears exactly once in pty:listSessions, remains bound to the same PTY id across two worktree switch-away/switch-back cycles, accepts more keyboard input after each restore, changes pty:getSize after viewport resize, prints the same process-visible size, and prints an exit marker; after shell exit, pty:listSessions no longer contains the old id.",
@@ -615,12 +615,12 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap only; no executable coverage is wired yet.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6541",
-        "https://github.com/stablyai/orca/pull/6858",
-        "https://github.com/stablyai/orca/pull/6876",
-        "https://github.com/stablyai/orca/pull/6968",
-        "https://github.com/stablyai/orca/pull/6970",
-        "https://github.com/stablyai/orca/pull/6999"
+        "https://github.com/nebutra/pebble/pull/6541",
+        "https://github.com/nebutra/pebble/pull/6858",
+        "https://github.com/nebutra/pebble/pull/6876",
+        "https://github.com/nebutra/pebble/pull/6968",
+        "https://github.com/nebutra/pebble/pull/6970",
+        "https://github.com/nebutra/pebble/pull/6999"
       ],
       "invariant": "Windows local and daemon terminals must spawn with the intended shell, accept normal Enter/Backspace/Arrow input after agent or TUI exit, render cursor/CJK/wide-glyph redraws without stale cells, and converge to nonzero applied size.",
       "oracle": "A Windows live gate proves shell echo, command submission, keyboard reset, resize readback, cursor visibility, and CJK/wide-glyph redraw using PTY input logs plus visible buffer/pixel evidence.",
@@ -687,8 +687,8 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap on main. The targeted-hasPty product hardening and no-hot count assertions exist only on the pending reliability stack. It registers here with its owning split PR.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/7002",
-        "https://github.com/stablyai/orca/pull/6858"
+        "https://github.com/nebutra/pebble/pull/7002",
+        "https://github.com/nebutra/pebble/pull/6858"
       ],
       "invariant": "Typing, focus, terminal switch, workspace switch, visibility resume, resize, render, and per-pane liveness paths must not call global pty:listSessions; they must use targeted per-PTY APIs or cached provider-owned state.",
       "oracle": "The current executable slice asserts targeted visibility/first-input liveness, resize re-assertion after visibility resume, light tab/active-state resume, SSH/remote skip behavior, and closed Resource Manager status badges avoid pty:listSessions; targeted hasPty/getSize calls are allowed for liveness/resize slices and forbidden for light tab/active-state resume. The full hot-path oracle still needs instrumentation around raw focus, split focus, workspace switch, render ticks, and high-session local/daemon/SSH fixtures.",
@@ -754,8 +754,8 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap on main. The crash-breadcrumb recording and its test exist only on the pending reliability stack. It registers here with its owning split PR.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6800",
-        "https://github.com/stablyai/orca/issues/6773"
+        "https://github.com/nebutra/pebble/pull/6800",
+        "https://github.com/nebutra/pebble/issues/6773"
       ],
       "invariant": "Terminal lifecycle anomalies around reattach, restore, provider ownership, stale liveness, and fallback routing must leave compact, deduped, privacy-safe breadcrumbs in crash diagnostics so future reports can be attributed from evidence.",
       "oracle": "The current executable slice calls warnTerminalLifecycleAnomaly with terminal identity, provider, PTY id, binding epoch, and reason, then asserts the existing console warning is preserved and a compact terminal_lifecycle_anomaly crash breadcrumb is recorded once per lifecycle identity. Full pane transition traces and diagnostics-bundle artifact proof remain follow-ups.",
@@ -823,10 +823,10 @@
       "coveredProviders": [],
       "coverageNotes": "Local macOS evidence over the main-process pending-output caps that exist on main@1282f5c2d. Daemon stream write(false)/drain contracts, cross-session drain priority, and bounded queued tails arrive with the pending perf slice; live flood/latency artifacts remain gaps.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6836",
-        "https://github.com/stablyai/orca/pull/6858",
-        "https://github.com/stablyai/orca/pull/7002",
-        "https://github.com/stablyai/orca/pull/7054"
+        "https://github.com/nebutra/pebble/pull/6836",
+        "https://github.com/nebutra/pebble/pull/6858",
+        "https://github.com/nebutra/pebble/pull/7002",
+        "https://github.com/nebutra/pebble/pull/7054"
       ],
       "invariant": "High-volume terminal output must stay bounded across daemon socket writes, main-to-renderer in-flight bytes, renderer scheduler queues, and hidden-output restore without starving focused input.",
       "oracle": "The current executable slice injects daemon socket backpressure and main-process renderer backlog pressure, then asserts write(false)/drain ordering, bounded queued daemon bytes, per-PTY and total pending-output caps, preserved sequenced-tail metadata, active-pending protection ahead of background trimming, and ACK-gated in-flight bounds. The live Electron perf oracle adds hidden-output floods, renderer scheduler queue depth, dropped-output-zero normal scenarios, and active key latency budgets before promotion.",
@@ -912,9 +912,9 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap on main. The fail-closed degraded-daemon hardening and its contracts exist only on the pending reliability stack. It registers here with its owning split PR.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6830",
-        "https://github.com/stablyai/orca/pull/6866",
-        "https://github.com/stablyai/orca/pull/7002"
+        "https://github.com/nebutra/pebble/pull/6830",
+        "https://github.com/nebutra/pebble/pull/6866",
+        "https://github.com/nebutra/pebble/pull/7002"
       ],
       "invariant": "Daemon startup reconciliation must preserve valid live daemon sessions, reap only true orphans, and degraded mode must not route an existing-looking daemon session through local fallback unless the caller explicitly marks a fresh degraded-mode spawn.",
       "oracle": "The current provider-contract corpus covers valid current-worktree ids, folder/floating workspace ids, invalid removed-worktree ids, mixed live/orphan dry-run reconciliation, hyphenated worktree ids, malformed ids, daemon sessions discovered after restart, router discovery before existing-session spawn, router fail-closed behavior when legacy ownership cannot be listed or a known session has exited, degraded daemon fallback for fresh sessions, fail-closed behavior for unknown restored ids, benign inspection defaults for unknown ownership, and synthetic exits on daemon restart. Prior-worktree aliases and renamed-worktree startup wiring are promotion gaps, not current proof.",
@@ -978,10 +978,10 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap on main. The SSH unknown-liveness hardening and deferred-reattach contracts exist only on the pending reliability stack. It registers here with its owning split PR.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6951",
-        "https://github.com/stablyai/orca/pull/6955",
-        "https://github.com/stablyai/orca/pull/6979",
-        "https://github.com/stablyai/orca/pull/7009"
+        "https://github.com/nebutra/pebble/pull/6951",
+        "https://github.com/nebutra/pebble/pull/6955",
+        "https://github.com/nebutra/pebble/pull/6979",
+        "https://github.com/nebutra/pebble/pull/7009"
       ],
       "invariant": "SSH, WSL, and remote-runtime restore paths must treat provider listing failures and unknown liveness as unknown, not dead, while still avoiding duplicate spawn and clearing expired relay leases exactly once.",
       "oracle": "The current executable slice asserts saved SSH sessions use relay attach, expired relay attach does not silently fresh-spawn inside the provider, provider listing and targeted-liveness failures are unknown rather than dead, deferred passphrase cancellation does not auto-reconnect, deferred SSH attach uses saved leaf/tab session ids once connected, transient deferred reattach failure preserves the saved restore id without fresh-spawning, deferred SSH no-result cleanup clears the pending serializer without consuming the saved restore id, disconnected SSH relay ids are retained as deferred reconnect metadata and sidebar wake hints rather than attached PTY proof, and expired deferred relay state clears stale pane/tab bindings before one fresh replacement spawn. WSL and remote-runtime mirror polling require separate follow-up contracts.",
@@ -1045,10 +1045,10 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap only; no executable coverage is wired yet.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6801",
-        "https://github.com/stablyai/orca/pull/6830",
-        "https://github.com/stablyai/orca/pull/6866",
-        "https://github.com/stablyai/orca/pull/6951"
+        "https://github.com/nebutra/pebble/pull/6801",
+        "https://github.com/nebutra/pebble/pull/6830",
+        "https://github.com/nebutra/pebble/pull/6866",
+        "https://github.com/nebutra/pebble/pull/6951"
       ],
       "invariant": "WSL terminal restore must preserve Windows-host and Linux-guest path/cwd identity, shell launch args, startup command delivery, provider liveness semantics, and saved session ownership without being treated as ordinary local Windows ConPTY or generic SSH.",
       "oracle": "No executable slice yet. Promotion needs a Windows provider contract plus one focused live WSL smoke proving cwd/path mapping, shell echo, startup command delivery, targeted liveness unknown handling, and restore without duplicate panes or destructive false-dead cleanup.",
@@ -1113,9 +1113,9 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap on main. The replay FIFO/burst coalescing product change and its tests exist only on the pending reliability stack; main still uses a single pendingReplayData slot. It registers here with its owning split PR.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/7012",
-        "https://github.com/stablyai/orca/pull/7054",
-        "https://github.com/stablyai/orca/pull/6949"
+        "https://github.com/nebutra/pebble/pull/7012",
+        "https://github.com/nebutra/pebble/pull/7054",
+        "https://github.com/nebutra/pebble/pull/6949"
       ],
       "invariant": "Multiple replay notifications, metadata-only eager replays, hidden-output restores, and WebGL recovery must preserve FIFO ordering, apply clear-before-replay only when intended, and never overlay stale bytes on newer terminal output.",
       "oracle": "The current executable slice injects overlapping replay notifications while async replay drains and asserts pre-parse coalescing, in-flight replay preservation, FIFO draining after xterm parsing starts, and bounded burst-tail coalescing. Metadata-only replay, hidden output chunks, live output interleaving, clear semantics, and stale-overlap checks remain promotion-scope gaps.",
@@ -1184,10 +1184,10 @@
       "coveredProviders": [],
       "coverageNotes": "Local macOS evidence on main@1282f5c2d; identical files to the pending stack. Real OS IME automation, Windows ConPTY post-agent reset, and the CJK/Vietnamese/Arabic matrix remain registered gaps.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6699",
-        "https://github.com/stablyai/orca/pull/6682",
-        "https://github.com/stablyai/orca/pull/6513",
-        "https://github.com/stablyai/orca/pull/6999"
+        "https://github.com/nebutra/pebble/pull/6699",
+        "https://github.com/nebutra/pebble/pull/6682",
+        "https://github.com/nebutra/pebble/pull/6513",
+        "https://github.com/nebutra/pebble/pull/6999"
       ],
       "invariant": "Composition, native text forwarding, synthetic input, paste, and platform keyboard bypass paths must not send preedit/control bytes before commit and must commit text exactly once to the intended PTY.",
       "oracle": "The current renderer-unit slice asserts native text commits route to the intended PTY once, composition/preedit bookkeeping does not leak premature text, input-source classification handles synthetic/native paths, and paste/runtime forwarding avoids duplicate terminal payloads for covered fixtures. Real IME paths and the full CJK/Vietnamese/Arabic/JIS-yen matrix run in follow-up platform soak where automation is possible.",
@@ -1284,8 +1284,8 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap only; no executable coverage is wired yet.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6999",
-        "https://github.com/stablyai/orca/pull/6858"
+        "https://github.com/nebutra/pebble/pull/6999",
+        "https://github.com/nebutra/pebble/pull/6858"
       ],
       "invariant": "After an agent or TUI exits on Windows ConPTY, ordinary Enter, Backspace, Arrow, paste, and printable keys must be delivered as standard shell input, not stale Kitty/CSI-u or application-mode bytes.",
       "oracle": "A Windows gate records PTY input bytes before and after agent/TUI exit, submits real shell commands, and proves standard keys work without protocol leakage.",
@@ -1347,9 +1347,9 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap only; no executable coverage is wired yet.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6876",
-        "https://github.com/stablyai/orca/pull/6968",
-        "https://github.com/stablyai/orca/pull/6970"
+        "https://github.com/nebutra/pebble/pull/6876",
+        "https://github.com/nebutra/pebble/pull/6968",
+        "https://github.com/nebutra/pebble/pull/6970"
       ],
       "invariant": "Windows terminal repaint must not leave stale cells, clipped wide glyphs, or hidden cursor state after CJK, emoji, or cursor-rewrite output.",
       "oracle": "A Windows gate combines xterm buffer assertions with bounded screenshot/canvas evidence for representative CJK, emoji, and rewrite sequences.",
@@ -1411,8 +1411,8 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap only; no executable coverage is wired yet.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6541",
-        "https://github.com/stablyai/orca/pull/6858"
+        "https://github.com/nebutra/pebble/pull/6541",
+        "https://github.com/nebutra/pebble/pull/6858"
       ],
       "invariant": "Windows local and daemon terminals must resolve equivalent shell paths, args, cwd, env, startup command delivery, and fallback behavior for PowerShell 5/7, cmd, Git Bash, WSL, and missing pwsh.",
       "oracle": "Provider-contract fixtures compare resolved command descriptors and live shell markers for supported Windows shells across local and daemon providers.",
@@ -1476,8 +1476,8 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap only; no executable coverage is wired yet.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/7002",
-        "https://github.com/stablyai/orca/pull/6858"
+        "https://github.com/nebutra/pebble/pull/7002",
+        "https://github.com/nebutra/pebble/pull/6858"
       ],
       "invariant": "Terminal typing, paste, resize, and output rendering must stay within latency and throughput budgets under realistic active and hidden-output load.",
       "oracle": "Perf artifacts record median/p95/max key latency, event-loop delay, renderer CPU, output bytes/sec, resize count, hidden restore latency, queue depth, and dropped-output counts.",
@@ -1538,8 +1538,8 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap on main. The daemon batcher write(false)/drain contracts exist only on the pending reliability stack. It registers here with its owning split PR.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6836",
-        "https://github.com/stablyai/orca/pull/6858"
+        "https://github.com/nebutra/pebble/pull/6836",
+        "https://github.com/nebutra/pebble/pull/6858"
       ],
       "invariant": "Daemon terminal output floods must pause when socket writes return false, resume on drain, keep buffered bytes bounded, and not starve focused input.",
       "oracle": "The current executable slice injects a slow socket and asserts write(false)/drain ordering, bounded queued daemon stream bytes, close/error listener cleanup, newest-tail preservation under sustained pressure, and flush-immediate cross-session priority ahead of unrelated background backlog on drain. Active input latency remains part of the broader perf gate.",
@@ -1606,7 +1606,7 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap on main. The boot-hydration counters and their tests exist only on the pending reliability stack. It registers here with its owning split PR.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/7002"
+        "https://github.com/nebutra/pebble/pull/7002"
       ],
       "invariant": "Terminal typing, focus, resize, tab/workspace switch, and agent/session restore must not trigger unbounded store projection, git status, provider listing, or per-pane polling work.",
       "oracle": "The current executable slice instruments boot-time local PTY registry hydration with repo counts, local-vs-remote repo skips, worktree enumeration counts, adapter/session listing counts, registration/skipped-session counts, duration, and failure phase. The broader oracle still needs instrumentation that counts store selector recomputes, git status requests, provider listings, and session scans during scripted hot interactions with many worktrees and terminal panes.",
@@ -1673,11 +1673,11 @@
       "coveredProviders": [],
       "coverageNotes": "Local macOS evidence over the merged #7133/#7173 restore and hidden-output ordering tests on main@1282f5c2d. The dirty-state exactness contract, normal-buffer clear semantics, and metadata-only replay remain pending-stack work.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/7173",
-        "https://github.com/stablyai/orca/pull/7133",
-        "https://github.com/stablyai/orca/pull/7012",
-        "https://github.com/stablyai/orca/pull/7054",
-        "https://github.com/stablyai/orca/pull/6949"
+        "https://github.com/nebutra/pebble/pull/7173",
+        "https://github.com/nebutra/pebble/pull/7133",
+        "https://github.com/nebutra/pebble/pull/7012",
+        "https://github.com/nebutra/pebble/pull/7054",
+        "https://github.com/nebutra/pebble/pull/6949"
       ],
       "invariant": "Hidden-output restore, snapshot replay, metadata-only replay, and clear-before-replay must preserve order and never overlay stale bytes on newer live terminal output; restoring a snapshot onto an already-dirty pane must yield a buffer exactly equal to the snapshot frame.",
       "oracle": "Apply snapshots onto adversarially dirty pane states (already on the alternate screen, stale content occupying cells the new frame leaves blank, scrollback present, wide glyphs, revived sessions with restarted PTY seq counters) and assert exact buffer equality with the snapshot frame; fault injection interleaves hidden chunks, live output, metadata-only replay, and clear-before-replay, then asserts ordered terminal buffer content, clear decisions, and replay diagnostics. Marker-presence checks are not acceptable evidence on restore paths.",
@@ -1769,7 +1769,7 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap only; no executable coverage is wired yet.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6949"
+        "https://github.com/nebutra/pebble/pull/6949"
       ],
       "invariant": "Startup OSC 10/11 color queries are answered out of band at startup only, never leak into shell/provider output streams, and ordinary runtime OSC color queries remain renderer-handled.",
       "oracle": "A provider-contract fixture records startup query replies, shell-visible bytes, renderer-visible bytes, and later runtime OSC behavior to prove no query leakage or color deadlock.",
@@ -1836,9 +1836,9 @@
       "coveredProviders": [],
       "coverageNotes": "Local macOS evidence over the runtime-RPC stream budgets on main@1282f5c2d. The pending stack adds byte-exact 512KB/2MB/256KB/48KB budget assertions; legacy JSON subscribe parity remains undecided.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/6951",
-        "https://github.com/stablyai/orca/pull/6955",
-        "https://github.com/stablyai/orca/pull/7009"
+        "https://github.com/nebutra/pebble/pull/6951",
+        "https://github.com/nebutra/pebble/pull/6955",
+        "https://github.com/nebutra/pebble/pull/7009"
       ],
       "invariant": "Runtime and mobile terminal subscriptions must cap initial snapshots, live output buffered while snapshots load, chunk sizes, and batch sizes, while preserving output order, input locks, resize/driver events, and fallback parity or explicit fallback deprecation.",
       "oracle": "The current executable slice asserts mobile initial snapshots downgrade until they fit <=512KB, requested binary snapshots downgrade until they fit <=2MB, binary live output queued while the initial snapshot loads stays <=256KB while preserving the newest tail, large binary output is split into <=48KB frames, output bursts are coalesced before emit, aborts do not register stale listeners, and stale mobile resize re-stream completions are dropped. JSON fallback parity/deprecation remains an explicit gap.",
@@ -1945,8 +1945,8 @@
       "coveredProviders": [],
       "coverageNotes": "Local macOS evidence over #7148's width-parity oracle on main@1282f5c2d. A broader byte corpus, a shared parser-construction assertion over terminal-unicode-provider.ts/pane-terminal-options.ts, and recorded agent-session corpora remain gaps.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/7148",
-        "https://github.com/stablyai/orca/pull/7133"
+        "https://github.com/nebutra/pebble/pull/7148",
+        "https://github.com/nebutra/pebble/pull/7133"
       ],
       "invariant": "The main-process headless terminal mirror and the renderer xterm must parse identical byte streams into cell-identical buffers (unicode width tables, joining behavior, modes, and addon-visible semantics), so snapshots, restores, reads, and mobile streams never encode a frame the renderer would not have produced.",
       "oracle": "Feed identical byte corpora (emoji/ZWJ/wide glyphs, positioned overwrites after wide characters, alternate-screen transitions, wrapped lines) to both parser configurations and assert cell-identical visible buffers; both parsers must be constructed from one shared configuration module so one-sided drift fails the gate.",
@@ -2033,8 +2033,8 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap only; the anomaly-breadcrumb machinery exists in this branch but no convergence probe is implemented.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/7133",
-        "https://github.com/stablyai/orca/pull/7054"
+        "https://github.com/nebutra/pebble/pull/7133",
+        "https://github.com/nebutra/pebble/pull/7054"
       ],
       "invariant": "After every hidden-to-visible reveal settles — whether or not a restore was triggered — the renderer buffer must converge with the current main-mirror state; divergence is recorded as a compact, content-free terminal_lifecycle_anomaly breadcrumb and counted in telemetry instead of failing silently. Restore-scoped checking is insufficient: #7173's frozen-output variant restores faithfully and then silently drops later hidden output, so it never triggers another restore.",
       "oracle": "Deterministic tests inject forced divergence in both shapes — stale bytes written after a faithful restore, and a frozen pane whose reveal triggers no restore — and assert exactly one deduped breadcrumb with row-hash evidence and no terminal content; the production probe is a bounded row-hash sample comparison against current mirror rows that runs once per reveal with no polling and a strict time budget.",
@@ -2098,8 +2098,8 @@
       "coveredProviders": [],
       "coverageNotes": "Registered gap only; the live repro harness with a refresh-repair oracle exists but is not productized into the release-blocking terminal-rendering-golden suite.",
       "motivatingLinks": [
-        "https://github.com/stablyai/orca/pull/7133",
-        "https://github.com/stablyai/orca/pull/7054"
+        "https://github.com/nebutra/pebble/pull/7133",
+        "https://github.com/nebutra/pebble/pull/7054"
       ],
       "invariant": "After any reveal, restore, or wake, the pixels a pane displays must equal what a forced full model-invalidating repaint would draw from the buffer; a material refresh-repair diff means stale rendering escaped, whatever the mechanism.",
       "oracle": "Screenshot the revealed pane, force a model-invalidating full repaint, screenshot again, and assert the bounded pixel diff is immaterial; pair with a JS-level render-model-vs-buffer comparison. Compositor screenshots only, because WebGL canvas readback is blank with preserveDrawingBuffer disabled.",

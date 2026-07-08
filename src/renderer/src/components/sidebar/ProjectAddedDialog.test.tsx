@@ -49,7 +49,7 @@ function makeRepo(overrides: Partial<Repo> = {}): Repo {
   return {
     id: 'repo-1',
     path: '/repo',
-    displayName: 'orca',
+    displayName: 'pebble',
     badgeColor: '#999999',
     addedAt: 1,
     ...overrides

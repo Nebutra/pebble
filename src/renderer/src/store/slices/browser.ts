@@ -13,7 +13,7 @@ import type {
   WorkspaceSessionState
 } from '../../../../shared/types'
 import { GRAB_BUDGET, type BrowserPageAnnotation } from '../../../../shared/browser-grab-types'
-import { FLOATING_TERMINAL_WORKTREE_ID, ORCA_BROWSER_BLANK_URL } from '../../../../shared/constants'
+import { FLOATING_TERMINAL_WORKTREE_ID, PEBBLE_BROWSER_BLANK_URL } from '../../../../shared/constants'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import { redactKagiSessionToken } from '../../../../shared/browser-url'
 import {
@@ -227,12 +227,12 @@ function normalizeUrl(url: string): string {
 function normalizeBrowserTitle(title: string | null | undefined, url: string): string {
   if (
     url === 'about:blank' ||
-    url === ORCA_BROWSER_BLANK_URL ||
+    url === PEBBLE_BROWSER_BLANK_URL ||
     title === 'about:blank' ||
-    title === ORCA_BROWSER_BLANK_URL ||
+    title === PEBBLE_BROWSER_BLANK_URL ||
     !title
   ) {
-    // Why: blank pages render through Orca's inert data: URL guest. Persisting
+    // Why: blank pages render through Pebble's inert data: URL guest. Persisting
     // that internal bootstrap URL as the page/workspace title leaks an
     // implementation detail into the tab strip and makes every blank page look
     // broken. Keep the user-facing label stable as "New Tab" instead.
@@ -313,7 +313,7 @@ function buildBrowserPage(
     // Why: blank pages mount an inert guest first. Treating them as loading
     // would make an empty workspace flash the global loading affordance even
     // though no real navigation happened yet.
-    loading: normalizedUrl !== 'about:blank' && normalizedUrl !== ORCA_BROWSER_BLANK_URL,
+    loading: normalizedUrl !== 'about:blank' && normalizedUrl !== PEBBLE_BROWSER_BLANK_URL,
     faviconUrl: null,
     canGoBack: false,
     canGoForward: false,
@@ -545,7 +545,7 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
       const shouldFocusAddressBar =
         (shouldUpdateGlobalActiveSurface || shouldFocusFloatingTab) &&
         (options?.focusAddressBar ??
-          (page.url === 'about:blank' || page.url === ORCA_BROWSER_BLANK_URL))
+          (page.url === 'about:blank' || page.url === PEBBLE_BROWSER_BLANK_URL))
 
       return {
         browserTabsByWorktree: {
@@ -948,7 +948,7 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
         s.activeBrowserTabIdByWorktree[workspace.worktreeId] === workspaceId
       const shouldFocusAddressBar =
         shouldUpdateGlobalActiveSurface &&
-        (page.url === 'about:blank' || page.url === ORCA_BROWSER_BLANK_URL)
+        (page.url === 'about:blank' || page.url === PEBBLE_BROWSER_BLANK_URL)
 
       return {
         browserPagesByWorkspace: {
@@ -1359,7 +1359,7 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
 
   setBrowserPageUrl: (pageId, url) => {
     const nextUrl = normalizeUrl(url)
-    if (nextUrl !== 'about:blank' && nextUrl !== ORCA_BROWSER_BLANK_URL) {
+    if (nextUrl !== 'about:blank' && nextUrl !== PEBBLE_BROWSER_BLANK_URL) {
       const currentPage = findPage(get().browserPagesByWorkspace, pageId)
       if (currentPage) {
         get().recordFeatureInteraction?.('browser')
@@ -2070,7 +2070,7 @@ export const createBrowserSlice: StateCreator<AppState, [], [], BrowserSlice> = 
 
   addBrowserHistoryEntry: (url, title) => {
     const safeUrl = redactKagiSessionToken(url)
-    if (safeUrl === ORCA_BROWSER_BLANK_URL || safeUrl === 'about:blank' || !safeUrl) {
+    if (safeUrl === PEBBLE_BROWSER_BLANK_URL || safeUrl === 'about:blank' || !safeUrl) {
       return
     }
     const normalized = normalizeBrowserHistoryUrl(safeUrl)

@@ -33,7 +33,7 @@ function dispatchPrelaunchedSession(worktreeId: string, info: EmulatorStreamInfo
   }
   window.setTimeout(() => {
     window.dispatchEvent(
-      new CustomEvent('orca:emulator-auto-attach', {
+      new CustomEvent('pebble:emulator-auto-attach', {
         detail: { worktreeId, info }
       })
     )

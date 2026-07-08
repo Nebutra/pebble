@@ -388,7 +388,7 @@ function mapRpcWindow(
   return {
     usedPercent: Math.min(100, Math.max(0, raw.usedPercent)),
     // Why: Codex currently reports remaining minutes in `windowDurationMins`.
-    // Orca's UI needs the fixed bucket duration so labels stay "5h" / "wk".
+    // Pebble's UI needs the fixed bucket duration so labels stay "5h" / "wk".
     windowMinutes: expectedWindowMinutes,
     resetsAt,
     resetDescription
@@ -506,7 +506,7 @@ async function fetchViaRpc(options?: FetchCodexRateLimitsOptions): Promise<Provi
     let rateLimitsId: number | null = null
 
     const initId = sendRpc('initialize', {
-      clientInfo: { name: 'orca', version: '1.0.0' }
+      clientInfo: { name: 'pebble', version: '1.0.0' }
     })
 
     function sendNotification(method: string): void {

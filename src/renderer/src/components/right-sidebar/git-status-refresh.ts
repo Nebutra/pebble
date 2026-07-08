@@ -170,7 +170,7 @@ export async function refreshGitStatusForWorktree({
     })
     if (pushTarget) {
       // Why: porcelain status reports Git's configured upstream. Source Control
-      // actions for PR-created worktrees must instead reconcile with Orca's
+      // actions for PR-created worktrees must instead reconcile with Pebble's
       // explicit publish target.
       const cachedUpstreamStatus = getCachedAutomaticPushTargetUpstreamStatus({
         settings,
@@ -284,7 +284,7 @@ export async function refreshGitStatusForWorktreeStrict({
   })
   if (pushTarget) {
     // Why: porcelain status reports Git's configured upstream. Source Control
-    // actions for PR-created worktrees must instead reconcile with Orca's
+    // actions for PR-created worktrees must instead reconcile with Pebble's
     // explicit publish target.
     const upstreamStatus = await getRuntimeGitUpstreamStatus(
       { settings, worktreeId, worktreePath, connectionId },

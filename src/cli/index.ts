@@ -55,7 +55,7 @@ export async function main(argv = process.argv.slice(2), cwd = process.cwd()): P
 
   try {
     // Why: CLI syntax and flag errors should be reported before any runtime
-    // lookup so users do not get misleading "Orca is not running" failures for
+    // lookup so users do not get misleading "Pebble is not running" failures for
     // simple command typos or unsupported flags.
     validateCommandAndFlags(COMMAND_SPECS, parsed)
     const ignoreRemoteSelection = shouldIgnoreRemoteSelection(parsed.commandPath)
@@ -63,7 +63,7 @@ export async function main(argv = process.argv.slice(2), cwd = process.cwd()): P
     const environmentSelector = ignoreRemoteSelection ? null : parsed.flags.get('environment')
     // Why: pass `null` (not `undefined`) when remote selection is suppressed
     // so the RuntimeClient default parameter does not re-activate the
-    // ORCA_PAIRING_CODE / ORCA_ENVIRONMENT env-var fallback for commands
+    // PEBBLE_PAIRING_CODE / PEBBLE_ENVIRONMENT env-var fallback for commands
     // that must run locally (environment / serve).
     const client = new RuntimeClient(
       undefined,
@@ -89,8 +89,8 @@ export async function main(argv = process.argv.slice(2), cwd = process.cwd()): P
 
 async function runClaudeTeams(argv: string[], cwd: string): Promise<void> {
   try {
-    // Why: everything after `orca claude-teams` belongs to Claude Code, not
-    // Orca's own flag parser, so new Claude flags work without Orca changes.
+    // Why: everything after `pebble claude-teams` belongs to Claude Code, not
+    // Pebble's own flag parser, so new Claude flags work without Pebble changes.
     const client = new RuntimeClient(undefined, undefined, null, null)
     await dispatch(['claude-teams'], {
       flags: new Map(),
@@ -113,8 +113,8 @@ async function runAgentTeamsTmuxShim(argv: string[]): Promise<void> {
     }>(
       'agentTeams.tmuxCompat',
       {
-        teamId: process.env.ORCA_AGENT_TEAMS_TEAM_ID,
-        token: process.env.ORCA_AGENT_TEAMS_TOKEN,
+        teamId: process.env.PEBBLE_AGENT_TEAMS_TEAM_ID,
+        token: process.env.PEBBLE_AGENT_TEAMS_TOKEN,
         envPane: process.env.TMUX_PANE,
         cwd: process.cwd(),
         argv

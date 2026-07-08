@@ -418,7 +418,7 @@ export type TerminalSlice = {
   defaultTerminalTabsAppliedByWorktreeId: Record<string, true>
   markDefaultTerminalTabsApplied: (worktreeId: string) => void
   /** True only after hydrateWorkspaceSession ran from a real load of
-   *  orca-data.json. Guards the debounced session writer so that a crash
+   *  pebble-data.json. Guards the debounced session writer so that a crash
    *  during early startup (fetchRepos / fetchAllWorktrees / session.get /
    *  hydrateWorkspaceSession itself) cannot cause an empty in-memory state
    *  to be serialized back over the user's good data on disk.

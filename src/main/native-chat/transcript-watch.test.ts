@@ -17,7 +17,7 @@ afterEach(async () => {
 })
 
 async function tempFile(initial: string): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'orca-native-chat-watch-'))
+  const root = await mkdtemp(join(tmpdir(), 'pebble-native-chat-watch-'))
   tempRoots.push(root)
   const filePath = join(root, 'rollout.jsonl')
   await writeFile(filePath, initial)

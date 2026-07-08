@@ -185,7 +185,7 @@ function getHostSetupAvailability(host: ExecutionHostRegistryEntry): {
   if (host.health === 'blocked') {
     return {
       isAvailable: false,
-      detail: 'Orca server version is incompatible'
+      detail: 'Pebble server version is incompatible'
     }
   }
   if (host.kind === 'runtime') {
@@ -201,7 +201,7 @@ function getHostSetupAvailability(host: ExecutionHostRegistryEntry): {
     ) {
       return {
         isAvailable: false,
-        detail: 'Update Orca on this host to set up projects'
+        detail: 'Update Pebble on this host to set up projects'
       }
     }
   }

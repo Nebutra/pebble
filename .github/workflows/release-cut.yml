@@ -55,7 +55,7 @@ jobs:
     # Actions enabled, the scheduled cut would run against the fork's main and
     # diverge it (version line) every slot, conflicting every PR back upstream.
     # Gate to the canonical repo so the workflow no-ops on forks.
-    if: github.repository == 'stablyai/orca'
+    if: github.repository == 'nebutra/pebble'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -590,11 +590,11 @@ jobs:
 
       - name: Run terminal rendering golden on Linux
         if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-golden
+        run: xvfb-run --auto-servernum env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-golden
 
       - name: Run terminal rendering golden on macOS
         if: runner.os == 'macOS'
-        run: env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-golden
+        run: env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-golden
 
       - name: Upload Playwright traces
         if: failure()
@@ -665,18 +665,18 @@ jobs:
 
       - name: Run terminal rendering evidence on Linux
         if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-release-evidence
+        run: xvfb-run --auto-servernum env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-release-evidence
 
       - name: Run terminal rendering evidence on macOS
         if: runner.os == 'macOS'
-        run: env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-release-evidence
+        run: env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-release-evidence
 
       - name: Run terminal rendering evidence on Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $env:SKIP_BUILD = '1'
-          $env:ORCA_E2E_FORWARD_APP_LOGS = '1'
+          $env:PEBBLE_E2E_FORWARD_APP_LOGS = '1'
           pnpm run test:e2e:terminal-rendering-release-evidence
 
       - name: Upload Playwright traces
@@ -713,7 +713,7 @@ jobs:
               ~/.cache/electron-builder
           - os: ubuntu-24.04-arm
             platform: linux-arm64
-            release_command: node config/scripts/ensure-native-runtime.mjs --runtime=electron && ORCA_LINUX_ARM64_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb rpm --arm64 --publish always
+            release_command: node config/scripts/ensure-native-runtime.mjs --runtime=electron && PEBBLE_LINUX_ARM64_RELEASE=1 pnpm exec electron-builder --config config/electron-builder.config.cjs --linux AppImage deb rpm --arm64 --publish always
             eb_cache_path: |
               ~/.cache/electron
               ~/.cache/electron-builder
@@ -815,18 +815,18 @@ jobs:
           echo "identity=$identity" >>"$GITHUB_OUTPUT"
           echo "Classified $TAG as $identity"
 
-      # Why ORCA_POSTHOG_WRITE_KEY here: this is the only build that
+      # Why PEBBLE_POSTHOG_WRITE_KEY here: this is the only build that
       # produces a published binary, so this is the only place the secret
       # needs to be in scope. The key is a PostHog *project* API key, not
       # a server secret — it ships in every official binary's app.asar
       # and is therefore extractable from any release. We still keep it
       # in GitHub Actions secrets so the literal stays out of the repo
       # (and out of fork CI runs / log scrapers / casual greps).
-      # Why ORCA_BUILD_IDENTITY here (not in env at the job level): the
+      # Why PEBBLE_BUILD_IDENTITY here (not in env at the job level): the
       # value comes from the per-tag classification above and electron-vite
       # reads it from `process.env` during `pnpm build:release` only.
-      # Why ORCA_DIAGNOSTICS_TOKEN_URL here: official builds pin crash
-      # diagnostic uploads to Orca's endpoint at compile time, matching the
+      # Why PEBBLE_DIAGNOSTICS_TOKEN_URL here: official builds pin crash
+      # diagnostic uploads to Pebble's endpoint at compile time, matching the
       # telemetry gate's "official binary only" behavior.
       - name: Build app
         run: pnpm build:release
@@ -834,9 +834,9 @@ jobs:
           # Why: Vite's web build crossed Node's default old-space ceiling on
           # the macOS release runner, leaving v1.4.2-rc.8 as an incomplete draft.
           NODE_OPTIONS: --max-old-space-size=4096
-          ORCA_BUILD_IDENTITY: ${{ steps.tag-classify.outputs.identity }}
-          ORCA_DIAGNOSTICS_TOKEN_URL: https://www.onorca.dev/diagnostics/token
-          ORCA_POSTHOG_WRITE_KEY: ${{ secrets.ORCA_POSTHOG_WRITE_KEY }}
+          PEBBLE_BUILD_IDENTITY: ${{ steps.tag-classify.outputs.identity }}
+          PEBBLE_DIAGNOSTICS_TOKEN_URL: https://www.nebutra.com/pebble/diagnostics/token
+          PEBBLE_POSTHOG_WRITE_KEY: ${{ secrets.PEBBLE_POSTHOG_WRITE_KEY }}
 
       - name: Publish release artifacts (Linux)
         if: matrix.platform == 'linux-x64' || matrix.platform == 'linux-arm64'
@@ -963,8 +963,8 @@ jobs:
         id: upload-unsigned-windows-installer
         uses: actions/upload-artifact@v7
         with:
-          name: orca-windows-unsigned-${{ needs.cut.outputs.tag }}
-          path: dist/orca-windows-setup.exe
+          name: pebble-windows-unsigned-${{ needs.cut.outputs.tag }}
+          path: dist/pebble-windows-setup.exe
           if-no-files-found: error
 
       # Why: SignPath Foundation production certificates require manual review,
@@ -976,7 +976,7 @@ jobs:
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: c37aa192-a27a-4377-9c90-5d6c95912dc0
-          project-slug: orca
+          project-slug: pebble
           signing-policy-slug: release-signing
           artifact-configuration-slug: github-actions-windows-installer
           github-artifact-id: ${{ steps.upload-unsigned-windows-installer.outputs.artifact-id }}
@@ -1002,7 +1002,7 @@ jobs:
             $requestUrl = "https://app.signpath.io/Web/$env:SIGNPATH_ORGANIZATION_ID/SigningRequests/$env:SIGNPATH_REQUEST_ID"
           }
 
-          $message = "Orca Windows release $env:TAG is ready for SignPath approval.`n<$requestUrl|Open SignPath signing request>`n<$env:GITHUB_RUN_URL|Open GitHub Actions run>"
+          $message = "Pebble Windows release $env:TAG is ready for SignPath approval.`n<$requestUrl|Open SignPath signing request>`n<$env:GITHUB_RUN_URL|Open GitHub Actions run>"
           $payload = @{
             text = $message
             blocks = @(
@@ -1040,16 +1040,16 @@ jobs:
         if: matrix.platform == 'win'
         shell: pwsh
         run: |
-          $signedInstaller = Get-ChildItem -Path signed-windows -Recurse -File -Filter 'orca-windows-setup.exe' | Select-Object -First 1
+          $signedInstaller = Get-ChildItem -Path signed-windows -Recurse -File -Filter 'pebble-windows-setup.exe' | Select-Object -First 1
           if ($null -eq $signedInstaller) {
             throw 'Signed Windows installer was not returned by SignPath.'
           }
 
-          Copy-Item -Path $signedInstaller.FullName -Destination 'dist/orca-windows-setup.exe' -Force
-          & 'node_modules/app-builder-bin/win/x64/app-builder.exe' blockmap --input 'dist/orca-windows-setup.exe' --output 'dist/orca-windows-setup.exe.blockmap'
+          Copy-Item -Path $signedInstaller.FullName -Destination 'dist/pebble-windows-setup.exe' -Force
+          & 'node_modules/app-builder-bin/win/x64/app-builder.exe' blockmap --input 'dist/pebble-windows-setup.exe' --output 'dist/pebble-windows-setup.exe.blockmap'
 
-          $installer = Get-Item 'dist/orca-windows-setup.exe'
-          $blockmap = Get-Item 'dist/orca-windows-setup.exe.blockmap'
+          $installer = Get-Item 'dist/pebble-windows-setup.exe'
+          $blockmap = Get-Item 'dist/pebble-windows-setup.exe.blockmap'
           $stream = [System.IO.File]::OpenRead($installer.FullName)
           try {
             $sha512 = [System.Security.Cryptography.SHA512]::Create()
@@ -1070,13 +1070,13 @@ jobs:
           $latestYml = $latestYml -replace '(?m)^    blockMapSize: \d+$', "    blockMapSize: $($blockmap.Length)"
           Set-Content -Path 'dist/latest.yml' -Value $latestYml -NoNewline
 
-          Get-Item 'dist/orca-windows-setup.exe', 'dist/orca-windows-setup.exe.blockmap', 'dist/latest.yml'
+          Get-Item 'dist/pebble-windows-setup.exe', 'dist/pebble-windows-setup.exe.blockmap', 'dist/latest.yml'
 
       - name: Verify signed Windows installer
         if: matrix.platform == 'win'
         shell: pwsh
         run: |
-          $signature = Get-AuthenticodeSignature -FilePath 'dist/orca-windows-setup.exe'
+          $signature = Get-AuthenticodeSignature -FilePath 'dist/pebble-windows-setup.exe'
           if ($signature.Status -ne 'Valid') {
             throw ($signature | Format-List * | Out-String)
           }
@@ -1092,7 +1092,7 @@ jobs:
           timeout_minutes: 10
           max_attempts: 3
           retry_wait_seconds: 30
-          command: gh release upload "${{ needs.cut.outputs.tag }}" "dist/orca-windows-setup.exe" "dist/orca-windows-setup.exe.blockmap" "dist/latest.yml" --clobber --repo "${{ github.repository }}"
+          command: gh release upload "${{ needs.cut.outputs.tag }}" "dist/pebble-windows-setup.exe" "dist/pebble-windows-setup.exe.blockmap" "dist/latest.yml" --clobber --repo "${{ github.repository }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -1129,7 +1129,7 @@ jobs:
       # deletes the draft and re-cuts.
       #
       # Why this guards against: a misconfigured CI run where
-      # `ORCA_POSTHOG_WRITE_KEY` is unset or the tag fails to classify
+      # `PEBBLE_POSTHOG_WRITE_KEY` is unset or the tag fails to classify
       # would otherwise produce a binary with `BUILD_IDENTITY = null` and
       # `WRITE_KEY = null`, which silently disables transport
       # (`IS_OFFICIAL_BUILD === false`) — the exact failure mode flagged

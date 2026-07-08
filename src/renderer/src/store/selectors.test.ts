@@ -242,8 +242,8 @@ describe('store selectors', () => {
     const repos = [
       makeRepo({
         id: 'repo-1',
-        path: '/Users/alice/orca',
-        displayName: 'orca'
+        path: '/Users/alice/pebble',
+        displayName: 'pebble'
       })
     ]
     const state = { repos }
@@ -264,8 +264,8 @@ describe('store selectors', () => {
     const repos = [
       makeRepo({
         id: 'repo-1',
-        path: '/Users/alice/orca',
-        displayName: 'orca'
+        path: '/Users/alice/pebble',
+        displayName: 'pebble'
       })
     ]
     const projects = [
@@ -284,8 +284,8 @@ describe('store selectors', () => {
         projectId: 'project-1',
         hostId: 'local' as const,
         repoId: 'repo-1',
-        path: '/Users/alice/orca',
-        displayName: 'orca',
+        path: '/Users/alice/pebble',
+        displayName: 'pebble',
         setupState: 'ready' as const,
         setupMethod: 'legacy-repo' as const,
         createdAt: 1,
@@ -302,33 +302,33 @@ describe('store selectors', () => {
   it('groups hydrated VM project setups under the repo-derived project identity', () => {
     const repos = [
       makeRepo({
-        id: 'local-orca',
-        path: '/Users/alice/stably/orca',
-        displayName: 'orca',
-        upstream: { owner: 'stablyai', repo: 'orca' }
+        id: 'local-pebble',
+        path: '/Users/alice/nebutra/pebble',
+        displayName: 'pebble',
+        upstream: { owner: 'nebutra', repo: 'pebble' }
       }),
       makeRepo({
-        id: 'vm-orca',
-        path: '/vercel/sandbox/orca',
-        displayName: 'orca',
-        upstream: { owner: 'stablyai', repo: 'orca' },
+        id: 'vm-pebble',
+        path: '/vercel/sandbox/pebble',
+        displayName: 'pebble',
+        upstream: { owner: 'nebutra', repo: 'pebble' },
         executionHostId: toRuntimeExecutionHostId('vm-env')
       })
     ]
     const projects = [
       {
-        id: 'github:stablyai/orca',
-        displayName: 'orca',
+        id: 'github:nebutra/pebble',
+        displayName: 'pebble',
         badgeColor: '#737373',
-        sourceRepoIds: ['local-orca'],
+        sourceRepoIds: ['local-pebble'],
         createdAt: 1,
         updatedAt: 1
       },
       {
-        id: 'repo:vm-orca',
-        displayName: 'vercel/sandbox/orca',
+        id: 'repo:vm-pebble',
+        displayName: 'vercel/sandbox/pebble',
         badgeColor: '#737373',
-        sourceRepoIds: ['vm-orca'],
+        sourceRepoIds: ['vm-pebble'],
         createdAt: 1,
         updatedAt: 1
       }
@@ -336,11 +336,11 @@ describe('store selectors', () => {
     const projectHostSetups = [
       {
         id: 'local-setup',
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         hostId: 'local' as const,
-        repoId: 'local-orca',
-        path: '/Users/alice/stably/orca',
-        displayName: 'orca',
+        repoId: 'local-pebble',
+        path: '/Users/alice/nebutra/pebble',
+        displayName: 'pebble',
         setupState: 'ready' as const,
         setupMethod: 'legacy-repo' as const,
         createdAt: 1,
@@ -348,11 +348,11 @@ describe('store selectors', () => {
       },
       {
         id: 'vm-setup',
-        projectId: 'repo:vm-orca',
+        projectId: 'repo:vm-pebble',
         hostId: toRuntimeExecutionHostId('vm-env'),
-        repoId: 'vm-orca',
-        path: '/vercel/sandbox/orca',
-        displayName: 'orca',
+        repoId: 'vm-pebble',
+        path: '/vercel/sandbox/pebble',
+        displayName: 'pebble',
         setupState: 'ready' as const,
         setupMethod: 'provisioned' as const,
         createdAt: 1,
@@ -366,11 +366,11 @@ describe('store selectors', () => {
       projectHostSetups
     })
 
-    expect(projection.projects.map((project) => project.id)).toEqual(['github:stablyai/orca'])
+    expect(projection.projects.map((project) => project.id)).toEqual(['github:nebutra/pebble'])
     expect(projection.setups).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'local-setup', projectId: 'github:stablyai/orca' }),
-        expect.objectContaining({ id: 'vm-setup', projectId: 'github:stablyai/orca' })
+        expect.objectContaining({ id: 'local-setup', projectId: 'github:nebutra/pebble' }),
+        expect.objectContaining({ id: 'vm-setup', projectId: 'github:nebutra/pebble' })
       ])
     )
   })
@@ -379,9 +379,9 @@ describe('store selectors', () => {
     const repos = [
       makeRepo({
         id: 'repo-1',
-        path: '/Users/alice/orca',
-        displayName: 'orca',
-        upstream: { owner: 'stablyai', repo: 'orca' }
+        path: '/Users/alice/pebble',
+        displayName: 'pebble',
+        upstream: { owner: 'nebutra', repo: 'pebble' }
       })
     ]
 
@@ -393,17 +393,17 @@ describe('store selectors', () => {
 
     expect(projection.projects).toEqual([
       expect.objectContaining({
-        id: 'github:stablyai/orca',
+        id: 'github:nebutra/pebble',
         sourceRepoIds: ['repo-1']
       })
     ])
     expect(projection.setups).toEqual([
       expect.objectContaining({
         id: 'repo-1',
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         repoId: 'repo-1',
         hostId: 'local',
-        path: '/Users/alice/orca'
+        path: '/Users/alice/pebble'
       })
     ])
   })
@@ -412,8 +412,8 @@ describe('store selectors', () => {
     const repos = [
       makeRepo({
         id: 'repo-1',
-        path: '/Users/alice/orca',
-        displayName: 'orca'
+        path: '/Users/alice/pebble',
+        displayName: 'pebble'
       })
     ]
     const projects = [

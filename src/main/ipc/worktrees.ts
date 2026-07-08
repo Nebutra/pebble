@@ -23,15 +23,17 @@ import type {
   GitHubPrStartPoint,
   GitPushTarget,
   GitWorktreeInfo,
-  OrcaHooks,
+  PebbleHooks,
   Repo,
   RemoveWorktreeResult,
   Worktree,
   WorktreeMeta
 } from '../../shared/types'
 import {
-  buildKnownOrcaWorkspaceLayouts,
+  buildKnownPebbleWorkspaceLayouts,
+  isManagedWorktreeOwnership,
   isLegacyRepoForExternalWorktreeVisibility,
+  MANAGED_WORKTREE_OWNERSHIP,
   toDetectedWorktree
 } from '../../shared/worktree-ownership'
 import {
@@ -55,11 +57,11 @@ import {
   getEffectiveHooksFromConfig,
   getSetupRunnerEnvVars,
   loadHooks,
-  parseOrcaYaml,
+  parsePebbleYaml,
   readIssueCommand,
   runHook,
   hasHooksFile,
-  hasUnrecognizedOrcaYamlKeys,
+  hasUnrecognizedPebbleYamlKeys,
   writeIssueCommand
 } from '../hooks'
 import {
@@ -85,7 +87,7 @@ import {
   registerWorktreeRootsForRepo
 } from './filesystem-auth'
 import { closeLocalWatcherForWorktreePath } from './filesystem-watcher'
-import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import type { PebbleRuntimeService } from '../runtime/pebble-runtime'
 import { killAllProcessesForWorktree } from '../runtime/worktree-teardown'
 import { clearProviderPtyState, getLocalPtyProvider } from './pty'
 import { removeWorktreeLinkedPaths } from './worktree-symlinks'
@@ -105,14 +107,14 @@ import { classifyWorkspaceCreateError } from './workspace-create-error-classifie
 import { advertisedUrlWatcher } from '../ports/advertised-url-watcher'
 import {
   assertWorktreeDoesNotContainRegisteredWorktree,
-  canCleanupUnregisteredOrcaLeftoverDirectory,
-  canCleanupUnregisteredOrcaWorktreeDirectory,
+  canCleanupUnregisteredPebbleLeftoverDirectory,
+  canCleanupUnregisteredPebbleWorktreeDirectory,
   canSafelyRemoveOrphanedWorktreeDirectory,
   findRegisteredDeletableWorktree,
   isDangerousWorktreeRemovalPath,
   isWorktreePathMissing,
   ORPHANED_WORKTREE_DIRECTORY_MESSAGE,
-  stripOrcaProvenanceMetaUpdates,
+  stripPebbleProvenanceMetaUpdates,
   UNREGISTERED_MISSING_WORKTREE_MESSAGE
 } from '../worktree-removal-safety'
 import { isWindowsAbsolutePathLike } from '../../shared/cross-platform-path'
@@ -208,7 +210,7 @@ function getProjectHostSetupMetaUpdates(
   }
 }
 
-// Why: worktrees discovered on disk (not created via Orca's UI) have no
+// Why: worktrees discovered on disk (not created via Pebble's UI) have no
 // persisted WorktreeMeta, so mergeWorktree falls back to `lastActivityAt: 0`.
 // That makes them sort to the bottom of "Recent" even though the user just
 // added the repo / folder. The same authoritative discovery pass is also the
@@ -296,7 +298,7 @@ function getWorktreeRemovalOptionsKey(args: { force?: boolean; skipArchive?: boo
   return `${forceKey}:${archiveKey}`
 }
 
-async function getArchiveHooksForRemoval(repo: Repo): Promise<OrcaHooks | null> {
+async function getArchiveHooksForRemoval(repo: Repo): Promise<PebbleHooks | null> {
   if (!repo.connectionId) {
     return getEffectiveHooks(repo)
   }
@@ -307,8 +309,8 @@ async function getArchiveHooksForRemoval(repo: Repo): Promise<OrcaHooks | null> 
   }
 
   try {
-    const result = await fsProvider.readFile(joinWorktreeRelativePath(repo.path, 'orca.yaml'))
-    const yamlHooks = result.isBinary ? null : parseOrcaYaml(result.content)
+    const result = await fsProvider.readFile(joinWorktreeRelativePath(repo.path, 'pebble.yaml'))
+    const yamlHooks = result.isBinary ? null : parsePebbleYaml(result.content)
     return getEffectiveHooksFromConfig(repo, yamlHooks)
   } catch {
     return getEffectiveHooksFromConfig(repo, null)
@@ -677,7 +679,7 @@ function buildDetectedGitWorktrees(
   gitWorktrees: GitWorktreeInfo[]
 ): DetectedWorktree[] {
   const settings = store.getSettings()
-  const knownOrcaLayouts = buildKnownOrcaWorkspaceLayouts(settings, repo)
+  const knownPebbleLayouts = buildKnownPebbleWorkspaceLayouts(settings, repo)
   const isLegacyRepoForVisibility = isLegacyRepoForExternalWorktreeVisibility(repo)
   return dedupeGitWorktreesByPath(gitWorktrees).map((gitWorktree) => {
     const worktreeId = `${repo.id}::${gitWorktree.path}`
@@ -688,7 +690,7 @@ function buildDetectedGitWorktrees(
       worktree,
       meta,
       settings,
-      knownOrcaLayouts,
+      knownPebbleLayouts,
       isLegacyRepoForVisibility
     })
     if (!detected.visible) {
@@ -701,7 +703,7 @@ function buildDetectedGitWorktrees(
       worktree: mergeWorktree(repo.id, gitWorktree, meta, repo.displayName),
       meta,
       settings,
-      knownOrcaLayouts,
+      knownPebbleLayouts,
       isLegacyRepoForVisibility
     })
   })
@@ -826,7 +828,7 @@ function buildFolderDetectedWorktrees(store: Store, repo: Repo): DetectedWorktre
       worktree,
       meta: store.getWorktreeMeta(worktree.id),
       settings,
-      knownOrcaLayouts: [],
+      knownPebbleLayouts: [],
       isLegacyRepoForVisibility: true
     })
   )
@@ -862,8 +864,8 @@ function createFolderWorkspace(
     displayName: args.displayName || args.name,
     lastActivityAt: now,
     createdAt: now,
-    orcaCreatedAt: now,
-    orcaCreationSource: 'desktop',
+    pebbleCreatedAt: now,
+    pebbleCreationSource: 'desktop',
     ...(args.automationProvenance ? { automationProvenance: args.automationProvenance } : {}),
     ...(args.createdWithAgent ? { createdWithAgent: args.createdWithAgent } : {}),
     ...(args.linkedIssue !== undefined ? { linkedIssue: args.linkedIssue } : {}),
@@ -901,13 +903,15 @@ function buildDisconnectedDetectedWorktrees(
       worktree,
       meta,
       settings,
-      knownOrcaLayouts: [],
+      knownPebbleLayouts: [],
       isLegacyRepoForVisibility: true
     })
     return {
       ...detected,
       visible: true,
-      ownership: detected.ownership === 'orca-managed' ? 'orca-managed' : 'unknown-legacy'
+      ownership: isManagedWorktreeOwnership(detected.ownership)
+        ? MANAGED_WORKTREE_OWNERSHIP
+        : 'unknown-legacy'
     }
   })
 }
@@ -915,7 +919,7 @@ function buildDisconnectedDetectedWorktrees(
 export function registerWorktreeHandlers(
   mainWindow: BrowserWindow,
   store: Store,
-  runtime: OrcaRuntimeService
+  runtime: PebbleRuntimeService
 ): void {
   // Remove any previously registered handlers so we can re-register them
   // (e.g. when macOS re-activates the app and creates a new window).
@@ -1403,7 +1407,7 @@ export function registerWorktreeHandlers(
           const fsProvider = repo.connectionId ? getSshFilesystemProvider(repo.connectionId) : null
           let canCleanOrphanedDirectory = false
           if (
-            canCleanupUnregisteredOrcaWorktreeDirectory({
+            canCleanupUnregisteredPebbleWorktreeDirectory({
               meta: removedMeta
             })
           ) {
@@ -1471,7 +1475,7 @@ export function registerWorktreeHandlers(
               localWorktreeGitOptions
             )
             if (
-              await canCleanupUnregisteredOrcaLeftoverDirectory({
+              await canCleanupUnregisteredPebbleLeftoverDirectory({
                 meta: removedMeta,
                 worktreePath,
                 runtimeWorktreePath,
@@ -1505,12 +1509,12 @@ export function registerWorktreeHandlers(
           if (await isAlreadyRemovedWorktreePath(repo, worktreePath, localWorktreeGitOptions)) {
             if (!args.force && !removedMeta) {
               // Why: without persisted metadata, require the renderer recovery
-              // path before deleting Orca-only state for an unregistered path.
+              // path before deleting Pebble-only state for an unregistered path.
               throw new Error(UNREGISTERED_MISSING_WORKTREE_MESSAGE)
             }
             // Why: a manually deleted worktree is already gone from Git and disk.
             // The sidebar delete action has persisted metadata proving this was
-            // an Orca-known row, so no force confirmation is needed.
+            // an Pebble-known row, so no force confirmation is needed.
             if (repo.connectionId) {
               await cleanupUnusedWorktreePushTargetRemoteSsh(
                 provider!,
@@ -1709,7 +1713,7 @@ export function registerWorktreeHandlers(
           )
         } catch (error) {
           // Why: Git for Windows can fail long-path directory deletion after
-          // Orca has already validated the target and explicit force delete.
+          // Pebble has already validated the target and explicit force delete.
           const recoveredRemovalResult = await recoverLocalWindowsLongPathWorktreeRemoval({
             error,
             force: args.force ?? false,
@@ -1876,7 +1880,7 @@ export function registerWorktreeHandlers(
               firstAgentMessageRenameError: null
             }
           : args.updates
-      const meta = store.setWorktreeMeta(args.worktreeId, stripOrcaProvenanceMetaUpdates(updates))
+      const meta = store.setWorktreeMeta(args.worktreeId, stripPebbleProvenanceMetaUpdates(updates))
       // Do NOT call notifyWorktreesChanged here. The renderer applies meta
       // updates optimistically before calling this IPC, so a notification
       // would trigger a redundant fetchWorktrees round-trip that bumps
@@ -1942,11 +1946,11 @@ export function registerWorktreeHandlers(
         return { status: 'error', hasHooks: false, hooks: null, mayNeedUpdate: false }
       }
       try {
-        const result = await fsProvider.readFile(joinWorktreeRelativePath(repo.path, 'orca.yaml'))
+        const result = await fsProvider.readFile(joinWorktreeRelativePath(repo.path, 'pebble.yaml'))
         return {
           status: 'ok',
           hasHooks: !result.isBinary,
-          hooks: result.isBinary ? null : parseOrcaYaml(result.content),
+          hooks: result.isBinary ? null : parsePebbleYaml(result.content),
           mayNeedUpdate: false
         }
       } catch (error) {
@@ -1961,11 +1965,11 @@ export function registerWorktreeHandlers(
 
     const has = hasHooksFile(repo.path)
     const hooks = has ? loadHooks(repo.path) : null
-    // Why: when a newer Orca version adds a top-level key to `orca.yaml`, older
+    // Why: when a newer Pebble version adds a top-level key to `pebble.yaml`, older
     // versions that don't recognise it return null and show "could not be parsed".
     // Detecting well-formed but unrecognised keys lets the UI suggest updating
     // instead of implying the file is broken.
-    const mayNeedUpdate = has && !hooks && hasUnrecognizedOrcaYamlKeys(repo.path)
+    const mayNeedUpdate = has && !hooks && hasUnrecognizedPebbleYamlKeys(repo.path)
     return {
       status: 'ok',
       hasHooks: has,
@@ -2065,7 +2069,7 @@ export function registerWorktreeHandlers(
       }
     }
     if (repo.connectionId) {
-      const issueCommandPath = joinWorktreeRelativePath(repo.path, '.orca/issue-command')
+      const issueCommandPath = joinWorktreeRelativePath(repo.path, '.pebble/issue-command')
       const fsProvider = getSshFilesystemProvider(repo.connectionId)
       if (!fsProvider) {
         return {
@@ -2090,10 +2094,10 @@ export function registerWorktreeHandlers(
         }
       }
       try {
-        const result = await fsProvider.readFile(joinWorktreeRelativePath(repo.path, 'orca.yaml'))
+        const result = await fsProvider.readFile(joinWorktreeRelativePath(repo.path, 'pebble.yaml'))
         sharedContent = result.isBinary
           ? null
-          : parseOrcaYaml(result.content)?.issueCommand?.trim() || null
+          : parsePebbleYaml(result.content)?.issueCommand?.trim() || null
       } catch (error) {
         if (!isENOENT(error)) {
           status = 'error'
@@ -2124,7 +2128,7 @@ export function registerWorktreeHandlers(
         return
       }
       if (repo.connectionId) {
-        const issueCommandPath = joinWorktreeRelativePath(repo.path, '.orca/issue-command')
+        const issueCommandPath = joinWorktreeRelativePath(repo.path, '.pebble/issue-command')
         const fsProvider = getSshFilesystemProvider(repo.connectionId)
         if (!fsProvider) {
           throw new Error(
@@ -2140,19 +2144,19 @@ export function registerWorktreeHandlers(
           })
           return
         }
-        await fsProvider.createDir(joinWorktreeRelativePath(repo.path, '.orca'))
+        await fsProvider.createDir(joinWorktreeRelativePath(repo.path, '.pebble'))
         const gitignorePath = joinWorktreeRelativePath(repo.path, '.gitignore')
         try {
           const result = await fsProvider.readFile(gitignorePath)
-          if (!result.isBinary && !/^\.orca\/?$/m.test(result.content)) {
+          if (!result.isBinary && !/^\.pebble\/?$/m.test(result.content)) {
             const separator = result.content.endsWith('\n') ? '' : '\n'
-            await fsProvider.writeFile(gitignorePath, `${result.content}${separator}.orca\n`)
+            await fsProvider.writeFile(gitignorePath, `${result.content}${separator}.pebble\n`)
           }
         } catch (error) {
           if (!isENOENT(error)) {
             throw error
           }
-          await fsProvider.writeFile(gitignorePath, '.orca\n')
+          await fsProvider.writeFile(gitignorePath, '.pebble\n')
         }
         await fsProvider.writeFile(issueCommandPath, `${trimmed}\n`)
         return

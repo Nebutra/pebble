@@ -25,7 +25,10 @@ function cloneProcessEnv(): Record<string, string> {
   return env
 }
 
-function readInheritedOrShellEnvVar(name: string, sourceName?: string): string | undefined {
+function readInheritedOrShellEnvVar(
+  name: string,
+  sourceName?: string
+): string | undefined {
   return (
     (sourceName ? process.env[sourceName] : undefined) ??
     process.env[name] ??
@@ -43,17 +46,17 @@ function prepareShellConfigDirEnv(agentId: string): { ok: true; env?: NodeJS.Pro
   if (!configVar) {
     return null
   }
-  // Why: each kind owns a distinct ORCA_*_SOURCE_* shadow so a headless commit
+  // Why: each kind owns a distinct Pebble source shadow so a headless commit
   // run from inside a legacy OMP overlay restores the OMP source dir, never
   // the Pi one (and vice versa). PI_CODING_AGENT_DIR is the binary-facing var
   // both kinds consume — see src/main/pi/titlebar-extension-service.ts.
   const sourceVar =
     agentId === 'opencode'
-      ? 'ORCA_OPENCODE_SOURCE_CONFIG_DIR'
+      ? 'PEBBLE_OPENCODE_SOURCE_CONFIG_DIR'
       : agentId === 'pi'
-        ? 'ORCA_PI_SOURCE_AGENT_DIR'
+        ? 'PEBBLE_PI_SOURCE_AGENT_DIR'
         : agentId === 'omp'
-          ? 'ORCA_OMP_SOURCE_AGENT_DIR'
+          ? 'PEBBLE_OMP_SOURCE_AGENT_DIR'
           : undefined
 
   const value = readInheritedOrShellEnvVar(configVar, sourceVar)
@@ -61,9 +64,9 @@ function prepareShellConfigDirEnv(agentId: string): { ok: true; env?: NodeJS.Pro
     return { ok: true }
   }
 
-  // Why: GUI-launched Orca may not inherit shell startup exports, but these
-  // vars point the headless CLI at the user's auth/config root. Nested Orca
-  // launches inherit PTY overlays, so prefer ORCA_*_SOURCE_* when present.
+  // Why: GUI-launched Pebble may not inherit shell startup exports, but these
+  // vars point the headless CLI at the user's auth/config root. Nested Pebble
+  // launches inherit PTY overlays, so prefer Pebble source shadows when present.
   return { ok: true, env: { ...cloneProcessEnv(), [configVar]: value } }
 }
 

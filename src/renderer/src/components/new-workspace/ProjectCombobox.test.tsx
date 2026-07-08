@@ -40,19 +40,19 @@ let root: Root
 const projects: NewWorkspaceProjectOption[] = [
   {
     kind: 'project',
-    id: 'github:stablyai/orca',
-    projectId: 'github:stablyai/orca',
-    displayName: 'orca',
+    id: 'github:nebutra/pebble',
+    projectId: 'github:nebutra/pebble',
+    displayName: 'pebble',
     badgeColor: '#111111',
-    detail: 'stablyai/orca'
+    detail: 'nebutra/pebble'
   },
   {
     kind: 'project',
-    id: 'github:stablyai/noqa',
-    projectId: 'github:stablyai/noqa',
+    id: 'github:nebutra/noqa',
+    projectId: 'github:nebutra/noqa',
     displayName: 'noqa',
     badgeColor: '#222222',
-    detail: 'stablyai/noqa'
+    detail: 'nebutra/noqa'
   },
   {
     kind: 'project-group',
@@ -83,12 +83,12 @@ describe('ProjectCombobox', () => {
   it('renders a logical project label without host-specific SSH chrome', () => {
     act(() => {
       root.render(
-        <ProjectCombobox options={projects} value="github:stablyai/orca" onValueChange={vi.fn()} />
+        <ProjectCombobox options={projects} value="github:nebutra/pebble" onValueChange={vi.fn()} />
       )
     })
 
     const trigger = container.querySelector('[data-project-combobox-root="true"][role="combobox"]')
-    expect(trigger?.textContent).toContain('orca')
+    expect(trigger?.textContent).toContain('pebble')
     expect(trigger?.textContent).not.toContain('SSH')
   })
 
@@ -99,18 +99,18 @@ describe('ProjectCombobox', () => {
       root.render(
         <ProjectCombobox
           options={projects}
-          value="github:stablyai/orca"
+          value="github:nebutra/pebble"
           onValueChange={onValueChange}
         />
       )
     })
     act(() => {
       container
-        .querySelector<HTMLButtonElement>('[data-command-value="github:stablyai/noqa"]')
+        .querySelector<HTMLButtonElement>('[data-command-value="github:nebutra/noqa"]')
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(onValueChange).toHaveBeenCalledWith('github:stablyai/noqa')
+    expect(onValueChange).toHaveBeenCalledWith('github:nebutra/noqa')
   })
 
   it('renders and selects project-group options', () => {

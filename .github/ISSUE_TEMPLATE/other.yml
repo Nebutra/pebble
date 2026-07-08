@@ -1,5 +1,5 @@
 name: Other
-description: Report another Orca issue type
+description: Report another Pebble issue type
 title: '[Other]: '
 body:
   - type: textarea

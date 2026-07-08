@@ -110,7 +110,7 @@ function getDefaultState(): CodexUsagePersistedState {
 
 export function normalizePersistedState(state: CodexUsagePersistedState): CodexUsagePersistedState {
   if (state.schemaVersion !== SCHEMA_VERSION) {
-    // Why: Orca-scoped Codex projections now depend on locationModelBreakdown.
+    // Why: Pebble-scoped Codex projections now depend on locationModelBreakdown.
     // Reusing an older cache would silently serve wrong model/session rows
     // until the next forced rescan, so schema changes must invalidate stale
     // persisted analytics instead of best-effort patching partial data.
@@ -135,12 +135,12 @@ export function normalizePersistedState(state: CodexUsagePersistedState): CodexU
 }
 
 export function initCodexUsagePath(): void {
-  _codexUsageFile = join(app.getPath('userData'), 'orca-codex-usage.json')
+  _codexUsageFile = join(app.getPath('userData'), 'pebble-codex-usage.json')
 }
 
 function getCodexUsageFile(): string {
   if (!_codexUsageFile) {
-    _codexUsageFile = join(app.getPath('userData'), 'orca-codex-usage.json')
+    _codexUsageFile = join(app.getPath('userData'), 'pebble-codex-usage.json')
   }
   return _codexUsageFile
 }
@@ -831,7 +831,7 @@ export class CodexUsageStore {
       estimatedCostUsd: hasKnownCost ? estimatedCostUsd : null,
       estimatedCostSource: hasKnownCost ? 'api_equivalent' : null,
       providerSessionId: session.sessionId,
-      // Why: Orca terminal tab ids and Codex usage session ids are different
+      // Why: Pebble terminal tab ids and Codex usage session ids are different
       // systems today, so attribution is intentionally limited to one local
       // provider session in the run's worktree/time window.
       attribution: 'provider_session_time_window',
@@ -847,7 +847,7 @@ export class CodexUsageStore {
       if (cutoff && entry.day < cutoff) {
         return false
       }
-      if (scope === 'orca' && entry.worktreeId === null) {
+      if (scope === 'pebble' && entry.worktreeId === null) {
         return false
       }
       return true
@@ -864,7 +864,7 @@ export class CodexUsageStore {
       if (cutoff && day < cutoff) {
         return false
       }
-      if (scope === 'orca') {
+      if (scope === 'pebble') {
         return session.locationBreakdown.some((entry) => entry.worktreeId !== null)
       }
       return true

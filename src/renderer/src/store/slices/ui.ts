@@ -12,7 +12,7 @@ import type {
   GitHubWorkItem,
   JiraIssue,
   LinearIssue,
-  PersistedTrustedOrcaHooks,
+  PersistedTrustedPebbleHooks,
   PersistedUIState,
   StatusBarItem,
   TaskProvider,
@@ -85,7 +85,7 @@ import {
 } from '../../../../shared/workspace-statuses'
 import { clampMarkdownTocPanelWidth } from '../../../../shared/markdown-toc-panel-width'
 import { normalizeKagiSessionLink } from '../../../../shared/browser-url'
-import type { OrcaHookScriptKind } from '../../lib/orca-hook-trust'
+import type { PebbleHookScriptKind } from '../../lib/pebble-hook-trust'
 import type { SettingsNavTarget } from '@/lib/settings-navigation-types'
 import {
   filterSetupScriptPromptDismissalsToValidRepos,
@@ -349,11 +349,11 @@ function collectAcknowledgedAgentNotificationId({
   }
 }
 
-function filterTrustedOrcaHooksToValidRepos(
-  trust: PersistedTrustedOrcaHooks,
+function filterTrustedPebbleHooksToValidRepos(
+  trust: PersistedTrustedPebbleHooks,
   validRepoIds: Set<string>
-): PersistedTrustedOrcaHooks {
-  const next: PersistedTrustedOrcaHooks = {}
+): PersistedTrustedPebbleHooks {
+  const next: PersistedTrustedPebbleHooks = {}
   for (const [repoId, entry] of Object.entries(trust)) {
     if (validRepoIds.has(repoId)) {
       next[repoId] = entry
@@ -720,7 +720,7 @@ export type UISlice = {
     | 'feature-wall'
     | 'feature-tips'
     | 'new-workspace-composer'
-    | 'confirm-orca-yaml-hooks'
+    | 'confirm-pebble-yaml-hooks'
   modalData: Record<string, unknown>
   openModal: (modal: UISlice['activeModal'], data?: Record<string, unknown>) => void
   closeModal: () => void
@@ -758,14 +758,14 @@ export type UISlice = {
   completeContextualTour: (id?: ContextualTourId) => void
   cancelContextualTour: (id?: ContextualTourId) => void
   markContextualToursSeen: (ids: ContextualTourId[]) => void
-  trustedOrcaHooks: PersistedTrustedOrcaHooks
-  markOrcaHookScriptConfirmed: (
+  trustedPebbleHooks: PersistedTrustedPebbleHooks
+  markPebbleHookScriptConfirmed: (
     repoId: string,
-    kind: OrcaHookScriptKind,
+    kind: PebbleHookScriptKind,
     contentHash: string
   ) => void
-  markOrcaHookRepoAlwaysTrusted: (repoId: string) => void
-  clearOrcaHookTrustForRepo: (repoId: string) => void
+  markPebbleHookRepoAlwaysTrusted: (repoId: string) => void
+  clearPebbleHookTrustForRepo: (repoId: string) => void
   setupScriptPromptDismissedRepoIds: string[]
   dismissSetupScriptPrompt: (repoId: string) => void
   setupGuideSidebarDismissed: boolean
@@ -1341,9 +1341,6 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       }
     }),
   openActivityPage: () => {
-    if (get().settings?.experimentalActivity !== true) {
-      return
-    }
     set((state) => ({
       activeView: 'activity',
       previousViewBeforeActivity:
@@ -1432,12 +1429,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   },
   closeSettingsPage: () =>
     set((state) => {
-      const previousView =
-        state.previousViewBeforeSettings === 'activity' &&
-        state.settings?.experimentalActivity !== true
-          ? 'terminal'
-          : state.previousViewBeforeSettings
-      return { activeView: previousView }
+      return { activeView: state.previousViewBeforeSettings }
     }),
   settingsNavigationTarget: null,
   openSettingsTarget: (target) => set({ settingsNavigationTarget: target }),
@@ -1752,10 +1744,10 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       }
       return { contextualToursSeenIds: next }
     }),
-  trustedOrcaHooks: {},
-  markOrcaHookScriptConfirmed: (repoId, kind, contentHash) =>
+  trustedPebbleHooks: {},
+  markPebbleHookScriptConfirmed: (repoId, kind, contentHash) =>
     set((s) => {
-      const existing = s.trustedOrcaHooks[repoId]
+      const existing = s.trustedPebbleHooks[repoId]
       const currentEntry = existing?.[kind]
       if (currentEntry?.contentHash === contentHash) {
         return s
@@ -1764,35 +1756,35 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         ...existing,
         [kind]: { contentHash, approvedAt: Date.now() }
       }
-      const next = { ...s.trustedOrcaHooks, [repoId]: nextRepo }
-      window.api.ui.set({ trustedOrcaHooks: next }).catch(console.error)
-      return { trustedOrcaHooks: next }
+      const next = { ...s.trustedPebbleHooks, [repoId]: nextRepo }
+      window.api.ui.set({ trustedPebbleHooks: next }).catch(console.error)
+      return { trustedPebbleHooks: next }
     }),
-  markOrcaHookRepoAlwaysTrusted: (repoId) =>
+  markPebbleHookRepoAlwaysTrusted: (repoId) =>
     set((s) => {
-      const existing = s.trustedOrcaHooks[repoId]
+      const existing = s.trustedPebbleHooks[repoId]
       if (existing?.all) {
         return s
       }
       const next = {
-        ...s.trustedOrcaHooks,
+        ...s.trustedPebbleHooks,
         [repoId]: {
           ...existing,
           all: { approvedAt: Date.now() }
         }
       }
-      window.api.ui.set({ trustedOrcaHooks: next }).catch(console.error)
-      return { trustedOrcaHooks: next }
+      window.api.ui.set({ trustedPebbleHooks: next }).catch(console.error)
+      return { trustedPebbleHooks: next }
     }),
-  clearOrcaHookTrustForRepo: (repoId) =>
+  clearPebbleHookTrustForRepo: (repoId) =>
     set((s) => {
-      if (!(repoId in s.trustedOrcaHooks)) {
+      if (!(repoId in s.trustedPebbleHooks)) {
         return s
       }
-      const next = { ...s.trustedOrcaHooks }
+      const next = { ...s.trustedPebbleHooks }
       delete next[repoId]
-      window.api.ui.set({ trustedOrcaHooks: next }).catch(console.error)
-      return { trustedOrcaHooks: next }
+      window.api.ui.set({ trustedPebbleHooks: next }).catch(console.error)
+      return { trustedPebbleHooks: next }
     }),
   setupScriptPromptDismissedRepoIds: [],
   dismissSetupScriptPrompt: (repoId) =>
@@ -2332,8 +2324,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
           typeof ui.contextualToursAutoEligible === 'boolean'
             ? ui.contextualToursAutoEligible
             : null,
-        trustedOrcaHooks: filterTrustedOrcaHooksToValidRepos(
-          ui.trustedOrcaHooks ?? {},
+        trustedPebbleHooks: filterTrustedPebbleHooksToValidRepos(
+          ui.trustedPebbleHooks ?? {},
           validRepoIds
         ),
         setupScriptPromptDismissedRepoIds: filterSetupScriptPromptDismissalsToValidRepos(

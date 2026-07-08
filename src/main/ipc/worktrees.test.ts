@@ -39,7 +39,7 @@ const {
   createSetupRunnerScriptMock,
   getEffectiveHooksFromConfigMock,
   getDefaultTabsLaunchMock,
-  parseOrcaYamlMock,
+  parsePebbleYamlMock,
   shouldRunSetupForCreateMock,
   buildPosixRunnerScriptMock,
   buildWindowsRunnerScriptMock,
@@ -88,7 +88,7 @@ const {
   createSetupRunnerScriptMock: vi.fn(),
   getEffectiveHooksFromConfigMock: vi.fn(),
   getDefaultTabsLaunchMock: vi.fn(),
-  parseOrcaYamlMock: vi.fn(),
+  parsePebbleYamlMock: vi.fn(),
   shouldRunSetupForCreateMock: vi.fn(),
   buildPosixRunnerScriptMock: vi.fn(),
   buildWindowsRunnerScriptMock: vi.fn(),
@@ -182,7 +182,7 @@ vi.mock('../hooks', () => ({
   getDefaultTabsLaunch: getDefaultTabsLaunchMock,
   getSetupRunnerEnvVars: getSetupRunnerEnvVarsMock,
   loadHooks: loadHooksMock,
-  parseOrcaYaml: parseOrcaYamlMock,
+  parsePebbleYaml: parsePebbleYamlMock,
   runHook: runHookMock,
   hasHooksFile: hasHooksFileMock,
   shouldRunSetupForCreate: shouldRunSetupForCreateMock
@@ -303,7 +303,7 @@ describe('registerWorktreeHandlers', () => {
       getEffectiveHooksMock,
       getEffectiveHooksFromConfigMock,
       getDefaultTabsLaunchMock,
-      parseOrcaYamlMock,
+      parsePebbleYamlMock,
       createIssueCommandRunnerScriptMock,
       createSetupRunnerScriptMock,
       buildPosixRunnerScriptMock,
@@ -407,7 +407,7 @@ describe('registerWorktreeHandlers', () => {
     getEffectiveHooksMock.mockReturnValue(null)
     getEffectiveHooksFromConfigMock.mockImplementation(() => getEffectiveHooksMock())
     getDefaultTabsLaunchMock.mockReturnValue(undefined)
-    parseOrcaYamlMock.mockReturnValue(null)
+    parsePebbleYamlMock.mockReturnValue(null)
     shouldRunSetupForCreateMock.mockReturnValue(false)
     buildPosixRunnerScriptMock.mockImplementation(
       (script: string) => `#!/usr/bin/env bash\nset -e\n${script.replace(/\r\n/g, '\n')}\n`
@@ -415,25 +415,25 @@ describe('registerWorktreeHandlers', () => {
     buildWindowsRunnerScriptMock.mockImplementation((script: string) => script)
     getSetupRunnerEnvVarsMock.mockImplementation(
       (repoArg: { path: string }, worktreePath: string) => ({
-        ORCA_ROOT_PATH: repoArg.path,
-        ORCA_WORKTREE_PATH: worktreePath,
-        ORCA_WORKSPACE_NAME: worktreePath.split('/').at(-1) ?? '',
+        PEBBLE_ROOT_PATH: repoArg.path,
+        PEBBLE_WORKTREE_PATH: worktreePath,
+        PEBBLE_WORKSPACE_NAME: worktreePath.split('/').at(-1) ?? '',
         CONDUCTOR_ROOT_PATH: repoArg.path,
         GHOSTX_ROOT_PATH: repoArg.path
       })
     )
     createSetupRunnerScriptMock.mockReturnValue({
-      runnerScriptPath: '/workspace/repo/.git/orca/setup-runner.sh',
+      runnerScriptPath: '/workspace/repo/.git/pebble/setup-runner.sh',
       envVars: {
-        ORCA_ROOT_PATH: '/workspace/repo',
-        ORCA_WORKTREE_PATH: '/workspace/improve-dashboard'
+        PEBBLE_ROOT_PATH: '/workspace/repo',
+        PEBBLE_WORKTREE_PATH: '/workspace/improve-dashboard'
       }
     })
     createIssueCommandRunnerScriptMock.mockReturnValue({
-      runnerScriptPath: '/workspace/repo/.git/orca/issue-command-runner.sh',
+      runnerScriptPath: '/workspace/repo/.git/pebble/issue-command-runner.sh',
       envVars: {
-        ORCA_ROOT_PATH: '/workspace/repo',
-        ORCA_WORKTREE_PATH: '/workspace/improve-dashboard'
+        PEBBLE_ROOT_PATH: '/workspace/repo',
+        PEBBLE_WORKTREE_PATH: '/workspace/improve-dashboard'
       }
     })
     computeWorktreePathMock.mockImplementation(
@@ -711,7 +711,7 @@ describe('registerWorktreeHandlers', () => {
     ])
   }
 
-  it('strips Orca provenance fields from renderer metadata updates', () => {
+  it('strips Pebble provenance fields from renderer metadata updates', () => {
     store.setWorktreeMeta.mockImplementation((_worktreeId, meta) => meta)
 
     const result = handlers['worktrees:updateMeta'](null, {
@@ -719,9 +719,9 @@ describe('registerWorktreeHandlers', () => {
       updates: {
         comment: 'keep me',
         isPinned: true,
-        orcaCreatedAt: 123,
-        orcaCreationSource: 'desktop',
-        orcaCreationWorkspaceLayout: { path: '/workspace', nestWorkspaces: false }
+        pebbleCreatedAt: 123,
+        pebbleCreationSource: 'desktop',
+        pebbleCreationWorkspaceLayout: { path: '/workspace', nestWorkspaces: false }
       }
     })
 
@@ -842,7 +842,7 @@ describe('registerWorktreeHandlers', () => {
     expect(store.setWorktreeMeta).toHaveBeenCalledWith(
       'repo-1::../worktrees/feature',
       expect.objectContaining({
-        orcaCreationWorkspaceLayout: { path: '../worktrees', nestWorkspaces: false }
+        pebbleCreationWorkspaceLayout: { path: '../worktrees', nestWorkspaces: false }
       })
     )
   })
@@ -981,7 +981,7 @@ describe('registerWorktreeHandlers', () => {
       createdWithAgent: 'claude',
       startup: {
         command: 'claude --prefill test',
-        env: { ORCA_AGENT_MODE: 'direct' },
+        env: { PEBBLE_AGENT_MODE: 'direct' },
         telemetry: {
           agent_kind: 'claude',
           launch_source: 'new_workspace_composer',
@@ -1000,7 +1000,7 @@ describe('registerWorktreeHandlers', () => {
       {
         claudeAgentTeamsSourceCommand: 'claude --prefill test',
         command: 'claude --prefill test',
-        env: { ORCA_AGENT_MODE: 'direct' },
+        env: { PEBBLE_AGENT_MODE: 'direct' },
         launchAgent: 'claude',
         startupCommandDelivery: undefined,
         telemetry: {
@@ -1016,10 +1016,10 @@ describe('registerWorktreeHandlers', () => {
       'id:repo-1::/workspace/improve-dashboard',
       {
         title: 'Setup',
-        command: expect.stringContaining('bash /workspace/repo/.git/orca/setup-runner.sh'),
+        command: expect.stringContaining('bash /workspace/repo/.git/pebble/setup-runner.sh'),
         env: {
-          ORCA_ROOT_PATH: '/workspace/repo',
-          ORCA_WORKTREE_PATH: '/workspace/improve-dashboard'
+          PEBBLE_ROOT_PATH: '/workspace/repo',
+          PEBBLE_WORKTREE_PATH: '/workspace/improve-dashboard'
         },
         activate: false
       }
@@ -1032,7 +1032,7 @@ describe('registerWorktreeHandlers', () => {
     const startupCommand = (startupCreateCall[1] as { command: string }).command
     const setupCommand = (setupCreateCall[1] as { command: string }).command
     expect(startupCommand).toBe('claude --prefill test')
-    expect(setupCommand).toBe('bash /workspace/repo/.git/orca/setup-runner.sh')
+    expect(setupCommand).toBe('bash /workspace/repo/.git/pebble/setup-runner.sh')
     expect(result.setup).toBeUndefined()
     expect(result.startupTerminal).toEqual({ spawned: true, surface: 'visible' })
     expect(result.timing?.phases.map((phase) => phase.phase)).toEqual(
@@ -1061,10 +1061,10 @@ describe('registerWorktreeHandlers', () => {
     getEffectiveHooksFromConfigMock.mockReturnValue({ scripts: { setup: 'pnpm install' } })
     shouldRunSetupForCreateMock.mockReturnValue(true)
     createSetupRunnerScriptMock.mockReturnValueOnce({
-      runnerScriptPath: '/workspace/repo/.git/orca/setup-runner.sh',
+      runnerScriptPath: '/workspace/repo/.git/pebble/setup-runner.sh',
       envVars: {
-        ORCA_ROOT_PATH: '/workspace/repo',
-        ORCA_WORKTREE_PATH: '/workspace/improve-dashboard'
+        PEBBLE_ROOT_PATH: '/workspace/repo',
+        PEBBLE_WORKTREE_PATH: '/workspace/improve-dashboard'
       },
       waitForAgentStartup: true
     })
@@ -1078,7 +1078,7 @@ describe('registerWorktreeHandlers', () => {
       createdWithAgent: 'claude',
       startup: {
         command: 'claude --prefill test',
-        env: { ORCA_AGENT_MODE: 'direct' },
+        env: { PEBBLE_AGENT_MODE: 'direct' },
         telemetry: {
           agent_kind: 'claude',
           launch_source: 'new_workspace_composer',
@@ -1089,8 +1089,8 @@ describe('registerWorktreeHandlers', () => {
 
     expect(result.setup).toEqual(
       expect.objectContaining({
-        runnerScriptPath: '/workspace/repo/.git/orca/setup-runner.sh',
-        command: expect.stringContaining('bash /workspace/repo/.git/orca/setup-runner.sh')
+        runnerScriptPath: '/workspace/repo/.git/pebble/setup-runner.sh',
+        command: expect.stringContaining('bash /workspace/repo/.git/pebble/setup-runner.sh')
       })
     )
     expect(result.setup?.command).toContain('printf')
@@ -1841,21 +1841,21 @@ describe('registerWorktreeHandlers', () => {
       repoId: 'repo-1',
       name: 'improve-dashboard',
       pushTarget: {
-        remoteName: 'pr-prateek-orca',
+        remoteName: 'pr-prateek-pebble',
         branchName: 'prateek/fix-sidebar-agents-toggle',
-        remoteUrl: 'git@github.com:prateek/orca.git'
+        remoteUrl: 'git@github.com:prateek/pebble.git'
       }
     })
 
     expect(gitExecFileAsyncMock).toHaveBeenCalledWith(
-      ['remote', 'add', 'pr-prateek-orca', 'git@github.com:prateek/orca.git'],
+      ['remote', 'add', 'pr-prateek-pebble', 'git@github.com:prateek/pebble.git'],
       { cwd: '/workspace/repo' }
     )
     expect(gitExecFileAsyncMock).toHaveBeenCalledWith(
       [
         'fetch',
-        'pr-prateek-orca',
-        '+refs/heads/prateek/fix-sidebar-agents-toggle:refs/remotes/pr-prateek-orca/prateek/fix-sidebar-agents-toggle'
+        'pr-prateek-pebble',
+        '+refs/heads/prateek/fix-sidebar-agents-toggle:refs/remotes/pr-prateek-pebble/prateek/fix-sidebar-agents-toggle'
       ],
       { cwd: '/workspace/repo' }
     )
@@ -1863,7 +1863,7 @@ describe('registerWorktreeHandlers', () => {
       [
         'branch',
         '--set-upstream-to',
-        'pr-prateek-orca/prateek/fix-sidebar-agents-toggle',
+        'pr-prateek-pebble/prateek/fix-sidebar-agents-toggle',
         'improve-dashboard'
       ],
       { cwd: '/workspace/improve-dashboard' }
@@ -1872,16 +1872,16 @@ describe('registerWorktreeHandlers', () => {
       'repo-1::/workspace/improve-dashboard',
       expect.objectContaining({
         pushTarget: expect.objectContaining({
-          remoteName: 'pr-prateek-orca',
+          remoteName: 'pr-prateek-pebble',
           branchName: 'prateek/fix-sidebar-agents-toggle',
-          remoteUrl: 'git@github.com:prateek/orca.git',
+          remoteUrl: 'git@github.com:prateek/pebble.git',
           remoteCreated: true
         })
       })
     )
   })
 
-  it('keeps the Orca-created marker when a new worktree reuses an Orca-created fork remote', async () => {
+  it('keeps the Pebble-created marker when a new worktree reuses an Pebble-created fork remote', async () => {
     listWorktreesMock.mockResolvedValue([
       {
         path: '/workspace/improve-dashboard',
@@ -1892,9 +1892,9 @@ describe('registerWorktreeHandlers', () => {
       }
     ])
     const existingPushTarget = {
-      remoteName: 'pr-contributor-orca',
+      remoteName: 'pr-contributor-pebble',
       branchName: 'contributor/previous-fix',
-      remoteUrl: 'https://github.com/contributor/orca.git',
+      remoteUrl: 'https://github.com/contributor/pebble.git',
       remoteCreated: true
     }
     store.getAllWorktreeMeta.mockReturnValue({
@@ -1903,10 +1903,10 @@ describe('registerWorktreeHandlers', () => {
     store.setWorktreeMeta.mockImplementation((_worktreeId, meta) => meta)
     gitExecFileAsyncMock.mockImplementation(async (args: string[]) => {
       if (args[0] === 'remote' && args.length === 1) {
-        return { stdout: 'pr-contributor-orca\n', stderr: '' }
+        return { stdout: 'pr-contributor-pebble\n', stderr: '' }
       }
       if (args[0] === 'remote' && args[1] === 'get-url') {
-        return { stdout: 'https://github.com/contributor/orca.git\n', stderr: '' }
+        return { stdout: 'https://github.com/contributor/pebble.git\n', stderr: '' }
       }
       return { stdout: '', stderr: '' }
     })
@@ -1915,9 +1915,9 @@ describe('registerWorktreeHandlers', () => {
       repoId: 'repo-1',
       name: 'improve-dashboard',
       pushTarget: {
-        remoteName: 'pr-contributor-orca',
+        remoteName: 'pr-contributor-pebble',
         branchName: 'contributor/new-fix',
-        remoteUrl: 'https://github.com/contributor/orca.git'
+        remoteUrl: 'https://github.com/contributor/pebble.git'
       }
     })
 
@@ -1929,9 +1929,9 @@ describe('registerWorktreeHandlers', () => {
       'repo-1::/workspace/improve-dashboard',
       expect.objectContaining({
         pushTarget: expect.objectContaining({
-          remoteName: 'pr-contributor-orca',
+          remoteName: 'pr-contributor-pebble',
           branchName: 'contributor/new-fix',
-          remoteUrl: 'https://github.com/contributor/orca.git',
+          remoteUrl: 'https://github.com/contributor/pebble.git',
           remoteCreated: true
         })
       })
@@ -1941,9 +1941,9 @@ describe('registerWorktreeHandlers', () => {
   it('returns the PR head push target when resolving a fork PR base', async () => {
     getPullRequestPushTargetMock.mockResolvedValue({
       pushTarget: {
-        remoteName: 'pr-prateek-orca',
+        remoteName: 'pr-prateek-pebble',
         branchName: 'prateek/fix-sidebar-agents-toggle',
-        remoteUrl: 'git@github.com:prateek/orca.git'
+        remoteUrl: 'git@github.com:prateek/pebble.git'
       }
     })
     gitExecFileAsyncMock.mockImplementation(async (args: string[]) => {
@@ -1968,9 +1968,9 @@ describe('registerWorktreeHandlers', () => {
       headSha: 'abc123',
       branchNameOverride: 'prateek/fix-sidebar-agents-toggle',
       pushTarget: {
-        remoteName: 'pr-prateek-orca',
+        remoteName: 'pr-prateek-pebble',
         branchName: 'prateek/fix-sidebar-agents-toggle',
-        remoteUrl: 'git@github.com:prateek/orca.git'
+        remoteUrl: 'git@github.com:prateek/pebble.git'
       }
     })
   })
@@ -2079,9 +2079,9 @@ describe('registerWorktreeHandlers', () => {
       repoId: 'repo-1',
       name: 'wsl-fork',
       pushTarget: {
-        remoteName: 'pr-contributor-orca',
+        remoteName: 'pr-contributor-pebble',
         branchName: 'contributor/wsl-fork',
-        remoteUrl: 'git@github.com:contributor/orca.git'
+        remoteUrl: 'git@github.com:contributor/pebble.git'
       }
     })
 
@@ -2090,19 +2090,19 @@ describe('registerWorktreeHandlers', () => {
       { cwd: '/workspace/repo', wslDistro: 'Ubuntu' }
     )
     expect(gitExecFileAsyncMock).toHaveBeenCalledWith(
-      ['remote', 'add', 'pr-contributor-orca', 'git@github.com:contributor/orca.git'],
+      ['remote', 'add', 'pr-contributor-pebble', 'git@github.com:contributor/pebble.git'],
       { cwd: '/workspace/repo', wslDistro: 'Ubuntu' }
     )
     expect(gitExecFileAsyncMock).toHaveBeenCalledWith(
       [
         'fetch',
-        'pr-contributor-orca',
-        '+refs/heads/contributor/wsl-fork:refs/remotes/pr-contributor-orca/contributor/wsl-fork'
+        'pr-contributor-pebble',
+        '+refs/heads/contributor/wsl-fork:refs/remotes/pr-contributor-pebble/contributor/wsl-fork'
       ],
       { cwd: '/workspace/repo', wslDistro: 'Ubuntu' }
     )
     expect(gitExecFileAsyncMock).toHaveBeenCalledWith(
-      ['branch', '--set-upstream-to', 'pr-contributor-orca/contributor/wsl-fork', 'wsl-fork'],
+      ['branch', '--set-upstream-to', 'pr-contributor-pebble/contributor/wsl-fork', 'wsl-fork'],
       { cwd: '/workspace/wsl-fork', wslDistro: 'Ubuntu' }
     )
   })
@@ -3217,7 +3217,7 @@ describe('registerWorktreeHandlers', () => {
     expect(result.localBaseRefUpdateSuggestion).toBeUndefined()
   })
 
-  it('reads remote orca.yaml and returns a setup launch payload during SSH create', async () => {
+  it('reads remote pebble.yaml and returns a setup launch payload during SSH create', async () => {
     const repo = {
       id: 'repo-ssh',
       path: '/remote/repo',
@@ -3234,7 +3234,7 @@ describe('registerWorktreeHandlers', () => {
         }
         if (args[0] === 'rev-parse' && args[1] === '--git-path') {
           return {
-            stdout: '/remote/repo/.git/worktrees/improve-dashboard/orca/setup-runner.sh\n',
+            stdout: '/remote/repo/.git/worktrees/improve-dashboard/pebble/setup-runner.sh\n',
             stderr: ''
           }
         }
@@ -3273,7 +3273,7 @@ describe('registerWorktreeHandlers', () => {
     getSshFilesystemProviderMock.mockReturnValue(fsProvider)
     getActiveMultiplexerMock.mockReturnValue(mux)
     store.setWorktreeMeta.mockImplementation((_worktreeId, meta) => meta)
-    parseOrcaYamlMock.mockReturnValue({ scripts: { setup: 'pnpm install' } })
+    parsePebbleYamlMock.mockReturnValue({ scripts: { setup: 'pnpm install' } })
     getEffectiveHooksFromConfigMock.mockReturnValue({ scripts: { setup: 'pnpm install' } })
     shouldRunSetupForCreateMock.mockReturnValue(true)
 
@@ -3283,26 +3283,26 @@ describe('registerWorktreeHandlers', () => {
       setupDecision: 'run'
     })
 
-    expect(fsProvider.readFile).toHaveBeenCalledWith('/remote/repo/orca.yaml')
-    expect(fsProvider.readFile).toHaveBeenCalledWith('/remote/improve-dashboard/orca.yaml')
+    expect(fsProvider.readFile).toHaveBeenCalledWith('/remote/repo/pebble.yaml')
+    expect(fsProvider.readFile).toHaveBeenCalledWith('/remote/improve-dashboard/pebble.yaml')
     expect(provider.exec).toHaveBeenCalledWith(
-      ['rev-parse', '--git-path', 'orca/setup-runner.sh'],
+      ['rev-parse', '--git-path', 'pebble/setup-runner.sh'],
       '/remote/improve-dashboard'
     )
     expect(fsProvider.createDir).toHaveBeenCalledWith(
-      '/remote/repo/.git/worktrees/improve-dashboard/orca'
+      '/remote/repo/.git/worktrees/improve-dashboard/pebble'
     )
     expect(fsProvider.writeFile).toHaveBeenCalledWith(
-      '/remote/repo/.git/worktrees/improve-dashboard/orca/setup-runner.sh',
+      '/remote/repo/.git/worktrees/improve-dashboard/pebble/setup-runner.sh',
       '#!/usr/bin/env bash\nset -e\npnpm install\n'
     )
     expect(result).toEqual(
       expect.objectContaining({
         setup: {
-          runnerScriptPath: '/remote/repo/.git/worktrees/improve-dashboard/orca/setup-runner.sh',
+          runnerScriptPath: '/remote/repo/.git/worktrees/improve-dashboard/pebble/setup-runner.sh',
           envVars: expect.objectContaining({
-            ORCA_ROOT_PATH: '/remote/repo',
-            ORCA_WORKTREE_PATH: '/remote/improve-dashboard'
+            PEBBLE_ROOT_PATH: '/remote/repo',
+            PEBBLE_WORKTREE_PATH: '/remote/improve-dashboard'
           })
         }
       })
@@ -4959,10 +4959,10 @@ describe('registerWorktreeHandlers', () => {
       {}
     )
     expect(result).toMatchObject({
-      runnerScriptPath: '/workspace/repo/.git/orca/issue-command-runner.sh',
+      runnerScriptPath: '/workspace/repo/.git/pebble/issue-command-runner.sh',
       envVars: {
-        ORCA_ROOT_PATH: '/workspace/repo',
-        ORCA_WORKTREE_PATH: '/workspace/improve-dashboard'
+        PEBBLE_ROOT_PATH: '/workspace/repo',
+        PEBBLE_WORKTREE_PATH: '/workspace/improve-dashboard'
       }
     })
   })
@@ -5415,7 +5415,7 @@ describe('registerWorktreeHandlers', () => {
     store.getProjectHostSetups.mockReturnValue([
       {
         id: 'repo-1',
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         hostId: 'local',
         repoId: 'repo-1',
         path: '/workspace/repo',
@@ -5443,7 +5443,7 @@ describe('registerWorktreeHandlers', () => {
     })
     store.setWorktreeMeta.mockReturnValue({
       instanceId: 'existing-instance',
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       hostId: 'local',
       projectHostSetupId: 'repo-1',
       lastActivityAt: 42
@@ -5458,11 +5458,11 @@ describe('registerWorktreeHandlers', () => {
     }[]
 
     expect(store.setWorktreeMeta).toHaveBeenCalledWith('repo-1::/workspace/existing-wt', {
-      projectId: 'github:stablyai/orca'
+      projectId: 'github:nebutra/pebble'
     })
     expect(listed[0]).toMatchObject({
       id: 'repo-1::/workspace/existing-wt',
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       hostId: 'local',
       projectHostSetupId: 'repo-1',
       lastActivityAt: 42
@@ -5482,7 +5482,7 @@ describe('registerWorktreeHandlers', () => {
     store.getProjectHostSetups.mockReturnValue([
       {
         id: 'repo-1',
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         hostId: 'local',
         repoId: 'repo-1',
         path: '/workspace/repo',
@@ -5517,15 +5517,15 @@ describe('registerWorktreeHandlers', () => {
   it('repairs legacy project ids when SSH worktree listing falls back to persisted metadata', async () => {
     const repo = {
       id: 'repo-ssh',
-      path: '/remote/orca',
-      displayName: 'orca',
+      path: '/remote/pebble',
+      displayName: 'pebble',
       badgeColor: '#000',
       addedAt: 0,
       connectionId: 'ssh-target-1'
     }
     store.getRepo.mockReturnValue(repo)
     store.getAllWorktreeMeta.mockReturnValue({
-      'repo-ssh::/remote/orca': makeWorktreeMeta({
+      'repo-ssh::/remote/pebble': makeWorktreeMeta({
         instanceId: 'existing-instance',
         projectId: 'repo:repo-ssh',
         hostId: 'ssh:ssh-target-1',
@@ -5536,11 +5536,11 @@ describe('registerWorktreeHandlers', () => {
     store.getProjectHostSetups.mockReturnValue([
       {
         id: 'repo-ssh',
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         hostId: 'ssh:ssh-target-1',
         repoId: 'repo-ssh',
-        path: '/remote/orca',
-        displayName: 'orca',
+        path: '/remote/pebble',
+        displayName: 'pebble',
         setupState: 'ready',
         setupMethod: 'imported-existing-folder',
         createdAt: 0,
@@ -5550,7 +5550,7 @@ describe('registerWorktreeHandlers', () => {
     store.setWorktreeMeta.mockReturnValue(
       makeWorktreeMeta({
         instanceId: 'existing-instance',
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         hostId: 'ssh:ssh-target-1',
         projectHostSetupId: 'repo-ssh',
         lastActivityAt: 42
@@ -5566,13 +5566,13 @@ describe('registerWorktreeHandlers', () => {
     }[]
 
     expect(getSshGitProviderMock).toHaveBeenCalledWith('ssh-target-1')
-    expect(store.setWorktreeMeta).toHaveBeenCalledWith('repo-ssh::/remote/orca', {
-      projectId: 'github:stablyai/orca'
+    expect(store.setWorktreeMeta).toHaveBeenCalledWith('repo-ssh::/remote/pebble', {
+      projectId: 'github:nebutra/pebble'
     })
     expect(listed).toEqual([
       expect.objectContaining({
-        id: 'repo-ssh::/remote/orca',
-        projectId: 'github:stablyai/orca',
+        id: 'repo-ssh::/remote/pebble',
+        projectId: 'github:nebutra/pebble',
         hostId: 'ssh:ssh-target-1',
         projectHostSetupId: 'repo-ssh',
         lastActivityAt: 42
@@ -5927,10 +5927,10 @@ describe('registerWorktreeHandlers', () => {
         branch: 'improve-dashboard'
       }),
       setup: {
-        runnerScriptPath: '/workspace/repo/.git/orca/setup-runner.sh',
+        runnerScriptPath: '/workspace/repo/.git/pebble/setup-runner.sh',
         envVars: {
-          ORCA_ROOT_PATH: '/workspace/repo',
-          ORCA_WORKTREE_PATH: '/workspace/improve-dashboard'
+          PEBBLE_ROOT_PATH: '/workspace/repo',
+          PEBBLE_WORKTREE_PATH: '/workspace/improve-dashboard'
         }
       }
     })
@@ -5992,7 +5992,7 @@ describe('registerWorktreeHandlers', () => {
     )
   })
 
-  it('launches setup even when primary and worktree orca.yaml scripts diverge', async () => {
+  it('launches setup even when primary and worktree pebble.yaml scripts diverge', async () => {
     // Why: regression for a silent skip introduced by the #1280 content-equality
     // gate. Benign divergence (whitespace, comments, or any setup edit that
     // landed on the base branch but not yet in the primary checkout) must not
@@ -6024,7 +6024,7 @@ describe('registerWorktreeHandlers', () => {
     expect(result).toEqual(
       expect.objectContaining({
         setup: expect.objectContaining({
-          runnerScriptPath: '/workspace/repo/.git/orca/setup-runner.sh'
+          runnerScriptPath: '/workspace/repo/.git/pebble/setup-runner.sh'
         })
       })
     )
@@ -6253,7 +6253,7 @@ describe('registerWorktreeHandlers', () => {
 
   it('recovers forced Windows long-path worktree removal through local deletion and prune', async () => {
     setPlatform('win32')
-    const parentDir = await mkdtemp(join(tmpdir(), 'orca-ipc-long-path-'))
+    const parentDir = await mkdtemp(join(tmpdir(), 'pebble-ipc-long-path-'))
     const repoPath = join(parentDir, 'repo')
     const worktreePath = join(parentDir, 'feature-wt')
     await mkdir(worktreePath, { recursive: true })
@@ -6556,7 +6556,7 @@ describe('registerWorktreeHandlers', () => {
       worktreeId: 'repo-ssh::/remote/feature-wt'
     })
 
-    expect(fsProvider.readFile).toHaveBeenCalledWith('/remote/repo/orca.yaml')
+    expect(fsProvider.readFile).toHaveBeenCalledWith('/remote/repo/pebble.yaml')
     expect(provider.execNonInteractive).toHaveBeenCalledWith(
       '/bin/bash',
       ['-lc', 'echo archived'],
@@ -6564,8 +6564,8 @@ describe('registerWorktreeHandlers', () => {
       120_000,
       undefined,
       expect.objectContaining({
-        ORCA_ROOT_PATH: '/remote/repo',
-        ORCA_WORKTREE_PATH: '/remote/feature-wt'
+        PEBBLE_ROOT_PATH: '/remote/repo',
+        PEBBLE_WORKTREE_PATH: '/remote/feature-wt'
       })
     )
     expect(provider.removeWorktree).toHaveBeenCalledWith('/remote/feature-wt', undefined)
@@ -6866,7 +6866,7 @@ describe('registerWorktreeHandlers', () => {
       worktreeId: 'repo-ssh::C:\\remote\\feature-wt'
     })
 
-    expect(fsProvider.readFile).toHaveBeenCalledWith('C:\\remote\\repo\\orca.yaml')
+    expect(fsProvider.readFile).toHaveBeenCalledWith('C:\\remote\\repo\\pebble.yaml')
     expect(provider.execNonInteractive).toHaveBeenCalledWith(
       'cmd.exe',
       ['/d', '/s', '/c', 'echo archived'],
@@ -6874,8 +6874,8 @@ describe('registerWorktreeHandlers', () => {
       120_000,
       undefined,
       expect.objectContaining({
-        ORCA_ROOT_PATH: 'C:\\remote\\repo',
-        ORCA_WORKTREE_PATH: 'C:\\remote\\feature-wt'
+        PEBBLE_ROOT_PATH: 'C:\\remote\\repo',
+        PEBBLE_WORKTREE_PATH: 'C:\\remote\\feature-wt'
       })
     )
   })
@@ -7055,13 +7055,13 @@ describe('registerWorktreeHandlers', () => {
     expect(forceDeleteLocalBranchMock).not.toHaveBeenCalled()
   })
 
-  it('removes an unused Orca-created fork remote after deleting its worktree', async () => {
+  it('removes an unused Pebble-created fork remote after deleting its worktree', async () => {
     mockKnownFeatureWorktree()
     removeWorktreeMock.mockResolvedValue(undefined)
     const pushTarget = {
-      remoteName: 'pr-contributor-orca',
+      remoteName: 'pr-contributor-pebble',
       branchName: 'feature/from-fork',
-      remoteUrl: 'https://github.com/contributor/orca.git',
+      remoteUrl: 'https://github.com/contributor/pebble.git',
       remoteCreated: true
     }
     store.getWorktreeMeta.mockReturnValue(makeWorktreeMeta({ pushTarget }))
@@ -7073,7 +7073,7 @@ describe('registerWorktreeHandlers', () => {
         throw new Error('no branch config')
       }
       if (args[0] === 'remote' && args[1] === 'get-url') {
-        return { stdout: 'https://github.com/contributor/orca.git\n', stderr: '' }
+        return { stdout: 'https://github.com/contributor/pebble.git\n', stderr: '' }
       }
       return { stdout: '', stderr: '' }
     })
@@ -7082,18 +7082,18 @@ describe('registerWorktreeHandlers', () => {
       worktreeId: 'repo-1::/workspace/feature-wt'
     })
 
-    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(['remote', 'remove', 'pr-contributor-orca'], {
+    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(['remote', 'remove', 'pr-contributor-pebble'], {
       cwd: '/workspace/repo'
     })
   })
 
-  it('keeps an Orca-created fork remote while another worktree still uses it', async () => {
+  it('keeps an Pebble-created fork remote while another worktree still uses it', async () => {
     mockKnownFeatureWorktree()
     removeWorktreeMock.mockResolvedValue(undefined)
     const pushTarget = {
-      remoteName: 'pr-contributor-orca',
+      remoteName: 'pr-contributor-pebble',
       branchName: 'feature/from-fork',
-      remoteUrl: 'https://github.com/contributor/orca.git',
+      remoteUrl: 'https://github.com/contributor/pebble.git',
       remoteCreated: true
     }
     store.getWorktreeMeta.mockReturnValue(makeWorktreeMeta({ pushTarget }))
@@ -7112,7 +7112,7 @@ describe('registerWorktreeHandlers', () => {
     })
 
     expect(gitExecFileAsyncMock).not.toHaveBeenCalledWith(
-      ['remote', 'remove', 'pr-contributor-orca'],
+      ['remote', 'remove', 'pr-contributor-pebble'],
       expect.any(Object)
     )
   })
@@ -7121,9 +7121,9 @@ describe('registerWorktreeHandlers', () => {
     mockKnownFeatureWorktree()
     removeWorktreeMock.mockResolvedValue(undefined)
     const pushTarget = {
-      remoteName: 'pr-contributor-orca',
+      remoteName: 'pr-contributor-pebble',
       branchName: 'feature/from-fork',
-      remoteUrl: 'https://github.com/contributor/orca.git',
+      remoteUrl: 'https://github.com/contributor/pebble.git',
       remoteCreated: true
     }
     store.getWorktreeMeta.mockReturnValue(makeWorktreeMeta({ pushTarget }))
@@ -7141,7 +7141,7 @@ describe('registerWorktreeHandlers', () => {
         throw new Error('no branch config')
       }
       if (args[0] === 'remote' && args[1] === 'get-url') {
-        return { stdout: 'https://github.com/contributor/orca.git\n', stderr: '' }
+        return { stdout: 'https://github.com/contributor/pebble.git\n', stderr: '' }
       }
       return { stdout: '', stderr: '' }
     })
@@ -7150,7 +7150,7 @@ describe('registerWorktreeHandlers', () => {
       worktreeId: 'repo-1::/workspace/feature-wt'
     })
 
-    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(['remote', 'remove', 'pr-contributor-orca'], {
+    expect(gitExecFileAsyncMock).toHaveBeenCalledWith(['remote', 'remove', 'pr-contributor-pebble'], {
       cwd: '/workspace/repo'
     })
   })
@@ -7244,8 +7244,8 @@ describe('registerWorktreeHandlers', () => {
     })
   })
 
-  it('force-removes a legacy Orca-created orphaned worktree directory after Git tracking is gone', async () => {
-    const parentDir = await mkdtemp(join(tmpdir(), 'orca-ipc-orphan-'))
+  it('force-removes a legacy Pebble-created orphaned worktree directory after Git tracking is gone', async () => {
+    const parentDir = await mkdtemp(join(tmpdir(), 'pebble-ipc-orphan-'))
     const repoPath = join(parentDir, 'repo')
     const orphanPath = join(parentDir, 'orphan')
     const adminWorktreePath = join(repoPath, '.git', 'worktrees', 'orphan')
@@ -7286,8 +7286,8 @@ describe('registerWorktreeHandlers', () => {
     }
   })
 
-  it('prompts for force before removing an Orca-created orphaned worktree directory', async () => {
-    const parentDir = await mkdtemp(join(tmpdir(), 'orca-ipc-orphan-'))
+  it('prompts for force before removing a Pebble-created orphaned worktree directory', async () => {
+    const parentDir = await mkdtemp(join(tmpdir(), 'pebble-ipc-orphan-'))
     const repoPath = join(parentDir, 'repo')
     const orphanPath = join(parentDir, 'orphan')
     const adminWorktreePath = join(repoPath, '.git', 'worktrees', 'orphan')
@@ -7305,7 +7305,7 @@ describe('registerWorktreeHandlers', () => {
     })
     mockKnownFeatureWorktree(join(parentDir, 'real-feature'), repoPath)
     store.getWorktreeMeta.mockReturnValue(
-      makeWorktreeMeta({ orcaCreatedAt: Date.now(), orcaCreationSource: 'runtime' })
+      makeWorktreeMeta({ pebbleCreatedAt: Date.now(), pebbleCreationSource: 'runtime' })
     )
 
     try {
@@ -7323,8 +7323,8 @@ describe('registerWorktreeHandlers', () => {
     }
   })
 
-  it('prompts then force-removes an Orca-created unregistered leftover directory with no git marker', async () => {
-    const parentDir = await mkdtemp(join(tmpdir(), 'orca-ipc-leftover-'))
+  it('prompts then force-removes a Pebble-created unregistered leftover directory with no git marker', async () => {
+    const parentDir = await mkdtemp(join(tmpdir(), 'pebble-ipc-leftover-'))
     const repoPath = join(parentDir, 'repo')
     const leftoverPath = join(parentDir, 'leftover')
     const worktreeId = `repo-1::${leftoverPath}`
@@ -7340,7 +7340,7 @@ describe('registerWorktreeHandlers', () => {
     })
     mockKnownFeatureWorktree(join(parentDir, 'real-feature'), repoPath)
     store.getWorktreeMeta.mockReturnValue(
-      makeWorktreeMeta({ orcaCreatedAt: Date.now(), orcaCreationSource: 'runtime' })
+      makeWorktreeMeta({ pebbleCreatedAt: Date.now(), pebbleCreationSource: 'runtime' })
     )
     gitExecFileAsyncMock.mockImplementation(async (args: string[]) => {
       if (args[0] === 'status') {
@@ -7376,8 +7376,8 @@ describe('registerWorktreeHandlers', () => {
     }
   })
 
-  it('rejects an Orca-created unregistered local directory with a git directory', async () => {
-    const parentDir = await mkdtemp(join(tmpdir(), 'orca-ipc-standalone-'))
+  it('rejects a Pebble-created unregistered local directory with a git directory', async () => {
+    const parentDir = await mkdtemp(join(tmpdir(), 'pebble-ipc-standalone-'))
     const repoPath = join(parentDir, 'repo')
     const standalonePath = join(parentDir, 'standalone')
     await mkdir(join(standalonePath, '.git'), { recursive: true })
@@ -7391,7 +7391,7 @@ describe('registerWorktreeHandlers', () => {
     })
     mockKnownFeatureWorktree(join(parentDir, 'real-feature'), repoPath)
     store.getWorktreeMeta.mockReturnValue(
-      makeWorktreeMeta({ orcaCreatedAt: Date.now(), orcaCreationSource: 'runtime' })
+      makeWorktreeMeta({ pebbleCreatedAt: Date.now(), pebbleCreationSource: 'runtime' })
     )
 
     try {
@@ -7411,7 +7411,7 @@ describe('registerWorktreeHandlers', () => {
   })
 
   it('does not inspect or delete a local path when SSH orphan cleanup has no filesystem provider', async () => {
-    const localPath = await mkdtemp(join(tmpdir(), 'orca-ipc-ssh-missing-fs-'))
+    const localPath = await mkdtemp(join(tmpdir(), 'pebble-ipc-ssh-missing-fs-'))
     const repo = {
       id: 'repo-ssh-missing-fs',
       path: '/remote/repo',
@@ -7434,7 +7434,7 @@ describe('registerWorktreeHandlers', () => {
     }
     store.getRepo.mockReturnValue(repo)
     store.getWorktreeMeta.mockReturnValue(
-      makeWorktreeMeta({ orcaCreatedAt: Date.now(), orcaCreationSource: 'ssh' })
+      makeWorktreeMeta({ pebbleCreatedAt: Date.now(), pebbleCreationSource: 'ssh' })
     )
     getSshGitProviderMock.mockReturnValue(provider)
     getSshFilesystemProviderMock.mockReturnValue(undefined)
@@ -7485,7 +7485,7 @@ describe('registerWorktreeHandlers', () => {
     }
     store.getRepo.mockReturnValue(repo)
     store.getWorktreeMeta.mockReturnValue(
-      makeWorktreeMeta({ orcaCreatedAt: Date.now(), orcaCreationSource: 'ssh' })
+      makeWorktreeMeta({ pebbleCreatedAt: Date.now(), pebbleCreationSource: 'ssh' })
     )
     getSshGitProviderMock.mockReturnValue(provider)
     getSshFilesystemProviderMock.mockReturnValue(fsProvider)
@@ -7820,7 +7820,7 @@ describe('registerWorktreeHandlers', () => {
     }
     const fsProvider = {
       readFile: vi.fn(async (filePath: string) => {
-        if (filePath.endsWith('/.orca/issue-command')) {
+        if (filePath.endsWith('/.pebble/issue-command')) {
           return { content: 'local command\n', isBinary: false }
         }
         throw new Error('shared read failed')
@@ -7864,7 +7864,7 @@ describe('registerWorktreeHandlers', () => {
     await expect(
       handlers['hooks:writeIssueCommand'](null, {
         repoId: 'repo-ssh',
-        content: 'orca issue command'
+        content: 'pebble issue command'
       })
     ).rejects.toThrow('ssh read failed')
 
@@ -7893,14 +7893,14 @@ describe('registerWorktreeHandlers', () => {
 
     await handlers['hooks:writeIssueCommand'](null, {
       repoId: 'repo-ssh',
-      content: 'orca issue command'
+      content: 'pebble issue command'
     })
 
-    expect(fsProvider.writeFile).toHaveBeenNthCalledWith(1, '/remote/repo/.gitignore', '.orca\n')
+    expect(fsProvider.writeFile).toHaveBeenNthCalledWith(1, '/remote/repo/.gitignore', '.pebble\n')
     expect(fsProvider.writeFile).toHaveBeenNthCalledWith(
       2,
-      '/remote/repo/.orca/issue-command',
-      'orca issue command\n'
+      '/remote/repo/.pebble/issue-command',
+      'pebble issue command\n'
     )
   })
 
@@ -7920,7 +7920,7 @@ describe('registerWorktreeHandlers', () => {
     await expect(
       handlers['hooks:writeIssueCommand'](null, {
         repoId: 'repo-ssh',
-        content: 'orca issue command'
+        content: 'pebble issue command'
       })
     ).rejects.toThrow('Remote filesystem unavailable')
   })

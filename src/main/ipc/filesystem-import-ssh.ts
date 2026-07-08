@@ -43,12 +43,12 @@ export async function importExternalPathsSsh(
 
   try {
     if (options?.ensureDir) {
-      // Why: terminal-drop staging needs `${worktree}/.orca/drops` to exist
+      // Why: terminal-drop staging needs `${worktree}/.pebble/drops` to exist
       // before the first upload. Upload primitives do not create parent dirs,
       // and mkdirSftp is not recursive — so walk the parent chain here on the
       // same SFTP session to avoid doubling the handshake cost. Writing the
-      // .orca/.gitignore marker only when absent prevents clobbering user-
-      // authored patterns. .orca/ is reserved as Orca-owned remote state;
+      // .pebble/.gitignore marker only when absent prevents clobbering user-
+      // authored patterns. .pebble/ is reserved as Pebble-owned remote state;
       // see docs/terminal-drop-ssh.md.
       await ensureDropStagingDir(sftp, destDir)
     }
@@ -199,12 +199,12 @@ async function deconflictNameSftp(
 }
 
 async function ensureDropStagingDir(sftp: SFTPWrapper, destDir: string): Promise<void> {
-  // destDir is a posix remote path, expected to be `${worktreePath}/.orca/drops`.
+  // destDir is a posix remote path, expected to be `${worktreePath}/.pebble/drops`.
   const parent = posix.dirname(destDir)
   await mkdirSftp(sftp, parent)
   const gitignorePath = `${parent}/.gitignore`
   if (!(await sftpPathExists(sftp, gitignorePath))) {
-    // Why: negate the marker so .orca/.gitignore itself is trackable if we
+    // Why: negate the marker so .pebble/.gitignore itself is trackable if we
     // ever want to, without dirtying `git status` today. Only write when
     // absent to avoid clobbering user-authored patterns.
     await writeSftpFile(sftp, gitignorePath, '*\n!.gitignore\n')

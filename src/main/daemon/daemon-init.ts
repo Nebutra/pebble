@@ -203,7 +203,7 @@ function createOutOfProcessLauncher(runtimeDir: string): DaemonLauncher {
         // Why: a protocol-healthy daemon can outlive the app bundle that
         // launched it. In dev this happens after deleting/rebuilding a
         // worktree; in packaged apps it happens when the stable
-        // /Applications/Orca.app path is replaced during update.
+        // /Applications/Pebble.app path is replaced during update.
         const identity = await getDaemonLaunchIdentity(runtimeDir, socketPath, tokenPath, entryPath)
         const stalePackagedBundle =
           app.isPackaged &&
@@ -278,7 +278,7 @@ function createOutOfProcessLauncher(runtimeDir: string): DaemonLauncher {
         ELECTRON_RUN_AS_NODE: '1',
         // Why: the detached daemon is plain Node and cannot call Electron's
         // app.getPath(), but shell-ready rcfiles must live outside swept tmp.
-        ORCA_USER_DATA_PATH: userDataPath
+        PEBBLE_USER_DATA_PATH: userDataPath
       }
     })
 
@@ -379,7 +379,7 @@ export async function initDaemonPtyProvider(signal?: AbortSignal): Promise<void>
   // that deterministically outlasts the first-window timeout. Real triggers
   // (stale-daemon cleanup, legacy probes on a busy disk) are not controllable
   // from a test.
-  const e2eInitDelayMs = Number(process.env.ORCA_E2E_DAEMON_INIT_DELAY_MS)
+  const e2eInitDelayMs = Number(process.env.PEBBLE_E2E_DAEMON_INIT_DELAY_MS)
   if (Number.isFinite(e2eInitDelayMs) && e2eInitDelayMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, e2eInitDelayMs))
   }
@@ -606,7 +606,7 @@ async function runRestartDaemon(): Promise<RestartDaemonResult> {
 // Why: disconnect from the daemon without killing it. The daemon runs as a
 // separate process and survives app quit — sessions stay alive for warm
 // reattach on next launch. Leave history sessions marked "unclean" here so a
-// later daemon crash while Orca is closed is still recoverable on next launch.
+// later daemon crash while Pebble is closed is still recoverable on next launch.
 export async function disconnectDaemon(): Promise<void> {
   await adapter?.disconnectOnly()
   adapter = null

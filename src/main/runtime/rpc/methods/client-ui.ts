@@ -231,7 +231,7 @@ const UiUpdate = z
     _sortBySmartMigrated: z.boolean().optional(),
     _inlineAgentsDefaultedForExperiment: z.boolean().optional(),
     _inlineAgentsDefaultedForAllUsers: z.boolean().optional(),
-    trustedOrcaHooks: z.record(z.string(), z.unknown()).optional(),
+    trustedPebbleHooks: z.record(z.string(), z.unknown()).optional(),
     setupScriptPromptDismissedRepoIds: StringArray.optional(),
     projectOrderManualDefaultNoticeDismissed: z.boolean().optional(),
     usageEmptyStateDismissed: z.boolean().optional(),

@@ -197,21 +197,21 @@ function configureSharedProjectCompatibilityMocks(
   sharedProjectId: string
   sharedRemoteProject: Project
 } {
-  const sharedProjectId = 'github:stablyai/orca'
+  const sharedProjectId = 'github:nebutra/pebble'
   const localRepoForSharedProject: Repo =
     options.localRepoHasProviderIdentity === false
       ? localRepo
       : {
           ...localRepo,
-          upstream: { owner: 'stablyai', repo: 'orca' }
+          upstream: { owner: 'nebutra', repo: 'pebble' }
         }
   const remoteRepoWithIdentity: Repo = {
     ...remoteRepo,
-    upstream: { owner: 'stablyai', repo: 'orca' }
+    upstream: { owner: 'nebutra', repo: 'pebble' }
   }
   const sharedLocalProject: Project = {
     id: sharedProjectId,
-    displayName: 'Orca',
+    displayName: 'Pebble',
     badgeColor: '#000',
     sourceRepoIds: ['local-repo'],
     localWindowsRuntimePreference: { kind: 'windows-host' },
@@ -220,7 +220,7 @@ function configureSharedProjectCompatibilityMocks(
   }
   const sharedRemoteProject: Project = {
     id: sharedProjectId,
-    displayName: 'Orca',
+    displayName: 'Pebble',
     badgeColor: '#111',
     sourceRepoIds: ['remote-repo'],
     ...(options.remoteProjectRuntimePreference
@@ -601,7 +601,7 @@ describe('fetchReposForAllHosts', () => {
         .getState()
         .projects.map((project) => project.id)
         .sort()
-    ).toEqual(['github:stablyai/orca', 'repo:remote-repo'])
+    ).toEqual(['github:nebutra/pebble', 'repo:remote-repo'])
     expect(store.getState().projectHostSetups).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

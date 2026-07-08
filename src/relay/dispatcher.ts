@@ -92,7 +92,7 @@ export class RelayDispatcher {
     this.notifyClientDetached(this.primaryClient.id)
   }
 
-  // Why: synced remote workspaces can have more than one Orca client attached
+  // Why: synced remote workspaces can have more than one Pebble client attached
   // to the same relay. Frame sequence numbers and JSON-RPC request ids are per
   // SSH channel, so each socket client needs independent protocol state.
   attachClient(write: (data: Buffer) => void): number {
@@ -182,11 +182,11 @@ export class RelayDispatcher {
       (client) => !client.closed && client.id !== options?.excludeClientId
     )
     // Why: detached relays keep the synthetic primary client object around even
-    // though the owning Orca is attached through a Unix-socket client. Prefer a
-    // real attached client so remote `orca` shims do not forward to dead stdout.
+    // though the owning Pebble is attached through a Unix-socket client. Prefer a
+    // real attached client so remote `pebble` shims do not forward to dead stdout.
     const target = candidates.find((client) => client !== this.primaryClient) ?? candidates[0]
     if (!target) {
-      return Promise.reject(new Error('No owning Orca client is connected to the relay'))
+      return Promise.reject(new Error('No owning Pebble client is connected to the relay'))
     }
     return this.requestClient(target.id, method, params, options)
   }

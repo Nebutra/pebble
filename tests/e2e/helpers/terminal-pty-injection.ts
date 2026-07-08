@@ -1,5 +1,5 @@
-import type { Page } from '@stablyai/playwright-test'
-import { expect } from '@stablyai/playwright-test'
+import type { Page } from '@nebutra/playwright-test'
+import { expect } from '@nebutra/playwright-test'
 
 type TerminalPtyDataInjectionWindow = Window & {
   __terminalPtyDataInjection?: {

@@ -8,8 +8,8 @@ export function getTerminalFileOpenHint(): string {
     : 'Ctrl+click to open or Shift+Ctrl+click for default app'
 }
 
-export function getTerminalOrcaFileOpenHint(): string {
-  return isMacPlatform() ? '⌘+click to open in Orca' : 'Ctrl+click to open in Orca'
+export function getTerminalPebbleFileOpenHint(): string {
+  return isMacPlatform() ? '⌘+click to open in Pebble' : 'Ctrl+click to open in Pebble'
 }
 
 // Why: detected local .html/.htm file paths keep the same modifier gate as

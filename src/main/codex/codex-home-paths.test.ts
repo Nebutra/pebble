@@ -89,10 +89,10 @@ function mockElectronAppPaths(): void {
 beforeEach(() => {
   mockElectronAppPaths()
   fsMockState.failSymlink = false
-  fakeHomeDir = mkdtempSync(join(tmpdir(), 'orca-codex-resource-home-'))
-  userDataDir = mkdtempSync(join(tmpdir(), 'orca-codex-resource-user-data-'))
-  previousUserDataPath = process.env.ORCA_USER_DATA_PATH
-  process.env.ORCA_USER_DATA_PATH = userDataDir
+  fakeHomeDir = mkdtempSync(join(tmpdir(), 'pebble-codex-resource-home-'))
+  userDataDir = mkdtempSync(join(tmpdir(), 'pebble-codex-resource-user-data-'))
+  previousUserDataPath = process.env.PEBBLE_USER_DATA_PATH
+  process.env.PEBBLE_USER_DATA_PATH = userDataDir
   homedirMock.mockReturnValue(fakeHomeDir)
   getPathMock.mockImplementation((name: string) => {
     if (name === 'userData') {
@@ -107,31 +107,31 @@ afterEach(() => {
   rmSync(fakeHomeDir, { recursive: true, force: true })
   rmSync(userDataDir, { recursive: true, force: true })
   if (previousUserDataPath === undefined) {
-    delete process.env.ORCA_USER_DATA_PATH
+    delete process.env.PEBBLE_USER_DATA_PATH
   } else {
-    process.env.ORCA_USER_DATA_PATH = previousUserDataPath
+    process.env.PEBBLE_USER_DATA_PATH = previousUserDataPath
   }
   vi.clearAllMocks()
 })
 
 describe('syncSystemCodexResourcesIntoManagedHome', () => {
-  it('uses ORCA_USER_DATA_PATH when Electron cannot be required', async () => {
+  it('uses PEBBLE_USER_DATA_PATH when Electron cannot be required', async () => {
     vi.resetModules()
     vi.doMock('electron', () => {
       throw new Error('electron unavailable in packaged CLI')
     })
-    const previousUserDataPath = process.env.ORCA_USER_DATA_PATH
-    process.env.ORCA_USER_DATA_PATH = userDataDir
+    const previousUserDataPath = process.env.PEBBLE_USER_DATA_PATH
+    process.env.PEBBLE_USER_DATA_PATH = userDataDir
     try {
-      const { getOrcaManagedCodexHomePath: getCliSafeManagedPath } =
+      const { getPebbleManagedCodexHomePath: getCliSafeManagedPath } =
         await import('./codex-home-paths')
 
       expect(getCliSafeManagedPath()).toBe(join(userDataDir, 'codex-runtime-home', 'home'))
     } finally {
       if (previousUserDataPath === undefined) {
-        delete process.env.ORCA_USER_DATA_PATH
+        delete process.env.PEBBLE_USER_DATA_PATH
       } else {
-        process.env.ORCA_USER_DATA_PATH = previousUserDataPath
+        process.env.PEBBLE_USER_DATA_PATH = previousUserDataPath
       }
       mockElectronAppPaths()
       vi.resetModules()

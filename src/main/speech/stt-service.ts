@@ -414,7 +414,7 @@ export class SttService {
   private scheduleIdleTeardown(): void {
     this.clearIdleTeardownTimer()
     // Why: keep the native recognizer warm for repeated dictations, but release
-    // the ONNX model after a quiet period so long-running Orca sessions don't
+    // the ONNX model after a quiet period so long-running Pebble sessions don't
     // pin speech memory forever.
     this.idleTeardownTimer = setTimeout(() => {
       void this.teardownIdleWorker()

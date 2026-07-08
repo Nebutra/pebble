@@ -30,7 +30,7 @@ describe('applyTerminalAttributionEnv', () => {
   })
 
   function makeTmpRoot(): string {
-    tmpRoot = mkdtempSync(join(tmpdir(), 'orca-attribution-'))
+    tmpRoot = mkdtempSync(join(tmpdir(), 'pebble-attribution-'))
     return tmpRoot
   }
 
@@ -38,19 +38,19 @@ describe('applyTerminalAttributionEnv', () => {
     const pathDelimiter = process.platform === 'win32' ? ';' : ':'
     return pathValue
       .split(pathDelimiter)
-      .filter((entry) => !entry.includes('orca-terminal-attribution'))
+      .filter((entry) => !entry.includes('pebble-terminal-attribution'))
       .join(pathDelimiter)
   }
 
   function cleanAttributionEnv(env?: Record<string, string>): Record<string, string> {
     const base = { ...process.env }
-    delete base.ORCA_ENABLE_GIT_ATTRIBUTION
-    delete base.ORCA_GIT_COMMIT_TRAILER
-    delete base.ORCA_GH_PR_FOOTER
-    delete base.ORCA_GH_ISSUE_FOOTER
-    delete base.ORCA_ATTRIBUTION_SHIM_DIR
-    delete base.ORCA_REAL_GIT
-    delete base.ORCA_REAL_GH
+    delete base.PEBBLE_ENABLE_GIT_ATTRIBUTION
+    delete base.PEBBLE_GIT_COMMIT_TRAILER
+    delete base.PEBBLE_GH_PR_FOOTER
+    delete base.PEBBLE_GH_ISSUE_FOOTER
+    delete base.PEBBLE_ATTRIBUTION_SHIM_DIR
+    delete base.PEBBLE_REAL_GIT
+    delete base.PEBBLE_REAL_GH
     base.PATH = stripInheritedAttributionPath(base.PATH ?? '')
     const next = { ...base, ...env }
     return next as Record<string, string>
@@ -89,8 +89,8 @@ describe('applyTerminalAttributionEnv', () => {
     const repo = join(root, 'repo')
     mkdirSync(repo)
     runGit(repo, ['init'])
-    runGit(repo, ['config', 'user.name', 'Orca Test'])
-    runGit(repo, ['config', 'user.email', 'orca-test@example.com'])
+    runGit(repo, ['config', 'user.name', 'Pebble Test'])
+    runGit(repo, ['config', 'user.email', 'pebble-test@example.com'])
     writeFileSync(join(repo, 'README.md'), 'initial\n')
     runGit(repo, ['add', 'README.md'])
     runGit(repo, ['commit', '-m', 'initial'])
@@ -109,12 +109,12 @@ describe('applyTerminalAttributionEnv', () => {
     runGit(repo, ['commit', '--dry-run', '-m', 'second'], attributionEnv)
 
     expect(runGit(repo, ['rev-parse', 'HEAD']).trim()).toBe(beforeHead)
-    expect(runGit(repo, ['log', '-1', '--format=%B'])).not.toContain('Co-authored-by: Orca')
+    expect(runGit(repo, ['log', '-1', '--format=%B'])).not.toContain('Co-authored-by: Pebble')
 
     runGit(repo, ['commit', '-m', 'second'], attributionEnv)
     expect(runGit(repo, ['rev-parse', 'HEAD']).trim()).not.toBe(beforeHead)
     expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
+      'Co-authored-by: Pebble <help@nebutra.ai>'
     )
   })
 
@@ -123,8 +123,8 @@ describe('applyTerminalAttributionEnv', () => {
     const repo = join(root, 'repo')
     mkdirSync(repo)
     runGit(repo, ['init'])
-    runGit(repo, ['config', 'user.name', 'Orca Test'])
-    runGit(repo, ['config', 'user.email', 'orca-test@example.com'])
+    runGit(repo, ['config', 'user.name', 'Pebble Test'])
+    runGit(repo, ['config', 'user.email', 'pebble-test@example.com'])
     writeFileSync(join(repo, 'README.md'), 'initial\n')
     runGit(repo, ['add', 'README.md'])
 
@@ -137,7 +137,7 @@ describe('applyTerminalAttributionEnv', () => {
     runGit(repo, ['commit', '-n', '-m', 'initial'], attributionEnv)
 
     expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
+      'Co-authored-by: Pebble <help@nebutra.ai>'
     )
   })
 
@@ -146,8 +146,8 @@ describe('applyTerminalAttributionEnv', () => {
     const repo = join(root, 'repo')
     mkdirSync(repo)
     runGit(repo, ['init'])
-    runGit(repo, ['config', 'user.name', 'Orca Test'])
-    runGit(repo, ['config', 'user.email', 'orca-test@example.com'])
+    runGit(repo, ['config', 'user.name', 'Pebble Test'])
+    runGit(repo, ['config', 'user.email', 'pebble-test@example.com'])
     writeFileSync(join(repo, 'README.md'), 'initial\n')
     runGit(repo, ['add', 'README.md'])
     runGit(repo, ['commit', '-m', 'initial'])
@@ -162,7 +162,7 @@ describe('applyTerminalAttributionEnv', () => {
     runGit(repo, ['commit', '-am', 'combined message'], attributionEnv)
 
     expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
+      'Co-authored-by: Pebble <help@nebutra.ai>'
     )
   })
 
@@ -171,8 +171,8 @@ describe('applyTerminalAttributionEnv', () => {
     const repo = join(root, 'repo')
     mkdirSync(repo)
     runGit(repo, ['init'])
-    runGit(repo, ['config', 'user.name', 'Orca Test'])
-    runGit(repo, ['config', 'user.email', 'orca-test@example.com'])
+    runGit(repo, ['config', 'user.name', 'Pebble Test'])
+    runGit(repo, ['config', 'user.email', 'pebble-test@example.com'])
     writeFileSync(join(repo, 'README.md'), 'initial\n')
     runGit(repo, ['add', 'README.md'])
 
@@ -185,7 +185,7 @@ describe('applyTerminalAttributionEnv', () => {
     runGit(repo, ['-c', 'core.quotePath=false', 'commit', '-m', 'initial'], attributionEnv)
 
     expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
+      'Co-authored-by: Pebble <help@nebutra.ai>'
     )
   })
 
@@ -195,8 +195,8 @@ describe('applyTerminalAttributionEnv', () => {
     const messagePath = join(root, 'message.txt')
     mkdirSync(repo)
     runGit(repo, ['init'])
-    runGit(repo, ['config', 'user.name', 'Orca Test'])
-    runGit(repo, ['config', 'user.email', 'orca-test@example.com'])
+    runGit(repo, ['config', 'user.name', 'Pebble Test'])
+    runGit(repo, ['config', 'user.email', 'pebble-test@example.com'])
     writeFileSync(join(repo, 'README.md'), 'initial\n')
     writeFileSync(messagePath, 'initial from file\n')
     runGit(repo, ['add', 'README.md'])
@@ -210,7 +210,7 @@ describe('applyTerminalAttributionEnv', () => {
     runGit(repo, ['commit', '-F', messagePath], attributionEnv)
 
     expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
+      'Co-authored-by: Pebble <help@nebutra.ai>'
     )
     expect(readFileSync(messagePath, 'utf8')).toBe('initial from file\n')
   })
@@ -251,7 +251,7 @@ exit 1
         })
       ).toThrow()
 
-      expect(readFileSync(argsPath, 'utf8')).not.toContain('Co-authored-by: Orca')
+      expect(readFileSync(argsPath, 'utf8')).not.toContain('Co-authored-by: Pebble')
     }
   )
 
@@ -299,7 +299,7 @@ exit 1
         env: cleanAttributionEnv(attributionEnv)
       })
 
-      expect(readFileSync(argsPath, 'utf8')).not.toContain('Co-authored-by: Orca')
+      expect(readFileSync(argsPath, 'utf8')).not.toContain('Co-authored-by: Pebble')
     }
   )
 
@@ -308,8 +308,8 @@ exit 1
     const repo = join(root, 'repo')
     mkdirSync(repo)
     runGit(repo, ['init'])
-    runGit(repo, ['config', 'user.name', 'Orca Test'])
-    runGit(repo, ['config', 'user.email', 'orca-test@example.com'])
+    runGit(repo, ['config', 'user.name', 'Pebble Test'])
+    runGit(repo, ['config', 'user.email', 'pebble-test@example.com'])
     const hookPath = join(repo, '.git', 'hooks', 'commit-msg')
     const hookCounterPath = join(repo, 'hook-count')
     writeFileSync(
@@ -321,7 +321,7 @@ if [[ -f "${hookCounterPath}" ]]; then
   count="$(cat "${hookCounterPath}")"
 fi
 printf '%s\\n' "$((count + 1))" >"${hookCounterPath}"
-grep -Fq 'Co-authored-by: Orca <help@stably.ai>' "$1"
+grep -Fq 'Co-authored-by: Pebble <help@nebutra.ai>' "$1"
 `,
       'utf8'
     )
@@ -339,7 +339,7 @@ grep -Fq 'Co-authored-by: Orca <help@stably.ai>' "$1"
 
     expect(readFileSync(hookCounterPath, 'utf8').trim()).toBe('1')
     expect(runGit(repo, ['log', '-1', '--format=%B'])).toContain(
-      'Co-authored-by: Orca <help@stably.ai>'
+      'Co-authored-by: Pebble <help@nebutra.ai>'
     )
   })
 
@@ -388,7 +388,7 @@ exit 1
 
     expect(existsSync(commitPath)).toBe(true)
     expect(existsSync(amendPath)).toBe(false)
-    expect(readFileSync(argsPath, 'utf8')).toContain('Co-authored-by: Orca <help@stably.ai>')
+    expect(readFileSync(argsPath, 'utf8')).toContain('Co-authored-by: Pebble <help@nebutra.ai>')
   })
 
   posixSubprocessIt('passes editor-based commits through without attribution', () => {
@@ -440,14 +440,14 @@ if [[ "$1 $2" == "pr create" ]]; then
   exit 0
 fi
 if [[ "$1 $2 $3 $4" == "pr view --json url" ]]; then
-  printf '%s\\n' 'https://github.com/stablyai/orca/pull/123'
+  printf '%s\\n' 'https://github.com/nebutra/pebble/pull/123'
   exit 0
 fi
-if [[ "$1 $2" == "api repos/stablyai/orca/pulls/123" && "\${3:-}" == "--jq" ]]; then
+if [[ "$1 $2" == "api repos/nebutra/pebble/pulls/123" && "\${3:-}" == "--jq" ]]; then
   printf '%s\\n' 'Existing body'
   exit 0
 fi
-if [[ "$1 $2 $3 $4" == "api -X PATCH repos/stablyai/orca/pulls/123" ]]; then
+if [[ "$1 $2 $3 $4" == "api -X PATCH repos/nebutra/pebble/pulls/123" ]]; then
   touch "${markerPath}"
   exit 0
 fi
@@ -485,27 +485,27 @@ exit 1
       `#!/usr/bin/env bash
 set -euo pipefail
 if [[ "$1 $2" == "pr create" ]]; then
-  printf '%s\\n' 'https://github.com/stablyai/orca/pull/123'
+  printf '%s\\n' 'https://github.com/nebutra/pebble/pull/123'
   exit 0
 fi
 if [[ "$1 $2" == "issue create" ]]; then
-  printf '%s\\n' 'https://github.com/stablyai/orca/issues/456'
+  printf '%s\\n' 'https://github.com/nebutra/pebble/issues/456'
   exit 0
 fi
-if [[ "$1 $2" == "api repos/stablyai/orca/pulls/123" && "\${3:-}" == "--jq" ]]; then
+if [[ "$1 $2" == "api repos/nebutra/pebble/pulls/123" && "\${3:-}" == "--jq" ]]; then
   printf '%s\\n' 'PR body'
   exit 0
 fi
-if [[ "$1 $2" == "api repos/stablyai/orca/issues/456" && "\${3:-}" == "--jq" ]]; then
+if [[ "$1 $2" == "api repos/nebutra/pebble/issues/456" && "\${3:-}" == "--jq" ]]; then
   printf '%s\\n' 'Issue body'
   exit 0
 fi
-if [[ "$1 $2 $3 $4" == "api -X PATCH repos/stablyai/orca/pulls/123" ]]; then
+if [[ "$1 $2 $3 $4" == "api -X PATCH repos/nebutra/pebble/pulls/123" ]]; then
   printf '%s\\n' "$@" >"${patchArgsPath}"
   touch "${prMarkerPath}"
   exit 0
 fi
-if [[ "$1 $2 $3 $4" == "api -X PATCH repos/stablyai/orca/issues/456" ]]; then
+if [[ "$1 $2 $3 $4" == "api -X PATCH repos/nebutra/pebble/issues/456" ]]; then
   touch "${issueMarkerPath}"
   exit 0
 fi
@@ -527,13 +527,13 @@ exit 1
         encoding: 'utf8',
         env: cleanAttributionEnv(attributionEnv)
       })
-    ).toBe('https://github.com/stablyai/orca/pull/123\n')
+    ).toBe('https://github.com/nebutra/pebble/pull/123\n')
     expect(
       execFileSync('gh', ['issue', 'create', '--title', 'Issue', '--body', 'Body'], {
         encoding: 'utf8',
         env: cleanAttributionEnv(attributionEnv)
       })
-    ).toBe('https://github.com/stablyai/orca/issues/456\n')
+    ).toBe('https://github.com/nebutra/pebble/issues/456\n')
 
     expect(existsSync(prMarkerPath)).toBe(true)
     expect(existsSync(issueMarkerPath)).toBe(true)
@@ -559,18 +559,18 @@ if [[ "$1 $2 $3" == "issue create --help" ]]; then
   exit 0
 fi
 if [[ "$1 $2 $3 $4" == "pr view --json url" ]]; then
-  printf '%s\\n' 'https://github.com/stablyai/orca/pull/123'
+  printf '%s\\n' 'https://github.com/nebutra/pebble/pull/123'
   exit 0
 fi
 if [[ "$1 $2" == "issue list" ]]; then
-  printf '%s\\n' 'https://github.com/stablyai/orca/issues/456'
+  printf '%s\\n' 'https://github.com/nebutra/pebble/issues/456'
   exit 0
 fi
-if [[ "$1 $2 $3 $4" == "api -X PATCH repos/stablyai/orca/pulls/123" ]]; then
+if [[ "$1 $2 $3 $4" == "api -X PATCH repos/nebutra/pebble/pulls/123" ]]; then
   touch "${markerPath}"
   exit 0
 fi
-if [[ "$1 $2 $3 $4" == "api -X PATCH repos/stablyai/orca/issues/456" ]]; then
+if [[ "$1 $2 $3 $4" == "api -X PATCH repos/nebutra/pebble/issues/456" ]]; then
   touch "${markerPath}"
   exit 0
 fi
@@ -618,10 +618,10 @@ if [[ "$1 $2" == "issue create" ]]; then
   exit 0
 fi
 if [[ "$1 $2" == "issue list" ]]; then
-  printf '%s\\n' 'https://github.com/stablyai/orca/issues/456'
+  printf '%s\\n' 'https://github.com/nebutra/pebble/issues/456'
   exit 0
 fi
-if [[ "$1 $2 $3 $4" == "api -X PATCH repos/stablyai/orca/issues/456" ]]; then
+if [[ "$1 $2 $3 $4" == "api -X PATCH repos/nebutra/pebble/issues/456" ]]; then
   touch "${markerPath}"
   exit 0
 fi
@@ -658,13 +658,13 @@ exit 1
       `#!/usr/bin/env bash
 set -euo pipefail
 if [[ "$1 $2" == "pr create" ]]; then
-  printf '%s\\n' 'https://github.com/stablyai/orca/pull/123'
+  printf '%s\\n' 'https://github.com/nebutra/pebble/pull/123'
   exit 0
 fi
-if [[ "$1 $2" == "api repos/stablyai/orca/pulls/123" && "\${3:-}" == "--jq" ]]; then
+if [[ "$1 $2" == "api repos/nebutra/pebble/pulls/123" && "\${3:-}" == "--jq" ]]; then
   exit 7
 fi
-if [[ "$1 $2 $3 $4" == "api -X PATCH repos/stablyai/orca/pulls/123" ]]; then
+if [[ "$1 $2 $3 $4" == "api -X PATCH repos/nebutra/pebble/pulls/123" ]]; then
   touch "${markerPath}"
   exit 0
 fi
@@ -686,7 +686,7 @@ exit 1
       env: cleanAttributionEnv(attributionEnv)
     })
 
-    expect(output).toBe('https://github.com/stablyai/orca/pull/123\n')
+    expect(output).toBe('https://github.com/nebutra/pebble/pull/123\n')
     expect(existsSync(markerPath)).toBe(false)
   })
 
@@ -699,14 +699,14 @@ exit 1
       `#!/usr/bin/env bash
 set -euo pipefail
 if [[ "$1 $2" == "pr create" ]]; then
-  printf '%s\\n' 'https://github.com/stablyai/orca/pull/123'
+  printf '%s\\n' 'https://github.com/nebutra/pebble/pull/123'
   exit 0
 fi
-if [[ "$1 $2" == "api repos/stablyai/orca/pulls/123" && "\${3:-}" == "--jq" ]]; then
+if [[ "$1 $2" == "api repos/nebutra/pebble/pulls/123" && "\${3:-}" == "--jq" ]]; then
   printf '%s\\n' 'Existing body'
   exit 0
 fi
-if [[ "$1 $2 $3 $4" == "api -X PATCH repos/stablyai/orca/pulls/123" ]]; then
+if [[ "$1 $2 $3 $4" == "api -X PATCH repos/nebutra/pebble/pulls/123" ]]; then
   exit 9
 fi
 exit 1
@@ -727,7 +727,7 @@ exit 1
       env: cleanAttributionEnv(attributionEnv)
     })
 
-    expect(output).toBe('https://github.com/stablyai/orca/pull/123\n')
+    expect(output).toBe('https://github.com/nebutra/pebble/pull/123\n')
   })
 
   it('fails open when shim files cannot be written', () => {
@@ -741,7 +741,7 @@ exit 1
       userDataPath: blockedUserDataPath
     })
 
-    expect(baseEnv.ORCA_ENABLE_GIT_ATTRIBUTION).toBeUndefined()
+    expect(baseEnv.PEBBLE_ENABLE_GIT_ATTRIBUTION).toBeUndefined()
     expect(baseEnv.PATH).toBe('/usr/bin')
   })
 
@@ -757,7 +757,7 @@ exit 1
     applyTerminalAttributionEnv(baseEnv, options)
 
     const shimEntries = baseEnv.PATH.split(pathDelimiter).filter((entry) =>
-      entry.includes('orca-terminal-attribution')
+      entry.includes('pebble-terminal-attribution')
     )
     expect(new Set(shimEntries).size).toBe(shimEntries.length)
   })
@@ -774,13 +774,13 @@ exit 1
       userDataPath
     })
 
-    const posixDir = join(userDataPath, 'orca-terminal-attribution', 'posix')
-    const win32Dir = join(userDataPath, 'orca-terminal-attribution', 'win32')
+    const posixDir = join(userDataPath, 'pebble-terminal-attribution', 'posix')
+    const win32Dir = join(userDataPath, 'pebble-terminal-attribution', 'win32')
     const pathEntries = baseEnv.PATH.split(';')
 
     expect(pathEntries[0]).toBe(win32Dir)
     expect(pathEntries).not.toContain(posixDir)
-    expect(baseEnv.ORCA_ATTRIBUTION_SHIM_DIR).toBeUndefined()
+    expect(baseEnv.PEBBLE_ATTRIBUTION_SHIM_DIR).toBeUndefined()
     expect(existsSync(join(win32Dir, 'git.cmd'))).toBe(true)
   })
 
@@ -796,13 +796,13 @@ exit 1
       userDataPath
     })
 
-    const posixDir = join(userDataPath, 'orca-terminal-attribution', 'posix')
-    const win32Dir = join(userDataPath, 'orca-terminal-attribution', 'win32')
+    const posixDir = join(userDataPath, 'pebble-terminal-attribution', 'posix')
+    const win32Dir = join(userDataPath, 'pebble-terminal-attribution', 'win32')
     const pathEntries = baseEnv.PATH.split(';')
 
     expect(pathEntries[0]).toBe(posixDir)
     expect(pathEntries).not.toContain(win32Dir)
-    expect(baseEnv.ORCA_ATTRIBUTION_SHIM_DIR).toBe(posixDir)
+    expect(baseEnv.PEBBLE_ATTRIBUTION_SHIM_DIR).toBe(posixDir)
     expect(existsSync(join(posixDir, 'git'))).toBe(true)
   })
 
@@ -813,7 +813,7 @@ exit 1
       { enabled: true, userDataPath: join(root, 'user-data') }
     )
 
-    const shimDir = join(root, 'user-data', 'orca-terminal-attribution', 'win32')
+    const shimDir = join(root, 'user-data', 'pebble-terminal-attribution', 'win32')
     const gitWrapper = readFileSync(join(shimDir, 'git-wrapper.ps1'), 'utf8')
     const ghWrapper = readFileSync(join(shimDir, 'gh-wrapper.ps1'), 'utf8')
 

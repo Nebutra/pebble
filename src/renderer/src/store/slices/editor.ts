@@ -2130,7 +2130,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
         activeFileId: newActiveId,
         // Why: if closing the last editor also leaves the worktree without any
         // browser or terminal surface, keep parity with the terminal/browser
-        // close handlers and return to the Orca landing state instead of
+        // close handlers and return to the Pebble landing state instead of
         // leaving an active worktree selected with nothing renderable.
         activeWorktreeId: shouldDeactivateWorktree ? null : s.activeWorktreeId,
         activeBrowserTabId: shouldDeactivateWorktree
@@ -3610,7 +3610,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
       remoteOperationDepth: s.remoteOperationDepth + 1,
       isRemoteOperationActive: true,
       // Why: last-write-wins. The UI disables every action entry while busy,
-      // so a second remote op can't be started from inside Orca. If a
+      // so a second remote op can't be started from inside Pebble. If a
       // background caller (future) triggers one, surfacing the most recent
       // kind matches "what the user is currently watching".
       inFlightRemoteOpKind: kind ?? s.inFlightRemoteOpKind
@@ -4124,7 +4124,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
           return
         }
         // Why: terminal file links already authorize clicked external paths
-        // before opening them in Orca. Markdown file:// links need the same
+        // before opening them in Pebble. Markdown file:// links need the same
         // user-gesture authorization so /tmp screenshots can use ImageViewer.
         await window.api.fs.authorizeExternalPath({ targetPath: target.absolutePath })
       } else {
@@ -4285,7 +4285,7 @@ export const createEditorSlice: StateCreator<AppState, [], [], EditorSlice> = (s
             filePath: pf.filePath,
             relativePath: pf.relativePath,
             worktreeId,
-            // Why: sessions can contain language ids from older Orca builds.
+            // Why: sessions can contain language ids from older Pebble builds.
             // Re-detect on hydrate so newly-supported extensions like .ipynb
             // stop reopening as raw JSON/plain text after the upgrade.
             language: detectLanguage(pf.relativePath || pf.filePath),

@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mobile Driver Overlay — Orca Preview</title>
+    <title>Mobile Driver Overlay — Pebble Preview</title>
     <style>
-      /* ── Orca dark tokens (from main.css .dark) ── */
+      /* ── Pebble dark tokens (from main.css .dark) ── */
       :root {
         --background: #0a0a0a;
         --foreground: #fafafa;
@@ -23,9 +23,9 @@
         --radius: 0.625rem;
         --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
           'Courier New', monospace;
-        --orca-pane-title-height: 24px;
-        --orca-pane-title-fg: rgb(255 255 255 / 0.52);
-        --orca-pane-title-separator: rgb(255 255 255 / 0.06);
+        --pebble-pane-title-height: 24px;
+        --pebble-pane-title-fg: rgb(255 255 255 / 0.52);
+        --pebble-pane-title-separator: rgb(255 255 255 / 0.06);
         --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
         --xterm-bg: #000000;
         --xterm-fg: #cccccc;
@@ -59,7 +59,7 @@
         letter-spacing: 0.01em;
       }
 
-      /* ── Preview chrome (switcher only — not part of Orca UI) ── */
+      /* ── Preview chrome (switcher only — not part of Pebble UI) ── */
       .preview-chrome {
         position: fixed;
         top: 0;
@@ -107,7 +107,7 @@
         color: var(--foreground);
       }
 
-      /* ── Orca workspace frame ── */
+      /* ── Pebble workspace frame ── */
       .workspace {
         height: 100%;
         padding-top: 3rem;
@@ -133,11 +133,11 @@
       .pane[data-has-title]::after {
         content: '';
         position: absolute;
-        top: var(--orca-pane-title-height);
+        top: var(--pebble-pane-title-height);
         left: -5px;
         right: -5px;
         height: 1px;
-        background: var(--orca-pane-title-separator);
+        background: var(--pebble-pane-title-separator);
         z-index: 6;
         pointer-events: none;
       }
@@ -147,14 +147,14 @@
         top: 0;
         left: 0;
         right: 0;
-        height: var(--orca-pane-title-height);
+        height: var(--pebble-pane-title-height);
         z-index: 5;
         display: flex;
         align-items: center;
         padding: 0 8px;
         font-size: 13px;
         font-family: var(--font-mono);
-        color: var(--orca-pane-title-fg);
+        color: var(--pebble-pane-title-fg);
         background: transparent;
         user-select: none;
       }
@@ -162,8 +162,8 @@
       .xterm-container {
         position: relative;
         width: calc(100% - 4px);
-        height: calc(100% - var(--orca-pane-title-height));
-        margin-top: var(--orca-pane-title-height);
+        height: calc(100% - var(--pebble-pane-title-height));
+        margin-top: var(--pebble-pane-title-height);
         margin-left: 4px;
       }
 

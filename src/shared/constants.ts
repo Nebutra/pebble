@@ -58,12 +58,12 @@ export function normalizeAgentActivityDisplayMode(value: unknown): AgentActivity
 export const ONBOARDING_FINAL_STEP = 5
 export const ONBOARDING_FLOW_VERSION = 4
 
-export const ORCA_BROWSER_PARTITION = 'persist:orca-browser'
+export const PEBBLE_BROWSER_PARTITION = 'persist:pebble-browser'
 // Why: blank browser tabs must start from an inert guest URL that does not
 // navigate the privileged main window to about:blank. Renderer and main both
 // need the exact same value so the attach policy can allow only this one safe
 // data URL while still rejecting arbitrary renderer-provided data URLs.
-export const ORCA_BROWSER_BLANK_URL = 'data:text/html,'
+export const PEBBLE_BROWSER_BLANK_URL = 'data:text/html,'
 
 // Why: Electron's invoke error path preserves message text, not arbitrary
 // custom Error fields. Keep this stable token shared across main/renderer.
@@ -178,7 +178,7 @@ export function getDefaultOnboardingState(): OnboardingState {
 function getDefaultWorkspaceDir(homeDir: string): string {
   const separator = homeDir.includes('\\') ? '\\' : '/'
   const trimmedHomeDir = homeDir.replace(/[\\/]+$/, '')
-  return [trimmedHomeDir, 'orca', 'workspaces'].join(separator)
+  return [trimmedHomeDir, 'pebble', 'workspaces'].join(separator)
 }
 
 export function getDefaultSettings(homedir: string): GlobalSettings {
@@ -285,8 +285,8 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     showMobileButton: true,
     ctrlTabOrderMode: 'mru',
     // Why: switching worktrees and opening command surfaces from a focused
-    // terminal is a core Orca workflow; users who prefer TUI ownership opt in.
-    terminalShortcutPolicy: 'orca-first',
+    // terminal is a core Pebble workflow; users who prefer TUI ownership opt in.
+    terminalShortcutPolicy: 'pebble-first',
     floatingTerminalEnabled: true,
     floatingTerminalDefaultedForAllUsers: true,
     floatingTerminalCwd: '~',
@@ -351,7 +351,9 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     // Why: off by default — opt-in cosmetic joke feature. Leaving the default
     // false keeps the overlay unmounted for users who never enable it.
     experimentalPet: false,
-    experimentalActivity: false,
+    // Why: Agents graduated into the primary sidebar. Keep the legacy persisted
+    // flag true so old settings cannot hide the restored source UI.
+    experimentalActivity: true,
     experimentalActivityDefaultedOffForAllUsers: true,
     experimentalTerminalAttention: false,
     experimentalAgentHibernation: false,
@@ -487,7 +489,7 @@ export function getDefaultUIState(): PersistedUIState {
     statusBarVisible: true,
     dismissedUpdateVersion: null,
     lastUpdateCheckAt: null,
-    trustedOrcaHooks: {},
+    trustedPebbleHooks: {},
     setupScriptPromptDismissedRepoIds: [],
     acknowledgedAgentsByPaneKey: {},
     setupGuideSidebarDismissed: false,

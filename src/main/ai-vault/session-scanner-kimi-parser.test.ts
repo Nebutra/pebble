@@ -86,7 +86,7 @@ async function writeKimiSession(args: {
   workDir?: string | null
   wireLines?: unknown[] | null
 }): Promise<{ file: FileWithMtime }> {
-  const home = await mkdtemp(join(tmpdir(), 'orca-kimi-'))
+  const home = await mkdtemp(join(tmpdir(), 'pebble-kimi-'))
   tempDirs.push(home)
   const sessionId = args.sessionId ?? SESSION_ID
   const sessionDir = join(home, 'sessions', 'wd_kimi-test-proj_36fb0f9f4385', sessionId)

@@ -152,7 +152,7 @@ function formatSparseDirectoryPreview(directories: string[]): string {
 }
 
 function isWebClient(): boolean {
-  return Boolean((window as unknown as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__)
+  return Boolean((window as unknown as { __PEBBLE_WEB_CLIENT__?: boolean }).__PEBBLE_WEB_CLIENT__)
 }
 
 function getDirectoryName(folderPath: string): string {
@@ -333,7 +333,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
   // SSH disconnected state
   const sshStatus = useAppStore((s) => {
     // Why: runtime-owned (per-workspace-env) SSH targets are hidden and their relay health is
-    // owned by the runtime layer — Orca suppresses their ssh:state-changed broadcasts, so their
+    // owned by the runtime layer — Pebble suppresses their ssh:state-changed broadcasts, so their
     // state is absent here. Don't show a false "disconnected" SSH chip for them.
     if (!repo?.connectionId || isRuntimeOwnedSshTargetId(repo.connectionId)) {
       return null
@@ -350,7 +350,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
     (s) => (s.activeTabTypeByWorktree?.[worktree.id] ?? 'terminal') === 'terminal'
   )
 
-  // Why: runtime ("Orca server") hosts get the same disconnected treatment as
+  // Why: runtime ("Pebble server") hosts get the same disconnected treatment as
   // SSH — when the host's runtime environment has no live status, its worktrees
   // are dimmed and marked disconnected instead of looking fully available.
   const isRuntimeDisconnected = useAppStore((s) => {
@@ -655,7 +655,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
         staleWhileRevalidate: true
       })
     }
-    // Why: PRs created outside Orca (for example `gh pr create`) do not emit a
+    // Why: PRs created outside Pebble (for example `gh pr create`) do not emit a
     // renderer event; visible-card polling discovers them after an earlier miss.
     return installWindowVisibilityInterval({
       run: refreshHostedReview,
@@ -1065,7 +1065,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
     agentActivityDisplayMode === 'compact' &&
     compactInlineAgentRows.length > 0
   const showAggregateCacheTimer = !compactCards && !compactInlineAgentRowsVisible
-  const handleOpenGitHubIssueInOrca = useCallback(
+  const handleOpenGitHubIssueInPebble = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
       const issueUrl = hoverIssue && 'url' in hoverIssue ? hoverIssue.url : undefined
@@ -1088,7 +1088,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
     },
     [hoverIssue, openTaskPage, repo]
   )
-  const handleOpenReviewInOrca = useCallback(
+  const handleOpenReviewInPebble = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
       if (!repo || !hoverReview?.url || hoverReview.provider !== 'github') {
@@ -1139,7 +1139,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
         break
     }
   }, [hoverReview?.provider, updateWorktreeMeta, worktree.id])
-  const handleOpenLinearIssueInOrca = useCallback(
+  const handleOpenLinearIssueInPebble = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
       if (!linearIssue) {
@@ -1260,15 +1260,15 @@ const WorktreeCard = React.memo(function WorktreeCard({
             hoverControl={detailsHoverControl}
             onEditIssue={affiliateListMode ? undefined : handleEditIssue}
             onEditComment={affiliateListMode ? undefined : handleEditComment}
-            onOpenGitHubIssueInOrca={
+            onOpenGitHubIssueInPebble={
               metaIssue && 'url' in metaIssue && metaIssue.url
-                ? handleOpenGitHubIssueInOrca
+                ? handleOpenGitHubIssueInPebble
                 : undefined
             }
-            onOpenLinearIssueInOrca={linearIssue?.url ? handleOpenLinearIssueInOrca : undefined}
-            onOpenReviewInOrca={
+            onOpenLinearIssueInPebble={linearIssue?.url ? handleOpenLinearIssueInPebble : undefined}
+            onOpenReviewInPebble={
               metaReview?.url && metaReview.provider === 'github'
-                ? handleOpenReviewInOrca
+                ? handleOpenReviewInPebble
                 : undefined
             }
             onOpenAutomation={affiliateListMode ? undefined : handleOpenAutomation}
@@ -1325,12 +1325,12 @@ const WorktreeCard = React.memo(function WorktreeCard({
         hoverControl={detailsHoverControl}
         onEditIssue={affiliateListMode ? undefined : handleEditIssue}
         onEditComment={affiliateListMode ? undefined : handleEditComment}
-        onOpenGitHubIssueInOrca={
-          metaIssue && 'url' in metaIssue && metaIssue.url ? handleOpenGitHubIssueInOrca : undefined
+        onOpenGitHubIssueInPebble={
+          metaIssue && 'url' in metaIssue && metaIssue.url ? handleOpenGitHubIssueInPebble : undefined
         }
-        onOpenLinearIssueInOrca={linearIssue?.url ? handleOpenLinearIssueInOrca : undefined}
-        onOpenReviewInOrca={
-          metaReview?.url && metaReview.provider === 'github' ? handleOpenReviewInOrca : undefined
+        onOpenLinearIssueInPebble={linearIssue?.url ? handleOpenLinearIssueInPebble : undefined}
+        onOpenReviewInPebble={
+          metaReview?.url && metaReview.provider === 'github' ? handleOpenReviewInPebble : undefined
         }
         onOpenAutomation={affiliateListMode ? undefined : handleOpenAutomation}
         onOpenAutomationRun={affiliateListMode ? undefined : handleOpenAutomationRun}
@@ -1457,7 +1457,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
                         )
                       : translate(
                           'auto.components.sidebar.WorktreeCard.runtimeHostProject',
-                          'Project on Orca server'
+                          'Project on Pebble server'
                         )}
                   </TooltipContent>
                 </Tooltip>
@@ -1816,14 +1816,14 @@ const WorktreeCard = React.memo(function WorktreeCard({
         onRenameWorkspaceTitle={affiliateListMode ? undefined : handleRenameTitle}
         onEditIssue={affiliateListMode ? undefined : handleEditIssue}
         onEditComment={affiliateListMode ? undefined : handleEditComment}
-        onOpenGitHubIssueInOrca={
+        onOpenGitHubIssueInPebble={
           hoverIssue && 'url' in hoverIssue && hoverIssue.url
-            ? handleOpenGitHubIssueInOrca
+            ? handleOpenGitHubIssueInPebble
             : undefined
         }
-        onOpenLinearIssueInOrca={linearIssue?.url ? handleOpenLinearIssueInOrca : undefined}
-        onOpenReviewInOrca={
-          hoverReview?.url && hoverReview.provider === 'github' ? handleOpenReviewInOrca : undefined
+        onOpenLinearIssueInPebble={linearIssue?.url ? handleOpenLinearIssueInPebble : undefined}
+        onOpenReviewInPebble={
+          hoverReview?.url && hoverReview.provider === 'github' ? handleOpenReviewInPebble : undefined
         }
         onOpenAutomation={affiliateListMode ? undefined : handleOpenAutomation}
         onOpenAutomationRun={affiliateListMode ? undefined : handleOpenAutomationRun}

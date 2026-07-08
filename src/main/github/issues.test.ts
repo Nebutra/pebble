@@ -55,29 +55,29 @@ describe('issue source operations', () => {
   })
 
   it('gets a single issue from the issue owner/repo', async () => {
-    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'stablyai', repo: 'orca' })
+    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'nebutra', repo: 'pebble' })
     ghExecFileAsyncMock.mockResolvedValueOnce({
       stdout: JSON.stringify({
         number: 923,
         title: 'Use upstream issues',
         state: 'open',
-        html_url: 'https://github.com/stablyai/orca/issues/923',
+        html_url: 'https://github.com/nebutra/pebble/issues/923',
         labels: []
       })
     })
 
     await expect(getIssue('/repo-root', 923)).resolves.toMatchObject({ number: 923 })
     expect(ghExecFileAsyncMock).toHaveBeenCalledWith(
-      ['api', '--cache', '300s', 'repos/stablyai/orca/issues/923'],
+      ['api', '--cache', '300s', 'repos/nebutra/pebble/issues/923'],
       { cwd: '/repo-root' }
     )
   })
 
   it('routes local WSL issue operations through repo resolution and gh execution options', async () => {
     const localGitOptions = { wslDistro: 'Ubuntu' }
-    getIssueOwnerRepoMock.mockResolvedValue({ owner: 'stablyai', repo: 'orca' })
+    getIssueOwnerRepoMock.mockResolvedValue({ owner: 'nebutra', repo: 'pebble' })
     resolveIssueSourceMock.mockResolvedValue({
-      source: { owner: 'stablyai', repo: 'orca' },
+      source: { owner: 'nebutra', repo: 'pebble' },
       fellBack: false
     })
     ghExecFileAsyncMock
@@ -86,7 +86,7 @@ describe('issue source operations', () => {
           number: 923,
           title: 'Use upstream issues',
           state: 'open',
-          html_url: 'https://github.com/stablyai/orca/issues/923',
+          html_url: 'https://github.com/nebutra/pebble/issues/923',
           labels: []
         })
       })
@@ -94,7 +94,7 @@ describe('issue source operations', () => {
       .mockResolvedValueOnce({
         stdout: JSON.stringify({
           number: 924,
-          html_url: 'https://github.com/stablyai/orca/issues/924'
+          html_url: 'https://github.com/nebutra/pebble/issues/924'
         })
       })
       .mockResolvedValueOnce({ stdout: '' })
@@ -104,7 +104,7 @@ describe('issue source operations', () => {
           user: { login: 'octo', avatar_url: '', type: 'User' },
           body: 'Comment',
           created_at: '2026-06-16T00:00:00.000Z',
-          html_url: 'https://github.com/stablyai/orca/issues/923#issuecomment-1'
+          html_url: 'https://github.com/nebutra/pebble/issues/923#issuecomment-1'
         })
       })
       .mockResolvedValueOnce({ stdout: 'bug\nfrontend\n' })
@@ -139,7 +139,7 @@ describe('issue source operations', () => {
   })
 
   it('lists issues from the issue owner/repo', async () => {
-    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'stablyai', repo: 'orca' })
+    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'nebutra', repo: 'pebble' })
     ghExecFileAsyncMock.mockResolvedValueOnce({ stdout: '[]' })
 
     await expect(listIssues('/repo-root', 5)).resolves.toEqual({ items: [] })
@@ -149,7 +149,7 @@ describe('issue source operations', () => {
         'api',
         '--cache',
         '120s',
-        'repos/stablyai/orca/issues?per_page=5&state=open&sort=updated&direction=desc'
+        'repos/nebutra/pebble/issues?per_page=5&state=open&sort=updated&direction=desc'
       ],
       { cwd: '/repo-root' }
     )
@@ -159,7 +159,7 @@ describe('issue source operations', () => {
     // Why: parent design doc §3 — a 403 on a private upstream must not
     // masquerade as "No issues". The envelope carries an error the UI can
     // render as a banner with retry, not a silent empty list.
-    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'stablyai', repo: 'orca' })
+    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'nebutra', repo: 'pebble' })
     ghExecFileAsyncMock.mockRejectedValueOnce(
       new Error('HTTP 403: Resource not accessible by integration')
     )
@@ -171,25 +171,25 @@ describe('issue source operations', () => {
   })
 
   it('creates issues in the issue owner/repo', async () => {
-    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'stablyai', repo: 'orca' })
+    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'nebutra', repo: 'pebble' })
     ghExecFileAsyncMock.mockResolvedValueOnce({
       stdout: JSON.stringify({
         number: 924,
-        html_url: 'https://github.com/stablyai/orca/issues/924'
+        html_url: 'https://github.com/nebutra/pebble/issues/924'
       })
     })
 
     await expect(createIssue('/repo-root', 'New issue', 'Body')).resolves.toEqual({
       ok: true,
       number: 924,
-      url: 'https://github.com/stablyai/orca/issues/924'
+      url: 'https://github.com/nebutra/pebble/issues/924'
     })
     expect(ghExecFileAsyncMock).toHaveBeenCalledWith(
       [
         'api',
         '-X',
         'POST',
-        'repos/stablyai/orca/issues',
+        'repos/nebutra/pebble/issues',
         '--raw-field',
         'title=New issue',
         '--raw-field',
@@ -200,11 +200,11 @@ describe('issue source operations', () => {
   })
 
   it('creates issues with labels and assignees', async () => {
-    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'stablyai', repo: 'orca' })
+    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'nebutra', repo: 'pebble' })
     ghExecFileAsyncMock.mockResolvedValueOnce({
       stdout: JSON.stringify({
         number: 925,
-        html_url: 'https://github.com/stablyai/orca/issues/925'
+        html_url: 'https://github.com/nebutra/pebble/issues/925'
       })
     })
 
@@ -216,14 +216,14 @@ describe('issue source operations', () => {
     ).resolves.toEqual({
       ok: true,
       number: 925,
-      url: 'https://github.com/stablyai/orca/issues/925'
+      url: 'https://github.com/nebutra/pebble/issues/925'
     })
     expect(ghExecFileAsyncMock).toHaveBeenCalledWith(
       [
         'api',
         '-X',
         'POST',
-        'repos/stablyai/orca/issues',
+        'repos/nebutra/pebble/issues',
         '--raw-field',
         'title=New issue',
         '--raw-field',
@@ -240,20 +240,20 @@ describe('issue source operations', () => {
   })
 
   it('updates issue body through the REST issue endpoint', async () => {
-    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'stablyai', repo: 'orca' })
+    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'nebutra', repo: 'pebble' })
     ghExecFileAsyncMock.mockResolvedValueOnce({ stdout: '' })
 
     await expect(updateIssue('/repo-root', 924, { body: 'Updated body' })).resolves.toEqual({
       ok: true
     })
     expect(ghExecFileAsyncMock).toHaveBeenCalledWith(
-      ['api', '-X', 'PATCH', 'repos/stablyai/orca/issues/924', '--raw-field', 'body=Updated body'],
+      ['api', '-X', 'PATCH', 'repos/nebutra/pebble/issues/924', '--raw-field', 'body=Updated body'],
       { cwd: '/repo-root' }
     )
   })
 
   it('closes issues with completed, not planned, and duplicate reasons', async () => {
-    getIssueOwnerRepoMock.mockResolvedValue({ owner: 'stablyai', repo: 'orca' })
+    getIssueOwnerRepoMock.mockResolvedValue({ owner: 'nebutra', repo: 'pebble' })
     ghExecFileAsyncMock.mockResolvedValue({ stdout: '' })
 
     await expect(
@@ -272,30 +272,30 @@ describe('issue source operations', () => {
 
     expect(ghExecFileAsyncMock).toHaveBeenNthCalledWith(
       1,
-      ['issue', 'close', '924', '--repo', 'stablyai/orca', '--reason', 'completed'],
+      ['issue', 'close', '924', '--repo', 'nebutra/pebble', '--reason', 'completed'],
       { cwd: '/repo-root' }
     )
     expect(ghExecFileAsyncMock).toHaveBeenNthCalledWith(
       2,
-      ['issue', 'close', '925', '--repo', 'stablyai/orca', '--reason', 'not planned'],
+      ['issue', 'close', '925', '--repo', 'nebutra/pebble', '--reason', 'not planned'],
       { cwd: '/repo-root' }
     )
     expect(ghExecFileAsyncMock).toHaveBeenNthCalledWith(
       3,
-      ['issue', 'close', '926', '--repo', 'stablyai/orca', '--duplicate-of', '99'],
+      ['issue', 'close', '926', '--repo', 'nebutra/pebble', '--duplicate-of', '99'],
       { cwd: '/repo-root' }
     )
   })
 
   it('reopens issues through gh issue reopen', async () => {
-    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'stablyai', repo: 'orca' })
+    getIssueOwnerRepoMock.mockResolvedValueOnce({ owner: 'nebutra', repo: 'pebble' })
     ghExecFileAsyncMock.mockResolvedValueOnce({ stdout: '' })
 
     await expect(updateIssue('/repo-root', 924, { state: 'open' })).resolves.toEqual({
       ok: true
     })
     expect(ghExecFileAsyncMock).toHaveBeenCalledWith(
-      ['issue', 'reopen', '924', '--repo', 'stablyai/orca'],
+      ['issue', 'reopen', '924', '--repo', 'nebutra/pebble'],
       { cwd: '/repo-root' }
     )
   })

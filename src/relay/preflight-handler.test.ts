@@ -39,7 +39,7 @@ function lookupArgs(command: string, mode: '-lc' | '-ilc' = '-lc'): string[] {
     mode,
     [
       `if resolved=$(command -v ${command} 2>/dev/null); then`,
-      'printf \'__ORCA_AGENT_PATH__%s\\n\' "$resolved"',
+      'printf \'__PEBBLE_AGENT_PATH__%s\\n\' "$resolved"',
       'fi'
     ].join('\n')
   ]
@@ -51,7 +51,7 @@ function fishLookupArgs(command: string): string[] {
     [
       `set -l resolved (command -v ${command} 2>/dev/null)`,
       'if test -n "$resolved"',
-      'printf \'__ORCA_AGENT_PATH__%s\\n\' "$resolved"',
+      'printf \'__PEBBLE_AGENT_PATH__%s\\n\' "$resolved"',
       'end'
     ].join('\n')
   ]
@@ -151,7 +151,7 @@ describe('isCommandOnPathForRelay', () => {
   it('falls back to inherited PATH when shell startup returns no absolute command path', async () => {
     execFileAsyncMock
       .mockResolvedValueOnce({ stdout: 'welcome\ncodex is a function\n' })
-      .mockResolvedValueOnce({ stdout: '__ORCA_AGENT_PATH__/relay/path/codex\n' })
+      .mockResolvedValueOnce({ stdout: '__PEBBLE_AGENT_PATH__/relay/path/codex\n' })
 
     await expect(
       isCommandOnPathForRelay('codex', {
@@ -180,7 +180,7 @@ describe('isCommandOnPathForRelay', () => {
   it('falls back to inherited PATH when shell startup fails', async () => {
     execFileAsyncMock
       .mockRejectedValueOnce(new Error('startup failed'))
-      .mockResolvedValueOnce({ stdout: '__ORCA_AGENT_PATH__/relay/path/codex\n' })
+      .mockResolvedValueOnce({ stdout: '__PEBBLE_AGENT_PATH__/relay/path/codex\n' })
 
     await expect(
       isCommandOnPathForRelay('codex', {
@@ -193,7 +193,7 @@ describe('isCommandOnPathForRelay', () => {
   })
 
   it('does not execute an untrusted configured shell before inherited PATH lookup', async () => {
-    execFileAsyncMock.mockResolvedValueOnce({ stdout: '__ORCA_AGENT_PATH__/relay/path/codex\n' })
+    execFileAsyncMock.mockResolvedValueOnce({ stdout: '__PEBBLE_AGENT_PATH__/relay/path/codex\n' })
 
     await expect(
       isCommandOnPathForRelay('codex', {
@@ -224,7 +224,7 @@ describe('hasAbsoluteCommandPath', () => {
 
   it('recognizes a sentinel-marked command path amid shell startup and exit output', () => {
     expect(
-      hasAbsoluteCommandPath('welcome\n__ORCA_AGENT_PATH__/opt/bin/codex\nlogout-banner\n', 'linux')
+      hasAbsoluteCommandPath('welcome\n__PEBBLE_AGENT_PATH__/opt/bin/codex\nlogout-banner\n', 'linux')
     ).toBe(true)
   })
 

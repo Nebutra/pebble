@@ -1,7 +1,7 @@
-import type { Page } from '@stablyai/playwright-test'
+import type { Page } from '@nebutra/playwright-test'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
-import { test, expect } from './helpers/orca-app'
+import { test, expect } from './helpers/pebble-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import {
   getTerminalContent,
@@ -168,41 +168,41 @@ function median(values: number[]): number {
 }
 
 test.describe('local Codex terminal typing latency', () => {
-  test('keeps Codex prompt typing responsive @local-real-codex', async ({ orcaPage }, testInfo) => {
+  test('keeps Codex prompt typing responsive @local-real-codex', async ({ pebblePage }, testInfo) => {
     test.skip(
-      process.env.ORCA_E2E_REAL_CODEX !== '1',
-      'Set ORCA_E2E_REAL_CODEX=1 to exercise the locally installed Codex TUI'
+      process.env.PEBBLE_E2E_REAL_CODEX !== '1',
+      'Set PEBBLE_E2E_REAL_CODEX=1 to exercise the locally installed Codex TUI'
     )
     test.skip(process.platform === 'win32', 'local Codex command is POSIX-shell oriented')
 
-    await waitForSessionReady(orcaPage)
-    await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
-    await waitForActiveTerminalManager(orcaPage, 30_000)
+    await waitForSessionReady(pebblePage)
+    await waitForActiveWorktree(pebblePage)
+    await ensureTerminalVisible(pebblePage)
+    await waitForActiveTerminalManager(pebblePage, 30_000)
 
-    const ptyId = await waitForActivePanePtyId(orcaPage)
+    const ptyId = await waitForActivePanePtyId(pebblePage)
     const codexSource = path.join(process.env.HOME ?? '', 'projects', 'codex')
     const launchCommand =
       `cd ${JSON.stringify(codexSource)} && ` +
       'codex --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust\r'
 
     try {
-      await sendToTerminal(orcaPage, ptyId, launchCommand)
-      await dismissCodexPromptsIfPresent(orcaPage)
-      await waitForCodexReady(orcaPage)
-      await focusActiveTerminalInput(orcaPage)
-      await forceCursorProbeTheme(orcaPage)
-      const blinkSamples = await sampleCursorBlink(orcaPage)
+      await sendToTerminal(pebblePage, ptyId, launchCommand)
+      await dismissCodexPromptsIfPresent(pebblePage)
+      await waitForCodexReady(pebblePage)
+      await focusActiveTerminalInput(pebblePage)
+      await forceCursorProbeTheme(pebblePage)
+      const blinkSamples = await sampleCursorBlink(pebblePage)
 
       const runId = randomUUID().replaceAll('-', '').slice(0, 8)
-      const prompt = `orca_codex_latency_${runId}`
+      const prompt = `pebble_codex_latency_${runId}`
       const latencies: number[] = []
       let typed = ''
       for (const char of prompt) {
         typed += char
         const start = performance.now()
-        await orcaPage.keyboard.type(char)
-        await waitForPromptText(orcaPage, typed)
+        await pebblePage.keyboard.type(char)
+        await waitForPromptText(pebblePage, typed)
         latencies.push(performance.now() - start)
       }
 
@@ -226,7 +226,7 @@ test.describe('local Codex terminal typing latency', () => {
       expect(medianLatency).toBeLessThan(MAX_MEDIAN_KEY_LATENCY_MS)
       expect(worstLatency).toBeLessThan(MAX_WORST_KEY_LATENCY_MS)
     } finally {
-      await sendToTerminal(orcaPage, ptyId, '\x03').catch(() => undefined)
+      await sendToTerminal(pebblePage, ptyId, '\x03').catch(() => undefined)
     }
   })
 })

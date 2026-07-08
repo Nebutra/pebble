@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState } from '@/store/types'
-import type { PersistedTrustedOrcaHooks } from '../../../shared/types'
+import type { PersistedTrustedPebbleHooks } from '../../../shared/types'
 import { __resetTrustPromptChainForTests, ensureHooksConfirmed } from './ensure-hooks-confirmed'
-import { hashOrcaHookScript } from './orca-hook-trust'
+import { hashPebbleHookScript } from './pebble-hook-trust'
 import {
   createCompatibleRuntimeStatusResponseIfNeeded,
   type RuntimeEnvironmentCallRequest
@@ -39,9 +39,9 @@ function createTestState(overrides?: Partial<AppState>): {
   pending: PendingPrompt[]
 } {
   const pending: PendingPrompt[] = []
-  const trust: PersistedTrustedOrcaHooks = {}
+  const trust: PersistedTrustedPebbleHooks = {}
   const state = {
-    trustedOrcaHooks: trust,
+    trustedPebbleHooks: trust,
     repos: [{ id: 'repo-1', displayName: 'Repo One' }],
     openModal: (modal: string, data: Record<string, unknown>) => {
       pending.push({ modal, data, resolve: data.onResolve as (d: 'run' | 'skip') => void })
@@ -72,8 +72,8 @@ describe('ensureHooksConfirmed', () => {
   it('short-circuits to run when the persisted content hash matches the current script', async () => {
     const { state, pending } = createTestState()
     const script = 'pnpm install'
-    const hash = await hashOrcaHookScript(script)
-    state.trustedOrcaHooks['repo-1'] = {
+    const hash = await hashPebbleHookScript(script)
+    state.trustedPebbleHooks['repo-1'] = {
       setup: { contentHash: hash, approvedAt: 1 }
     }
     hooksCheckMock.mockResolvedValue({
@@ -90,8 +90,8 @@ describe('ensureHooksConfirmed', () => {
 
   it('re-prompts when the script content differs from the persisted hash', async () => {
     const { state, pending } = createTestState()
-    const staleHash = await hashOrcaHookScript('old script')
-    state.trustedOrcaHooks['repo-1'] = {
+    const staleHash = await hashPebbleHookScript('old script')
+    state.trustedPebbleHooks['repo-1'] = {
       setup: { contentHash: staleHash, approvedAt: 1 }
     }
     hooksCheckMock.mockResolvedValue({
@@ -105,7 +105,7 @@ describe('ensureHooksConfirmed', () => {
     await vi.waitFor(() => expect(pending).toHaveLength(1))
     expect(pending[0].data.scriptContent).toBe('new script')
     // The dialog uses this flag to tell the user we're re-prompting *because*
-    // orca.yaml changed, not because they've never approved this hook.
+    // pebble.yaml changed, not because they've never approved this hook.
     expect(pending[0].data.previouslyApproved).toBe(true)
 
     pending[0].resolve('run')
@@ -133,7 +133,7 @@ describe('ensureHooksConfirmed', () => {
     const expectedContent =
       'pnpm install\n\n# defaultTabs[1] Server\npnpm dev\n\n# defaultTabs[3]\ncodex'
     expect(pending[0].data.scriptContent).toBe(expectedContent)
-    expect(pending[0].data.contentHash).toBe(await hashOrcaHookScript(expectedContent))
+    expect(pending[0].data.contentHash).toBe(await hashPebbleHookScript(expectedContent))
 
     pending[0].resolve('skip')
     await expect(promise).resolves.toBe('skip')
@@ -175,7 +175,7 @@ describe('ensureHooksConfirmed', () => {
 
   it('returns run without inspecting hooks when the repo is always trusted', async () => {
     const { state, pending } = createTestState()
-    state.trustedOrcaHooks['repo-1'] = {
+    state.trustedPebbleHooks['repo-1'] = {
       all: { approvedAt: 1 }
     }
     hooksCheckMock.mockRejectedValue(new Error('boom'))
@@ -260,7 +260,7 @@ describe('ensureHooksConfirmed', () => {
     expect(pending).toHaveLength(0)
   })
 
-  it('does not prompt for orca.yaml when the repo uses local commands only', async () => {
+  it('does not prompt for pebble.yaml when the repo uses local commands only', async () => {
     const { state, pending } = createTestState({
       repos: [
         {
@@ -287,7 +287,7 @@ describe('ensureHooksConfirmed', () => {
     expect(pending).toHaveLength(0)
   })
 
-  it('does not prompt for orca.yaml when local commands are the implicit default', async () => {
+  it('does not prompt for pebble.yaml when local commands are the implicit default', async () => {
     const { state, pending } = createTestState({
       repos: [
         {
@@ -379,7 +379,7 @@ describe('ensureHooksConfirmed', () => {
       repoName: 'Repo One',
       scriptKind: 'setup',
       scriptContent: 'pnpm install',
-      contentHash: await hashOrcaHookScript('pnpm install'),
+      contentHash: await hashPebbleHookScript('pnpm install'),
       previouslyApproved: false
     })
 

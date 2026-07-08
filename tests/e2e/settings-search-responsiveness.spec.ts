@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { test, expect } from './helpers/orca-app'
+import { test, expect } from './helpers/pebble-app'
 import { waitForSessionReady } from './helpers/store'
 import type { Repo } from '../../src/shared/types'
 
@@ -13,11 +13,11 @@ function buildProjectPaths(): string[] {
 
 test.describe('Settings search responsiveness', () => {
   test('renders only the active settings pane when many projects match search', async ({
-    orcaPage
+    pebblePage
   }) => {
-    await waitForSessionReady(orcaPage)
+    await waitForSessionReady(pebblePage)
 
-    await orcaPage.evaluate(
+    await pebblePage.evaluate(
       ({ projectPaths, projectCount }) => {
         const store = window.__store
         if (!store) {
@@ -44,26 +44,26 @@ test.describe('Settings search responsiveness', () => {
       { projectPaths: buildProjectPaths(), projectCount: MATCHING_PROJECT_COUNT }
     )
 
-    const searchInput = orcaPage.getByPlaceholder('Search settings')
+    const searchInput = pebblePage.getByPlaceholder('Search settings')
     await expect(searchInput).toBeVisible()
     await searchInput.fill('Project Long Search')
 
     await expect
-      .poll(() => orcaPage.evaluate(() => window.__store?.getState().settingsSearchQuery ?? ''), {
+      .poll(() => pebblePage.evaluate(() => window.__store?.getState().settingsSearchQuery ?? ''), {
         timeout: 5_000,
         message: 'settings search query did not apply'
       })
       .toBe('Project Long Search')
 
-    await expect(orcaPage.getByRole('button', { name: 'Project Long Search 000' })).toBeVisible()
+    await expect(pebblePage.getByRole('button', { name: 'Project Long Search 000' })).toBeVisible()
     await expect
-      .poll(() => orcaPage.locator('section.scroll-mt-8[data-settings-section]').count(), {
+      .poll(() => pebblePage.locator('section.scroll-mt-8[data-settings-section]').count(), {
         timeout: 5_000,
         message: 'settings search rendered more than the active pane'
       })
       .toBe(1)
 
-    const renderedSectionId = await orcaPage
+    const renderedSectionId = await pebblePage
       .locator('section.scroll-mt-8[data-settings-section]')
       .first()
       .getAttribute('data-settings-section')

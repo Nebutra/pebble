@@ -64,17 +64,17 @@ describe('resolveWindowsShellLaunchArgs', () => {
     const command = Buffer.from(result.shellArgs[3] ?? '', 'base64').toString('utf16le')
     const outputEncodingIndex = command.indexOf('[Console]::OutputEncoding')
     const opencodeRestoreIndex = command.indexOf(
-      '$env:OPENCODE_CONFIG_DIR = $env:ORCA_OPENCODE_CONFIG_DIR'
+      '$env:OPENCODE_CONFIG_DIR = $env:PEBBLE_OPENCODE_CONFIG_DIR'
     )
     const ompWrapperIndex = command.indexOf('function Global:omp')
-    const ompExtensionIndex = command.indexOf('--extension $env:ORCA_OMP_STATUS_EXTENSION')
-    const codexRestoreIndex = command.indexOf('$env:CODEX_HOME = $env:ORCA_CODEX_HOME')
+    const ompExtensionIndex = command.indexOf('--extension $PebbleStatusExtension')
+    const codexRestoreIndex = command.indexOf('$env:CODEX_HOME = $env:PEBBLE_CODEX_HOME')
     const promptIndex = command.indexOf('function Global:prompt')
 
     expect(command).not.toContain('$PROFILE')
-    expect(command).not.toContain('ORCA_PI_CODING_AGENT_DIR')
-    expect(command).not.toContain('ORCA_OMP_CODING_AGENT_DIR')
-    expect(command).not.toContain('$env:PI_CODING_AGENT_DIR = $env:ORCA_OMP_SOURCE_AGENT_DIR')
+    expect(command).not.toContain('PEBBLE_PI_CODING_AGENT_DIR')
+    expect(command).not.toContain('PEBBLE_OMP_CODING_AGENT_DIR')
+    expect(command).not.toContain('$env:PI_CODING_AGENT_DIR = $env:PEBBLE_OMP_SOURCE_AGENT_DIR')
     expect(outputEncodingIndex).toBeGreaterThanOrEqual(0)
     expect(opencodeRestoreIndex).toBeGreaterThan(outputEncodingIndex)
     expect(ompWrapperIndex).toBeGreaterThan(opencodeRestoreIndex)
@@ -117,7 +117,7 @@ describe('resolveWindowsShellLaunchArgs', () => {
 
   it('preserves complex PowerShell startup command text through EncodedCommand', () => {
     const startupCommand =
-      '& "C:\\Program Files\\Orca CLI\\orca.exe" "--label" "quoted value"; $env:ORCA_VALUE = "nested"'
+      '& "C:\\Program Files\\Pebble CLI\\pebble.exe" "--label" "quoted value"; $env:PEBBLE_VALUE = "nested"'
     const result = resolveWindowsShellLaunchArgs(
       'powershell.exe',
       'C:\\Users\\alice',
@@ -138,7 +138,7 @@ describe('resolveWindowsShellLaunchArgs', () => {
       'C:\\Users\\alice',
       'C:\\Users\\alice',
       undefined,
-      `orca ${'x'.repeat(7000)}`
+      `pebble ${'x'.repeat(7000)}`
     )
 
     expect(result.startupCommandDeliveredInShellArgs).toBeUndefined()
@@ -232,7 +232,7 @@ describe('resolveWindowsShellLaunchArgs', () => {
     // The injected sh cmd must not break out of the surrounding single quotes
     // when the path contains a ' character.
     expect(result.shellArgs[3]).toContain("cd '/mnt/c/weird'\\''path'")
-    expect(result.shellArgs[3]).toContain('exec "\\$_orca_wsl_shell" -l')
+    expect(result.shellArgs[3]).toContain('exec "\\$_pebble_wsl_shell" -l')
   })
 
   it('falls back to /mnt/c when cwd is not a drive-letter path', () => {

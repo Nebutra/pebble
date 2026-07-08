@@ -5,7 +5,7 @@
  * - Browser works and also retains state when switching tabs etc.
  */
 
-import { test, expect } from './helpers/orca-app'
+import { test, expect } from './helpers/pebble-app'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import {
@@ -184,47 +184,47 @@ async function writeBrowserInputValue(
 }
 
 test.describe('Browser Tab', () => {
-  test.beforeEach(async ({ orcaPage }) => {
-    await waitForSessionReady(orcaPage)
-    await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
+  test.beforeEach(async ({ pebblePage }) => {
+    await waitForSessionReady(pebblePage)
+    await waitForActiveWorktree(pebblePage)
+    await ensureTerminalVisible(pebblePage)
   })
 
   /**
    * User Prompt:
    * - Browser works and also retains state when switching tabs etc.
    */
-  test('creating a browser tab adds it and activates browser view', async ({ orcaPage }) => {
-    const worktreeId = (await getActiveWorktreeId(orcaPage))!
-    const browserTabsBefore = await getBrowserTabs(orcaPage, worktreeId)
+  test('creating a browser tab adds it and activates browser view', async ({ pebblePage }) => {
+    const worktreeId = (await getActiveWorktreeId(pebblePage))!
+    const browserTabsBefore = await getBrowserTabs(pebblePage, worktreeId)
 
-    await createBrowserTab(orcaPage, worktreeId)
+    await createBrowserTab(pebblePage, worktreeId)
 
     // Wait for the browser tab to appear in the store
     await expect
-      .poll(async () => (await getBrowserTabs(orcaPage, worktreeId)).length, { timeout: 5_000 })
+      .poll(async () => (await getBrowserTabs(pebblePage, worktreeId)).length, { timeout: 5_000 })
       .toBe(browserTabsBefore.length + 1)
 
     // The active tab type should switch to 'browser'
-    await expect.poll(async () => getActiveTabType(orcaPage), { timeout: 3_000 }).toBe('browser')
+    await expect.poll(async () => getActiveTabType(pebblePage), { timeout: 3_000 }).toBe('browser')
   })
 
   /**
    * User Prompt:
    * - Browser works and also retains state when switching tabs etc.
    */
-  test('browser tab is created and active in the store', async ({ orcaPage }) => {
-    const worktreeId = (await getActiveWorktreeId(orcaPage))!
+  test('browser tab is created and active in the store', async ({ pebblePage }) => {
+    const worktreeId = (await getActiveWorktreeId(pebblePage))!
 
-    await createBrowserTab(orcaPage, worktreeId)
-    await expect.poll(async () => getActiveTabType(orcaPage), { timeout: 5_000 }).toBe('browser')
+    await createBrowserTab(pebblePage, worktreeId)
+    await expect.poll(async () => getActiveTabType(pebblePage), { timeout: 5_000 }).toBe('browser')
 
     // Verify the browser tab exists in the store
-    const browserTabs = await getBrowserTabs(orcaPage, worktreeId)
+    const browserTabs = await getBrowserTabs(pebblePage, worktreeId)
     expect(browserTabs.length).toBeGreaterThan(0)
 
     // The active browser tab should have a URL (even if it's about:blank or the default)
-    const activeBrowserTabId = await orcaPage.evaluate(() => {
+    const activeBrowserTabId = await pebblePage.evaluate(() => {
       const store = window.__store
       return store?.getState().activeBrowserTabId ?? null
     })
@@ -235,66 +235,66 @@ test.describe('Browser Tab', () => {
    * User Prompt:
    * - Browser works and also retains state when switching tabs etc.
    */
-  test('browser tab retains state when switching to terminal and back', async ({ orcaPage }) => {
-    const worktreeId = (await getActiveWorktreeId(orcaPage))!
+  test('browser tab retains state when switching to terminal and back', async ({ pebblePage }) => {
+    const worktreeId = (await getActiveWorktreeId(pebblePage))!
 
-    await createBrowserTab(orcaPage, worktreeId)
-    await expect.poll(async () => getActiveTabType(orcaPage), { timeout: 5_000 }).toBe('browser')
+    await createBrowserTab(pebblePage, worktreeId)
+    await expect.poll(async () => getActiveTabType(pebblePage), { timeout: 5_000 }).toBe('browser')
 
     // Record the browser tab info
-    const browserTabsBefore = await getBrowserTabs(orcaPage, worktreeId)
+    const browserTabsBefore = await getBrowserTabs(pebblePage, worktreeId)
     expect(browserTabsBefore.length).toBeGreaterThan(0)
     const browserTabId = browserTabsBefore.at(-1)?.id
     expect(browserTabId).toBeTruthy()
 
     // Switch to the terminal view
-    await switchToTerminalTab(orcaPage, worktreeId)
-    await expect.poll(async () => getActiveTabType(orcaPage), { timeout: 3_000 }).toBe('terminal')
+    await switchToTerminalTab(pebblePage, worktreeId)
+    await expect.poll(async () => getActiveTabType(pebblePage), { timeout: 3_000 }).toBe('terminal')
 
     // Switch back to browser tab
-    await switchToBrowserTab(orcaPage, worktreeId, browserTabId!)
-    await expect.poll(async () => getActiveTabType(orcaPage), { timeout: 3_000 }).toBe('browser')
+    await switchToBrowserTab(pebblePage, worktreeId, browserTabId!)
+    await expect.poll(async () => getActiveTabType(pebblePage), { timeout: 3_000 }).toBe('browser')
 
     // The browser tab should still exist with the same ID
-    const browserTabsAfter = await getBrowserTabs(orcaPage, worktreeId)
+    const browserTabsAfter = await getBrowserTabs(pebblePage, worktreeId)
     const tabStillExists = browserTabsAfter.some((tab) => tab.id === browserTabId)
     expect(tabStillExists).toBe(true)
   })
 
   test('browser webview form state survives switching between browser tabs', async ({
-    orcaPage
+    pebblePage
   }) => {
     const formServer = await startBrowserFormServer()
     try {
-      const worktreeId = (await getActiveWorktreeId(orcaPage))!
+      const worktreeId = (await getActiveWorktreeId(pebblePage))!
       const firstTab = await createBrowserTab(
-        orcaPage,
+        pebblePage,
         worktreeId,
         formServer.url('First search'),
         'First Form'
       )
       expect(firstTab?.id).toBeTruthy()
-      await writeBrowserInputValue(orcaPage, firstTab!.id, 'first typed value')
+      await writeBrowserInputValue(pebblePage, firstTab!.id, 'first typed value')
 
       const secondTab = await createBrowserTab(
-        orcaPage,
+        pebblePage,
         worktreeId,
         formServer.url('Second search'),
         'Second Form'
       )
       expect(secondTab?.id).toBeTruthy()
-      await writeBrowserInputValue(orcaPage, secondTab!.id, 'second typed value')
+      await writeBrowserInputValue(pebblePage, secondTab!.id, 'second typed value')
 
       // Why: switching browser tabs used to unmount and reparent the inactive
       // Electron webview, which recreated the guest document and erased form DOM.
-      await switchToBrowserTab(orcaPage, worktreeId, firstTab!.id)
+      await switchToBrowserTab(pebblePage, worktreeId, firstTab!.id)
       await expect
-        .poll(async () => readBrowserInputValue(orcaPage, firstTab!.id), { timeout: 5_000 })
+        .poll(async () => readBrowserInputValue(pebblePage, firstTab!.id), { timeout: 5_000 })
         .toBe('first typed value')
 
-      await switchToBrowserTab(orcaPage, worktreeId, secondTab!.id)
+      await switchToBrowserTab(pebblePage, worktreeId, secondTab!.id)
       await expect
-        .poll(async () => readBrowserInputValue(orcaPage, secondTab!.id), { timeout: 5_000 })
+        .poll(async () => readBrowserInputValue(pebblePage, secondTab!.id), { timeout: 5_000 })
         .toBe('second typed value')
     } finally {
       await formServer.close()
@@ -305,33 +305,33 @@ test.describe('Browser Tab', () => {
    * User Prompt:
    * - Browser works and also retains state when switching tabs etc.
    */
-  test('browser tab retains state when switching worktrees and back', async ({ orcaPage }) => {
-    const allWorktreeIds = await getAllWorktreeIds(orcaPage)
+  test('browser tab retains state when switching worktrees and back', async ({ pebblePage }) => {
+    const allWorktreeIds = await getAllWorktreeIds(pebblePage)
     if (allWorktreeIds.length < 2) {
       test.skip(true, 'Need at least 2 worktrees to test worktree switching')
     }
 
-    const worktreeId = (await getActiveWorktreeId(orcaPage))!
+    const worktreeId = (await getActiveWorktreeId(pebblePage))!
 
-    await createBrowserTab(orcaPage, worktreeId)
-    await expect.poll(async () => getActiveTabType(orcaPage), { timeout: 5_000 }).toBe('browser')
+    await createBrowserTab(pebblePage, worktreeId)
+    await expect.poll(async () => getActiveTabType(pebblePage), { timeout: 5_000 }).toBe('browser')
 
-    const browserTabsBefore = await getBrowserTabs(orcaPage, worktreeId)
+    const browserTabsBefore = await getBrowserTabs(pebblePage, worktreeId)
     expect(browserTabsBefore.length).toBeGreaterThan(0)
 
     // Switch to a different worktree via the store
-    const otherId = await switchToOtherWorktree(orcaPage, worktreeId)
+    const otherId = await switchToOtherWorktree(pebblePage, worktreeId)
     expect(otherId).not.toBeNull()
-    await expect.poll(async () => getActiveWorktreeId(orcaPage), { timeout: 5_000 }).toBe(otherId)
+    await expect.poll(async () => getActiveWorktreeId(pebblePage), { timeout: 5_000 }).toBe(otherId)
 
     // Switch back to the original worktree
-    await switchToWorktree(orcaPage, worktreeId)
+    await switchToWorktree(pebblePage, worktreeId)
     await expect
-      .poll(async () => getActiveWorktreeId(orcaPage), { timeout: 5_000 })
+      .poll(async () => getActiveWorktreeId(pebblePage), { timeout: 5_000 })
       .toBe(worktreeId)
 
     // Browser tabs should still be preserved
-    const browserTabsAfter = await getBrowserTabs(orcaPage, worktreeId)
+    const browserTabsAfter = await getBrowserTabs(pebblePage, worktreeId)
     expect(browserTabsAfter.length).toBe(browserTabsBefore.length)
   })
 })

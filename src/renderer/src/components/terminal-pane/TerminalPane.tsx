@@ -630,7 +630,7 @@ export default function TerminalPane({
     useShallow((store) => store.runtimePaneTitlesByTabId[tabId] ?? {})
   )
   // The native-chat toggle joins the pane header's split/close cluster. Eligible
-  // when Orca launched a *supported* agent here or one was detected live for the
+  // when Pebble launched a *supported* agent here or one was detected live for the
   // leaf, keyed `${tabId}:${leafId}`. Carry the agent identity, not just "an
   // agent exists", so the gate can reject Grok et al.
   // Scoped to this tab's panes (leafId → agentType) and shallow-compared so an
@@ -892,15 +892,15 @@ export default function TerminalPane({
         return openLinksInAppPreferencePromiseRef.current
       }
       const preferencePromise = (async () => {
-        const openInOrca = await requestLinkRoutingPreference({
+        const openInPebble = await requestLinkRoutingPreference({
           openLinksInAppDefault: settingsRef.current?.openLinksInApp === true,
           url
         })
         await updateSettings({
-          openLinksInApp: openInOrca,
+          openLinksInApp: openInPebble,
           openLinksInAppPreferencePrompted: true
         })
-        return openInOrca
+        return openInPebble
       })()
       openLinksInAppPreferencePromiseRef.current = preferencePromise
       void preferencePromise.finally(() => {
@@ -1476,7 +1476,7 @@ export default function TerminalPane({
     // must materialize their panes; local desktop tabs split directly.
     if (
       !isHostAuthoritativeLayout({
-        isWebClient: !!(globalThis as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__,
+        isWebClient: !!(globalThis as { __PEBBLE_WEB_CLIENT__?: boolean }).__PEBBLE_WEB_CLIENT__,
         ptyIdsByLeafId: restoredLayout.ptyIdsByLeafId
       })
     ) {
@@ -1752,7 +1752,7 @@ export default function TerminalPane({
     searchStateRef,
     macOptionAsAltRef,
     keybindings,
-    terminalShortcutPolicy: settings?.terminalShortcutPolicy ?? 'orca-first'
+    terminalShortcutPolicy: settings?.terminalShortcutPolicy ?? 'pebble-first'
   })
 
   useTerminalPaneGlobalEffects({
@@ -1781,7 +1781,7 @@ export default function TerminalPane({
 
   useEffect(() => {
     if (
-      !(globalThis as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__ ||
+      !(globalThis as { __PEBBLE_WEB_CLIENT__?: boolean }).__PEBBLE_WEB_CLIENT__ ||
       !isVisible ||
       !isActive
     ) {
@@ -2858,9 +2858,9 @@ export default function TerminalPane({
     // `hidden` reliably clips that pseudo-element paint at the terminal body.
     overflow: 'hidden',
     ...hiddenStartupStyle,
-    ['--orca-terminal-divider-color' as string]:
+    ['--pebble-terminal-divider-color' as string]:
       effectiveAppearance?.dividerColor ?? DEFAULT_TERMINAL_DIVIDER_DARK,
-    ['--orca-terminal-divider-color-strong' as string]: normalizeColor(
+    ['--pebble-terminal-divider-color-strong' as string]: normalizeColor(
       effectiveAppearance?.dividerColor,
       DEFAULT_TERMINAL_DIVIDER_DARK
     )

@@ -389,10 +389,10 @@ describe('automation target availability', () => {
           sourceContext: {
             kind: 'task-source',
             provider: 'github',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'local',
             repoId: 'repo-1',
-            providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' }
+            providerIdentity: { provider: 'github', owner: 'nebutra', repo: 'pebble' }
           }
         }),
         repo: makeRepo(),
@@ -415,15 +415,15 @@ describe('automation target availability', () => {
           sourceContext: {
             kind: 'task-source',
             provider: 'gitlab',
-            projectId: 'gitlab:stablyai/orca',
+            projectId: 'gitlab:nebutra/pebble',
             hostId: 'runtime:old-server',
             repoId: 'repo-1',
             providerIdentity: {
               provider: 'gitlab',
-              projectId: 'stablyai/orca',
-              namespace: 'stablyai',
-              project: 'orca',
-              webUrl: 'https://gitlab.com/stablyai/orca'
+              projectId: 'nebutra/pebble',
+              namespace: 'nebutra',
+              project: 'pebble',
+              webUrl: 'https://gitlab.com/nebutra/pebble'
             }
           }
         }),

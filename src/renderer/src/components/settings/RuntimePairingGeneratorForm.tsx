@@ -193,7 +193,7 @@ export function RuntimePairingGeneratorForm({
           )}
           description={translate(
             'auto.components.settings.RuntimePairingUrlGenerator.f7cafdc9f3',
-            'Browser link unavailable in this build. The pairing URL still works for Orca clients.'
+            'Browser link unavailable in this build. The pairing URL still works for Pebble clients.'
           )}
         />
       ) : null}
@@ -202,11 +202,11 @@ export function RuntimePairingGeneratorForm({
         <GeneratedUrlRow
           label={translate(
             'auto.components.settings.RuntimePairingUrlGenerator.2e5c4e3c93',
-            'Pair another Orca client'
+            'Pair another Pebble client'
           )}
           description={translate(
             'auto.components.settings.RuntimePairingUrlGenerator.849825e829',
-            'Paste this pairing URL into another Orca client.'
+            'Paste this pairing URL into another Pebble client.'
           )}
           value={runtimePairingUrl}
           copied={copiedTarget === 'pairing'}

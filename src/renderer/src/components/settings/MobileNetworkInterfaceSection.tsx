@@ -116,7 +116,7 @@ export function MobileNetworkInterfaceSection({
             <p>
               {translate(
                 'auto.components.settings.MobileNetworkInterfaceSection.9fc5d203ff',
-                'Orca Mobile connects directly to this computer. To use it away from the same local network, put your computer and phone on the same private overlay network, then generate the QR code with that network address selected.'
+                'Pebble Mobile connects directly to this computer. To use it away from the same local network, put your computer and phone on the same private overlay network, then generate the QR code with that network address selected.'
               )}
             </p>
             <ol className="list-decimal space-y-1 pl-4">
@@ -156,7 +156,7 @@ export function MobileNetworkInterfaceSection({
               <li>
                 {translate(
                   'auto.components.settings.MobileNetworkInterfaceSection.63d5e4ae1e',
-                  'Regenerate the QR code and scan it from the Orca mobile app.'
+                  'Regenerate the QR code and scan it from the Pebble mobile app.'
                 )}
               </li>
             </ol>

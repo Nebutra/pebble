@@ -64,7 +64,7 @@ describe('registerMobileHandlers', () => {
     })
     const createPairingOffer = vi.fn().mockReturnValue({
       available: true,
-      pairingUrl: 'orca://pair#mobile',
+      pairingUrl: 'pebble://pair#mobile',
       endpoint: 'ws://100.102.47.57:6768',
       deviceId: 'mobile-1'
     })
@@ -74,7 +74,7 @@ describe('registerMobileHandlers', () => {
 
     await expect(handlers.get('mobile:getPairingQR')?.(null, {})).resolves.toMatchObject({
       available: true,
-      pairingUrl: 'orca://pair#mobile',
+      pairingUrl: 'pebble://pair#mobile',
       endpoint: 'ws://100.102.47.57:6768',
       deviceId: 'mobile-1'
     })
@@ -133,7 +133,7 @@ describe('registerMobileHandlers', () => {
   it('generates runtime-scoped pairing urls for web and desktop clients', async () => {
     const createPairingOffer = vi.fn().mockReturnValue({
       available: true,
-      pairingUrl: 'orca://pair#runtime',
+      pairingUrl: 'pebble://pair#runtime',
       webClientUrl: 'http://100.64.1.20:6768/web-index.html?pairing=runtime',
       endpoint: 'ws://100.64.1.20:6768',
       deviceId: 'runtime-1'
@@ -149,7 +149,7 @@ describe('registerMobileHandlers', () => {
       })
     ).resolves.toEqual({
       available: true,
-      pairingUrl: 'orca://pair#runtime',
+      pairingUrl: 'pebble://pair#runtime',
       webClientUrl: 'http://100.64.1.20:6768/web-index.html?pairing=runtime',
       endpoint: 'ws://100.64.1.20:6768',
       deviceId: 'runtime-1'

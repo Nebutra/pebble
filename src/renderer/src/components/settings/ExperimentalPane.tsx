@@ -34,9 +34,6 @@ export function ExperimentalPane({
 }: ExperimentalPaneProps): React.JSX.Element {
   const searchQuery = useAppStore((s) => s.settingsSearchQuery)
   const showPet = matchesSettingsSearch(searchQuery, [getExperimentalSearchEntry().pet])
-  const showAgentsView = matchesSettingsSearch(searchQuery, [
-    getExperimentalSearchEntry().agentsView
-  ])
   const showNativeChat = matchesSettingsSearch(searchQuery, [
     getExperimentalSearchEntry().nativeChat
   ])
@@ -99,51 +96,6 @@ export function ExperimentalPane({
               <span
                 className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background shadow-sm transition-transform ${
                   settings.experimentalPet ? 'translate-x-4' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-        </SearchableSetting>
-      ) : null}
-
-      {showAgentsView ? (
-        <SearchableSetting
-          title={translate('auto.components.settings.ExperimentalPane.a05bcdaf57', 'Agents View')}
-          description={translate(
-            'auto.components.settings.ExperimentalPane.f63ea281e3',
-            'Threaded left-sidebar feed for agent completions and blocking states.'
-          )}
-          keywords={getExperimentalSearchEntry().agentsView.keywords}
-          className="space-y-3 py-2"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 shrink space-y-0.5">
-              <Label>
-                {translate('auto.components.settings.ExperimentalPane.a05bcdaf57', 'Agents View')}
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                {translate(
-                  'auto.components.settings.ExperimentalPane.0277901cf7',
-                  'Adds an Agents entry to the left sidebar with a threaded worktree feed for completed agents, blocking questions, unread state, and worktree creation events. Experimental — the event model and UI may change.'
-                )}
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={settings.experimentalActivity}
-              onClick={() =>
-                updateSettings({
-                  experimentalActivity: !settings.experimentalActivity
-                })
-              }
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-colors ${
-                settings.experimentalActivity ? 'bg-foreground' : 'bg-muted-foreground/30'
-              }`}
-            >
-              <span
-                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-background shadow-sm transition-transform ${
-                  settings.experimentalActivity ? 'translate-x-4' : 'translate-x-0.5'
                 }`}
               />
             </button>
@@ -231,7 +183,7 @@ export function ExperimentalPane({
               <p className="text-xs text-muted-foreground">
                 {translate(
                   'auto.components.settings.ExperimentalPane.agentHibernation.copy',
-                  'Stops idle background agent terminals after the configured idle window and resumes supported sessions when you open them again. Agent sleep preserves launch options for agents started by Orca. Manually started agents may resume with your current Orca defaults. Experimental while we tune the safety model.'
+                  'Stops idle background agent terminals after the configured idle window and resumes supported sessions when you open them again. Agent sleep preserves launch options for agents started by Pebble. Manually started agents may resume with your current Pebble defaults. Experimental while we tune the safety model.'
                 )}
               </p>
             </div>
@@ -256,7 +208,7 @@ export function ExperimentalPane({
               )}
               description={translate(
                 'auto.components.settings.ExperimentalPane.agentHibernation.idleMinutesDescription',
-                'How many idle minutes a completed background agent must wait before Orca can sleep it.'
+                'How many idle minutes a completed background agent must wait before Pebble can sleep it.'
               )}
               value={agentHibernationIdleMinutes}
               min={MIN_AGENT_HIBERNATION_IDLE_MS / MS_PER_MINUTE}

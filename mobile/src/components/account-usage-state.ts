@@ -80,7 +80,7 @@ export function getInactiveProviderUsage(
   return list.find((u) => u.accountId === accountId) ?? null
 }
 
-// Why: rate limits are fetched for the active target even when no Orca-managed
+// Why: rate limits are fetched for the active target even when no Pebble-managed
 // account exists (the default target is the agent's own system-default login).
 // Treat a provider as having usage worth showing when a fetch succeeded or any
 // window has data; an unavailable/error provider with no windows means the
@@ -118,7 +118,7 @@ export function getUsageBarState(
 }
 
 // Why: the usage UI must render for the system-default login, not only for
-// Orca-managed accounts. Show a provider when it has at least one managed
+// Pebble-managed accounts. Show a provider when it has at least one managed
 // account OR active rate-limit data for the system-default target.
 export function hasRenderableUsage(snapshot: AccountsSnapshot, provider: ProviderKey): boolean {
   const accounts = provider === 'claude' ? snapshot.claude.accounts : snapshot.codex.accounts

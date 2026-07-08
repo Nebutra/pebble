@@ -36,7 +36,7 @@ describe('terminal autocomplete preference', () => {
     vi.mocked(AsyncStorage.getItem).mockResolvedValue(null)
 
     await expect(loadTerminalAutocompleteEnabled()).resolves.toBe(false)
-    expect(AsyncStorage.getItem).toHaveBeenCalledWith('orca:terminalAutocompleteEnabled')
+    expect(AsyncStorage.getItem).toHaveBeenCalledWith('pebble:terminalAutocompleteEnabled')
   })
 
   it('loads enabled only from the persisted true value', async () => {
@@ -58,11 +58,11 @@ describe('terminal autocomplete preference', () => {
   it('persists the selected value', async () => {
     await saveTerminalAutocompleteEnabled(true)
 
-    expect(AsyncStorage.setItem).toHaveBeenCalledWith('orca:terminalAutocompleteEnabled', 'true')
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith('pebble:terminalAutocompleteEnabled', 'true')
 
     await saveTerminalAutocompleteEnabled(false)
 
-    expect(AsyncStorage.setItem).toHaveBeenCalledWith('orca:terminalAutocompleteEnabled', 'false')
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith('pebble:terminalAutocompleteEnabled', 'false')
   })
 })
 
@@ -116,7 +116,7 @@ describe('terminal live input disabled handles preference', () => {
     )
 
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      'orca:terminalLiveInputDisabled:host%2Fone:folder%3AC%3A%5Crepo',
+      'pebble:terminalLiveInputDisabled:host%2Fone:folder%3AC%3A%5Crepo',
       JSON.stringify(['pty-2', 'pty-1'])
     )
   })
@@ -156,7 +156,7 @@ describe('host sidebar width preference', () => {
     await saveHostSidebarWidth(HOST_SIDEBAR_MIN_WIDTH - 20)
 
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      'orca:hostSidebarWidth',
+      'pebble:hostSidebarWidth',
       String(HOST_SIDEBAR_MIN_WIDTH)
     )
   })
@@ -176,11 +176,11 @@ describe('terminal link open mode preference', () => {
     vi.mocked(AsyncStorage.setItem).mockReset()
   })
 
-  it('defaults to Orca browser when unset', async () => {
+  it('defaults to Pebble browser when unset', async () => {
     vi.mocked(AsyncStorage.getItem).mockResolvedValue(null)
 
-    await expect(loadTerminalLinkOpenMode()).resolves.toBe('orca-browser')
-    expect(AsyncStorage.getItem).toHaveBeenCalledWith('orca:terminalLinkOpenMode')
+    await expect(loadTerminalLinkOpenMode()).resolves.toBe('pebble-browser')
+    expect(AsyncStorage.getItem).toHaveBeenCalledWith('pebble:terminalLinkOpenMode')
   })
 
   it('loads only known modes', async () => {
@@ -188,18 +188,18 @@ describe('terminal link open mode preference', () => {
     await expect(loadTerminalLinkOpenMode()).resolves.toBe('phone-browser')
 
     vi.mocked(AsyncStorage.getItem).mockResolvedValue('external')
-    await expect(loadTerminalLinkOpenMode()).resolves.toBe('orca-browser')
+    await expect(loadTerminalLinkOpenMode()).resolves.toBe('pebble-browser')
   })
 
-  it('falls back to Orca browser when storage cannot be read', async () => {
+  it('falls back to Pebble browser when storage cannot be read', async () => {
     vi.mocked(AsyncStorage.getItem).mockRejectedValue(new Error('storage unavailable'))
 
-    await expect(loadTerminalLinkOpenMode()).resolves.toBe('orca-browser')
+    await expect(loadTerminalLinkOpenMode()).resolves.toBe('pebble-browser')
   })
 
   it('persists the selected mode', async () => {
     await saveTerminalLinkOpenMode('phone-browser')
 
-    expect(AsyncStorage.setItem).toHaveBeenCalledWith('orca:terminalLinkOpenMode', 'phone-browser')
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith('pebble:terminalLinkOpenMode', 'phone-browser')
   })
 })

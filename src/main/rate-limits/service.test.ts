@@ -495,8 +495,8 @@ describe('RateLimitService', () => {
   it('passes the selected WSL Codex home into active account rate-limit fetches', async () => {
     const service = new RateLimitService()
     const wslCodexHome =
-      '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\orca\\codex-accounts\\a\\home'
-    const hostCodexHome = 'C:\\Users\\jin\\.orca\\codex-accounts\\host\\home'
+      '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\pebble\\codex-accounts\\a\\home'
+    const hostCodexHome = 'C:\\Users\\jin\\.pebble\\codex-accounts\\host\\home'
     const resolver = vi.fn((target) => (target?.runtime === 'wsl' ? wslCodexHome : hostCodexHome))
     service.setCodexHomePathResolver(resolver)
 
@@ -513,8 +513,8 @@ describe('RateLimitService', () => {
   it('uses the initialized WSL target for active Codex rate-limit fetches', async () => {
     const service = new RateLimitService()
     const wslCodexHome =
-      '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\orca\\codex-accounts\\a\\home'
-    const hostCodexHome = 'C:\\Users\\jin\\.orca\\codex-accounts\\host\\home'
+      '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\pebble\\codex-accounts\\a\\home'
+    const hostCodexHome = 'C:\\Users\\jin\\.pebble\\codex-accounts\\host\\home'
     const resolver = vi.fn((target) => (target?.runtime === 'wsl' ? wslCodexHome : hostCodexHome))
     service.setCodexHomePathResolver(resolver)
     service.setCodexFetchTarget({ runtime: 'wsl', wslDistro: 'Ubuntu' })
@@ -664,8 +664,8 @@ describe('RateLimitService', () => {
   it('does not cache host Codex usage under an outgoing WSL account', async () => {
     const service = new RateLimitService()
     const wslCodexHome =
-      '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\orca\\codex-accounts\\a\\home'
-    const hostCodexHome = 'C:\\Users\\jin\\.orca\\codex-accounts\\host\\home'
+      '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\pebble\\codex-accounts\\a\\home'
+    const hostCodexHome = 'C:\\Users\\jin\\.pebble\\codex-accounts\\host\\home'
     service.setCodexHomePathResolver((target) =>
       target?.runtime === 'wsl' ? wslCodexHome : hostCodexHome
     )
@@ -727,7 +727,7 @@ describe('RateLimitService', () => {
   it('passes WSL Codex managed homes into inactive account rate-limit fetches', async () => {
     const service = new RateLimitService()
     const wslCodexHome =
-      '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\orca\\codex-accounts\\a\\home'
+      '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\pebble\\codex-accounts\\a\\home'
     service.setInactiveCodexAccountsResolver(() => [
       { id: 'account-1', managedHomePath: wslCodexHome }
     ])

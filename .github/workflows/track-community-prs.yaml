@@ -24,14 +24,14 @@ jobs:
         with:
           app-id: 2590194
           private-key: ${{ secrets.BUFO_BOT_PRIVATE_KEY }}
-          owner: stablyai
+          owner: nebutra
 
       - name: Add PR to project
         uses: actions/github-script@v8
         env:
-          PROJECT_OWNER: stablyai
+          PROJECT_OWNER: nebutra
           PROJECT_NUMBER: '13'
-          INTERNAL_TEAM_SLUG: stably-eng
+          INTERNAL_TEAM_SLUG: nebutra-eng
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |

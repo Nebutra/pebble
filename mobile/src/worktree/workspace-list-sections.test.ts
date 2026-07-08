@@ -5,12 +5,12 @@ import { buildSections, filterWorktrees, getWorktreeStatus } from './workspace-l
 import { DEFAULT_MOBILE_WORKSPACE_STATUSES } from './mobile-workspace-statuses'
 
 function worktree(overrides: Partial<Worktree> = {}): Worktree {
-  const worktreePath = join('/tmp', 'orca', 'worktrees', 'feature')
+  const worktreePath = join('/tmp', 'pebble', 'worktrees', 'feature')
   return {
     workspaceKind: 'git',
     worktreeId: `repo-1::${worktreePath}`,
     repoId: 'repo-1',
-    repo: 'orca',
+    repo: 'pebble',
     branch: 'feature/mobile-parity',
     displayName: 'feature',
     path: worktreePath,
@@ -170,14 +170,14 @@ describe('buildSections', () => {
 
   it('renders empty repo sections from repo placeholders in repo grouping', () => {
     const sections = buildSections(
-      [worktree({ repoId: 'repo-1', repo: 'orca' })],
+      [worktree({ repoId: 'repo-1', repo: 'pebble' })],
       'manual',
       { filterRepoIds: new Set(), hideSleeping: false, hideDefaultBranch: false },
       '',
       'repo',
       new Set(),
       new Map([
-        ['orca', 'repo-1'],
+        ['pebble', 'repo-1'],
         ['zoom-img', 'repo-missing']
       ])
     )
@@ -185,8 +185,8 @@ describe('buildSections', () => {
     expect(withoutSectionListKeys(sections)).toEqual([
       {
         key: 'repo:repo-1',
-        title: 'orca',
-        data: [worktree({ repoId: 'repo-1', repo: 'orca' })]
+        title: 'pebble',
+        data: [worktree({ repoId: 'repo-1', repo: 'pebble' })]
       },
       { key: 'repo:repo-missing', title: 'zoom-img', data: [] }
     ])

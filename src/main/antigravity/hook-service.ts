@@ -25,7 +25,7 @@ import {
   writeManagedScriptRemote
 } from '../agent-hooks/installer-utils-remote'
 
-const ANTIGRAVITY_HOOK_BUNDLE_NAME = 'orca-status'
+const ANTIGRAVITY_HOOK_BUNDLE_NAME = 'pebble-status'
 
 const ANTIGRAVITY_EVENTS = [
   {
@@ -40,7 +40,7 @@ const ANTIGRAVITY_EVENTS = [
   },
   { eventName: 'Stop', schema: 'direct', windowsWrapperFileName: 'antigravity-stop.cmd' },
   // Why: Antigravity requires PreToolUse hooks to make permission decisions.
-  // Orca's hook is observational, so installing there can block user tools.
+  // Pebble's hook is observational, so installing there can block user tools.
   {
     eventName: 'PostToolUse',
     schema: 'tool',
@@ -78,7 +78,7 @@ function getManagedCommand(scriptPath: string, event: AntigravityEvent): string 
   if (process.platform === 'win32') {
     return getWindowsWrapperScriptPath(event)
   }
-  return wrapPosixHookCommand(scriptPath, { ORCA_ANTIGRAVITY_EVENT: event.eventName })
+  return wrapPosixHookCommand(scriptPath, { PEBBLE_ANTIGRAVITY_EVENT: event.eventName })
 }
 
 function getManagedScript(target: 'local' | 'posix' = 'local'): string {
@@ -86,15 +86,15 @@ function getManagedScript(target: 'local' | 'posix' = 'local'): string {
     return [
       '@echo off',
       'setlocal',
-      'if /I "%ORCA_ANTIGRAVITY_EVENT%"=="Stop" (',
+      'if /I "%PEBBLE_ANTIGRAVITY_EVENT%"=="Stop" (',
       '  echo {"decision":""}',
       ') else (',
       '  echo {}',
       ')',
-      'if defined ORCA_AGENT_HOOK_ENDPOINT if exist "%ORCA_AGENT_HOOK_ENDPOINT%" call "%ORCA_AGENT_HOOK_ENDPOINT%" 2>nul',
-      'if "%ORCA_AGENT_HOOK_PORT%"=="" exit /b 0',
-      'if "%ORCA_AGENT_HOOK_TOKEN%"=="" exit /b 0',
-      'if "%ORCA_PANE_KEY%"=="" exit /b 0',
+      'if defined PEBBLE_AGENT_HOOK_ENDPOINT if exist "%PEBBLE_AGENT_HOOK_ENDPOINT%" call "%PEBBLE_AGENT_HOOK_ENDPOINT%" 2>nul',
+      'if "%PEBBLE_AGENT_HOOK_PORT%"=="" exit /b 0',
+      'if "%PEBBLE_AGENT_HOOK_TOKEN%"=="" exit /b 0',
+      'if "%PEBBLE_PANE_KEY%"=="" exit /b 0',
       buildWindowsAntigravityHookPostCommand(),
       'exit /b 0',
       ''
@@ -103,7 +103,7 @@ function getManagedScript(target: 'local' | 'posix' = 'local'): string {
 
   return [
     '#!/bin/sh',
-    'case "$ORCA_ANTIGRAVITY_EVENT" in',
+    'case "$PEBBLE_ANTIGRAVITY_EVENT" in',
     '  Stop)',
     '    printf \'{"decision":""}\\n\'',
     '    ;;',
@@ -114,33 +114,33 @@ function getManagedScript(target: 'local' | 'posix' = 'local'): string {
     '    printf "{}\\n"',
     '    ;;',
     'esac',
-    'if [ -n "$ORCA_AGENT_HOOK_ENDPOINT" ] && [ -r "$ORCA_AGENT_HOOK_ENDPOINT" ]; then',
-    '  . "$ORCA_AGENT_HOOK_ENDPOINT" 2>/dev/null || :',
+    'if [ -n "$PEBBLE_AGENT_HOOK_ENDPOINT" ] && [ -r "$PEBBLE_AGENT_HOOK_ENDPOINT" ]; then',
+    '  . "$PEBBLE_AGENT_HOOK_ENDPOINT" 2>/dev/null || :',
     'fi',
-    'if [ -z "$ORCA_AGENT_HOOK_PORT" ] || [ -z "$ORCA_AGENT_HOOK_TOKEN" ] || [ -z "$ORCA_PANE_KEY" ]; then',
+    'if [ -z "$PEBBLE_AGENT_HOOK_PORT" ] || [ -z "$PEBBLE_AGENT_HOOK_TOKEN" ] || [ -z "$PEBBLE_PANE_KEY" ]; then',
     '  exit 0',
     'fi',
     'payload=$(cat)',
     'if [ -z "$payload" ]; then',
     // Why: some Antigravity hook events can arrive without stdin. Still post
-    // the event name so Orca shows a status row instead of silently dropping it.
+    // the event name so Pebble shows a status row instead of silently dropping it.
     "  payload='{}'",
     'fi',
     // Timeout caps best-effort hook posts if the local listener stalls.
     // Why: pipe payload to curl's stdin (`payload@-`) instead of an inline
     // `payload=$VALUE` arg, so tens-of-KB tool output stays off the curl
     // command line (EDR command-line false positives). Wire body is identical.
-    'printf \'%s\' "$payload" | curl -sS -X POST "http://127.0.0.1:${ORCA_AGENT_HOOK_PORT}/hook/antigravity" \\',
+    'printf \'%s\' "$payload" | curl -sS -X POST "http://127.0.0.1:${PEBBLE_AGENT_HOOK_PORT}/hook/antigravity" \\',
     '  --connect-timeout 0.5 --max-time 1.5 \\',
     '  -H "Content-Type: application/x-www-form-urlencoded" \\',
-    '  -H "X-Orca-Agent-Hook-Token: ${ORCA_AGENT_HOOK_TOKEN}" \\',
-    '  --data-urlencode "paneKey=${ORCA_PANE_KEY}" \\',
-    '  --data-urlencode "tabId=${ORCA_TAB_ID}" \\',
-    '  --data-urlencode "launchToken=${ORCA_AGENT_LAUNCH_TOKEN}" \\',
-    '  --data-urlencode "worktreeId=${ORCA_WORKTREE_ID}" \\',
-    '  --data-urlencode "env=${ORCA_AGENT_HOOK_ENV}" \\',
-    '  --data-urlencode "version=${ORCA_AGENT_HOOK_VERSION}" \\',
-    '  --data-urlencode "hook_event_name=${ORCA_ANTIGRAVITY_EVENT}" \\',
+    '  -H "X-Pebble-Agent-Hook-Token: ${PEBBLE_AGENT_HOOK_TOKEN}" \\',
+    '  --data-urlencode "paneKey=${PEBBLE_PANE_KEY}" \\',
+    '  --data-urlencode "tabId=${PEBBLE_TAB_ID}" \\',
+    '  --data-urlencode "launchToken=${PEBBLE_AGENT_LAUNCH_TOKEN}" \\',
+    '  --data-urlencode "worktreeId=${PEBBLE_WORKTREE_ID}" \\',
+    '  --data-urlencode "env=${PEBBLE_AGENT_HOOK_ENV}" \\',
+    '  --data-urlencode "version=${PEBBLE_AGENT_HOOK_VERSION}" \\',
+    '  --data-urlencode "hook_event_name=${PEBBLE_ANTIGRAVITY_EVENT}" \\',
     '  --data-urlencode "payload@-" >/dev/null 2>&1 || true',
     'exit 0',
     ''
@@ -151,13 +151,13 @@ function getWindowsWrapperScript(eventName: string): string {
   return [
     '@echo off',
     'setlocal',
-    `set "ORCA_ANTIGRAVITY_EVENT=${eventName}"`,
-    'set "ORCA_ANTIGRAVITY_CORE=%~dp0antigravity-hook.cmd"',
-    'if exist "%ORCA_ANTIGRAVITY_CORE%" (',
-    '  call "%ORCA_ANTIGRAVITY_CORE%"',
+    `set "PEBBLE_ANTIGRAVITY_EVENT=${eventName}"`,
+    'set "PEBBLE_ANTIGRAVITY_CORE=%~dp0antigravity-hook.cmd"',
+    'if exist "%PEBBLE_ANTIGRAVITY_CORE%" (',
+    '  call "%PEBBLE_ANTIGRAVITY_CORE%"',
     '  exit /b 0',
     ')',
-    'if /I "%ORCA_ANTIGRAVITY_EVENT%"=="Stop" (',
+    'if /I "%PEBBLE_ANTIGRAVITY_EVENT%"=="Stop" (',
     '  echo {"decision":""}',
     ') else (',
     '  echo {}',
@@ -171,7 +171,7 @@ function buildWindowsAntigravityHookPostCommand(): string {
   // Why: Antigravity hooks are best-effort status updates; do not let a stalled
   // local listener hold the agent process open. Qualify PowerShell so a
   // worktree-local powershell.exe cannot hijack hook payloads.
-  return `"%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -ExecutionPolicy Bypass -Command "$utf8=[System.Text.UTF8Encoding]::new($false); [Console]::InputEncoding=$utf8; [Console]::OutputEncoding=$utf8; $inputData=[Console]::In.ReadToEnd(); try { $payload=if ([string]::IsNullOrWhiteSpace($inputData)) { @{} } else { $inputData | ConvertFrom-Json }; $body=@{ paneKey=$env:ORCA_PANE_KEY; launchToken=$env:ORCA_AGENT_LAUNCH_TOKEN; tabId=$env:ORCA_TAB_ID; worktreeId=$env:ORCA_WORKTREE_ID; env=$env:ORCA_AGENT_HOOK_ENV; version=$env:ORCA_AGENT_HOOK_VERSION; hook_event_name=$env:ORCA_ANTIGRAVITY_EVENT; payload=$payload } | ConvertTo-Json -Depth 100 -Compress; $bodyBytes=$utf8.GetBytes($body); Invoke-WebRequest -UseBasicParsing -Method Post -Uri ('http://127.0.0.1:' + $env:ORCA_AGENT_HOOK_PORT + '/hook/antigravity') -ContentType 'application/json; charset=utf-8' -Headers @{ 'X-Orca-Agent-Hook-Token'=$env:ORCA_AGENT_HOOK_TOKEN } -Body $bodyBytes -TimeoutSec 2 | Out-Null } catch {}"`
+  return `"%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoProfile -ExecutionPolicy Bypass -Command "$utf8=[System.Text.UTF8Encoding]::new($false); [Console]::InputEncoding=$utf8; [Console]::OutputEncoding=$utf8; $inputData=[Console]::In.ReadToEnd(); try { $payload=if ([string]::IsNullOrWhiteSpace($inputData)) { @{} } else { $inputData | ConvertFrom-Json }; $body=@{ paneKey=$env:PEBBLE_PANE_KEY; launchToken=$env:PEBBLE_AGENT_LAUNCH_TOKEN; tabId=$env:PEBBLE_TAB_ID; worktreeId=$env:PEBBLE_WORKTREE_ID; env=$env:PEBBLE_AGENT_HOOK_ENV; version=$env:PEBBLE_AGENT_HOOK_VERSION; hook_event_name=$env:PEBBLE_ANTIGRAVITY_EVENT; payload=$payload } | ConvertTo-Json -Depth 100 -Compress; $bodyBytes=$utf8.GetBytes($body); Invoke-WebRequest -UseBasicParsing -Method Post -Uri ('http://127.0.0.1:' + $env:PEBBLE_AGENT_HOOK_PORT + '/hook/antigravity') -ContentType 'application/json; charset=utf-8' -Headers @{ 'X-Pebble-Agent-Hook-Token'=$env:PEBBLE_AGENT_HOOK_TOKEN } -Body $bodyBytes -TimeoutSec 2 | Out-Null } catch {}"`
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -383,7 +383,7 @@ export class AntigravityHookService {
   async installRemote(sftp: SFTPWrapper, remoteHome: string): Promise<AgentHookInstallStatus> {
     const home = remoteHome.replace(/\/$/, '')
     const remoteConfigPath = `${home}/.gemini/config/hooks.json`
-    const remoteScriptPath = `${home}/.orca/agent-hooks/antigravity-hook.sh`
+    const remoteScriptPath = `${home}/.pebble/agent-hooks/antigravity-hook.sh`
     try {
       const config = await readHooksJsonRemote(sftp, remoteConfigPath)
       if (!config) {
@@ -399,7 +399,7 @@ export class AntigravityHookService {
       buildInstalledConfig(
         config,
         (event) =>
-          wrapPosixHookCommand(remoteScriptPath, { ORCA_ANTIGRAVITY_EVENT: event.eventName }),
+          wrapPosixHookCommand(remoteScriptPath, { PEBBLE_ANTIGRAVITY_EVENT: event.eventName }),
         createAntigravityManagedCommandMatcher()
       )
       await writeManagedScriptRemote(sftp, remoteScriptPath, getManagedScript('posix'))

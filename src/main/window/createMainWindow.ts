@@ -20,7 +20,7 @@ import {
   normalizeBrowserNavigationUrl,
   normalizeExternalBrowserUrl
 } from '../../shared/browser-url'
-import { ORCA_BROWSER_GUEST_WEB_PREFERENCES } from '../../shared/browser-guest-web-preferences'
+import { PEBBLE_BROWSER_GUEST_WEB_PREFERENCES } from '../../shared/browser-guest-web-preferences'
 import { isCrashReportReason } from '../../shared/crash-reporting'
 import {
   DEFAULT_RENDERER_RECOVERY_MAX_RECOVERIES,
@@ -117,7 +117,7 @@ type CreateMainWindowOptions = {
     details: Electron.RenderProcessGoneDetails,
     webContentsId: number
   ) => boolean
-  /** Returns true when Orca should reload after an unexpected renderer loss.
+  /** Returns true when Pebble should reload after an unexpected renderer loss.
    *  Why: update relaunch and app quit intentionally tear down child
    *  processes; recovering those paths can fight Electron's shutdown. */
   shouldRecoverRenderer?: (
@@ -126,7 +126,7 @@ type CreateMainWindowOptions = {
   ) => boolean
   /** Called when consecutive auto-recoveries hit the circuit-breaker limit, so
    *  the host can record diagnostics and surface a recovery prompt instead of
-   *  letting Orca crash-loop. */
+   *  letting Pebble crash-loop. */
   onRendererRecoveryExhausted?: (info: {
     details: Electron.RenderProcessGoneDetails
     webContentsId: number
@@ -244,10 +244,10 @@ export function createMainWindow(
     ...(savedBounds ? { x: savedBounds.x, y: savedBounds.y } : {}),
     minWidth: MIN_WIDTH,
     minHeight: MIN_HEIGHT,
-    title: opts?.title ?? 'Orca',
+    title: opts?.title ?? 'Pebble',
     show: false,
     // Why: macOS swallows the app-activating click by default, so clicking
-    // back into Orca (e.g. the floating workspace) needed a second click.
+    // back into Pebble (e.g. the floating workspace) needed a second click.
     // macOS-only option; Windows/Linux already deliver that click.
     acceptFirstMouse: true,
     // Why: on macOS the menu lives in the system menu bar, so the in-window
@@ -302,7 +302,7 @@ export function createMainWindow(
     // Why: persistent browser webviews use separate compositor layers, and on
     // recent macOS releases those layers can fail to repaint after occlusion or
     // restore. Disabling main-window throttling and forcing a repaint on
-    // visibility transitions hardens Orca against black-surface failures during
+    // visibility transitions hardens Pebble against black-surface failures during
     // browser-tab restore and tab switching.
     mainWindow.webContents.setBackgroundThrottling(false)
     mainWindow.on('restore', () => {
@@ -486,10 +486,10 @@ export function createMainWindow(
     // Why: arbitrary sites must stay inside an unprivileged guest surface. We
     // fail closed here so a renderer bug cannot smuggle preload, Node, or a
     // non-browser partition into the guest and widen the app privilege boundary.
-    // The one allowed data URL is Orca's inert blank-tab bootstrap page; deny
+    // The one allowed data URL is Pebble's inert blank-tab bootstrap page; deny
     // every other data URL so the renderer cannot inject arbitrary inline HTML.
     // Why: session profiles use per-profile partitions (e.g.
-    // persist:orca-browser-session-<uuid>). The registry is the sole authority
+    // persist:pebble-browser-session-<uuid>). The registry is the sole authority
     // for which partitions are valid — renderer-provided strings that are not
     // in the allowlist are rejected.
     if (!normalizedSrc || !browserSessionRegistry.isAllowedPartition(partition)) {
@@ -511,7 +511,7 @@ export function createMainWindow(
     webPreferences.sandbox = true
     // Why: keep renderer-created webviews aligned with the browser guest policy
     // even if the host markup omits or misspells a preference.
-    Object.assign(webPreferences, ORCA_BROWSER_GUEST_WEB_PREFERENCES)
+    Object.assign(webPreferences, PEBBLE_BROWSER_GUEST_WEB_PREFERENCES)
     // Why: preserve the registry-validated partition instead of forcing the
     // legacy constant. This lets imported/isolated session profiles use their
     // own cookie/storage partition while keeping all other hardening intact.
@@ -521,7 +521,7 @@ export function createMainWindow(
   mainWindow.webContents.on('did-attach-webview', (_event, guest) => {
     // Why: popup and navigation policy must attach as soon as Chromium creates
     // the guest webContents. Waiting until renderer-driven registration leaves
-    // a race where target=_blank or early redirects can bypass Orca's intended
+    // a race where target=_blank or early redirects can bypass Pebble's intended
     // fallback behavior.
     browserManager.attachGuestPolicies(guest)
   })
@@ -812,7 +812,7 @@ export function createMainWindow(
 
     const capturedTerminalActionId =
       focusedShortcutContext.context === 'terminal' &&
-      focusedShortcutContext.terminalShortcutPolicy === 'orca-first' &&
+      focusedShortcutContext.terminalShortcutPolicy === 'pebble-first' &&
       windowShortcutActionCapturesTerminal(action)
         ? getWindowShortcutActionId(action)
         : null
@@ -875,7 +875,7 @@ export function createMainWindow(
 
     if (isMacAppPasteInput(input)) {
       // Why: native chat/terminal panes can own focus without being native
-      // editable controls, so route Cmd+V through Orca's paste ownership first.
+      // editable controls, so route Cmd+V through Pebble's paste ownership first.
       event.preventDefault()
       mainWindow.webContents.send('ui:appMenuPaste')
       return
@@ -1039,10 +1039,10 @@ export function createMainWindow(
     if (store.getUI().trayMinimizeNoticeShown !== true) {
       try {
         new Notification({
-          title: 'Orca',
+          title: 'Pebble',
           body: translateMain(
             'tray.minimizeNotice.body',
-            'Orca is still running in the system tray'
+            'Pebble is still running in the system tray'
           )
         }).show()
       } catch {
@@ -1207,7 +1207,7 @@ export function createMainWindow(
     // Why: on updater-triggered shutdown, BrowserWindow can emit `closed`
     // after its webContents has already been destroyed. The destroyed
     // webContents owns its listeners, so do not touch `mainWindow.webContents`
-    // here or the quit path can crash before Squirrel.Mac relaunches Orca.
+    // here or the quit path can crash before Squirrel.Mac relaunches Pebble.
     app.removeListener('before-quit', freezeBoundsOnQuit)
   })
 

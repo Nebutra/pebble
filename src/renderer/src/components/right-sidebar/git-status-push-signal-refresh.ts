@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { isWindowVisible } from '@/lib/window-visibility-interval'
 import {
-  ORCA_TERMINAL_COMMAND_FINISHED_EVENT,
+  PEBBLE_TERMINAL_COMMAND_FINISHED_EVENT,
   type TerminalCommandFinishedEventDetail
 } from '@/hooks/terminal-command-finished-event'
 
@@ -57,9 +57,9 @@ export function useGitStatusPushSignalRefresh({
       }
       fetchStatusRef.current()
     }
-    window.addEventListener(ORCA_TERMINAL_COMMAND_FINISHED_EVENT, handleCommandFinished)
+    window.addEventListener(PEBBLE_TERMINAL_COMMAND_FINISHED_EVENT, handleCommandFinished)
     return () => {
-      window.removeEventListener(ORCA_TERMINAL_COMMAND_FINISHED_EVENT, handleCommandFinished)
+      window.removeEventListener(PEBBLE_TERMINAL_COMMAND_FINISHED_EVENT, handleCommandFinished)
     }
   }, [enabled, activeWorktreeId])
 }

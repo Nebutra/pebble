@@ -6,15 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   callMock,
-  serveOrcaAppMock,
+  servePebbleAppMock,
   getDefaultUserDataPathMock,
   addEnvironmentFromPairingCodeMock,
   listEnvironmentsMock,
   spawnMock
 } = vi.hoisted(() => ({
   callMock: vi.fn(),
-  serveOrcaAppMock: vi.fn(),
-  getDefaultUserDataPathMock: vi.fn(() => '/tmp/orca-user-data'),
+  servePebbleAppMock: vi.fn(),
+  getDefaultUserDataPathMock: vi.fn(() => '/tmp/pebble-user-data'),
   addEnvironmentFromPairingCodeMock: vi.fn(),
   listEnvironmentsMock: vi.fn(),
   spawnMock: vi.fn()
@@ -25,7 +25,7 @@ vi.mock('./runtime-client', () => {
     readonly isRemote: boolean
     call = callMock
     getCliStatus = vi.fn()
-    openOrca = vi.fn()
+    openPebble = vi.fn()
 
     constructor(
       _userDataPath?: string,
@@ -35,10 +35,10 @@ vi.mock('./runtime-client', () => {
     ) {
       const effectivePairingCode =
         remotePairingCode === undefined
-          ? (process.env.ORCA_PAIRING_CODE ?? process.env.ORCA_REMOTE_PAIRING)
+          ? (process.env.PEBBLE_PAIRING_CODE ?? process.env.PEBBLE_REMOTE_PAIRING)
           : remotePairingCode
       const effectiveEnvironment =
-        environmentSelector === undefined ? process.env.ORCA_ENVIRONMENT : environmentSelector
+        environmentSelector === undefined ? process.env.PEBBLE_ENVIRONMENT : environmentSelector
       if (effectivePairingCode && effectiveEnvironment) {
         throw new RuntimeClientError(
           'invalid_argument',
@@ -71,7 +71,7 @@ vi.mock('./runtime-client', () => {
     RuntimeClient,
     RuntimeClientError,
     RuntimeRpcFailureError,
-    serveOrcaApp: serveOrcaAppMock,
+    servePebbleApp: servePebbleAppMock,
     getDefaultUserDataPath: getDefaultUserDataPathMock
   }
 })
@@ -141,7 +141,7 @@ describe('COMMAND_SPECS collision check', () => {
   })
 })
 
-describe('orca root help', () => {
+describe('pebble root help', () => {
   it('advertises computer-use capabilities discovery', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
@@ -173,7 +173,7 @@ describe('orca root help', () => {
       '`worktree create --agent` creates a new checkout with an agent.'
     )
     expect(logSpy.mock.calls[0][0]).toContain(
-      'orca terminal create --worktree active --command "codex"'
+      'pebble terminal create --worktree active --command "codex"'
     )
     expect(callMock).not.toHaveBeenCalled()
   })
@@ -193,7 +193,7 @@ describe('orca root help', () => {
     await main(['linear', '--help'], '/tmp/repo')
 
     const groupHelp = String(logSpy.mock.calls[0][0])
-    expect(groupHelp).toContain('orca linear')
+    expect(groupHelp).toContain('pebble linear')
     expect(groupHelp).toContain('issue')
     expect(groupHelp).toContain('search')
     expect(groupHelp).not.toContain('--comments')
@@ -203,7 +203,7 @@ describe('orca root help', () => {
     await main(['linear', 'issue', '--help'], '/tmp/repo')
 
     const issueHelp = String(logSpy.mock.calls[0][0])
-    expect(issueHelp).toContain('orca linear issue [<id>]')
+    expect(issueHelp).toContain('pebble linear issue [<id>]')
     expect(issueHelp).toContain('--comments             Include threaded Linear comments')
     expect(issueHelp).toContain('--attachments          Include attachment metadata and URLs')
     expect(issueHelp).toContain('--workspace <id>      Connected Linear workspace id')
@@ -213,7 +213,7 @@ describe('orca root help', () => {
     await main(['linear', 'search', '--help'], '/tmp/repo')
 
     const searchHelp = String(logSpy.mock.calls[0][0])
-    expect(searchHelp).toContain('orca linear search <query>')
+    expect(searchHelp).toContain('pebble linear search <query>')
     expect(searchHelp).toContain('--workspace <id|all>  Connected Linear workspace id, or all')
     expect(searchHelp).toContain('--query <text>        Text to search across Linear issues')
     expect(callMock).not.toHaveBeenCalled()
@@ -267,13 +267,13 @@ describe('orca root help', () => {
     expect(createHelp).not.toContain('checkout/workspace')
     expect(createHelp).not.toContain('caller workspace')
     expect(createHelp).not.toContain('current workspace')
-    expect(createHelp).not.toContain('active Orca workspace')
+    expect(createHelp).not.toContain('active Pebble workspace')
     expect(createHelp).not.toContain('folderWorkspaceId')
     expect(createHelp).toContain('folder:<id>')
     expect(createHelp).toContain('folder:<folderId>')
     expect(createHelp).toContain('worktree:<id>')
     expect(createHelp).toContain(
-      '--no-parent only affects Orca lineage; omit --base-branch to use the repo default base'
+      '--no-parent only affects Pebble lineage; omit --base-branch to use the repo default base'
     )
 
     logSpy.mockClear()
@@ -294,7 +294,7 @@ describe('orca root help', () => {
 
     expect(String(logSpy.mock.calls[0][0])).toContain('This creates a new checkout.')
     expect(String(logSpy.mock.calls[0][0])).toContain(
-      'orca terminal create --worktree active --command "codex"'
+      'pebble terminal create --worktree active --command "codex"'
     )
 
     logSpy.mockClear()
@@ -303,28 +303,28 @@ describe('orca root help', () => {
     const terminalHelp = String(logSpy.mock.calls[0][0])
     expect(terminalHelp).toContain('Use this, not worktree create')
     expect(terminalHelp).toContain(
-      'orca terminal create --worktree active --command "codex" --json'
+      'pebble terminal create --worktree active --command "codex" --json'
     )
     expect(callMock).not.toHaveBeenCalled()
   })
 })
 
-describe('orca cli worktree awareness', () => {
-  const originalTerminalHandle = process.env.ORCA_TERMINAL_HANDLE
-  const originalUserDataPath = process.env.ORCA_USER_DATA_PATH
-  const originalPairingCode = process.env.ORCA_PAIRING_CODE
-  const originalRemotePairing = process.env.ORCA_REMOTE_PAIRING
-  const originalEnvironment = process.env.ORCA_ENVIRONMENT
-  const originalWorkspaceId = process.env.ORCA_WORKSPACE_ID
-  const originalWorktreeId = process.env.ORCA_WORKTREE_ID
+describe('pebble cli worktree awareness', () => {
+  const originalTerminalHandle = process.env.PEBBLE_TERMINAL_HANDLE
+  const originalUserDataPath = process.env.PEBBLE_USER_DATA_PATH
+  const originalPairingCode = process.env.PEBBLE_PAIRING_CODE
+  const originalRemotePairing = process.env.PEBBLE_REMOTE_PAIRING
+  const originalEnvironment = process.env.PEBBLE_ENVIRONMENT
+  const originalWorkspaceId = process.env.PEBBLE_WORKSPACE_ID
+  const originalWorktreeId = process.env.PEBBLE_WORKTREE_ID
 
   beforeEach(() => {
     callMock.mockReset()
-    delete process.env.ORCA_TERMINAL_HANDLE
-    delete process.env.ORCA_USER_DATA_PATH
-    delete process.env.ORCA_WORKSPACE_ID
-    delete process.env.ORCA_WORKTREE_ID
-    serveOrcaAppMock.mockReset()
+    delete process.env.PEBBLE_TERMINAL_HANDLE
+    delete process.env.PEBBLE_USER_DATA_PATH
+    delete process.env.PEBBLE_WORKSPACE_ID
+    delete process.env.PEBBLE_WORKTREE_ID
+    servePebbleAppMock.mockReset()
     getDefaultUserDataPathMock.mockClear()
     addEnvironmentFromPairingCodeMock.mockReset()
     listEnvironmentsMock.mockReset()
@@ -354,39 +354,39 @@ describe('orca cli worktree awareness', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     if (originalTerminalHandle === undefined) {
-      delete process.env.ORCA_TERMINAL_HANDLE
+      delete process.env.PEBBLE_TERMINAL_HANDLE
     } else {
-      process.env.ORCA_TERMINAL_HANDLE = originalTerminalHandle
+      process.env.PEBBLE_TERMINAL_HANDLE = originalTerminalHandle
     }
     if (originalUserDataPath === undefined) {
-      delete process.env.ORCA_USER_DATA_PATH
+      delete process.env.PEBBLE_USER_DATA_PATH
     } else {
-      process.env.ORCA_USER_DATA_PATH = originalUserDataPath
+      process.env.PEBBLE_USER_DATA_PATH = originalUserDataPath
     }
     if (originalPairingCode === undefined) {
-      delete process.env.ORCA_PAIRING_CODE
+      delete process.env.PEBBLE_PAIRING_CODE
     } else {
-      process.env.ORCA_PAIRING_CODE = originalPairingCode
+      process.env.PEBBLE_PAIRING_CODE = originalPairingCode
     }
     if (originalRemotePairing === undefined) {
-      delete process.env.ORCA_REMOTE_PAIRING
+      delete process.env.PEBBLE_REMOTE_PAIRING
     } else {
-      process.env.ORCA_REMOTE_PAIRING = originalRemotePairing
+      process.env.PEBBLE_REMOTE_PAIRING = originalRemotePairing
     }
     if (originalEnvironment === undefined) {
-      delete process.env.ORCA_ENVIRONMENT
+      delete process.env.PEBBLE_ENVIRONMENT
     } else {
-      process.env.ORCA_ENVIRONMENT = originalEnvironment
+      process.env.PEBBLE_ENVIRONMENT = originalEnvironment
     }
     if (originalWorkspaceId === undefined) {
-      delete process.env.ORCA_WORKSPACE_ID
+      delete process.env.PEBBLE_WORKSPACE_ID
     } else {
-      process.env.ORCA_WORKSPACE_ID = originalWorkspaceId
+      process.env.PEBBLE_WORKSPACE_ID = originalWorkspaceId
     }
     if (originalWorktreeId === undefined) {
-      delete process.env.ORCA_WORKTREE_ID
+      delete process.env.PEBBLE_WORKTREE_ID
     } else {
-      process.env.ORCA_WORKTREE_ID = originalWorktreeId
+      process.env.PEBBLE_WORKTREE_ID = originalWorktreeId
     }
   })
 
@@ -435,18 +435,18 @@ describe('orca cli worktree awareness', () => {
   })
 
   it.skipIf(process.platform === 'win32')(
-    'prepares and starts Claude Agent Teams in the current Orca terminal',
+    'prepares and starts Claude Agent Teams in the current Pebble terminal',
     async () => {
-      process.env.ORCA_PANE_KEY = 'tab-1:11111111-1111-4111-8111-111111111111'
+      process.env.PEBBLE_PANE_KEY = 'tab-1:11111111-1111-4111-8111-111111111111'
       queueFixtures(
         callMock,
         okFixture('req_agent_teams_prepare', {
           launch: {
             env: {
               CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-              TMUX: '/tmp/orca-claude-agent-teams/team-1,0,1',
+              TMUX: '/tmp/pebble-claude-agent-teams/team-1,0,1',
               TMUX_PANE: '%1',
-              PATH: '/tmp/orca-shim:/usr/bin'
+              PATH: '/tmp/pebble-shim:/usr/bin'
             }
           }
         })
@@ -457,7 +457,7 @@ describe('orca cli worktree awareness', () => {
       expect(callMock).toHaveBeenCalledWith('agentTeams.prepareLaunch', {
         paneKey: 'tab-1:11111111-1111-4111-8111-111111111111',
         env: expect.objectContaining({
-          ORCA_PANE_KEY: 'tab-1:11111111-1111-4111-8111-111111111111'
+          PEBBLE_PANE_KEY: 'tab-1:11111111-1111-4111-8111-111111111111'
         })
       })
       expect(spawnMock).toHaveBeenCalledWith('claude', ['--teammate-mode', 'auto'], {
@@ -473,16 +473,16 @@ describe('orca cli worktree awareness', () => {
   it.skipIf(process.platform === 'win32')(
     'passes Claude Agent Teams arguments through to Claude Code',
     async () => {
-      process.env.ORCA_PANE_KEY = 'tab-1:11111111-1111-4111-8111-111111111111'
+      process.env.PEBBLE_PANE_KEY = 'tab-1:11111111-1111-4111-8111-111111111111'
       queueFixtures(
         callMock,
         okFixture('req_agent_teams_prepare', {
           launch: {
             env: {
               CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-              TMUX: '/tmp/orca-claude-agent-teams/team-1,0,1',
+              TMUX: '/tmp/pebble-claude-agent-teams/team-1,0,1',
               TMUX_PANE: '%1',
-              PATH: '/tmp/orca-shim:/usr/bin'
+              PATH: '/tmp/pebble-shim:/usr/bin'
             }
           }
         })
@@ -510,16 +510,16 @@ describe('orca cli worktree awareness', () => {
   it.skipIf(process.platform === 'win32')(
     'does not duplicate an explicit Claude teammate mode',
     async () => {
-      process.env.ORCA_PANE_KEY = 'tab-1:11111111-1111-4111-8111-111111111111'
+      process.env.PEBBLE_PANE_KEY = 'tab-1:11111111-1111-4111-8111-111111111111'
       queueFixtures(
         callMock,
         okFixture('req_agent_teams_prepare', {
           launch: {
             env: {
               CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-              TMUX: '/tmp/orca-claude-agent-teams/team-1,0,1',
+              TMUX: '/tmp/pebble-claude-agent-teams/team-1,0,1',
               TMUX_PANE: '%1',
-              PATH: '/tmp/orca-shim:/usr/bin'
+              PATH: '/tmp/pebble-shim:/usr/bin'
             }
           }
         })
@@ -753,9 +753,9 @@ describe('orca cli worktree awareness', () => {
       okFixture('req_set_linear', {
         worktree: {
           ...buildWorktree('/tmp/repo/child', 'feature/child'),
-          linkedLinearIssue: 'STA-335',
+          linkedLinearIssue: 'NEB-335',
           linkedLinearIssueWorkspaceId: null,
-          linkedLinearIssueOrganizationUrlKey: 'stably'
+          linkedLinearIssueOrganizationUrlKey: 'nebutra'
         }
       })
     )
@@ -768,7 +768,7 @@ describe('orca cli worktree awareness', () => {
         '--worktree',
         'id:repo::/tmp/repo/child',
         '--linear-issue',
-        'https://linear.app/stably/issue/STA-335/test-issue',
+        'https://linear.app/nebutra/issue/NEB-335/test-issue',
         '--json'
       ],
       '/tmp/repo'
@@ -778,9 +778,9 @@ describe('orca cli worktree awareness', () => {
       worktree: 'id:repo::/tmp/repo/child',
       displayName: undefined,
       linkedIssue: undefined,
-      linkedLinearIssue: 'STA-335',
+      linkedLinearIssue: 'NEB-335',
       linkedLinearIssueWorkspaceId: null,
-      linkedLinearIssueOrganizationUrlKey: 'stably',
+      linkedLinearIssueOrganizationUrlKey: 'nebutra',
       comment: undefined,
       workspaceStatus: undefined,
       parentWorktree: undefined,
@@ -899,9 +899,9 @@ describe('orca cli worktree awareness', () => {
       okFixture('req_create_linear', {
         worktree: {
           ...buildWorktree('/tmp/repo/feature', 'feature', 'abc', 'repo-1'),
-          linkedLinearIssue: 'STA-335',
+          linkedLinearIssue: 'NEB-335',
           linkedLinearIssueWorkspaceId: null,
-          linkedLinearIssueOrganizationUrlKey: 'stably'
+          linkedLinearIssueOrganizationUrlKey: 'nebutra'
         }
       })
     )
@@ -916,7 +916,7 @@ describe('orca cli worktree awareness', () => {
         '--name',
         'feature',
         '--linear-issue',
-        'https://linear.app/stably/issue/STA-335/test-issue',
+        'https://linear.app/nebutra/issue/NEB-335/test-issue',
         '--json'
       ],
       '/tmp/repo'
@@ -927,9 +927,9 @@ describe('orca cli worktree awareness', () => {
       name: 'feature',
       baseBranch: undefined,
       linkedIssue: undefined,
-      linkedLinearIssue: 'STA-335',
+      linkedLinearIssue: 'NEB-335',
       linkedLinearIssueWorkspaceId: null,
-      linkedLinearIssueOrganizationUrlKey: 'stably',
+      linkedLinearIssueOrganizationUrlKey: 'nebutra',
       comment: undefined,
       runHooks: false,
       activate: false,
@@ -1114,11 +1114,11 @@ describe('orca cli worktree awareness', () => {
         setups: [
           {
             id: 'setup-local',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'local',
             repoId: 'repo-local',
-            path: '/tmp/orca',
-            displayName: 'Orca',
+            path: '/tmp/pebble',
+            displayName: 'Pebble',
             setupState: 'ready',
             setupMethod: 'legacy-repo',
             createdAt: 1,
@@ -1126,11 +1126,11 @@ describe('orca cli worktree awareness', () => {
           },
           {
             id: 'setup-gpu',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'runtime:gpu',
             repoId: 'repo-gpu',
-            path: '/srv/orca',
-            displayName: 'Orca',
+            path: '/srv/pebble',
+            displayName: 'Pebble',
             setupState: 'ready',
             setupMethod: 'legacy-repo',
             createdAt: 1,
@@ -1139,7 +1139,7 @@ describe('orca cli worktree awareness', () => {
         ]
       }),
       okFixture('req_create', {
-        worktree: buildWorktree('/srv/orca/feature', 'feature', 'abc', 'repo-gpu'),
+        worktree: buildWorktree('/srv/pebble/feature', 'feature', 'abc', 'repo-gpu'),
         lineage: null,
         warnings: []
       })
@@ -1151,7 +1151,7 @@ describe('orca cli worktree awareness', () => {
         'worktree',
         'create',
         '--project',
-        'github:stablyai/orca',
+        'github:nebutra/pebble',
         '--host',
         'runtime:gpu',
         '--name',
@@ -1184,11 +1184,11 @@ describe('orca cli worktree awareness', () => {
         setups: [
           {
             id: 'setup-gpu',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'runtime:gpu',
             repoId: 'repo-gpu',
-            path: '/srv/orca',
-            displayName: 'Orca',
+            path: '/srv/pebble',
+            displayName: 'Pebble',
             setupState: 'ready',
             setupMethod: 'legacy-repo',
             createdAt: 1,
@@ -1197,7 +1197,7 @@ describe('orca cli worktree awareness', () => {
         ]
       }),
       okFixture('req_create', {
-        worktree: buildWorktree('/srv/orca/feature', 'feature', 'abc', 'repo-gpu'),
+        worktree: buildWorktree('/srv/pebble/feature', 'feature', 'abc', 'repo-gpu'),
         lineage: null,
         warnings: []
       })
@@ -1237,7 +1237,7 @@ describe('orca cli worktree awareness', () => {
         '--repo',
         'id:repo-local',
         '--project',
-        'github:stablyai/orca',
+        'github:nebutra/pebble',
         '--name',
         'feature',
         '--json'
@@ -1430,7 +1430,7 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('passes folder workspace environment lineage through worktree.create', async () => {
-    process.env.ORCA_WORKSPACE_ID = 'folder:folder-1'
+    process.env.PEBBLE_WORKSPACE_ID = 'folder:folder-1'
     queueFixtures(
       callMock,
       worktreeListFixture([buildWorktree('/tmp/repo', 'main', 'abc', 'repo-1')]),
@@ -1763,7 +1763,7 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('passes caller terminal handle through worktree.create with cwd fallback', async () => {
-    process.env.ORCA_TERMINAL_HANDLE = 'term_parent'
+    process.env.PEBBLE_TERMINAL_HANDLE = 'term_parent'
     queueFixtures(
       callMock,
       worktreeListFixture([buildWorktree('/tmp/repo', 'main', 'abc', 'repo-1')]),
@@ -1798,15 +1798,15 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('starts a foreground headless server through `serve`', async () => {
-    serveOrcaAppMock.mockResolvedValue(0)
-    process.env.ORCA_ENVIRONMENT = 'stale-env'
+    servePebbleAppMock.mockResolvedValue(0)
+    process.env.PEBBLE_ENVIRONMENT = 'stale-env'
 
     await main(
       ['serve', '--json', '--port', '6768', '--pairing-address', '100.64.1.20', '--no-pairing'],
       '/tmp/repo'
     )
 
-    expect(serveOrcaAppMock).toHaveBeenCalledWith({
+    expect(servePebbleAppMock).toHaveBeenCalledWith({
       json: true,
       port: '6768',
       pairingAddress: '100.64.1.20',
@@ -1818,14 +1818,14 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('starts a foreground headless server with mobile pairing enabled', async () => {
-    serveOrcaAppMock.mockResolvedValue(0)
+    servePebbleAppMock.mockResolvedValue(0)
 
     await main(
       ['serve', '--pairing-address', '100.64.1.20', '--mobile-pairing', '--json'],
       '/tmp/repo'
     )
 
-    expect(serveOrcaAppMock).toHaveBeenCalledWith({
+    expect(servePebbleAppMock).toHaveBeenCalledWith({
       json: true,
       port: null,
       pairingAddress: '100.64.1.20',
@@ -1837,7 +1837,7 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('starts a recipe JSON headless server for VM recipes', async () => {
-    serveOrcaAppMock.mockResolvedValue(0)
+    servePebbleAppMock.mockResolvedValue(0)
 
     await main(
       [
@@ -1851,7 +1851,7 @@ describe('orca cli worktree awareness', () => {
       '/tmp/repo'
     )
 
-    expect(serveOrcaAppMock).toHaveBeenCalledWith({
+    expect(servePebbleAppMock).toHaveBeenCalledWith({
       json: false,
       port: null,
       pairingAddress: 'wss://sandbox.example.com',
@@ -1863,23 +1863,23 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('runs vm recipe doctor locally without contacting the app runtime', async () => {
-    const repoPath = mkdtempSync(path.join(tmpdir(), 'orca-vm-doctor-'))
+    const repoPath = mkdtempSync(path.join(tmpdir(), 'pebble-vm-doctor-'))
     try {
-      mkdirSync(path.join(repoPath, 'scripts', 'orca-vm'), { recursive: true })
-      const startScript = path.join(repoPath, 'scripts', 'orca-vm', 'start.sh')
-      const cleanupScript = path.join(repoPath, 'scripts', 'orca-vm', 'cleanup.sh')
+      mkdirSync(path.join(repoPath, 'scripts', 'pebble-vm'), { recursive: true })
+      const startScript = path.join(repoPath, 'scripts', 'pebble-vm', 'start.sh')
+      const cleanupScript = path.join(repoPath, 'scripts', 'pebble-vm', 'cleanup.sh')
       writeFileSync(startScript, '#!/bin/sh\n')
       writeFileSync(cleanupScript, '#!/bin/sh\n')
       chmodSync(startScript, 0o755)
       chmodSync(cleanupScript, 0o755)
       writeFileSync(
-        path.join(repoPath, 'orca.yaml'),
+        path.join(repoPath, 'pebble.yaml'),
         [
           'environmentRecipes:',
           '  - id: cloud-sandbox',
           '    name: Cloud Sandbox',
-          '    create: ./scripts/orca-vm/start.sh',
-          '    destroy: ./scripts/orca-vm/cleanup.sh'
+          '    create: ./scripts/pebble-vm/start.sh',
+          '    destroy: ./scripts/pebble-vm/cleanup.sh'
         ].join('\n')
       )
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -1896,7 +1896,7 @@ describe('orca cli worktree awareness', () => {
       expect(output.ok).toBe(true)
       expect(output.checks).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ id: 'orca_yaml.parse', status: 'pass' }),
+          expect.objectContaining({ id: 'pebble_yaml.parse', status: 'pass' }),
           expect.objectContaining({ id: 'recipe.exists', status: 'pass' }),
           expect.objectContaining({ id: 'recipe.create', status: 'pass' }),
           expect.objectContaining({ id: 'recipe.destroy', status: 'pass' })
@@ -1909,17 +1909,17 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('warns when vm recipe doctor finds no cleanup hook', async () => {
-    const repoPath = mkdtempSync(path.join(tmpdir(), 'orca-vm-doctor-'))
+    const repoPath = mkdtempSync(path.join(tmpdir(), 'pebble-vm-doctor-'))
     try {
-      mkdirSync(path.join(repoPath, 'scripts', 'orca-vm'), { recursive: true })
-      writeFileSync(path.join(repoPath, 'scripts', 'orca-vm', 'start.sh'), '#!/bin/sh\n')
+      mkdirSync(path.join(repoPath, 'scripts', 'pebble-vm'), { recursive: true })
+      writeFileSync(path.join(repoPath, 'scripts', 'pebble-vm', 'start.sh'), '#!/bin/sh\n')
       writeFileSync(
-        path.join(repoPath, 'orca.yaml'),
+        path.join(repoPath, 'pebble.yaml'),
         [
           'environmentRecipes:',
           '  - id: manual-sandbox',
           '    name: Manual Sandbox',
-          '    create: ./scripts/orca-vm/start.sh'
+          '    create: ./scripts/pebble-vm/start.sh'
         ].join('\n')
       )
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -1947,7 +1947,7 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('runs vm recipe doctor provision mode and invokes cleanup', async () => {
-    const repoPath = mkdtempSync(path.join(tmpdir(), 'orca-vm-doctor-provision-'))
+    const repoPath = mkdtempSync(path.join(tmpdir(), 'pebble-vm-doctor-provision-'))
     const pairingCode = encodePairingOffer({
       v: PAIRING_OFFER_VERSION,
       endpoint: 'ws://sandbox.example.com:6767',
@@ -1955,9 +1955,9 @@ describe('orca cli worktree awareness', () => {
       publicKeyB64: 'public-key'
     })
     try {
-      mkdirSync(path.join(repoPath, 'scripts', 'orca-vm'), { recursive: true })
+      mkdirSync(path.join(repoPath, 'scripts', 'pebble-vm'), { recursive: true })
       writeFileSync(
-        path.join(repoPath, 'scripts', 'orca-vm', 'start.js'),
+        path.join(repoPath, 'scripts', 'pebble-vm', 'start.js'),
         [
           'console.log(JSON.stringify({',
           '  schemaVersion: 1,',
@@ -1967,7 +1967,7 @@ describe('orca cli worktree awareness', () => {
         ].join('\n')
       )
       writeFileSync(
-        path.join(repoPath, 'scripts', 'orca-vm', 'cleanup.js'),
+        path.join(repoPath, 'scripts', 'pebble-vm', 'cleanup.js'),
         [
           "const fs = require('fs')",
           "const input = fs.readFileSync(0, 'utf8')",
@@ -1976,13 +1976,13 @@ describe('orca cli worktree awareness', () => {
         ].join('\n')
       )
       writeFileSync(
-        path.join(repoPath, 'orca.yaml'),
+        path.join(repoPath, 'pebble.yaml'),
         [
           'environmentRecipes:',
           '  - id: cloud-sandbox',
           '    name: Cloud Sandbox',
-          `    create: ${JSON.stringify(`${process.execPath} ./scripts/orca-vm/start.js`)}`,
-          `    destroy: ${JSON.stringify(`${process.execPath} ./scripts/orca-vm/cleanup.js`)}`
+          `    create: ${JSON.stringify(`${process.execPath} ./scripts/pebble-vm/start.js`)}`,
+          `    destroy: ${JSON.stringify(`${process.execPath} ./scripts/pebble-vm/cleanup.js`)}`
         ].join('\n')
       )
       const { EventEmitter } = await import('node:events')
@@ -2070,17 +2070,17 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('returns the full create transcript when provision fails so the agent can self-diagnose', async () => {
-    const repoPath = mkdtempSync(path.join(tmpdir(), 'orca-vm-doctor-provision-fail-'))
+    const repoPath = mkdtempSync(path.join(tmpdir(), 'pebble-vm-doctor-provision-fail-'))
     try {
-      mkdirSync(path.join(repoPath, 'scripts', 'orca-vm'), { recursive: true })
-      writeFileSync(path.join(repoPath, 'scripts', 'orca-vm', 'start.js'), 'process.exit(0)')
+      mkdirSync(path.join(repoPath, 'scripts', 'pebble-vm'), { recursive: true })
+      writeFileSync(path.join(repoPath, 'scripts', 'pebble-vm', 'start.js'), 'process.exit(0)')
       writeFileSync(
-        path.join(repoPath, 'orca.yaml'),
+        path.join(repoPath, 'pebble.yaml'),
         [
           'environmentRecipes:',
           '  - id: cloud-sandbox',
           '    name: Cloud Sandbox',
-          `    create: ${JSON.stringify(`${process.execPath} ./scripts/orca-vm/start.js`)}`,
+          `    create: ${JSON.stringify(`${process.execPath} ./scripts/pebble-vm/start.js`)}`,
           '    destroy: none'
         ].join('\n')
       )
@@ -2150,7 +2150,7 @@ describe('orca cli worktree awareness', () => {
 
     await main(['serve', '--recipe-json'], '/tmp/repo')
 
-    expect(serveOrcaAppMock).not.toHaveBeenCalled()
+    expect(servePebbleAppMock).not.toHaveBeenCalled()
     expect([...logSpy.mock.calls, ...errSpy.mock.calls].flat().join('\n')).toContain(
       'Recipe JSON output requires --project-root.'
     )
@@ -2169,7 +2169,7 @@ describe('orca cli worktree awareness', () => {
       '/tmp/repo'
     )
 
-    expect(serveOrcaAppMock).not.toHaveBeenCalled()
+    expect(servePebbleAppMock).not.toHaveBeenCalled()
     expect([...logSpy.mock.calls, ...errSpy.mock.calls].flat().join('\n')).toContain(
       'Recipe JSON output requires runtime pairing; remove --mobile-pairing.'
     )
@@ -2185,7 +2185,7 @@ describe('orca cli worktree awareness', () => {
 
     await main(['serve', '--mobile-pairing', '--no-pairing', '--json'], '/tmp/repo')
 
-    expect(serveOrcaAppMock).not.toHaveBeenCalled()
+    expect(servePebbleAppMock).not.toHaveBeenCalled()
     expect([...logSpy.mock.calls, ...errSpy.mock.calls].flat().join('\n')).toContain(
       'Use either --mobile-pairing or --no-pairing, not both.'
     )
@@ -2201,7 +2201,7 @@ describe('orca cli worktree awareness', () => {
 
     await main(['serve', '--port', 'not-a-port', '--json'], '/tmp/repo')
 
-    expect(serveOrcaAppMock).not.toHaveBeenCalled()
+    expect(servePebbleAppMock).not.toHaveBeenCalled()
     expect([...logSpy.mock.calls, ...errSpy.mock.calls].flat().join('\n')).toContain(
       'Invalid --port value: not-a-port'
     )
@@ -2217,7 +2217,7 @@ describe('orca cli worktree awareness', () => {
 
     await main(['serve', '--port', '--json'], '/tmp/repo')
 
-    expect(serveOrcaAppMock).not.toHaveBeenCalled()
+    expect(servePebbleAppMock).not.toHaveBeenCalled()
     expect([...logSpy.mock.calls, ...errSpy.mock.calls].flat().join('\n')).toContain(
       'Missing value for --port.'
     )
@@ -2226,31 +2226,31 @@ describe('orca cli worktree awareness', () => {
     process.exitCode = priorExitCode
   })
 
-  it('lists saved environments even when ORCA_ENVIRONMENT is set', async () => {
-    process.env.ORCA_ENVIRONMENT = 'stale-env'
+  it('lists saved environments even when PEBBLE_ENVIRONMENT is set', async () => {
+    process.env.PEBBLE_ENVIRONMENT = 'stale-env'
     listEnvironmentsMock.mockReturnValue([addEnvironmentFromPairingCodeMock()])
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await main(['environment', 'list', '--json'], '/tmp/repo')
 
-    expect(listEnvironmentsMock).toHaveBeenCalledWith('/tmp/orca-user-data')
+    expect(listEnvironmentsMock).toHaveBeenCalledWith('/tmp/pebble-user-data')
     expect(callMock).not.toHaveBeenCalled()
     expect(logSpy.mock.calls[0]?.[0]).not.toContain('token')
     expect(logSpy.mock.calls[0]?.[0]).not.toContain('publicKeyB64')
   })
 
-  it('adds saved environments even when ORCA_ENVIRONMENT is set', async () => {
-    process.env.ORCA_ENVIRONMENT = 'stale-env'
+  it('adds saved environments even when PEBBLE_ENVIRONMENT is set', async () => {
+    process.env.PEBBLE_ENVIRONMENT = 'stale-env'
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await main(
-      ['environment', 'add', '--name', 'desk', '--pairing-code', 'orca://pair#abc', '--json'],
+      ['environment', 'add', '--name', 'desk', '--pairing-code', 'pebble://pair#abc', '--json'],
       '/tmp/repo'
     )
 
-    expect(addEnvironmentFromPairingCodeMock).toHaveBeenCalledWith('/tmp/orca-user-data', {
+    expect(addEnvironmentFromPairingCodeMock).toHaveBeenCalledWith('/tmp/pebble-user-data', {
       name: 'desk',
-      pairingCode: 'orca://pair#abc'
+      pairingCode: 'pebble://pair#abc'
     })
     expect(callMock).not.toHaveBeenCalled()
     expect(logSpy.mock.calls[0]?.[0]).not.toContain('token')
@@ -2283,13 +2283,13 @@ describe('orca cli worktree awareness', () => {
       okFixture('req_project_list', {
         projects: [
           {
-            id: 'github:stablyai/orca',
-            displayName: 'Orca',
+            id: 'github:nebutra/pebble',
+            displayName: 'Pebble',
             badgeColor: '#7c3aed',
             providerIdentity: {
               provider: 'github',
-              owner: 'stablyai',
-              repo: 'orca'
+              owner: 'nebutra',
+              repo: 'pebble'
             },
             sourceRepoIds: ['repo-1'],
             createdAt: 1,
@@ -2312,11 +2312,11 @@ describe('orca cli worktree awareness', () => {
         setups: [
           {
             id: 'setup-local',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'local',
             repoId: 'repo-local',
-            path: '/tmp/orca',
-            displayName: 'Orca',
+            path: '/tmp/pebble',
+            displayName: 'Pebble',
             setupState: 'ready',
             setupMethod: 'legacy-repo',
             createdAt: 1,
@@ -2324,11 +2324,11 @@ describe('orca cli worktree awareness', () => {
           },
           {
             id: 'setup-remote',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'runtime:gpu',
             repoId: 'repo-remote',
-            path: '/srv/orca',
-            displayName: 'Orca',
+            path: '/srv/pebble',
+            displayName: 'Pebble',
             setupState: 'ready',
             setupMethod: 'legacy-repo',
             createdAt: 1,
@@ -2340,7 +2340,7 @@ describe('orca cli worktree awareness', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await main(
-      ['project', 'setups', '--project', 'github:stablyai/orca', '--host', 'runtime:gpu'],
+      ['project', 'setups', '--project', 'github:nebutra/pebble', '--host', 'runtime:gpu'],
       '/tmp/repo'
     )
 
@@ -2355,8 +2355,8 @@ describe('orca cli worktree awareness', () => {
       okFixture('req_project_setup', {
         result: {
           project: {
-            id: 'github:stablyai/orca',
-            displayName: 'Orca',
+            id: 'github:nebutra/pebble',
+            displayName: 'Pebble',
             badgeColor: '#7c3aed',
             sourceRepoIds: ['repo-1'],
             createdAt: 1,
@@ -2364,11 +2364,11 @@ describe('orca cli worktree awareness', () => {
           },
           setup: {
             id: 'setup-local',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'local',
             repoId: 'repo-1',
-            path: path.resolve('/tmp/orca'),
-            displayName: 'Orca',
+            path: path.resolve('/tmp/pebble'),
+            displayName: 'Pebble',
             setupState: 'ready',
             setupMethod: 'imported-existing-folder',
             createdAt: 1,
@@ -2376,8 +2376,8 @@ describe('orca cli worktree awareness', () => {
           },
           repo: {
             id: 'repo-1',
-            path: path.resolve('/tmp/orca'),
-            displayName: 'Orca',
+            path: path.resolve('/tmp/pebble'),
+            displayName: 'Pebble',
             badgeColor: '#7c3aed',
             addedAt: 1
           }
@@ -2391,7 +2391,7 @@ describe('orca cli worktree awareness', () => {
         'project',
         'setup-existing-folder',
         '--project',
-        'github:stablyai/orca',
+        'github:nebutra/pebble',
         '--host',
         'local',
         '--path',
@@ -2399,18 +2399,18 @@ describe('orca cli worktree awareness', () => {
         '--kind',
         'git',
         '--display-name',
-        'Orca',
+        'Pebble',
         '--json'
       ],
-      '/tmp/orca/worktrees/feature'
+      '/tmp/pebble/worktrees/feature'
     )
 
     expect(callMock).toHaveBeenCalledWith('projectHostSetup.setupExistingFolder', {
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       hostId: 'local',
-      path: path.resolve('/tmp/orca/worktrees'),
+      path: path.resolve('/tmp/pebble/worktrees'),
       kind: 'git',
-      displayName: 'Orca'
+      displayName: 'Pebble'
     })
   })
 
@@ -2424,11 +2424,11 @@ describe('orca cli worktree awareness', () => {
         'project',
         'setup-existing-folder',
         '--project',
-        'github:stablyai/orca',
+        'github:nebutra/pebble',
         '--host',
         'runtime:gpu',
         '--path',
-        './orca',
+        './pebble',
         '--pairing-code',
         'remote-runtime',
         '--json'
@@ -2470,7 +2470,7 @@ describe('orca cli worktree awareness', () => {
       okFixture('req_repo_add', {
         repo: {
           id: 'repo-1',
-          path: '/srv/orca/web',
+          path: '/srv/pebble/web',
           displayName: 'web'
         }
       })
@@ -2478,12 +2478,12 @@ describe('orca cli worktree awareness', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
 
     await main(
-      ['repo', 'add', '--path', '/srv/orca/web', '--pairing-code', 'remote-runtime', '--json'],
+      ['repo', 'add', '--path', '/srv/pebble/web', '--pairing-code', 'remote-runtime', '--json'],
       '/tmp/repo'
     )
 
     expect(callMock).toHaveBeenCalledWith('repo.add', {
-      path: '/srv/orca/web'
+      path: '/srv/pebble/web'
     })
   })
 
@@ -3190,7 +3190,7 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('formats group orchestration sends in text mode', async () => {
-    process.env.ORCA_TERMINAL_HANDLE = 'term_sender'
+    process.env.PEBBLE_TERMINAL_HANDLE = 'term_sender'
     callMock.mockResolvedValueOnce({
       id: 'req_send',
       ok: true,
@@ -3269,7 +3269,7 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('rejects unknown task-update status with an enum-aware error', async () => {
-    process.env.ORCA_TERMINAL_HANDLE = 'term_coord'
+    process.env.PEBBLE_TERMINAL_HANDLE = 'term_coord'
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const priorExitCode = process.exitCode
@@ -3294,7 +3294,7 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('passes the caller terminal handle through orchestration task-create', async () => {
-    process.env.ORCA_TERMINAL_HANDLE = 'term_creator'
+    process.env.PEBBLE_TERMINAL_HANDLE = 'term_creator'
     callMock.mockResolvedValueOnce({
       id: 'req_task_create',
       ok: true,
@@ -3332,8 +3332,8 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('passes dev mode to injected orchestration dispatches', async () => {
-    process.env.ORCA_TERMINAL_HANDLE = 'term_sender'
-    process.env.ORCA_USER_DATA_PATH = '/tmp/orca-dev'
+    process.env.PEBBLE_TERMINAL_HANDLE = 'term_sender'
+    process.env.PEBBLE_USER_DATA_PATH = '/tmp/pebble-dev'
     callMock.mockResolvedValueOnce({
       id: 'req_dispatch',
       ok: true,
@@ -3401,7 +3401,7 @@ describe('orca cli worktree awareness', () => {
       okFixture('req_terminal_create', {
         terminal: {
           handle: 'term_1',
-          worktreeId: 'repo-1::/srv/orca/feature',
+          worktreeId: 'repo-1::/srv/pebble/feature',
           title: 'Server terminal'
         }
       })
@@ -3413,7 +3413,7 @@ describe('orca cli worktree awareness', () => {
         'terminal',
         'create',
         '--worktree',
-        'id:repo-1::/srv/orca/feature',
+        'id:repo-1::/srv/pebble/feature',
         '--pairing-code',
         'remote-runtime',
         '--json'
@@ -3422,7 +3422,7 @@ describe('orca cli worktree awareness', () => {
     )
 
     expect(callMock).toHaveBeenCalledWith('terminal.create', {
-      worktree: 'id:repo-1::/srv/orca/feature',
+      worktree: 'id:repo-1::/srv/pebble/feature',
       command: undefined,
       title: undefined,
       focus: false
@@ -3446,7 +3446,7 @@ describe('orca cli worktree awareness', () => {
             worktreeId: 'repo::/tmp/repo/feature',
             worktreeName: 'feature',
             repoId: 'repo',
-            repoName: 'Orca',
+            repoName: 'Pebble',
             cpu: 2.5,
             memory: 1024 * 1024,
             sessions: [
@@ -3486,7 +3486,7 @@ describe('orca cli worktree awareness', () => {
   })
 
   it('exits nonzero when terminal wait returns an unsatisfied blocked result', async () => {
-    process.env.ORCA_TERMINAL_HANDLE = 'term_worker'
+    process.env.PEBBLE_TERMINAL_HANDLE = 'term_worker'
     callMock.mockResolvedValueOnce({
       id: 'req_terminal_wait',
       ok: true,
@@ -3532,7 +3532,7 @@ describe('orca cli worktree awareness', () => {
       okFixture('req_terminal_create', {
         terminal: {
           handle: 'term_1',
-          worktreeId: 'repo-1::/srv/orca/feature',
+          worktreeId: 'repo-1::/srv/pebble/feature',
           title: 'Codex'
         }
       })
@@ -3544,7 +3544,7 @@ describe('orca cli worktree awareness', () => {
         'terminal',
         'create',
         '--worktree',
-        'id:repo-1::/srv/orca/feature',
+        'id:repo-1::/srv/pebble/feature',
         '--command',
         'codex',
         '--title',
@@ -3557,7 +3557,7 @@ describe('orca cli worktree awareness', () => {
     )
 
     expect(callMock).toHaveBeenCalledWith('terminal.create', {
-      worktree: 'id:repo-1::/srv/orca/feature',
+      worktree: 'id:repo-1::/srv/pebble/feature',
       command: 'codex',
       title: 'Codex',
       focus: false
@@ -3574,7 +3574,7 @@ describe('orca cli worktree awareness', () => {
           url: 'https://example.com',
           title: 'Example',
           active: true,
-          worktreeId: 'repo-1::/srv/orca/feature'
+          worktreeId: 'repo-1::/srv/pebble/feature'
         }
       })
     )
@@ -3748,11 +3748,11 @@ describe('orca cli worktree awareness', () => {
         setups: [
           {
             id: 'setup-local',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'local',
             repoId: 'repo-local',
-            path: '/tmp/orca',
-            displayName: 'Orca',
+            path: '/tmp/pebble',
+            displayName: 'Pebble',
             setupState: 'ready',
             setupMethod: 'legacy-repo',
             createdAt: 1,
@@ -3760,11 +3760,11 @@ describe('orca cli worktree awareness', () => {
           },
           {
             id: 'setup-gpu',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'runtime:gpu',
             repoId: 'repo-gpu',
-            path: '/srv/orca',
-            displayName: 'Orca',
+            path: '/srv/pebble',
+            displayName: 'Pebble',
             setupState: 'ready',
             setupMethod: 'legacy-repo',
             createdAt: 1,
@@ -3791,7 +3791,7 @@ describe('orca cli worktree awareness', () => {
         '--provider',
         'codex',
         '--project',
-        'github:stablyai/orca',
+        'github:nebutra/pebble',
         '--host',
         'runtime:gpu',
         '--json'
@@ -3807,11 +3807,11 @@ describe('orca cli worktree awareness', () => {
         repo: 'id:repo-gpu',
         runContext: {
           kind: 'workspace-run',
-          projectId: 'github:stablyai/orca',
+          projectId: 'github:nebutra/pebble',
           hostId: 'runtime:gpu',
           projectHostSetupId: 'setup-gpu',
           repoId: 'repo-gpu',
-          path: '/srv/orca'
+          path: '/srv/pebble'
         },
         workspace: undefined,
         workspaceMode: 'new_per_run'
@@ -3826,11 +3826,11 @@ describe('orca cli worktree awareness', () => {
         setups: [
           {
             id: 'setup-gpu',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'runtime:gpu',
             repoId: 'repo-gpu',
-            path: '/srv/orca',
-            displayName: 'Orca',
+            path: '/srv/pebble',
+            displayName: 'Pebble',
             setupState: 'ready',
             setupMethod: 'legacy-repo',
             createdAt: 1,
@@ -3859,11 +3859,11 @@ describe('orca cli worktree awareness', () => {
           repo: 'id:repo-gpu',
           runContext: {
             kind: 'workspace-run',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'runtime:gpu',
             projectHostSetupId: 'setup-gpu',
             repoId: 'repo-gpu',
-            path: '/srv/orca'
+            path: '/srv/pebble'
           }
         })
       })
@@ -3874,11 +3874,11 @@ describe('orca cli worktree awareness', () => {
     const sourceContext = {
       kind: 'task-source',
       provider: 'github',
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       hostId: 'runtime:gpu',
       projectHostSetupId: 'setup-gpu',
       repoId: 'repo-gpu',
-      providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' },
+      providerIdentity: { provider: 'github', owner: 'nebutra', repo: 'pebble' },
       accountLabel: 'gpu-bot'
     }
     queueFixtures(
@@ -4457,8 +4457,8 @@ describe('orca cli worktree awareness', () => {
       okFixture('req_project_setup_update', {
         result: {
           project: {
-            id: 'github:stablyai/orca',
-            displayName: 'Orca',
+            id: 'github:nebutra/pebble',
+            displayName: 'Pebble',
             badgeColor: '#7c3aed',
             sourceRepoIds: [],
             createdAt: 1,
@@ -4466,10 +4466,10 @@ describe('orca cli worktree awareness', () => {
           },
           setup: {
             id: 'setup-gpu',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'runtime:gpu',
             repoId: '',
-            path: '/srv/orca',
+            path: '/srv/pebble',
             displayName: 'GPU VM',
             setupState: 'ready',
             setupMethod: 'imported-existing-folder',
@@ -4490,7 +4490,7 @@ describe('orca cli worktree awareness', () => {
         '--display-name',
         'GPU VM',
         '--path',
-        '/srv/orca',
+        '/srv/pebble',
         '--worktree-base-path',
         '../worktrees',
         '--state',
@@ -4506,7 +4506,7 @@ describe('orca cli worktree awareness', () => {
       setupId: 'setup-gpu',
       updates: {
         displayName: 'GPU VM',
-        path: path.resolve('/tmp/repo', '/srv/orca'),
+        path: path.resolve('/tmp/repo', '/srv/pebble'),
         worktreeBasePath: '../worktrees',
         gitUsername: undefined,
         kind: undefined,
@@ -4522,8 +4522,8 @@ describe('orca cli worktree awareness', () => {
       okFixture('req_project_setup_create', {
         result: {
           project: {
-            id: 'github:stablyai/orca',
-            displayName: 'Orca',
+            id: 'github:nebutra/pebble',
+            displayName: 'Pebble',
             badgeColor: '#7c3aed',
             sourceRepoIds: [],
             createdAt: 1,
@@ -4531,7 +4531,7 @@ describe('orca cli worktree awareness', () => {
           },
           setup: {
             id: 'setup-gpu',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'runtime:gpu',
             repoId: '',
             path: '',
@@ -4551,7 +4551,7 @@ describe('orca cli worktree awareness', () => {
         'project',
         'setup-create',
         '--project',
-        'github:stablyai/orca',
+        'github:nebutra/pebble',
         '--host',
         'runtime:gpu',
         '--setup-id',
@@ -4568,7 +4568,7 @@ describe('orca cli worktree awareness', () => {
     )
 
     expect(callMock).toHaveBeenCalledWith('projectHostSetup.create', {
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       hostId: 'runtime:gpu',
       setupId: 'setup-gpu',
       path: undefined,
@@ -4587,8 +4587,8 @@ describe('orca cli worktree awareness', () => {
       okFixture('req_project_setup_delete', {
         result: {
           project: {
-            id: 'github:stablyai/orca',
-            displayName: 'Orca',
+            id: 'github:nebutra/pebble',
+            displayName: 'Pebble',
             badgeColor: '#7c3aed',
             sourceRepoIds: [],
             createdAt: 1,
@@ -4596,10 +4596,10 @@ describe('orca cli worktree awareness', () => {
           },
           setup: {
             id: 'setup-gpu',
-            projectId: 'github:stablyai/orca',
+            projectId: 'github:nebutra/pebble',
             hostId: 'runtime:gpu',
             repoId: '',
-            path: '/srv/orca',
+            path: '/srv/pebble',
             displayName: 'GPU VM',
             setupState: 'ready',
             setupMethod: 'imported-existing-folder',

@@ -33,7 +33,7 @@ export type PtySpawnOptions = {
   command?: string
   commandDelivery?: 'renderer' | 'provider'
   startupCommandDelivery?: StartupCommandDelivery
-  /** Orca worktree identity. When present, the local provider scopes shell
+  /** Pebble worktree identity. When present, the local provider scopes shell
    *  history to this worktree so ArrowUp only surfaces local commands. */
   worktreeId?: string
   /** Stable terminal pane identity. Remote providers use this as PTY metadata
@@ -109,7 +109,7 @@ export type PtyProcessInfo = {
   id: string
   cwd: string
   title: string
-  /** Trusted ORCA_TERMINAL_HANDLE exported into this PTY, when known. */
+  /** Trusted PEBBLE_TERMINAL_HANDLE exported into this PTY, when known. */
   terminalHandle?: string
 }
 

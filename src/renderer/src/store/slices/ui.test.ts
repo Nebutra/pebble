@@ -133,14 +133,14 @@ function makeLinearIssue(overrides: Partial<LinearIssue> = {}): LinearIssue {
     id: 'lin-1',
     identifier: 'ORC-1',
     title: 'Fix task flow',
-    url: 'https://linear.app/orca/issue/ORC-1/fix-task-flow',
+    url: 'https://linear.app/pebble/issue/ORC-1/fix-task-flow',
     state: { name: 'Todo', type: 'unstarted', color: '#999' },
     priority: 0,
     estimate: null,
     assignee: null,
     labels: [],
     labelIds: [],
-    team: { id: 'team-1', name: 'Orca', key: 'ORC' },
+    team: { id: 'team-1', name: 'Pebble', key: 'ORC' },
     workspaceId: 'workspace-1',
     updatedAt: '2026-05-30T00:00:00.000Z',
     createdAt: '2026-05-30T00:00:00.000Z',
@@ -172,7 +172,7 @@ function makeJiraIssue(overrides: Partial<JiraIssue> = {}): JiraIssue {
     url: 'https://example.atlassian.net/browse/ORC-1',
     siteId: 'site-1',
     siteName: 'Example Jira',
-    project: { id: '10000', key: 'ORC', name: 'Orca', siteId: 'site-1' },
+    project: { id: '10000', key: 'ORC', name: 'Pebble', siteId: 'site-1' },
     issueType: { id: '10001', name: 'Bug' },
     status: { id: '1', name: 'Todo', categoryKey: 'new', categoryName: 'To Do' },
     labels: [],
@@ -1775,6 +1775,27 @@ describe('createUISlice settings navigation', () => {
     expect(store.getState().settingsSearchInputQuery).toBe('')
     expect(store.getState().settingsSearchQuery).toBe('')
   })
+
+  it('opens the Agents view even when the legacy experimental flag is off', () => {
+    const store = createUIStore()
+    store.setState({
+      settings: { experimentalActivity: false } as unknown as AppState['settings']
+    })
+
+    store.getState().openActivityPage()
+
+    expect(store.getState().activeView).toBe('activity')
+  })
+
+  it('returns to the Agents view after visiting settings', () => {
+    const store = createUIStore()
+
+    store.getState().openActivityPage()
+    store.getState().openSettingsPage()
+    store.getState().closeSettingsPage()
+
+    expect(store.getState().activeView).toBe('activity')
+  })
 })
 
 describe('createUISlice new workspace draft', () => {
@@ -1907,7 +1928,7 @@ describe('createUISlice page navigation history', () => {
       hostId: 'ssh:devbox',
       projectHostSetupId: 'setup-1',
       repoId: 'repo-remote',
-      providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' }
+      providerIdentity: { provider: 'github', owner: 'nebutra', repo: 'pebble' }
     }
 
     store.getState().openTaskPage({

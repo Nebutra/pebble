@@ -1,4 +1,4 @@
-import { test, expect } from './helpers/orca-app'
+import { test, expect } from './helpers/pebble-app'
 import {
   execInTerminal,
   getTerminalContent,
@@ -9,7 +9,7 @@ import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } fro
 
 type CodexHomeProbe = {
   codexHome: string | null
-  orcaCodexHome: string | null
+  pebbleCodexHome: string | null
 }
 
 function readCodexHomeProbe(pageContent: string, marker: string): CodexHomeProbe | null {
@@ -21,39 +21,39 @@ function readCodexHomeProbe(pageContent: string, marker: string): CodexHomeProbe
 }
 
 test.describe('Terminal Codex runtime home', () => {
-  test.beforeEach(async ({ orcaPage }) => {
-    await waitForSessionReady(orcaPage)
-    await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
+  test.beforeEach(async ({ pebblePage }) => {
+    await waitForSessionReady(pebblePage)
+    await waitForActiveWorktree(pebblePage)
+    await ensureTerminalVisible(pebblePage)
   })
 
-  test('terminal process receives the Orca-managed Codex home', async ({ orcaPage }) => {
-    await waitForActiveTerminalManager(orcaPage)
-    const ptyId = await waitForActivePanePtyId(orcaPage)
-    const marker = `__ORCA_CODEX_HOME_E2E_${Date.now()}__`
+  test('terminal process receives the Pebble-managed Codex home', async ({ pebblePage }) => {
+    await waitForActiveTerminalManager(pebblePage)
+    const ptyId = await waitForActivePanePtyId(pebblePage)
+    const marker = `__PEBBLE_CODEX_HOME_E2E_${Date.now()}__`
     const command = [
       'node -e',
-      `"console.log('${marker}:' + JSON.stringify({codexHome: process.env.CODEX_HOME || null, orcaCodexHome: process.env.ORCA_CODEX_HOME || null}))"`
+      `"console.log('${marker}:' + JSON.stringify({codexHome: process.env.CODEX_HOME || null, pebbleCodexHome: process.env.PEBBLE_CODEX_HOME || null}))"`
     ].join(' ')
 
-    await execInTerminal(orcaPage, ptyId, command)
+    await execInTerminal(pebblePage, ptyId, command)
 
     let probe: CodexHomeProbe | null = null
     await expect
       .poll(
         async () => {
-          probe = readCodexHomeProbe(await getTerminalContent(orcaPage), marker)
+          probe = readCodexHomeProbe(await getTerminalContent(pebblePage), marker)
           return Boolean(
             probe?.codexHome &&
-            probe.orcaCodexHome &&
-            probe.codexHome === probe.orcaCodexHome &&
+            probe.pebbleCodexHome &&
+            probe.codexHome === probe.pebbleCodexHome &&
             /[\\/]codex-runtime-home[\\/]home$/.test(probe.codexHome)
           )
         },
-        { timeout: 15_000, message: 'Terminal did not expose Orca-managed Codex home env' }
+        { timeout: 15_000, message: 'Terminal did not expose Pebble-managed Codex home env' }
       )
       .toBe(true)
 
-    expect(probe?.codexHome).toBe(probe?.orcaCodexHome)
+    expect(probe?.codexHome).toBe(probe?.pebbleCodexHome)
   })
 })

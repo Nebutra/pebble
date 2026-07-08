@@ -34,8 +34,8 @@ const repoMap = new Map<string, Repo>([
     'repo-1',
     {
       id: 'repo-1',
-      path: '/repo/orca',
-      displayName: 'stablyai/orca',
+      path: '/repo/pebble',
+      displayName: 'nebutra/pebble',
       badgeColor: '#22c55e',
       addedAt: 0
     }
@@ -154,7 +154,7 @@ describe('worktree-palette-search', () => {
       'quick jump',
       repoMap,
       {
-        '/repo/orca::feature/palette-refresh': {
+        '/repo/pebble::feature/palette-refresh': {
           data: {
             number: 426,
             title: 'Refresh the worktree quick jump palette'
@@ -194,7 +194,7 @@ describe('worktree-palette-search', () => {
       })
     ]
 
-    const results = searchWorktrees(worktrees, 'orca', repoMap, null, null)
+    const results = searchWorktrees(worktrees, 'pebble', repoMap, null, null)
 
     // All three match on the repo name, order preserved from input
     expect(results).toHaveLength(3)
@@ -217,12 +217,12 @@ describe('worktree-palette-search', () => {
       })
     ]
 
-    const results = searchWorktrees(worktrees, 'orca/main', repoMap, null, null)
+    const results = searchWorktrees(worktrees, 'pebble/main', repoMap, null, null)
 
     expect(results).toHaveLength(1)
     expect(results[0].worktreeId).toBe('wt-main')
     expect(results[0].matchedField).toBe('branch')
-    expect(results[0].repoRange).toEqual({ start: 9, end: 13 })
+    expect(results[0].repoRange).toEqual({ start: 8, end: 14 })
     expect(results[0].branchRange).toEqual({ start: 0, end: 4 })
   })
 

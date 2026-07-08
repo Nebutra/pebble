@@ -39,11 +39,13 @@ export function ConfirmationDialogProvider({
   const [queue, setQueue] = useState<ConfirmationDialogRequest[]>([])
   const activeRequest = queue[0] ?? null
   const activeRequestRef = useRef<ConfirmationDialogRequest | null>(activeRequest)
+  const queueRef = useRef<ConfirmationDialogRequest[]>(queue)
   const setContextualToursBlockingSurfaceVisible = useAppStore(
     (s) => s.setContextualToursBlockingSurfaceVisible
   )
   const lastDisplayedRequestRef = useRef<ConfirmationDialogRequest | null>(activeRequest)
   activeRequestRef.current = activeRequest
+  queueRef.current = queue
   if (activeRequest) {
     lastDisplayedRequestRef.current = activeRequest
   }
@@ -56,6 +58,18 @@ export function ConfirmationDialogProvider({
     setContextualToursBlockingSurfaceVisible(activeRequest !== null)
     return () => setContextualToursBlockingSurfaceVisible(false)
   }, [activeRequest, setContextualToursBlockingSurfaceVisible])
+
+  useEffect(() => {
+    return () => {
+      // Why: right-sidebar/page providers can unmount while an async caller is
+      // awaiting confirmation; resolve false so actions never hang indefinitely.
+      for (const request of queueRef.current) {
+        request.resolve(false)
+      }
+      queueRef.current = []
+      activeRequestRef.current = null
+    }
+  }, [])
 
   const confirm = useCallback<ConfirmationDialogContextValue>((options) => {
     return new Promise((resolve) => {

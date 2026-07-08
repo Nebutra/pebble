@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  canCleanupUnregisteredOrcaWorktreeDirectory,
+  canCleanupUnregisteredPebbleWorktreeDirectory,
   isWorktreePathMissing,
-  stripOrcaProvenanceMetaUpdates
+  stripPebbleProvenanceMetaUpdates
 } from './worktree-removal-safety'
 import type { WorktreeMeta } from '../shared/types'
 
@@ -30,26 +30,31 @@ describe('isWorktreePathMissing', () => {
   })
 })
 
-describe('canCleanupUnregisteredOrcaWorktreeDirectory', () => {
-  it('does not treat orcaCreatedAt alone as cleanup authority', () => {
+describe('canCleanupUnregisteredPebbleWorktreeDirectory', () => {
+  it('does not treat pebbleCreatedAt alone as cleanup authority', () => {
     expect(
-      canCleanupUnregisteredOrcaWorktreeDirectory({
-        meta: { orcaCreatedAt: Date.now() }
+      canCleanupUnregisteredPebbleWorktreeDirectory({
+        meta: { pebbleCreatedAt: Date.now() }
       })
     ).toBe(false)
     expect(
-      canCleanupUnregisteredOrcaWorktreeDirectory({
+      canCleanupUnregisteredPebbleWorktreeDirectory({
         meta: {
-          orcaCreatedAt: Date.now(),
-          orcaCreationSource: 'runtime'
+          pebbleCreatedAt: Date.now(),
+          pebbleCreationSource: 'runtime'
         }
       })
     ).toBe(true)
   })
 
-  it('accepts legacy Orca-created metadata before explicit provenance existed', () => {
+  it('accepts legacy creation metadata from before the Pebble migration', () => {
     expect(
-      canCleanupUnregisteredOrcaWorktreeDirectory({
+      canCleanupUnregisteredPebbleWorktreeDirectory({
+        meta: { pebbleCreatedAt: Date.now(), pebbleCreationSource: 'runtime' }
+      })
+    ).toBe(true)
+    expect(
+      canCleanupUnregisteredPebbleWorktreeDirectory({
         meta: { createdAt: Date.now() }
       })
     ).toBe(true)
@@ -70,11 +75,11 @@ describe('canCleanupUnregisteredOrcaWorktreeDirectory', () => {
       sortOrder: 0,
       lastActivityAt: 0,
       workspaceStatus: 'todo',
-      orcaCreationWorkspaceLayout: { path: '/orca/workspaces', nestWorkspaces: true }
+      pebbleCreationWorkspaceLayout: { path: '/pebble/workspaces', nestWorkspaces: true }
     }
 
     expect(
-      canCleanupUnregisteredOrcaWorktreeDirectory({
+      canCleanupUnregisteredPebbleWorktreeDirectory({
         meta: layoutOnlyMeta
       })
     ).toBe(false)
@@ -82,21 +87,21 @@ describe('canCleanupUnregisteredOrcaWorktreeDirectory', () => {
 
   it('does not trust paths without provenance or legacy metadata', () => {
     expect(
-      canCleanupUnregisteredOrcaWorktreeDirectory({
+      canCleanupUnregisteredPebbleWorktreeDirectory({
         meta: undefined
       })
     ).toBe(false)
   })
 })
 
-describe('stripOrcaProvenanceMetaUpdates', () => {
-  it('removes Orca-owned provenance fields from user metadata updates', () => {
+describe('stripPebbleProvenanceMetaUpdates', () => {
+  it('removes Pebble-owned provenance fields from user metadata updates', () => {
     expect(
-      stripOrcaProvenanceMetaUpdates({
+      stripPebbleProvenanceMetaUpdates({
         comment: 'keep me',
-        orcaCreatedAt: 123,
-        orcaCreationSource: 'desktop',
-        orcaCreationWorkspaceLayout: { path: '/workspace', nestWorkspaces: false },
+        pebbleCreatedAt: 123,
+        pebbleCreationSource: 'desktop',
+        pebbleCreationWorkspaceLayout: { path: '/workspace', nestWorkspaces: false },
         automationProvenance: {
           kind: 'created-by-automation',
           automationId: 'automation-1',

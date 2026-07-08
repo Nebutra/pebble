@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   HookCommandSourcePolicy,
-  OrcaHooks,
+  PebbleHooks,
   Repo,
   RepoHookSettings,
   SetupAgentStartupPolicy,
@@ -27,7 +27,7 @@ import { getRepositoryHookScriptTextareaRows } from '@/lib/script-textarea-rows'
 
 type RepositoryHooksSectionProps = {
   repo: Repo
-  yamlHooks: OrcaHooks | null
+  yamlHooks: PebbleHooks | null
   hasHooksFile: boolean
   hooksInspectionReady: boolean
   mayNeedUpdate: boolean
@@ -189,7 +189,7 @@ function getCommandSourcePolicyOptions(): PolicyOption<HookCommandSourcePolicy>[
       policy: 'shared-only',
       label: translate(
         'auto.components.settings.RepositoryHooksSection.d88b6ff88f',
-        'orca.yaml only'
+        'pebble.yaml only'
       ),
       description: translate(
         'auto.components.settings.RepositoryHooksSection.29397e8bbc',
@@ -201,7 +201,7 @@ function getCommandSourcePolicyOptions(): PolicyOption<HookCommandSourcePolicy>[
       label: translate('auto.components.settings.RepositoryHooksSection.83dc78202a', 'Local only'),
       description: translate(
         'auto.components.settings.RepositoryHooksSection.0e8b2a520d',
-        'Ignore orca.yaml; run only your local commands.'
+        'Ignore pebble.yaml; run only your local commands.'
       )
     },
     {
@@ -209,7 +209,7 @@ function getCommandSourcePolicyOptions(): PolicyOption<HookCommandSourcePolicy>[
       label: translate('auto.components.settings.RepositoryHooksSection.8d6c56bff8', 'Run both'),
       description: translate(
         'auto.components.settings.RepositoryHooksSection.8561b0665f',
-        'orca.yaml first, then your local commands.'
+        'pebble.yaml first, then your local commands.'
       )
     }
   ]
@@ -220,7 +220,7 @@ function getCommandSourceLabel(policy: HookCommandSourcePolicy): string {
     case 'shared-only':
       return translate(
         'auto.components.settings.RepositoryHooksSection.d88b6ff88f',
-        'orca.yaml only'
+        'pebble.yaml only'
       )
     case 'local-only':
       return translate('auto.components.settings.RepositoryHooksSection.83dc78202a', 'Local only')
@@ -243,7 +243,7 @@ function getLocalHookFields(): readonly [LocalHookField, LocalHookField] {
       ),
       placeholder: translate(
         'auto.components.settings.RepositoryHooksSection.a3fc966677',
-        '# e.g. pnpm install cp "$ORCA_ROOT_PATH/.env" "$ORCA_WORKTREE_PATH/.env"'
+        '# e.g. pnpm install cp "$PEBBLE_ROOT_PATH/.env" "$PEBBLE_WORKTREE_PATH/.env"'
       )
     },
     {
@@ -258,7 +258,7 @@ function getLocalHookFields(): readonly [LocalHookField, LocalHookField] {
       ),
       placeholder: translate(
         'auto.components.settings.RepositoryHooksSection.9b821fa19d',
-        '# e.g. echo "Cleaning up $ORCA_WORKSPACE_NAME"'
+        '# e.g. echo "Cleaning up $PEBBLE_WORKSPACE_NAME"'
       )
     }
   ]
@@ -267,21 +267,21 @@ function getLocalHookFields(): readonly [LocalHookField, LocalHookField] {
 function getEnvVars(): readonly { name: string; description: string }[] {
   return [
     {
-      name: '$ORCA_ROOT_PATH',
+      name: '$PEBBLE_ROOT_PATH',
       description: translate(
         'auto.components.settings.RepositoryHooksSection.30952c4aa4',
         'Path to the main repo checkout. Useful for copying shared files, like .env, into a worktree.'
       )
     },
     {
-      name: '$ORCA_WORKTREE_PATH',
+      name: '$PEBBLE_WORKTREE_PATH',
       description: translate(
         'auto.components.settings.RepositoryHooksSection.54c73d88d0',
         'Path to the worktree being created. Setup commands run from this directory.'
       )
     },
     {
-      name: '$ORCA_WORKSPACE_NAME',
+      name: '$PEBBLE_WORKSPACE_NAME',
       description: translate(
         'auto.components.settings.RepositoryHooksSection.0fa21e19ec',
         'Name of the workspace, usually based on the branch name.'
@@ -296,7 +296,7 @@ function getYamlStateCopy(yamlState: string): { heading: string; description: st
       return {
         heading: translate(
           'auto.components.settings.RepositoryHooksSection.56f9a4a1d0',
-          'Using `orca.yaml`'
+          'Using `pebble.yaml`'
         ),
         description: translate(
           'auto.components.settings.RepositoryHooksSection.ca424ff135',
@@ -307,33 +307,33 @@ function getYamlStateCopy(yamlState: string): { heading: string; description: st
       return {
         heading: translate(
           'auto.components.settings.RepositoryHooksSection.623e0c9f31',
-          '`orca.yaml` could not be parsed'
+          '`pebble.yaml` could not be parsed'
         ),
         description: translate(
           'auto.components.settings.RepositoryHooksSection.aba825233f',
-          'The file contains configuration keys that this version of Orca does not recognize. You may need to update Orca, or check the file for typos.'
+          'The file contains configuration keys that this version of Pebble does not recognize. You may need to update Pebble, or check the file for typos.'
         )
       }
     case 'invalid':
       return {
         heading: translate(
           'auto.components.settings.RepositoryHooksSection.623e0c9f31',
-          '`orca.yaml` could not be parsed'
+          '`pebble.yaml` could not be parsed'
         ),
         description: translate(
           'auto.components.settings.RepositoryHooksSection.0cc712b823',
-          'The core configuration file exists in the repo root, but Orca could not parse the supported hook definitions yet.'
+          'The core configuration file exists in the repo root, but Pebble could not parse the supported hook definitions yet.'
         )
       }
     default:
       return {
         heading: translate(
           'auto.components.settings.RepositoryHooksSection.5a67e4793d',
-          'No `orca.yaml` detected'
+          'No `pebble.yaml` detected'
         ),
         description: translate(
           'auto.components.settings.RepositoryHooksSection.b20c5df6ca',
-          'Add an `orca.yaml` file to enable shared setup, archive, or issue-automation defaults for this repo. Example template:'
+          'Add an `pebble.yaml` file to enable shared setup, archive, or issue-automation defaults for this repo. Example template:'
         )
       }
   }
@@ -442,7 +442,7 @@ function ExampleTemplateCard({
       <p className="text-[10px] tracking-[0.18em] text-muted-foreground">
         {translate('auto.components.settings.RepositoryHooksSection.175daba180', 'Example')}
         <code className="rounded bg-muted px-1 py-0.5">
-          {translate('auto.components.settings.RepositoryHooksSection.39da2ae12f', 'orca.yaml')}
+          {translate('auto.components.settings.RepositoryHooksSection.39da2ae12f', 'pebble.yaml')}
         </code>{' '}
         {translate('auto.components.settings.RepositoryHooksSection.95a0411b3e', 'template')}
       </p>
@@ -557,11 +557,11 @@ function LocalCommandSourceNotice({
             {isChecking
               ? translate(
                   'auto.components.settings.RepositoryHooksSection.7f78e5eea6',
-                  'Local scripts are saved. Orca is still checking orca.yaml before it can recommend which script source to use.'
+                  'Local scripts are saved. Pebble is still checking pebble.yaml before it can recommend which script source to use.'
                 )
               : translate(
                   'auto.components.settings.RepositoryHooksSection.0ce113fd7b',
-                  'Local scripts are saved, but Script Source is set to orca.yaml only.'
+                  'Local scripts are saved, but Script Source is set to pebble.yaml only.'
                 )}
           </p>
         </div>
@@ -655,7 +655,7 @@ function ScriptEditor({
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-              {translate('auto.components.settings.RepositoryHooksSection.39da2ae12f', 'orca.yaml')}
+              {translate('auto.components.settings.RepositoryHooksSection.39da2ae12f', 'pebble.yaml')}
               <span className="font-normal text-emerald-700/80 dark:text-emerald-300/80">
                 {translate(
                   'auto.components.settings.RepositoryHooksSection.f828e1de19',
@@ -668,7 +668,7 @@ function ScriptEditor({
               <code className="rounded bg-muted px-1 py-0.5">
                 {translate(
                   'auto.components.settings.RepositoryHooksSection.39da2ae12f',
-                  'orca.yaml'
+                  'pebble.yaml'
                 )}
               </code>{' '}
               {translate(
@@ -972,12 +972,12 @@ export function RepositoryHooksSection({
       title: translate('auto.components.settings.RepositoryHooksSection.c9bc1bfd8f', 'Advanced'),
       description: translate(
         'auto.components.settings.RepositoryHooksSection.610d90fdbd',
-        'Command source and orca.yaml details.'
+        'Command source and pebble.yaml details.'
       ),
       keywords: [
         translate('auto.components.settings.RepositoryHooksSection.c5a55a2d2e', 'advanced'),
         translate('auto.components.settings.RepositoryHooksSection.4611b78617', 'command source'),
-        translate('auto.components.settings.RepositoryHooksSection.39da2ae12f', 'orca.yaml'),
+        translate('auto.components.settings.RepositoryHooksSection.39da2ae12f', 'pebble.yaml'),
         translate('auto.components.settings.RepositoryHooksSection.d2b3016c20', 'shared'),
         translate('auto.components.settings.RepositoryHooksSection.2d03a514db', 'local'),
         translate('auto.components.settings.RepositoryHooksSection.0518758f38', 'both'),
@@ -998,7 +998,7 @@ export function RepositoryHooksSection({
         <p className="text-xs text-muted-foreground">
           {translate(
             'auto.components.settings.RepositoryHooksSection.8567127a40',
-            'Scripts that run when worktrees are created or archived. Local scripts are stored on this machine; `orca.yaml` scripts are shared with your team.'
+            'Scripts that run when worktrees are created or archived. Local scripts are stored on this machine; `pebble.yaml` scripts are shared with your team.'
           )}
         </p>
       </div>
@@ -1019,8 +1019,8 @@ export function RepositoryHooksSection({
           'command',
           'local',
           'local settings scripts',
-          'orca.yaml',
-          'orca.yaml hooks',
+          'pebble.yaml',
+          'pebble.yaml hooks',
           'hook'
         ]}
       >
@@ -1120,8 +1120,8 @@ export function RepositoryHooksSection({
           'command',
           'local',
           'local settings scripts',
-          'orca.yaml',
-          'orca.yaml hooks',
+          'pebble.yaml',
+          'pebble.yaml hooks',
           'hook'
         ]}
       >
@@ -1206,7 +1206,7 @@ export function RepositoryHooksSection({
               'Leave blank to use the repo default from'
             )}{' '}
             <code className="rounded bg-muted px-1 py-0.5">
-              {translate('auto.components.settings.RepositoryHooksSection.39da2ae12f', 'orca.yaml')}
+              {translate('auto.components.settings.RepositoryHooksSection.39da2ae12f', 'pebble.yaml')}
             </code>
             {hasSharedIssueCommand
               ? '.'
@@ -1225,13 +1225,13 @@ export function RepositoryHooksSection({
         title={translate('auto.components.settings.RepositoryHooksSection.c9bc1bfd8f', 'Advanced')}
         description={translate(
           'auto.components.settings.RepositoryHooksSection.610d90fdbd',
-          'Command source and orca.yaml details.'
+          'Command source and pebble.yaml details.'
         )}
         forceVisible={forceVisible}
         keywords={[
           'advanced',
           'command source',
-          'orca.yaml',
+          'pebble.yaml',
           'shared',
           'local',
           'both',
@@ -1268,7 +1268,7 @@ export function RepositoryHooksSection({
               <span className="text-xs text-muted-foreground">
                 {translate(
                   'auto.components.settings.RepositoryHooksSection.bbbd6e0bc4',
-                  'Command source & orca.yaml'
+                  'Command source & pebble.yaml'
                 )}
               </span>
             </div>
@@ -1294,7 +1294,7 @@ export function RepositoryHooksSection({
                   <code className="rounded bg-muted px-1 py-0.5">
                     {translate(
                       'auto.components.settings.RepositoryHooksSection.39da2ae12f',
-                      'orca.yaml'
+                      'pebble.yaml'
                     )}
                   </code>{' '}
                   {translate(
@@ -1335,7 +1335,7 @@ export function RepositoryHooksSection({
                       <p>
                         {translate(
                           'auto.components.settings.RepositoryHooksSection.af49e2a19e',
-                          'The file is present, but Orca could not find valid `scripts` or `issueCommand` definitions.'
+                          'The file is present, but Pebble could not find valid `scripts` or `issueCommand` definitions.'
                         )}
                       </p>
                       <ol className="space-y-1.5 pl-4 text-[11.5px]">
@@ -1366,7 +1366,7 @@ export function RepositoryHooksSection({
   )
 }
 
-function renderYamlScriptPreview(hooks: OrcaHooks | null): string {
+function renderYamlScriptPreview(hooks: PebbleHooks | null): string {
   const fmt = (key: string, cmd?: string): string =>
     cmd ? `\n  ${key}: |\n${cmd.replace(/^/gm, '    ')}` : ''
   const issueCommand = hooks?.issueCommand

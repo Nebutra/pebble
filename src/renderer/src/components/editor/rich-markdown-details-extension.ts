@@ -181,7 +181,7 @@ export function exitEmptyDetailsBody(editor: Editor): boolean {
   return true
 }
 
-const OrcaDetails = Details.extend({
+const PebbleDetails = Details.extend({
   // Why: details summary Enter must run before StarterKit's generic paragraph
   // splitting so typing a toggle title then pressing Enter moves into the body.
   priority: 1000,
@@ -192,9 +192,9 @@ const OrcaDetails = Details.extend({
       variant: {
         default: null,
         parseHTML: (element) =>
-          element.getAttribute('data-orca-toggle') === 'heading-1' ? 'heading-1' : null,
+          element.getAttribute('data-pebble-toggle') === 'heading-1' ? 'heading-1' : null,
         renderHTML: ({ variant }) =>
-          variant === 'heading-1' ? { 'data-orca-toggle': 'heading-1' } : {}
+          variant === 'heading-1' ? { 'data-pebble-toggle': 'heading-1' } : {}
       }
     }
   },
@@ -268,7 +268,7 @@ const OrcaDetails = Details.extend({
   }
 })
 
-const OrcaDetailsContent = DetailsContent.extend({
+const PebbleDetailsContent = DetailsContent.extend({
   // Why: detailsContent's double-Enter escape must run before StarterKit's
   // generic paragraph split, otherwise users can get stuck inside a toggle.
   priority: 1000,
@@ -288,15 +288,15 @@ const OrcaDetailsContent = DetailsContent.extend({
   }
 })
 
-export function createOrcaDetailsExtensions(): AnyExtension[] {
+export function createPebbleDetailsExtensions(): AnyExtension[] {
   return [
-    OrcaDetails.configure({
+    PebbleDetails.configure({
       persist: true,
       HTMLAttributes: {
-        class: 'orca-details'
+        class: 'pebble-details'
       }
     }),
     DetailsSummary,
-    OrcaDetailsContent
+    PebbleDetailsContent
   ]
 }

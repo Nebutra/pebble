@@ -1,11 +1,11 @@
 import type { AppState } from '@/store/types'
-import type { OrcaHooks } from '../../../shared/types'
+import type { PebbleHooks } from '../../../shared/types'
 import { resolveHookCommandSourcePolicy } from '../../../shared/hook-command-source-policy'
-import { hashOrcaHookScript, type OrcaHookScriptKind } from './orca-hook-trust'
+import { hashPebbleHookScript, type PebbleHookScriptKind } from './pebble-hook-trust'
 import { checkRuntimeHooks, readRuntimeIssueCommand } from '@/runtime/runtime-hooks-client'
 import { getRuntimeEnvironmentIdForRepo } from './repo-runtime-owner'
 
-export type HookScriptKind = OrcaHookScriptKind
+export type HookScriptKind = PebbleHookScriptKind
 
 // Serialize the singleton modal callback so overlapping worktree actions cannot replace it.
 let trustPromptChain: Promise<unknown> = Promise.resolve()
@@ -20,7 +20,7 @@ export function __resetTrustPromptChainForTests(): void {
   trustPromptChain = Promise.resolve()
 }
 
-function getSetupTrustContent(yamlHooks: OrcaHooks | null): string {
+function getSetupTrustContent(yamlHooks: PebbleHooks | null): string {
   const defaultTabCommands = (yamlHooks?.defaultTabs ?? [])
     .map((tab, index) => {
       const command = tab.command?.trim()
@@ -34,7 +34,7 @@ function getSetupTrustContent(yamlHooks: OrcaHooks | null): string {
   return [yamlHooks?.scripts?.setup?.trim(), ...defaultTabCommands].filter(Boolean).join('\n\n')
 }
 
-function getVmRecipeTrustContent(yamlHooks: OrcaHooks | null): string {
+function getVmRecipeTrustContent(yamlHooks: PebbleHooks | null): string {
   return (yamlHooks?.environmentRecipes ?? [])
     .map((recipe) =>
       [
@@ -71,14 +71,14 @@ export async function ensureHooksConfirmed(
   scriptKind: HookScriptKind
 ): Promise<'run' | 'skip'> {
   return enqueueTrustPrompt(async () => {
-    if (state.trustedOrcaHooks[repoId]?.all) {
+    if (state.trustedPebbleHooks[repoId]?.all) {
       return 'run'
     }
 
     let scriptContent = ''
     try {
       if (scriptKind === 'issueCommand') {
-        // Local overrides are user-owned; only shared orca.yaml commands need repo trust.
+        // Local overrides are user-owned; only shared pebble.yaml commands need repo trust.
         const result = await readRuntimeIssueCommand(
           settingsForHookRepoOwner(state, repoId),
           repoId
@@ -109,7 +109,7 @@ export async function ensureHooksConfirmed(
         if (result.status === 'error') {
           return 'skip'
         }
-        const yamlHooks = (result.hooks as OrcaHooks | null) ?? null
+        const yamlHooks = (result.hooks as PebbleHooks | null) ?? null
         scriptContent =
           scriptKind === 'setup'
             ? getSetupTrustContent(yamlHooks)
@@ -126,8 +126,8 @@ export async function ensureHooksConfirmed(
       return 'run'
     }
 
-    const contentHash = await hashOrcaHookScript(scriptContent)
-    const existingHash = state.trustedOrcaHooks[repoId]?.[scriptKind]?.contentHash
+    const contentHash = await hashPebbleHookScript(scriptContent)
+    const existingHash = state.trustedPebbleHooks[repoId]?.[scriptKind]?.contentHash
     if (existingHash === contentHash) {
       return 'run'
     }
@@ -135,11 +135,11 @@ export async function ensureHooksConfirmed(
     const repo = state.repos.find((r) => r.id === repoId)
     const repoName = repo?.displayName ?? 'this repository'
     // A non-empty existingHash that didn't match means the user approved a previous
-    // version of this script; the prompt is reappearing because orca.yaml changed.
+    // version of this script; the prompt is reappearing because pebble.yaml changed.
     const previouslyApproved = Boolean(existingHash)
 
     return new Promise<'run' | 'skip'>((resolve) => {
-      state.openModal('confirm-orca-yaml-hooks', {
+      state.openModal('confirm-pebble-yaml-hooks', {
         repoId,
         repoName,
         scriptKind,

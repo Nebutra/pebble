@@ -1,4 +1,4 @@
-import { test, expect } from './helpers/orca-app'
+import { test, expect } from './helpers/pebble-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import type { Locator, Page } from '@playwright/test'
 
@@ -33,7 +33,7 @@ async function seedUntrackedFile(page: Page): Promise<SeededUntrackedFile> {
     }
 
     const separator = worktree.path.includes('\\') ? '\\' : '/'
-    const fileName = `orca-discard-confirm-${Date.now()}.txt`
+    const fileName = `pebble-discard-confirm-${Date.now()}.txt`
     const relativePath = fileName
     await window.api.fs.writeFile({
       filePath: `${worktree.path}${separator}${relativePath}`,
@@ -91,31 +91,31 @@ async function confirmPendingDelete(page: Page): Promise<void> {
 }
 
 test.describe('Source Control discard confirmation', () => {
-  test.beforeEach(async ({ orcaPage }) => {
-    await waitForSessionReady(orcaPage)
-    await waitForActiveWorktree(orcaPage)
+  test.beforeEach(async ({ pebblePage }) => {
+    await waitForSessionReady(pebblePage)
+    await waitForActiveWorktree(pebblePage)
   })
 
-  test('deletes an untracked file without confirmation', async ({ orcaPage }) => {
-    const seededFile = await seedUntrackedFile(orcaPage)
-    await openSourceControl(orcaPage)
+  test('deletes an untracked file without confirmation', async ({ pebblePage }) => {
+    const seededFile = await seedUntrackedFile(pebblePage)
+    await openSourceControl(pebblePage)
 
-    const row = orcaPage
+    const row = pebblePage
       .locator('[data-testid="source-control-entry"]')
       .filter({ hasText: seededFile.fileName })
     await expect(row).toBeVisible()
 
     await deleteUntrackedFileFromRow(row)
-    await confirmPendingDelete(orcaPage)
+    await confirmPendingDelete(pebblePage)
 
     await expect(
-      orcaPage.getByRole('dialog', { name: `Delete "${seededFile.fileName}"?` })
+      pebblePage.getByRole('dialog', { name: `Delete "${seededFile.fileName}"?` })
     ).toHaveCount(0)
     await expect(row).toHaveCount(0, { timeout: 10_000 })
 
-    await refreshGitStatus(orcaPage)
+    await refreshGitStatus(pebblePage)
     await expect(
-      orcaPage.locator('[data-testid="source-control-entry"]').filter({
+      pebblePage.locator('[data-testid="source-control-entry"]').filter({
         hasText: seededFile.fileName
       })
     ).toHaveCount(0)

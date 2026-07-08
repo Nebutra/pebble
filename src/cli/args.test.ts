@@ -58,7 +58,7 @@ describe('parseArgs', () => {
         {
           path: ['emulator', 'permissions'],
           summary: 'Permissions',
-          usage: 'orca emulator permissions <op> <package> [permission]',
+          usage: 'pebble emulator permissions <op> <package> [permission]',
           allowedFlags: ['op', 'package', 'permission'],
           positionalArgs: ['op', 'package', 'permission']
         }
@@ -105,7 +105,7 @@ describe('validateCommandAndFlags', () => {
     {
       path: ['demo'],
       summary: 'Demo command',
-      usage: 'orca demo',
+      usage: 'pebble demo',
       allowedFlags: []
     }
   ]

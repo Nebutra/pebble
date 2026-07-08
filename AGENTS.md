@@ -24,7 +24,7 @@ Always use the primary working directory (the worktree) for all file reads and e
 
 ## Cross-Platform Support
 
-Orca targets macOS, Linux, and Windows. Keep all platform-dependent behavior behind runtime checks:
+Pebble targets macOS, Linux, and Windows. Keep all platform-dependent behavior behind runtime checks:
 
 - **Keyboard shortcuts**: Never hardcode `e.metaKey`. Use a platform check (`navigator.userAgent.includes('Mac')`) to pick `metaKey` on Mac and `ctrlKey` on Linux/Windows. Electron menu accelerators should use `CmdOrCtrl`.
 - **Shortcut labels in UI**: Display `⌘` / `⇧` on Mac and `Ctrl+` / `Shift+` on other platforms.

@@ -4,7 +4,7 @@ import { getControlSocketPath, type SystemSshResolvedConfig } from './ssh-contro
 export type SystemSshBuildArgsOptions = {
   resolvedConfig?: SystemSshResolvedConfig | null
   disableControlMaster?: boolean
-  suppressOrcaControlMaster?: boolean
+  suppressPebbleControlMaster?: boolean
 }
 
 export function buildSshArgs(target: SshTarget, options?: SystemSshBuildArgsOptions): string[] {
@@ -19,7 +19,7 @@ export function buildSshArgs(target: SshTarget, options?: SystemSshBuildArgsOpti
   // spawnSystemSshCommand call opens a new TCP connection.
   const forceDisableControlMaster =
     options?.disableControlMaster === true || target.systemSshConnectionReuse === false
-  const controlPath = getOrcaControlSocketPath(target, options)
+  const controlPath = getPebbleControlSocketPath(target, options)
   if (forceDisableControlMaster) {
     // Why: muxed OpenSSH forwards remain registered on the master after the
     // client exits. Also honors the per-target compatibility opt-out even if
@@ -68,11 +68,11 @@ export function buildSshArgs(target: SshTarget, options?: SystemSshBuildArgsOpti
   return args
 }
 
-export function getOrcaControlSocketPath(
+export function getPebbleControlSocketPath(
   target: SshTarget,
   options?: SystemSshBuildArgsOptions
 ): string | null {
-  if (shouldDisableOrcaControlMaster(target, options)) {
+  if (shouldDisablePebbleControlMaster(target, options)) {
     return null
   }
   return getControlSocketPath(target, options?.resolvedConfig)
@@ -88,23 +88,23 @@ export function getSystemSshBuildArgsFromOperationOptions(
   if (options?.disableControlMaster === true) {
     buildArgsOptions.disableControlMaster = true
   }
-  if (options?.suppressOrcaControlMaster === true) {
-    buildArgsOptions.suppressOrcaControlMaster = true
+  if (options?.suppressPebbleControlMaster === true) {
+    buildArgsOptions.suppressPebbleControlMaster = true
   }
   return Object.keys(buildArgsOptions).length === 0 ? undefined : buildArgsOptions
 }
 
-function shouldDisableOrcaControlMaster(
+function shouldDisablePebbleControlMaster(
   target: SshTarget,
   options?: SystemSshBuildArgsOptions
 ): boolean {
-  // Why: unresolved ssh_config aliases could otherwise share one Orca socket
+  // Why: unresolved ssh_config aliases could otherwise share one Pebble socket
   // while OpenSSH routes them through mutable HostName/ProxyJump settings.
   const unresolvedConfigBackedTarget =
     isOpenSshConfigBackedTarget(target) && options?.resolvedConfig == null
   return (
     options?.disableControlMaster === true ||
-    options?.suppressOrcaControlMaster === true ||
+    options?.suppressPebbleControlMaster === true ||
     target.systemSshConnectionReuse === false ||
     unresolvedConfigBackedTarget ||
     hasUserConfiguredControlMaster(options?.resolvedConfig)
@@ -118,7 +118,7 @@ function hasUserConfiguredControlMaster(
     return false
   }
   // Why: ControlPersist/ControlPath alone can reuse a master someone else
-  // created, but they do not create the setup-burst master Orca needs.
+  // created, but they do not create the setup-burst master Pebble needs.
   return (
     hasEnabledControlMaster(resolvedConfig.controlMaster) &&
     hasEnabledControlPath(resolvedConfig.controlPath)

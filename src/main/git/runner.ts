@@ -1329,7 +1329,7 @@ async function sleep(ms: number): Promise<void> {
 }
 
 function defaultGhExecTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
-  const raw = env.ORCA_GH_EXEC_TIMEOUT_MS
+  const raw = env.PEBBLE_GH_EXEC_TIMEOUT_MS
   if (!raw) {
     return DEFAULT_GH_EXEC_TIMEOUT_MS
   }
@@ -1566,7 +1566,7 @@ export function wslAwareSpawn(
  * Translate absolute Linux paths in git output back to Windows UNC paths.
  *
  * Why: when git runs inside WSL, paths in output (e.g. `git worktree list`)
- * are Linux-native (/home/user/repo). The rest of Orca needs Windows UNC
+ * are Linux-native (/home/user/repo). The rest of Pebble needs Windows UNC
  * paths (\\wsl.localhost\Ubuntu\home\user\repo) to read files via Node fs.
  */
 export function translateWslOutputPaths(

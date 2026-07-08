@@ -11,7 +11,7 @@ const PNG_1X1_BASE64 =
 const tempDirs: string[] = []
 
 async function makeTempRepoDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'orca-repo-icon-'))
+  const dir = await mkdtemp(join(tmpdir(), 'pebble-repo-icon-'))
   tempDirs.push(dir)
   return dir
 }
@@ -117,15 +117,15 @@ describe('detectRepoIcon', () => {
   it('falls back to the GitHub owner avatar for GitHub repos', async () => {
     const repoPath = await makeTempRepoDir()
     await gitExecFileAsync(['init'], { cwd: repoPath })
-    await gitExecFileAsync(['remote', 'add', 'origin', 'git@github.com:stablyai/orca.git'], {
+    await gitExecFileAsync(['remote', 'add', 'origin', 'git@github.com:nebutra/pebble.git'], {
       cwd: repoPath
     })
 
     await expect(detectRepoIcon({ repoPath, kind: 'git' })).resolves.toEqual({
       type: 'image',
-      src: 'https://github.com/stablyai.png?size=64',
+      src: 'https://github.com/nebutra.png?size=64',
       source: 'github',
-      label: 'stablyai/orca'
+      label: 'nebutra/pebble'
     })
   })
 
@@ -133,18 +133,18 @@ describe('detectRepoIcon', () => {
     const repoPath = await makeTempRepoDir()
     await writeFile(
       join(repoPath, 'package.json'),
-      JSON.stringify({ homepage: 'https://github.com/stablyai/orca' })
+      JSON.stringify({ homepage: 'https://github.com/nebutra/pebble' })
     )
     await gitExecFileAsync(['init'], { cwd: repoPath })
-    await gitExecFileAsync(['remote', 'add', 'origin', 'https://github.com/stablyai/orca.git'], {
+    await gitExecFileAsync(['remote', 'add', 'origin', 'https://github.com/nebutra/pebble.git'], {
       cwd: repoPath
     })
 
     await expect(detectRepoIcon({ repoPath, kind: 'git' })).resolves.toEqual({
       type: 'image',
-      src: 'https://github.com/stablyai.png?size=64',
+      src: 'https://github.com/nebutra.png?size=64',
       source: 'github',
-      label: 'stablyai/orca'
+      label: 'nebutra/pebble'
     })
   })
 
@@ -160,26 +160,26 @@ describe('detectRepoIcon', () => {
   it('uses the resolved fork upstream for both metadata and the GitHub avatar', async () => {
     const repoPath = await makeTempRepoDir()
     await gitExecFileAsync(['init'], { cwd: repoPath })
-    await gitExecFileAsync(['remote', 'add', 'origin', 'git@github.com:tmchow/orca.git'], {
+    await gitExecFileAsync(['remote', 'add', 'origin', 'git@github.com:tmchow/pebble.git'], {
       cwd: repoPath
     })
-    await gitExecFileAsync(['remote', 'add', 'upstream', 'git@github.com:stablyai/orca.git'], {
+    await gitExecFileAsync(['remote', 'add', 'upstream', 'git@github.com:nebutra/pebble.git'], {
       cwd: repoPath
     })
 
     await expect(detectRepoIconAndUpstream({ repoPath, kind: 'git' })).resolves.toEqual({
       gitRemoteIdentity: {
-        canonicalKey: 'github.com/stablyai/orca',
+        canonicalKey: 'github.com/nebutra/pebble',
         remoteName: 'upstream',
-        remoteUrl: 'git@github.com:stablyai/orca.git'
+        remoteUrl: 'git@github.com:nebutra/pebble.git'
       },
       repoIcon: {
         type: 'image',
-        src: 'https://github.com/stablyai.png?size=64',
+        src: 'https://github.com/nebutra.png?size=64',
         source: 'github',
-        label: 'stablyai/orca'
+        label: 'nebutra/pebble'
       },
-      upstream: { owner: 'stablyai', repo: 'orca' }
+      upstream: { owner: 'nebutra', repo: 'pebble' }
     })
   })
 

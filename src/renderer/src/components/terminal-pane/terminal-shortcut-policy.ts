@@ -44,7 +44,7 @@ export type TerminalShortcutAction =
 
 /**
  * Resolves terminal keyboard events before xterm receives them.
- * Keeps configurable Orca shortcuts and terminal byte fallbacks in one
+ * Keeps configurable Pebble shortcuts and terminal byte fallbacks in one
  * platform-aware policy so renderer handlers do not duplicate key checks.
  */
 export function resolveTerminalShortcutAction(

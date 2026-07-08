@@ -43,7 +43,7 @@ describe('SourceControlBranchContextRow', () => {
       <SourceControlBranchContextRow
         summary={readySummary}
         compareBaseRef={null}
-        manualReviewUrl="https://github.com/stablyai/orca/compare/main...feature?expand=1"
+        manualReviewUrl="https://github.com/nebutra/pebble/compare/main...feature?expand=1"
         onChangeBaseRef={vi.fn()}
         onRetry={vi.fn()}
       />

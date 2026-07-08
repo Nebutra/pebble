@@ -53,9 +53,9 @@ function buildPaneEnv(
 ): Record<string, string> {
   return {
     ...env,
-    ORCA_PANE_KEY: makePaneKey(tabId, leafId),
-    ORCA_TAB_ID: tabId,
-    ORCA_WORKTREE_ID: worktreeId
+    PEBBLE_PANE_KEY: makePaneKey(tabId, leafId),
+    PEBBLE_TAB_ID: tabId,
+    PEBBLE_WORKTREE_ID: worktreeId
   }
 }
 

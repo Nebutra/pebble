@@ -617,7 +617,7 @@ function getWorktreeVisibilityMenuLabel(repo: Repo): string {
     repo,
     isLegacyRepoForExternalWorktreeVisibility(repo)
   )
-  return visibility === 'show' ? 'Hide non-Orca worktrees' : 'Show hidden worktrees'
+  return visibility === 'show' ? 'Hide non-Pebble worktrees' : 'Show hidden worktrees'
 }
 
 const SIDEBAR_POINTER_DRAG_THRESHOLD_PX = 4
@@ -6347,7 +6347,7 @@ const WorktreeList = React.memo(function WorktreeList({
         toast.error(
           translate(
             'auto.components.sidebar.WorktreeList.b667b59632',
-            'Some projects could not be removed from Orca'
+            'Some projects could not be removed from Pebble'
           ),
           {
             description: translate(

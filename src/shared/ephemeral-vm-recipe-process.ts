@@ -128,17 +128,17 @@ function buildRecipeEnv(
   return {
     ...process.env,
     ...env,
-    ORCA_VM_MODE: mode,
-    ORCA_VM_INSTANCE_ID: context.instanceId ?? '',
-    ORCA_RECIPE_ID: context.recipeId,
-    ORCA_PROJECT_ID: context.projectId ?? '',
-    ORCA_WORKSPACE_ID: context.workspaceId ?? '',
-    ORCA_WORKSPACE_NAME: context.workspaceName ?? '',
-    ORCA_REPO_PATH: context.repoPath,
-    ORCA_REPO_URL: context.repoUrl ?? '',
-    ORCA_REPO_BRANCH: context.branch ?? '',
-    ORCA_REPO_REF: context.ref ?? '',
-    ORCA_VERSION: context.orcaVersion ?? ''
+    PEBBLE_VM_MODE: mode,
+    PEBBLE_VM_INSTANCE_ID: context.instanceId ?? '',
+    PEBBLE_RECIPE_ID: context.recipeId,
+    PEBBLE_PROJECT_ID: context.projectId ?? '',
+    PEBBLE_WORKSPACE_ID: context.workspaceId ?? '',
+    PEBBLE_WORKSPACE_NAME: context.workspaceName ?? '',
+    PEBBLE_REPO_PATH: context.repoPath,
+    PEBBLE_REPO_URL: context.repoUrl ?? '',
+    PEBBLE_REPO_BRANCH: context.branch ?? '',
+    PEBBLE_REPO_REF: context.ref ?? '',
+    PEBBLE_VERSION: context.pebbleVersion ?? ''
   }
 }
 

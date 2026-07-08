@@ -33,8 +33,8 @@ const LOCAL_HOST_LABEL = getExecutionHostLabel('local')
 
 const repo: Repo = {
   id: 'repo-1',
-  path: '/tmp/orca',
-  displayName: 'orca',
+  path: '/tmp/pebble',
+  displayName: 'pebble',
   badgeColor: '#000000',
   addedAt: 0
 }
@@ -42,7 +42,7 @@ const repo: Repo = {
 const worktree: Worktree = {
   id: 'wt-1',
   repoId: repo.id,
-  path: '/tmp/orca-feature',
+  path: '/tmp/pebble-feature',
   branch: 'refs/heads/feature/super-critical',
   head: 'abc123',
   isBare: false,
@@ -67,8 +67,8 @@ function readWorktreeListSource(): string {
 
 const remoteRepo: Repo = {
   id: 'repo-remote',
-  path: '/home/alice/orca',
-  displayName: 'orca',
+  path: '/home/alice/pebble',
+  displayName: 'pebble',
   badgeColor: '#111111',
   addedAt: 1,
   connectionId: 'gpu-vm'
@@ -78,13 +78,13 @@ const remoteWorktree: Worktree = {
   ...worktree,
   id: 'wt-remote',
   repoId: remoteRepo.id,
-  path: '/home/alice/orca-feature',
+  path: '/home/alice/pebble-feature',
   displayName: 'remote feature'
 }
 
 const project: Project = {
-  id: 'github:stablyai/orca',
-  displayName: 'Orca',
+  id: 'github:nebutra/pebble',
+  displayName: 'Pebble',
   badgeColor: '#737373',
   sourceRepoIds: [repo.id, remoteRepo.id],
   createdAt: 1,
@@ -144,7 +144,7 @@ describe('getPRGroupKey', () => {
 
   it('prefers repo-scoped PR status over stale legacy path-scoped status', () => {
     const prCache = {
-      '/tmp/orca::feature/super-critical': {
+      '/tmp/pebble::feature/super-critical': {
         data: { state: 'closed' }
       },
       'repo-1::feature/super-critical': {
@@ -157,7 +157,7 @@ describe('getPRGroupKey', () => {
 
   it('falls back to legacy path-scoped PR status when no repo-scoped entry exists', () => {
     const prCache = {
-      '/tmp/orca::feature/super-critical': {
+      '/tmp/pebble::feature/super-critical': {
         data: { state: 'closed' }
       }
     }
@@ -357,7 +357,7 @@ describe('buildRows with pinned worktrees', () => {
     )
 
     expect(rows).toMatchObject([
-      { type: 'header', key: 'project:github:stablyai/orca', label: 'Orca', count: 2 },
+      { type: 'header', key: 'project:github:nebutra/pebble', label: 'Pebble', count: 2 },
       { type: 'item', worktree: { id: worktree.id }, hostContextLabel: LOCAL_HOST_LABEL },
       { type: 'item', worktree: { id: remoteWorktree.id }, hostContextLabel: 'gpu-vm' }
     ])
@@ -555,7 +555,7 @@ describe('buildRows with pinned worktrees', () => {
   it('orders project identity headers by the manual repo order anchor', () => {
     const analyticsProject: Project = {
       ...project,
-      id: 'github:stablyai/analytics',
+      id: 'github:nebutra/analytics',
       displayName: 'Analytics',
       sourceRepoIds: ['repo-analytics']
     }
@@ -564,7 +564,7 @@ describe('buildRows with pinned worktrees', () => {
       id: 'repo-analytics',
       path: '/tmp/analytics',
       displayName: 'analytics',
-      upstream: { owner: 'stablyai', repo: 'analytics' }
+      upstream: { owner: 'nebutra', repo: 'analytics' }
     }
     const analyticsWorktree: Worktree = {
       ...worktree,
@@ -620,22 +620,22 @@ describe('buildRows with pinned worktrees', () => {
 
     const headers = rows.filter((row) => row.type === 'header')
     expect(headers.map((row) => row.key)).toEqual([
-      'project:github:stablyai/orca',
-      'project:github:stablyai/analytics'
+      'project:github:nebutra/pebble',
+      'project:github:nebutra/analytics'
     ])
     expect(headers[0]).toMatchObject({
-      key: 'project:github:stablyai/orca',
+      key: 'project:github:nebutra/pebble',
       repo: { id: repo.id, badgeColor: repo.badgeColor }
     })
   })
 
   it('splits same-host checkouts of one project into separate per-setup groups', () => {
-    const repoB: Repo = { ...repo, id: 'repo-2', path: '/tmp/orca-2', displayName: 'orca-2' }
+    const repoB: Repo = { ...repo, id: 'repo-2', path: '/tmp/pebble-2', displayName: 'pebble-2' }
     const worktreeB: Worktree = {
       ...worktree,
       id: 'wt-2',
       repoId: repoB.id,
-      path: '/tmp/orca-2-feature',
+      path: '/tmp/pebble-2-feature',
       displayName: 'feature-b'
     }
     const localSetupB: ProjectHostSetup = {
@@ -680,12 +680,12 @@ describe('buildRows with pinned worktrees', () => {
     expect(headers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          key: 'project:github:stablyai/orca::setup:repo-1',
-          label: 'orca'
+          key: 'project:github:nebutra/pebble::setup:repo-1',
+          label: 'pebble'
         }),
         expect.objectContaining({
-          key: 'project:github:stablyai/orca::setup:repo-2',
-          label: 'orca-2'
+          key: 'project:github:nebutra/pebble::setup:repo-2',
+          label: 'pebble-2'
         })
       ])
     )
@@ -695,14 +695,14 @@ describe('buildRows with pinned worktrees', () => {
     const localRepoB: Repo = {
       ...repo,
       id: 'repo-local-b',
-      path: '/tmp/orca-b',
-      displayName: 'orca-b'
+      path: '/tmp/pebble-b',
+      displayName: 'pebble-b'
     }
     const localWorktreeB: Worktree = {
       ...worktree,
       id: 'wt-local-b',
       repoId: localRepoB.id,
-      path: '/tmp/orca-b-feature',
+      path: '/tmp/pebble-b-feature',
       displayName: 'feature-b'
     }
     const localSetupB: ProjectHostSetup = {
@@ -746,9 +746,9 @@ describe('buildRows with pinned worktrees', () => {
 
     const headers = rows.filter((row) => row.type === 'header')
     expect(headers.map((row) => row.key)).toEqual([
-      'project:github:stablyai/orca::setup:repo-1',
-      'project:github:stablyai/orca::setup:repo-local-b',
-      'project:github:stablyai/orca::setup:repo-remote'
+      'project:github:nebutra/pebble::setup:repo-1',
+      'project:github:nebutra/pebble::setup:repo-local-b',
+      'project:github:nebutra/pebble::setup:repo-remote'
     ])
   })
 
@@ -756,14 +756,14 @@ describe('buildRows with pinned worktrees', () => {
     const runtimeRepoB: Repo = {
       ...repo,
       id: 'repo-runtime-b',
-      path: '/tmp/orca-runtime-b',
-      displayName: 'orca-runtime-b'
+      path: '/tmp/pebble-runtime-b',
+      displayName: 'pebble-runtime-b'
     }
     const runtimeWorktreeB: Worktree = {
       ...worktree,
       id: 'wt-runtime-b',
       repoId: runtimeRepoB.id,
-      path: '/tmp/orca-runtime-b-feature',
+      path: '/tmp/pebble-runtime-b-feature',
       displayName: 'feature-runtime-b'
     }
     // Why: a `provisioned` (recipe-created ephemeral) copy shares the project's
@@ -810,8 +810,8 @@ describe('buildRows with pinned worktrees', () => {
     const headers = rows.filter((row) => row.type === 'header')
     expect(headers).toHaveLength(1)
     expect(headers[0]).toMatchObject({
-      key: 'project:github:stablyai/orca',
-      label: 'Orca',
+      key: 'project:github:nebutra/pebble',
+      label: 'Pebble',
       count: 2
     })
   })
@@ -824,14 +824,14 @@ describe('buildRows with pinned worktrees', () => {
     const localRepoB: Repo = {
       ...repo,
       id: 'repo-local-b',
-      path: '/tmp/orca-b',
-      displayName: 'orca-b'
+      path: '/tmp/pebble-b',
+      displayName: 'pebble-b'
     }
     const localWorktreeB: Worktree = {
       ...worktree,
       id: 'wt-local-b',
       repoId: localRepoB.id,
-      path: '/tmp/orca-b-feature',
+      path: '/tmp/pebble-b-feature',
       displayName: 'feature-b'
     }
     const localSetupB: ProjectHostSetup = {
@@ -844,14 +844,14 @@ describe('buildRows with pinned worktrees', () => {
     const runtimeRepoB: Repo = {
       ...repo,
       id: 'repo-runtime-b',
-      path: '/tmp/orca-runtime-b',
-      displayName: 'orca-runtime-b'
+      path: '/tmp/pebble-runtime-b',
+      displayName: 'pebble-runtime-b'
     }
     const runtimeWorktreeB: Worktree = {
       ...worktree,
       id: 'wt-runtime-b',
       repoId: runtimeRepoB.id,
-      path: '/tmp/orca-runtime-b-feature',
+      path: '/tmp/pebble-runtime-b-feature',
       displayName: 'feature-runtime-b'
     }
     const runtimeSetupB: ProjectHostSetup = {
@@ -896,17 +896,17 @@ describe('buildRows with pinned worktrees', () => {
 
     const headers = rows.filter((row) => row.type === 'header')
     expect(headers.map((row) => row.key).sort()).toEqual([
-      'project:github:stablyai/orca',
-      'project:github:stablyai/orca::setup:repo-1',
-      'project:github:stablyai/orca::setup:repo-local-b'
+      'project:github:nebutra/pebble',
+      'project:github:nebutra/pebble::setup:repo-1',
+      'project:github:nebutra/pebble::setup:repo-local-b'
     ])
     // The provisioned copy nests under the plain project key with only its own
     // worktree; it never gets a path-scoped `::setup:` header like the real
     // checkouts do. (buildRows disambiguates its visible label to the repo name.)
     expect(
-      headers.some((row) => row.key === 'project:github:stablyai/orca::setup:repo-runtime-b')
+      headers.some((row) => row.key === 'project:github:nebutra/pebble::setup:repo-runtime-b')
     ).toBe(false)
-    expect(headers.find((row) => row.key === 'project:github:stablyai/orca')).toMatchObject({
+    expect(headers.find((row) => row.key === 'project:github:nebutra/pebble')).toMatchObject({
       count: 1
     })
   })
@@ -916,28 +916,28 @@ describe('buildRows with pinned worktrees', () => {
     const windowsRepo: Repo = {
       ...repo,
       id: 'repo-windows',
-      path: String.raw`C:\Users\alice\git\orca`,
-      displayName: 'orca',
+      path: String.raw`C:\Users\alice\git\pebble`,
+      displayName: 'pebble',
       executionHostId: runtimeHostId
     }
     const wslRepo: Repo = {
       ...repo,
       id: 'repo-wsl',
-      path: String.raw`\\wsl.localhost\Ubuntu\home\alice\git\orca`,
-      displayName: 'orca',
+      path: String.raw`\\wsl.localhost\Ubuntu\home\alice\git\pebble`,
+      displayName: 'pebble',
       executionHostId: runtimeHostId
     }
     const windowsWorktree: Worktree = {
       ...worktree,
       id: 'wt-windows',
       repoId: windowsRepo.id,
-      path: String.raw`C:\Users\alice\git\orca\feature`
+      path: String.raw`C:\Users\alice\git\pebble\feature`
     }
     const wslWorktree: Worktree = {
       ...worktree,
       id: 'wt-wsl',
       repoId: wslRepo.id,
-      path: String.raw`\\wsl.localhost\Ubuntu\home\alice\git\orca\feature`
+      path: String.raw`\\wsl.localhost\Ubuntu\home\alice\git\pebble\feature`
     }
     const windowsSetup: ProjectHostSetup = {
       ...projectHostSetups[0]!,
@@ -985,8 +985,8 @@ describe('buildRows with pinned worktrees', () => {
 
     expect(rows.filter((row) => row.type === 'header')).toMatchObject([
       {
-        key: 'project:github:stablyai/orca',
-        label: 'Orca',
+        key: 'project:github:nebutra/pebble',
+        label: 'Pebble',
         count: 2
       }
     ])
@@ -996,7 +996,7 @@ describe('buildRows with pinned worktrees', () => {
     const runtimeRepo: Repo = {
       ...remoteRepo,
       id: 'repo-runtime',
-      path: '/Users/alice/runtime-orca',
+      path: '/Users/alice/runtime-pebble',
       connectionId: null,
       executionHostId: 'runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3'
     }
@@ -1045,7 +1045,7 @@ describe('buildRows with pinned worktrees', () => {
     )
 
     expect(rows).toMatchObject([
-      { type: 'header', key: 'project:github:stablyai/orca', label: 'Orca', count: 2 },
+      { type: 'header', key: 'project:github:nebutra/pebble', label: 'Pebble', count: 2 },
       { type: 'item', worktree: { id: worktree.id }, hostContextLabel: LOCAL_HOST_LABEL },
       { type: 'item', worktree: { id: runtimeWorktree.id }, hostContextLabel: 'dev box' }
     ])
@@ -1085,7 +1085,7 @@ describe('buildRows with pinned worktrees', () => {
     )
 
     expect(rows).toMatchObject([
-      { type: 'header', key: 'project:github:stablyai/orca', label: 'Orca', count: 2 },
+      { type: 'header', key: 'project:github:nebutra/pebble', label: 'Pebble', count: 2 },
       { type: 'item', worktree: { id: worktree.id } },
       { type: 'item', worktree: { id: secondLocalWorktree.id } }
     ])
@@ -1101,8 +1101,8 @@ describe('buildRows with pinned worktrees', () => {
       'repo',
       [worktree, remoteWorktree],
       new Map([
-        [repo.id, { ...repo, displayName: 'orca' }],
-        [remoteRepo.id, { ...remoteRepo, displayName: 'orca' }]
+        [repo.id, { ...repo, displayName: 'pebble' }],
+        [remoteRepo.id, { ...remoteRepo, displayName: 'pebble' }]
       ]),
       null,
       new Set()
@@ -1128,7 +1128,7 @@ describe('buildRows with pinned worktrees', () => {
           projectHostSetups
         }
       )
-    ).toBe('project:github:stablyai/orca')
+    ).toBe('project:github:nebutra/pebble')
   })
 
   it('emits an imported worktrees card at the top of repo-group rows', () => {
@@ -1239,7 +1239,7 @@ describe('buildRows with pinned worktrees', () => {
     )
 
     expect(rows).toMatchObject([
-      { type: 'header', key: 'repo:repo-1', label: 'orca' },
+      { type: 'header', key: 'repo:repo-1', label: 'pebble' },
       {
         type: 'imported-worktrees-card',
         key: 'imported-worktrees-card:repo-group:repo-1',

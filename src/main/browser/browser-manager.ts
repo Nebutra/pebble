@@ -74,7 +74,7 @@ function releaseAutomationVisibilityToken(renderer: Electron.WebContents, token:
   renderer
     .executeJavaScript(
       `(function() {
-        var bridge = window.__orcaBrowserAutomationVisibility;
+        var bridge = window.__pebbleBrowserAutomationVisibility;
         if (!bridge || typeof bridge.release !== 'function') return false;
         return bridge.release(${JSON.stringify(token)});
       })()`
@@ -308,7 +308,7 @@ export class BrowserManager {
     return renderer
   }
 
-  // Why: screenshot sessions target guest page ids, but Orca's visible browser
+  // Why: screenshot sessions target guest page ids, but Pebble's visible browser
   // chrome is keyed by workspace ids. If we activate the page id directly, the
   // webview stays hidden under the terminal pane and Page.captureScreenshot
   // times out even though the guest still exists.
@@ -497,7 +497,7 @@ export class BrowserManager {
                 ${JSON.stringify(prev?.targetBrowserPageId)} &&
               typeof state.setActiveBrowserPage === 'function'
             ) {
-              // Why: Orca remembers the last browser workspace/page even when
+              // Why: Pebble remembers the last browser workspace/page even when
               // the user is currently in terminal/editor view. Screenshot prep
               // temporarily switches that hidden browser selection state, so
               // restore it independently of the visible tab type.
@@ -533,11 +533,11 @@ export class BrowserManager {
     }
 
     // Why: agent browser commands need a paintable webview for lazy-loading
-    // sites, but must not steal the user's visible Orca tab/worktree.
+    // sites, but must not steal the user's visible Pebble tab/worktree.
     const acquirePromise = renderer
       .executeJavaScript(
         `(async function() {
-            var bridge = window.__orcaBrowserAutomationVisibility;
+            var bridge = window.__pebbleBrowserAutomationVisibility;
             if (!bridge || typeof bridge.acquire !== 'function') return null;
             return await bridge.acquire(${JSON.stringify(browserPageId)});
           })()`
@@ -572,7 +572,7 @@ export class BrowserManager {
 
     // Why: background throttling must be disabled so agent-driven screenshots
     // (Page.captureScreenshot via CDP proxy) can capture frames even when the
-    // Orca window is not the focused foreground app. With throttling enabled,
+    // Pebble window is not the focused foreground app. With throttling enabled,
     // the compositor stops producing frames and capturePage() returns empty.
     guest.setBackgroundThrottling(false)
     guest.setWindowOpenHandler(({ url }) => {
@@ -581,15 +581,15 @@ export class BrowserManager {
       const externalUrl = normalizeExternalBrowserUrl(url)
 
       // Why: popup-capable guests are required for OAuth and target=_blank
-      // flows, but Orca still does not host child windows itself. For normal
-      // web URLs, route the request into Orca's own browser-tab model first so
+      // flows, but Pebble still does not host child windows itself. For normal
+      // web URLs, route the request into Pebble's own browser-tab model first so
       // the user stays in the IDE. Only fall back to the system browser when
-      // Orca cannot safely host the destination or when the guest is not yet
+      // Pebble cannot safely host the destination or when the guest is not yet
       // associated with a trusted browser tab/renderer.
-      if (browserTabId && browserUrl && this.openLinkInOrcaTab(browserTabId, browserUrl)) {
+      if (browserTabId && browserUrl && this.openLinkInPebbleTab(browserTabId, browserUrl)) {
         this.forwardOrQueuePopupEvent(guest.id, {
           origin: safeOrigin(browserUrl),
-          action: 'opened-in-orca'
+          action: 'opened-in-pebble'
         })
       } else if (externalUrl) {
         // Why: a target=_blank click on a Kagi search result page produces a
@@ -831,7 +831,7 @@ export class BrowserManager {
     this.annotationViewportBridgeOpsByTabId.delete(browserTabId)
   }
 
-  // Why: headless orca serve has no renderer window to mount a <webview>, so its
+  // Why: headless pebble serve has no renderer window to mount a <webview>, so its
   // browser pages are backed by main-process offscreen WebContents instead. This
   // registers such a page into the same resolution maps the bridge/screencast/
   // input handlers read, but skips the webview-only guards and the renderer setup
@@ -867,7 +867,7 @@ export class BrowserManager {
     // Cancel all active grab ops before tearing down registrations
     this.grabSessionController.cancelAll('evicted')
     for (const downloadId of this.downloadsById.keys()) {
-      this.cancelDownloadInternal(downloadId, 'Orca is shutting down.')
+      this.cancelDownloadInternal(downloadId, 'Pebble is shutting down.')
     }
     browserDownloadDestinationReservations.clear()
     for (const browserTabId of this.webContentsIdByTabId.keys()) {
@@ -1014,7 +1014,7 @@ export class BrowserManager {
         item.cancel()
       } catch {
         // Why: failing setSavePath can leave Electron in a partially finalized
-        // state; cancellation is best-effort after Orca has made the UI terminal.
+        // state; cancellation is best-effort after Pebble has made the UI terminal.
       }
       return
     }
@@ -1069,7 +1069,7 @@ export class BrowserManager {
     return true
   }
 
-  // Why: guest browser surfaces are intentionally isolated from Orca's preload
+  // Why: guest browser surfaces are intentionally isolated from Pebble's preload
   // bridge, so renderer code cannot directly call Electron WebContents APIs on
   // them. Main owns the devtools escape hatch and only after tab→guest lookup.
   async openDevTools(browserTabId: string): Promise<boolean> {
@@ -1671,7 +1671,7 @@ export class BrowserManager {
     } catch {
       // Why: DownloadItem.cancel can throw after the item has already
       // finalized. Cleanup here is best-effort because the UI state is the
-      // source of truth for whether Orca still considers the request active.
+      // source of truth for whether Pebble still considers the request active.
     }
 
     if (shouldSendCancel) {
@@ -1774,7 +1774,7 @@ export class BrowserManager {
     })
   }
 
-  private openLinkInOrcaTab(browserTabId: string, rawUrl: string): boolean {
+  private openLinkInPebbleTab(browserTabId: string, rawUrl: string): boolean {
     const renderer = this.resolveRendererForBrowserTab(browserTabId)
     if (!renderer) {
       return false
@@ -1785,9 +1785,9 @@ export class BrowserManager {
     }
     // Why: the guest context menu knows which browser tab the click came from,
     // but only the renderer owns the worktree/tab model. Forward the validated
-    // URL back to that renderer so it can open a sibling Orca browser tab in
+    // URL back to that renderer so it can open a sibling Pebble browser tab in
     // the same worktree without letting the guest process mutate app state.
-    renderer.send('browser:open-link-in-orca-tab', {
+    renderer.send('browser:open-link-in-pebble-tab', {
       browserPageId: browserTabId,
       url: normalizedUrl
     })

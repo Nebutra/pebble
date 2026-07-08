@@ -44,10 +44,10 @@ export function normalizeGiteaApiBaseUrl(value: string): string {
 }
 
 function getAuthConfig(): GiteaAuthConfig {
-  const apiBaseUrl = envValue('ORCA_GITEA_API_BASE_URL')
+  const apiBaseUrl = envValue('PEBBLE_GITEA_API_BASE_URL')
   return {
     apiBaseUrl: apiBaseUrl ? normalizeGiteaApiBaseUrl(apiBaseUrl) : null,
-    token: envValue('ORCA_GITEA_TOKEN')
+    token: envValue('PEBBLE_GITEA_TOKEN')
   }
 }
 

@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { RpcDispatcher } from '../dispatcher'
 import type { RpcRequest } from '../core'
-import type { OrcaRuntimeService } from '../../orca-runtime'
+import type { PebbleRuntimeService } from '../../pebble-runtime'
 import { GITLAB_METHODS } from './gitlab'
 
 function makeRequest(method: string, params?: unknown): RpcRequest {
@@ -34,7 +34,7 @@ describe('gitlab RPC methods', () => {
       updateGitLabRepoMRReviewers: vi.fn().mockResolvedValue({ ok: true, reviewers: [] }),
       getGitLabRepoWorkItemDetails: vi.fn().mockResolvedValue({ body: 'Details' }),
       getGitLabRepoWorkItemByPath: vi.fn().mockResolvedValue({ id: 'gitlab-issue-7' })
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: GITLAB_METHODS })
     const projectRef = { host: 'gitlab.example.com', path: 'group/project' }
 
@@ -285,7 +285,7 @@ describe('gitlab RPC methods', () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
       listGitLabRepoIssues: vi.fn().mockResolvedValue({ items: [] })
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: GITLAB_METHODS })
 
     await dispatcher.dispatch(

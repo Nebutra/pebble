@@ -55,7 +55,7 @@ import type {
   WorkspaceLineage,
   WorkspaceKey,
   GlobalSettings,
-  OrcaWorkspaceLayout,
+  PebbleWorkspaceLayout,
   NotificationSettings,
   OnboardingChecklistState,
   OnboardingOutcome,
@@ -298,15 +298,18 @@ function retireLegacyInstructionsForClearedTextActionRecipes(
   return changed ? { ...sourceControlAi, instructionsByOperation } : sourceControlAi
 }
 
+const DATA_FILE_NAME = 'pebble-data.json'
+const LEGACY_PEBBLE_DATA_FILE_NAME = 'pebble-data.json'
+
 // Why: the data-file path must not be a module-level constant. Module-level
 // code runs at import time — before configureDevUserDataPath() redirects the
 // userData path in index.ts — so a constant would capture the default (non-dev)
 // path, causing dev and production instances to share the same file and silently
 // overwrite each other.
 //
-// It also must not be resolved lazily on every call, because app.setName('Orca')
+// It also must not be resolved lazily on every call, because app.setName('Pebble')
 // runs before the Store constructor and would change the resolved path from
-// lowercase 'orca' to uppercase 'Orca'. On case-sensitive filesystems (Linux)
+// lowercase 'pebble' to uppercase 'Pebble'. On case-sensitive filesystems (Linux)
 // this would look in the wrong directory and lose existing user data.
 //
 // Solution: index.ts calls initDataPath() right after configureDevUserDataPath()
@@ -317,7 +320,7 @@ let _userDataDir: string | null = null
 export function initDataPath(): void {
   const userDataDir = app.getPath('userData')
   _userDataDir = userDataDir
-  _dataFile = join(userDataDir, 'orca-data.json')
+  _dataFile = join(userDataDir, DATA_FILE_NAME)
 }
 
 function getDataFile(): string {
@@ -325,22 +328,31 @@ function getDataFile(): string {
     // Safety fallback — should not be hit in normal startup.
     const userDataDir = app.getPath('userData')
     _userDataDir = userDataDir
-    _dataFile = join(userDataDir, 'orca-data.json')
+    _dataFile = join(userDataDir, DATA_FILE_NAME)
   }
   return _dataFile
 }
 
+function getReadableDataFile(): string {
+  const dataFile = getDataFile()
+  if (existsSync(dataFile)) {
+    return dataFile
+  }
+  const legacyDataFile = join(dirname(dataFile), LEGACY_PEBBLE_DATA_FILE_NAME)
+  return existsSync(legacyDataFile) ? legacyDataFile : dataFile
+}
+
 // Why a sidecar: githubCache is a refetchable 5-min-TTL poll cache whose
-// fetchedAt stamps change on every refresh — keeping it inside orca-data.json
+// fetchedAt stamps change on every refresh — keeping it inside pebble-data.json
 // made every poll cycle rewrite the whole multi-MB durable state (defeating
 // the content-hash guard by design). It lives in memory during the session
 // and is snapshotted here best-effort at quit so PR/issue badges still paint
 // instantly on the next launch. Loss of this file costs nothing.
 function getGithubCacheFile(): string {
-  return join(dirname(getDataFile()), 'orca-github-cache.json')
+  return join(dirname(getDataFile()), 'pebble-github-cache.json')
 }
 
-// Why: worktrees deleted outside Orca (git CLI worktree remove, rm -rf,
+// Why: worktrees deleted outside Pebble (git CLI worktree remove, rm -rf,
 // agent scripts) purge renderer session state but nothing removed their
 // worktreeMeta, so the map grew monotonically (63% dead entries measured on
 // a heavy install). GC is deliberately narrow: local-host entries only
@@ -438,7 +450,7 @@ function readGithubCacheSnapshot(): PersistedState['githubCache'] | null {
  * Return the userData directory captured at initDataPath() time, before
  * app.setName() can change how app.getPath('userData') resolves.
  *
- * Subsystems that must share storage with orca-data.json (mobile pairing's
+ * Subsystems that must share storage with pebble-data.json (mobile pairing's
  * DeviceRegistry, E2EE keypair, runtime metadata) read this instead of
  * resolving the path late, which on case-sensitive filesystems can land in a
  * different directory and lose paired devices across restarts/updates.
@@ -486,7 +498,7 @@ export function migrateMobilePairingDataToCanonicalUserDataPath(sourceUserDataDi
   }
 }
 
-// Why (issue #1158): keep 5 rolling backups of orca-data.json so a corrupt or
+// Why (issue #1158): keep 5 rolling backups of pebble-data.json so a corrupt or
 // empty write leaves at least one earlier copy recoverable. Five snapshots at
 // >=1-hour spacing cover recent work without churning disk on every debounce.
 const BACKUP_COUNT = 5
@@ -551,7 +563,7 @@ function backupPath(dataFile: string, index: number): string {
 function buildWorkspaceDirHistoryForUpdate(
   current: GlobalSettings,
   updates: Partial<GlobalSettings>
-): OrcaWorkspaceLayout[] | null {
+): PebbleWorkspaceLayout[] | null {
   if (!('workspaceDir' in updates) && !('nestWorkspaces' in updates)) {
     return null
   }
@@ -643,7 +655,7 @@ function migrateTerminalTuiScrollSensitivityDefault(settings: GlobalSettings | u
   }
 }
 
-function getWorkspaceLayoutHistoryKey(layout: OrcaWorkspaceLayout): string {
+function getWorkspaceLayoutHistoryKey(layout: PebbleWorkspaceLayout): string {
   return `${normalizeRuntimePathForComparison(layout.path)}:${layout.nestWorkspaces}`
 }
 
@@ -892,7 +904,7 @@ function normalizeNotificationSettings(value: unknown): NotificationSettings {
     rawSoundId === 'beep' ||
     rawSoundId === 'custom'
       ? rawSoundId
-      : rawSoundId === 'orca' || rawSoundId === 'chime'
+      : rawSoundId === 'pebble' || rawSoundId === 'chime'
         ? 'two-tone'
         : rawSoundId === 'pop'
           ? 'blop'
@@ -1292,7 +1304,7 @@ function normalizeLoadedOnboardingState(
   input: unknown,
   defaults: OnboardingState
 ): OnboardingState {
-  // Why: if we successfully parsed an existing orca-data.json that lacks an
+  // Why: if we successfully parsed an existing pebble-data.json that lacks an
   // onboarding block, this is an upgrade-cohort user — backfill as completed
   // (not dismissed) so they don't get dropped into the wizard regardless of
   // whether they currently have repos, SSH targets, or just non-default
@@ -2777,14 +2789,15 @@ export class Store {
 
   private load(allowBackupRecovery = true): PersistedState {
     // Capture once, at the top: this is the unambiguous "has the user run
-    // Orca before?" signal used by the telemetry cohort migration below.
+    // Pebble before?" signal used by the telemetry cohort migration below.
     // Field-based inference (e.g., `settings.telemetry` presence) does not
     // work on the telemetry release itself — `telemetry` is new here, so it
     // would be absent on every pre-telemetry install and misclassify existing
     // users as fresh, flipping them to default-on in violation of the
     // social contract we installed them under.
     const dataFile = getDataFile()
-    const fileExistedOnLoad = existsSync(dataFile)
+    const readableDataFile = getReadableDataFile()
+    const fileExistedOnLoad = existsSync(readableDataFile)
     logPersistenceStartupMilestone('persistence-load-start', {
       fileExists: fileExistedOnLoad
     })
@@ -2793,7 +2806,7 @@ export class Store {
     try {
       if (fileExistedOnLoad) {
         const readStartedAt = performance.now()
-        const raw = readFileSync(dataFile, 'utf-8')
+        const raw = readFileSync(readableDataFile, 'utf-8')
         logPersistenceStartupMilestone('persistence-read-done', {
           bytes: Buffer.byteLength(raw),
           durationMs: Math.round(performance.now() - readStartedAt)
@@ -2917,13 +2930,12 @@ export class Store {
         if (normalizedFloatingTerminalTrustedCwds.changed) {
           this.loadNeedsSave = true
         }
-        const experimentalActivityDefaultedOffForAllUsers =
-          parsed.settings?.experimentalActivityDefaultedOffForAllUsers === true
-        // Why: the Agents view moved back behind Experimental. Flip every
-        // pre-migration profile off once, then preserve future user opt-ins.
-        const migratedExperimentalActivity = experimentalActivityDefaultedOffForAllUsers
-          ? (parsed.settings?.experimentalActivity ?? false)
-          : false
+        // Why: Agents graduated into primary navigation; migrate every profile
+        // to true so stale experimental state cannot hide the restored source UI.
+        const migratedExperimentalActivity = true
+        if (parsed.settings?.experimentalActivity !== true) {
+          this.loadNeedsSave = true
+        }
         const autoRenameBranchFromWorkDefaultedOn =
           parsed.settings?.autoRenameBranchFromWorkDefaultedOn === true
         // Why: default-on rollout should activate old profiles once, but a
@@ -3332,7 +3344,7 @@ export class Store {
 
     // Corrupt-file catch path and "no file on disk" path converge here. The
     // telemetry migration below runs on whichever branch produced `result`,
-    // because a user whose `orca-data.json` got corrupted is not a fresh
+    // because a user whose `pebble-data.json` got corrupted is not a fresh
     // install of the telemetry release — they still count as existing and
     // must see the opt-in banner, not the default-on toast.
     if (result === null && allowBackupRecovery) {

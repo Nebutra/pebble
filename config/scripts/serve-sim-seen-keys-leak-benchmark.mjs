@@ -11,12 +11,12 @@
 // prune disabled vs enabled.
 import { performance } from 'node:perf_hooks'
 
-const CYCLES = Number.parseInt(process.env.ORCA_SEEN_KEYS_BENCH_CYCLES ?? '5000', 10)
-const HELPERS_PER_WORKTREE = Number.parseInt(process.env.ORCA_SEEN_KEYS_BENCH_HELPERS ?? '2', 10)
+const CYCLES = Number.parseInt(process.env.PEBBLE_SEEN_KEYS_BENCH_CYCLES ?? '5000', 10)
+const HELPERS_PER_WORKTREE = Number.parseInt(process.env.PEBBLE_SEEN_KEYS_BENCH_HELPERS ?? '2', 10)
 
 for (const [name, value] of [
-  ['ORCA_SEEN_KEYS_BENCH_CYCLES', CYCLES],
-  ['ORCA_SEEN_KEYS_BENCH_HELPERS', HELPERS_PER_WORKTREE]
+  ['PEBBLE_SEEN_KEYS_BENCH_CYCLES', CYCLES],
+  ['PEBBLE_SEEN_KEYS_BENCH_HELPERS', HELPERS_PER_WORKTREE]
 ]) {
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive integer, received ${value}`)

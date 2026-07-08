@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RpcDispatcher } from './dispatcher'
 import type { RpcRequest } from './core'
-import type { OrcaRuntimeService } from '../orca-runtime'
+import type { PebbleRuntimeService } from '../pebble-runtime'
 import { TERMINAL_METHODS } from './methods/terminal'
 import { CLIPBOARD_TEXT_MEASURE_YIELD_CODE_UNITS } from '../../../shared/clipboard-text'
 import {
@@ -9,11 +9,11 @@ import {
   TERMINAL_INPUT_TOO_LARGE_ERROR
 } from '../../../shared/terminal-input'
 
-function stubRuntime(overrides: Partial<OrcaRuntimeService> = {}): OrcaRuntimeService {
+function stubRuntime(overrides: Partial<PebbleRuntimeService> = {}): PebbleRuntimeService {
   return {
     getRuntimeId: () => 'test-runtime',
     ...overrides
-  } as OrcaRuntimeService
+  } as PebbleRuntimeService
 }
 
 function makeRequest(method: string, params?: unknown): RpcRequest {

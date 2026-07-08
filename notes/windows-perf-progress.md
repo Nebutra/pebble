@@ -9,7 +9,7 @@ All changes must be proven with before/after benchmark numbers.
 Complaints: slow workspace switching, slow tab create/switch (terminal-related), occasional crashes.
 Harness: `tools/benchmarks/terminal-perf-bench.mjs` (CDP-driven dev app, renderer-clock phase
 timings; scenarios tab-create / tab-switch / workspace-switch; local git fixture).
-Main-process spawn attribution: `ORCA_PTY_SPAWN_TIMING=1` → `[pty-spawn-timing]` lines
+Main-process spawn attribution: `PEBBLE_PTY_SPAWN_TIMING=1` → `[pty-spawn-timing]` lines
 (pty.ts handler phases: preflight/auth/host_env/options/provider_spawn).
 
 Findings (baseline, this machine):
@@ -79,7 +79,7 @@ PATH assertions in src/main/ipc/pty.test.ts (path-separator artifacts).
 
 - Branch: `Jinwoo-H/windows-launch-time`
 - Electron app, entry: `src/main/index.ts` (~1557 lines)
-- Existing startup diagnostics: `ORCA_STARTUP_DIAGNOSTICS=1` writes `[startup] <event>` lines to stderr
+- Existing startup diagnostics: `PEBBLE_STARTUP_DIAGNOSTICS=1` writes `[startup] <event>` lines to stderr
   (`src/main/startup/startup-diagnostics.ts`)
 - Prior art: PR #4618 "perf: speed up desktop startup", #5011 "stop main-thread PowerShell ACL storm
   on env-store reads", #4526 "Avoid OpenCode config cleanup freezes on Windows", b240d5eee
@@ -119,7 +119,7 @@ checkpointInFlight guard.
 
 Harness: `node tools/benchmarks/startup-time-bench.mjs --label baseline --iterations 3 --files 28000`
 (28k-file synthetic Chromium-cache-shaped userData fixture in %TEMP%, headless launch of
-the electron-vite build with `ORCA_STARTUP_DIAGNOSTICS=1`, milestones parsed from stderr).
+the electron-vite build with `PEBBLE_STARTUP_DIAGNOSTICS=1`, milestones parsed from stderr).
 
 | phase (median of 3) | baseline |
 |---|---|
@@ -132,7 +132,7 @@ the electron-vite build with `ORCA_STARTUP_DIAGNOSTICS=1`, milestones parsed fro
 | **totalToDidFinishLoad** | **19.31s** |
 
 ACL walk = 81% of total. (Fixture is kinder than the real profile: same file count but
-freshly-written small files → real %APPDATA%\Orca measured 62s for the same command.)
+freshly-written small files → real %APPDATA%\Pebble measured 62s for the same command.)
 JSON: tools/benchmarks/results/startup-baseline-2026-06-10T19-36-01-305Z.json
 
 ### F4 — Sync main-thread audit (subagent, 2026-06-10)
@@ -150,7 +150,7 @@ Ranked offenders beyond the ACL grant (#1):
 ## Suspects (OpenCode freeze)
 
 - User report: UI freezes ~5s after sending prompt; OpenCode session itself continues fine
-  (visible from external terminal). So the agent process is healthy — the freeze is in Orca's
+  (visible from external terminal). So the agent process is healthy — the freeze is in Pebble's
   main process or renderer. Spinner in left panel still animates (= renderer compositor alive?
   or just that one timer). Need to find sync main-process work triggered by OpenCode activity.
 - Prior fix #4526 "Avoid OpenCode config cleanup freezes on Windows" — re-check that path.
@@ -163,7 +163,7 @@ Ranked offenders beyond the ACL grant (#1):
    slow, ACKs stall → in-flight fills → main stalls. Tests: terminal-foreground-redraw-freeze,
    artificial-opencode-terminal-load e2e.
 2. **Sync `runtime.onPtyData` per data event before batching** (MED-HIGH):
-   `src/main/ipc/pty.ts:1376-1430` → `orca-runtime.ts:3256-3420`: normalizeTerminalChunk +
+   `src/main/ipc/pty.ts:1376-1430` → `pebble-runtime.ts:3256-3420`: normalizeTerminalChunk +
    tail-buffer append + agent-status OSC parsing run synchronously per chunk on main.
    Daemon PTY path. High event rate × per-event cost can saturate the main loop.
 3. **`mirrorUserConfig` recursive fs work in `buildPtyEnv` on PTY spawn** (MED):
@@ -184,7 +184,7 @@ The raw TUI-output-flood theory doesn't explain an OpenCode-specific permanent f
 The actual mechanism (src/main/opencode/hook-service.ts plugin source):
 - OpenCode publishes `message.part.updated` with the FULL accumulated text of the part on
   every streamed append (architecture: parts are republished, not deltas).
-- Orca's plugin POSTed that full text to the agent-hook server on EVERY event →
+- Pebble's plugin POSTed that full text to the agent-hook server on EVERY event →
   **O(n²) bytes per streaming turn**. A 120KB reply in 400 updates = ~23 MB through
   loopback HTTP + main-process JSON.parse; real turns are worse (per-token updates).
 - Main process spends its whole loop on HTTP receive + parse + normalize + fanout. UI symptom
@@ -228,7 +228,7 @@ a Windows CI lane for the terminal-perf suite.
    assistant MessagePart posts are trailing-edge coalesced to ≥250ms apart and text is
    capped at 4000 chars (leading edge posts immediately so previews stay snappy; pending
    snapshot flushed before SessionIdle so the done-row preview is the final message; user
-   prompts bypass the throttle slot). Plugin file is rewritten on every Orca-launched
+   prompts bypass the throttle slot). Plugin file is rewritten on every Pebble-launched
    OpenCode spawn, so the fix deploys to new sessions immediately.
 2. **Listener-side cap (stale-plugin defense)** — `src/shared/agent-hook-listener.ts`:
    OpenCode MessagePart text capped at 8000 chars at ingest (OPENCODE_HOOK_TEXT_MAX_CHARS)
@@ -248,9 +248,9 @@ a Windows CI lane for the terminal-perf suite.
 
 ### F1 — Recursive icacls walk is the ~1 min startup (CONFIRMED, 2026-06-10)
 
-- This machine's real packaged-Orca userData: `%APPDATA%\Orca` = **28,650 files / 2.06 GB**
+- This machine's real packaged-Pebble userData: `%APPDATA%\Pebble` = **28,650 files / 2.06 GB**
   (mostly Chromium caches: Cache, Code Cache, GPUCache, blob_storage…).
-- Measured the exact command Orca runs in `openMainWindow()` (src/main/index.ts:517-523):
+- Measured the exact command Pebble runs in `openMainWindow()` (src/main/index.ts:517-523):
   - `icacls <userData> /grant:r <user>:(OI)(CI)(F) /T /C` → **62.0 s**
   - App runs it with `execFileSync` (main thread, BLOCKING, before BrowserWindow creation)
     with a **60s timeout** → every cold launch freezes ~60s, then the grant *times out and
@@ -267,13 +267,13 @@ a Windows CI lane for the terminal-perf suite.
 
 ### F2 — Instrumentation prior art
 
-- `ORCA_STARTUP_DIAGNOSTICS=1` → `[startup] <event>` lines on stderr (startup-diagnostics.ts).
+- `PEBBLE_STARTUP_DIAGNOSTICS=1` → `[startup] <event>` lines on stderr (startup-diagnostics.ts).
   Only 2 events exist today (single-instance lock). Commit b240d5eee (branch
   perf/startup-first-window, NOT merged here) has a full StartupPhaseTimer framework —
   too large to cherry-pick; adding minimal milestone logs instead.
-- Hermetic benchmark launch path: `ORCA_E2E_USER_DATA_DIR=<dir>` redirects userData
-  (works packaged + dev), `ORCA_E2E_HEADLESS=1` keeps window hidden. Dev/preview mode
-  skips single-instance lock → safe alongside installed Orca.
+- Hermetic benchmark launch path: `PEBBLE_E2E_USER_DATA_DIR=<dir>` redirects userData
+  (works packaged + dev), `PEBBLE_E2E_HEADLESS=1` keeps window hidden. Dev/preview mode
+  skips single-instance lock → safe alongside installed Pebble.
 
 ## Decisions / fixes
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { RpcDispatcher } from '../dispatcher'
 import type { RpcRequest } from '../core'
-import type { OrcaRuntimeService } from '../../orca-runtime'
+import type { PebbleRuntimeService } from '../../pebble-runtime'
 import { SSH_METHODS } from './ssh'
 
 const { connectRegisteredSshTargetMock, getRegisteredSshStateMock } = vi.hoisted(() => ({
@@ -27,7 +27,7 @@ describe('ssh RPC methods', () => {
       reconnectAttempt: 0
     }
     getRegisteredSshStateMock.mockReturnValueOnce(state)
-    const runtime = { getRuntimeId: () => 'test-runtime' } as unknown as OrcaRuntimeService
+    const runtime = { getRuntimeId: () => 'test-runtime' } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SSH_METHODS })
 
     const response = await dispatcher.dispatch(makeRequest('ssh.getState', { targetId: 'ssh-1' }))
@@ -44,7 +44,7 @@ describe('ssh RPC methods', () => {
       reconnectAttempt: 0
     }
     connectRegisteredSshTargetMock.mockResolvedValueOnce(state)
-    const runtime = { getRuntimeId: () => 'test-runtime' } as unknown as OrcaRuntimeService
+    const runtime = { getRuntimeId: () => 'test-runtime' } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SSH_METHODS })
 
     const response = await dispatcher.dispatch(makeRequest('ssh.connect', { targetId: 'ssh-1' }))
@@ -55,7 +55,7 @@ describe('ssh RPC methods', () => {
 
   it('returns null when the target has no registered state yet', async () => {
     getRegisteredSshStateMock.mockReturnValueOnce(undefined)
-    const runtime = { getRuntimeId: () => 'test-runtime' } as unknown as OrcaRuntimeService
+    const runtime = { getRuntimeId: () => 'test-runtime' } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SSH_METHODS })
 
     const response = await dispatcher.dispatch(makeRequest('ssh.getState', { targetId: 'ssh-1' }))

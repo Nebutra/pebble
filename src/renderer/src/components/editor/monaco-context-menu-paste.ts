@@ -9,13 +9,13 @@ import {
 } from './monaco-large-text-paste'
 
 // Why: Monaco's built-in context-menu Paste action (editor.action.clipboardPasteAction)
-// reads the clipboard with navigator.clipboard.readText(). Orca runs the renderer with
+// reads the clipboard with navigator.clipboard.readText(). Pebble runs the renderer with
 // `sandbox: true`, where that read is blocked/empty — so right-click Paste silently does
 // nothing even though Cmd+V (a real OS paste ClipboardEvent) and right-click Copy
-// (execCommand('copy') from a user gesture) both work. We route the read through Orca's
+// (execCommand('copy') from a user gesture) both work. We route the read through Pebble's
 // trusted clipboard IPC bridge instead, matching how the terminal already reads it.
-export const ORCA_CONTEXT_MENU_PASTE_PRIORITY = 10001
-export const ORCA_CONTEXT_MENU_PASTE_NAME = 'orca-ipc-paste'
+export const PEBBLE_CONTEXT_MENU_PASTE_PRIORITY = 10001
+export const PEBBLE_CONTEXT_MENU_PASTE_NAME = 'pebble-ipc-paste'
 
 // Why: this path may either dispatch a native paste (needs getOption/trigger)
 // or hand off to the chunked inserter (needs the MonacoPasteEditor surface), so
@@ -31,7 +31,7 @@ type ClipboardPasteMetadata = {
   mode?: string | null
 } | null
 
-export type OrcaContextMenuPasteDeps = {
+export type PebbleContextMenuPasteDeps = {
   getFocusedEditor: () => PasteCapableEditor | null
   readClipboardText: (options?: ReadClipboardTextOptions) => Promise<string>
   getClipboardMetadata: (text: string) => ClipboardPasteMetadata
@@ -41,7 +41,7 @@ export type OrcaContextMenuPasteDeps = {
   onReadError?: (error: unknown) => void
 }
 
-export type OrcaContextMenuPasteOutcome =
+export type PebbleContextMenuPasteOutcome =
   | { status: 'pasted'; mode: 'native' | 'chunked' }
   | { status: 'noop'; reason: 'empty' | 'read-failed' | 'too-large' | 'target-lost' }
 
@@ -69,12 +69,12 @@ function resolvePasteMetadata(
  * Replacement implementation for Monaco's clipboard paste command. Returns
  * `false` when it declines to handle the paste so Monaco's default
  * implementation runs unchanged (read-only editor, no focus, no clipboard
- * bridge); otherwise performs the paste through Orca's IPC clipboard read and
+ * bridge); otherwise performs the paste through Pebble's IPC clipboard read and
  * returns a Promise (truthy) so Monaco's blocked default never runs.
  */
-export function runOrcaContextMenuPaste(
-  deps: OrcaContextMenuPasteDeps
-): false | Promise<OrcaContextMenuPasteOutcome> {
+export function runPebbleContextMenuPaste(
+  deps: PebbleContextMenuPasteDeps
+): false | Promise<PebbleContextMenuPasteOutcome> {
   const editorInstance = deps.getFocusedEditor()
   // Why: only claim the paste when an editor truly has text focus and a model —
   // otherwise fall through so Monaco's default (and any other surface) behaves
@@ -89,13 +89,13 @@ export function runOrcaContextMenuPaste(
     return false
   }
 
-  return performOrcaContextMenuPaste(editorInstance, deps)
+  return performPebbleContextMenuPaste(editorInstance, deps)
 }
 
-async function performOrcaContextMenuPaste(
+async function performPebbleContextMenuPaste(
   editorInstance: PasteCapableEditor,
-  deps: OrcaContextMenuPasteDeps
-): Promise<OrcaContextMenuPasteOutcome> {
+  deps: PebbleContextMenuPasteDeps
+): Promise<PebbleContextMenuPasteOutcome> {
   let text: string
   try {
     text = await deps.readClipboardText({ maxBytes: MONACO_PASTE_MAX_BYTES })

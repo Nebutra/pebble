@@ -2,7 +2,7 @@ import './xterm-env-polyfill'
 import { Terminal } from '@xterm/headless'
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
-import { activateOrcaTerminalUnicodeProvider } from '../../shared/terminal-unicode-provider'
+import { activatePebbleTerminalUnicodeProvider } from '../../shared/terminal-unicode-provider'
 import { extractLastOscTitle } from '../../shared/agent-detection'
 import { collectHeadlessOscLinkRanges } from './headless-osc-link-ranges'
 import { extractOscScanTail, scanOsc7Uris } from './osc7-uri-extraction'
@@ -60,7 +60,7 @@ export class HeadlessEmulator {
     // differently here than on screen, so the mirrored buffer accumulates
     // cell-shifted tears that snapshot restores then paint back as garbage.
     this.terminal.loadAddon(new Unicode11Addon())
-    activateOrcaTerminalUnicodeProvider(this.terminal)
+    activatePebbleTerminalUnicodeProvider(this.terminal)
 
     // Why no onData wiring: this emulator exists purely for state tracking
     // (snapshots, cwd, mode flags). It MUST NOT respond to terminal query
@@ -72,7 +72,7 @@ export class HeadlessEmulator {
     // cursor position, and paste mode); a daemon-side reply would be a
     // double-reply with wrong values. OSC 11 was the visible casualty:
     // Claude Code's /theme auto always saw the emulator's default-black
-    // background regardless of Orca's configured terminal theme.
+    // background regardless of Pebble's configured terminal theme.
   }
 
   write(data: string): Promise<void> {

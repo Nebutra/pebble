@@ -70,7 +70,7 @@ describe('patchPackagedProcessPath', () => {
     const segments = (process.env.PATH ?? '').split(':')
     // Why: issue #829 — ~/.opencode/bin and ~/.vite-plus/bin are the documented
     // fallback install locations for the opencode and Pi CLI install scripts.
-    // Without them on PATH, GUI-launched Orca reports both as "Not installed"
+    // Without them on PATH, GUI-launched Pebble reports both as "Not installed"
     // even when `which` resolves them in the user's shell.
     expect(segments).toContain(join('/Users/tester', '.opencode/bin'))
     expect(segments).toContain(join('/Users/tester', '.vite-plus/bin'))
@@ -113,32 +113,40 @@ describe('configureDevUserDataPath', () => {
   it('uses an explicit dev userData override when provided', async () => {
     const { app } = await import('electron')
     const { configureDevUserDataPath } = await import('./configure-process')
-    const originalOverride = process.env.ORCA_DEV_USER_DATA_PATH
-    process.env.ORCA_DEV_USER_DATA_PATH = '/tmp/orca-dev-repro'
+    const originalOverride = process.env.PEBBLE_DEV_USER_DATA_PATH
+    const originalPebbleOverride = process.env.PEBBLE_DEV_USER_DATA_PATH
+    process.env.PEBBLE_DEV_USER_DATA_PATH = '/tmp/pebble-dev-repro'
 
     try {
       configureDevUserDataPath(true)
     } finally {
-      if (originalOverride === undefined) {
-        delete process.env.ORCA_DEV_USER_DATA_PATH
+      if (originalPebbleOverride === undefined) {
+        delete process.env.PEBBLE_DEV_USER_DATA_PATH
       } else {
-        process.env.ORCA_DEV_USER_DATA_PATH = originalOverride
+        process.env.PEBBLE_DEV_USER_DATA_PATH = originalPebbleOverride
+      }
+      if (originalOverride === undefined) {
+        delete process.env.PEBBLE_DEV_USER_DATA_PATH
+      } else {
+        process.env.PEBBLE_DEV_USER_DATA_PATH = originalOverride
       }
     }
 
-    expect(app.setPath).toHaveBeenCalledWith('userData', '/tmp/orca-dev-repro')
+    expect(app.setPath).toHaveBeenCalledWith('userData', '/tmp/pebble-dev-repro')
   })
 
-  it('moves dev runs onto an orca-dev userData path', async () => {
+  it('moves dev runs onto a pebble-dev userData path', async () => {
     const { app } = await import('electron')
     const { configureDevUserDataPath } = await import('./configure-process')
 
-    delete process.env.ORCA_DEV_USER_DATA_PATH
+    vi.mocked(app.setPath).mockClear()
+    delete process.env.PEBBLE_DEV_USER_DATA_PATH
+    delete process.env.PEBBLE_DEV_USER_DATA_PATH
     configureDevUserDataPath(true)
 
-    // Why: production code uses path.join(app.getPath('appData'), 'orca-dev')
+    // Why: production code uses path.join(app.getPath('appData'), 'pebble-dev')
     // which produces platform-specific separators.
-    expect(app.setPath).toHaveBeenCalledWith('userData', join('/tmp/app-data', 'orca-dev'))
+    expect(app.setPath).toHaveBeenCalledWith('userData', join('/tmp/app-data', 'pebble-dev'))
   })
 
   it('leaves packaged runs on the default userData path', async () => {
@@ -152,27 +160,27 @@ describe('configureDevUserDataPath', () => {
   })
 })
 
-describe('configureOrcaUserDataPathEnv', () => {
-  it('overwrites stale inherited ORCA_USER_DATA_PATH with Electron userData', async () => {
+describe('configurePebbleUserDataPathEnv', () => {
+  it('overwrites stale inherited userData env with Electron userData', async () => {
     const { app } = await import('electron')
-    const { configureOrcaUserDataPathEnv } = await import('./configure-process')
-    const originalUserDataPath = process.env.ORCA_USER_DATA_PATH
-    process.env.ORCA_USER_DATA_PATH = '/tmp/stale-orca-user-data'
-    app.setPath('userData', '/tmp/current-orca-user-data')
-    let configuredUserDataPath: string | undefined
+    const { configurePebbleUserDataPathEnv } = await import('./configure-process')
+    const originalPebbleUserDataPath = process.env.PEBBLE_USER_DATA_PATH
+    process.env.PEBBLE_USER_DATA_PATH = '/tmp/stale-pebble-user-data'
+    app.setPath('userData', '/tmp/current-pebble-user-data')
+    let configuredPebbleUserDataPath: string | undefined
 
     try {
-      configureOrcaUserDataPathEnv()
-      configuredUserDataPath = process.env.ORCA_USER_DATA_PATH
+      configurePebbleUserDataPathEnv()
+      configuredPebbleUserDataPath = process.env.PEBBLE_USER_DATA_PATH
     } finally {
-      if (originalUserDataPath === undefined) {
-        delete process.env.ORCA_USER_DATA_PATH
+      if (originalPebbleUserDataPath === undefined) {
+        delete process.env.PEBBLE_USER_DATA_PATH
       } else {
-        process.env.ORCA_USER_DATA_PATH = originalUserDataPath
+        process.env.PEBBLE_USER_DATA_PATH = originalPebbleUserDataPath
       }
     }
 
-    expect(configuredUserDataPath).toBe('/tmp/current-orca-user-data')
+    expect(configuredPebbleUserDataPath).toBe('/tmp/current-pebble-user-data')
   })
 })
 
@@ -192,12 +200,12 @@ describe('shouldInstallManagedHooks', () => {
 
 describe('configureElectronNetworkCompatibility', () => {
   const tempDirs: string[] = []
-  const originalEnvValue = process.env.ORCA_DISABLE_HTTP2
+  const originalEnvValue = process.env.PEBBLE_DISABLE_HTTP2
 
   function createUserDataDir(settings: Record<string, unknown>): string {
-    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-http1-compat-'))
+    const userDataPath = mkdtempSync(join(tmpdir(), 'pebble-http1-compat-'))
     tempDirs.push(userDataPath)
-    writeFileSync(join(userDataPath, 'orca-data.json'), JSON.stringify({ settings }), 'utf-8')
+    writeFileSync(join(userDataPath, 'pebble-data.json'), JSON.stringify({ settings }), 'utf-8')
     return userDataPath
   }
 
@@ -206,9 +214,9 @@ describe('configureElectronNetworkCompatibility', () => {
       rmSync(dir, { recursive: true, force: true })
     }
     if (originalEnvValue === undefined) {
-      delete process.env.ORCA_DISABLE_HTTP2
+      delete process.env.PEBBLE_DISABLE_HTTP2
     } else {
-      process.env.ORCA_DISABLE_HTTP2 = originalEnvValue
+      process.env.PEBBLE_DISABLE_HTTP2 = originalEnvValue
     }
   })
 
@@ -231,18 +239,18 @@ describe('configureElectronNetworkCompatibility', () => {
 
     expect(
       shouldDisableHttp2ForElectronNetworking({
-        env: { ORCA_DISABLE_HTTP2: 'true' },
+        env: { PEBBLE_DISABLE_HTTP2: 'true' },
         userDataPath: createUserDataDir({ electronHttp1CompatibilityMode: false })
       })
     ).toBe(true)
   })
 
-  it('lets the environment override force compatibility off', async () => {
+  it('lets the Pebble environment override force compatibility off', async () => {
     const { shouldDisableHttp2ForElectronNetworking } = await import('./configure-process')
 
     expect(
       shouldDisableHttp2ForElectronNetworking({
-        env: { ORCA_DISABLE_HTTP2: '0' },
+        env: { PEBBLE_DISABLE_HTTP2: '0' },
         userDataPath: createUserDataDir({ electronHttp1CompatibilityMode: true })
       })
     ).toBe(false)
@@ -262,7 +270,7 @@ describe('configureElectronNetworkCompatibility', () => {
 
 describe('enableMainProcessGpuFeatures', () => {
   const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
-  const originalE2EUserDataDir = process.env.ORCA_E2E_USER_DATA_DIR
+  const originalPebbleE2EUserDataDir = process.env.PEBBLE_E2E_USER_DATA_DIR
 
   function setPlatform(platform: NodeJS.Platform): void {
     Object.defineProperty(process, 'platform', {
@@ -275,10 +283,10 @@ describe('enableMainProcessGpuFeatures', () => {
     if (originalPlatform) {
       Object.defineProperty(process, 'platform', originalPlatform)
     }
-    if (originalE2EUserDataDir === undefined) {
-      delete process.env.ORCA_E2E_USER_DATA_DIR
+    if (originalPebbleE2EUserDataDir === undefined) {
+      delete process.env.PEBBLE_E2E_USER_DATA_DIR
     } else {
-      process.env.ORCA_E2E_USER_DATA_DIR = originalE2EUserDataDir
+      process.env.PEBBLE_E2E_USER_DATA_DIR = originalPebbleE2EUserDataDir
     }
   })
 
@@ -286,7 +294,7 @@ describe('enableMainProcessGpuFeatures', () => {
     const { app } = await import('electron')
     const { enableMainProcessGpuFeatures } = await import('./configure-process')
 
-    delete process.env.ORCA_E2E_USER_DATA_DIR
+    delete process.env.PEBBLE_E2E_USER_DATA_DIR
     vi.mocked(app.commandLine.appendSwitch).mockClear()
     enableMainProcessGpuFeatures()
 
@@ -301,7 +309,7 @@ describe('enableMainProcessGpuFeatures', () => {
     const { app } = await import('electron')
     const { enableMainProcessGpuFeatures } = await import('./configure-process')
 
-    delete process.env.ORCA_E2E_USER_DATA_DIR
+    delete process.env.PEBBLE_E2E_USER_DATA_DIR
     vi.mocked(app.commandLine.appendSwitch).mockClear()
     enableMainProcessGpuFeatures()
 
@@ -315,7 +323,7 @@ describe('enableMainProcessGpuFeatures', () => {
 
     try {
       setPlatform('linux')
-      delete process.env.ORCA_E2E_USER_DATA_DIR
+      delete process.env.PEBBLE_E2E_USER_DATA_DIR
       process.env.WAYLAND_DISPLAY = 'wayland-1'
       vi.mocked(app.disableHardwareAcceleration).mockClear()
       vi.mocked(app.commandLine.appendSwitch).mockClear()
@@ -346,7 +354,7 @@ describe('enableMainProcessGpuFeatures', () => {
     const { enableMainProcessGpuFeatures } = await import('./configure-process')
 
     setPlatform('linux')
-    delete process.env.ORCA_E2E_USER_DATA_DIR
+    delete process.env.PEBBLE_E2E_USER_DATA_DIR
     vi.mocked(app.commandLine.appendSwitch).mockClear()
     vi.mocked(app.commandLine.getSwitchValue).mockImplementation((switchName: string) =>
       switchName === 'ozone-platform' ? 'wayland' : ''
@@ -369,7 +377,7 @@ describe('enableMainProcessGpuFeatures', () => {
 
     try {
       setPlatform('linux')
-      delete process.env.ORCA_E2E_USER_DATA_DIR
+      delete process.env.PEBBLE_E2E_USER_DATA_DIR
       process.env.WAYLAND_DISPLAY = 'wayland-1'
       process.env.XDG_SESSION_TYPE = 'wayland'
       vi.mocked(app.commandLine.appendSwitch).mockClear()
@@ -406,7 +414,7 @@ describe('enableMainProcessGpuFeatures', () => {
     const originalOzoneHint = process.env.ELECTRON_OZONE_PLATFORM_HINT
 
     try {
-      delete process.env.ORCA_E2E_USER_DATA_DIR
+      delete process.env.PEBBLE_E2E_USER_DATA_DIR
       delete process.env.WAYLAND_DISPLAY
       delete process.env.XDG_SESSION_TYPE
       delete process.env.ELECTRON_OZONE_PLATFORM_HINT
@@ -446,7 +454,7 @@ describe('enableMainProcessGpuFeatures', () => {
     const { enableMainProcessGpuFeatures } = await import('./configure-process')
 
     setPlatform('linux')
-    process.env.ORCA_E2E_USER_DATA_DIR = '/tmp/orca-e2e'
+    process.env.PEBBLE_E2E_USER_DATA_DIR = '/tmp/pebble-e2e'
     vi.mocked(app.disableHardwareAcceleration).mockClear()
     vi.mocked(app.commandLine.appendSwitch).mockClear()
 
@@ -468,7 +476,7 @@ describe('enableMainProcessGpuFeatures', () => {
     const { app } = await import('electron')
     const { enableMainProcessGpuFeatures } = await import('./configure-process')
 
-    delete process.env.ORCA_E2E_USER_DATA_DIR
+    delete process.env.PEBBLE_E2E_USER_DATA_DIR
     vi.mocked(app.commandLine.appendSwitch).mockClear()
     vi.mocked(app.commandLine.getSwitchValue).mockReturnValue('ExistingFeature')
     enableMainProcessGpuFeatures()
@@ -486,7 +494,7 @@ describe('enableMainProcessGpuFeatures', () => {
 
     try {
       setPlatform('linux')
-      delete process.env.ORCA_E2E_USER_DATA_DIR
+      delete process.env.PEBBLE_E2E_USER_DATA_DIR
       process.env.WAYLAND_DISPLAY = 'wayland-1'
       vi.mocked(app.commandLine.appendSwitch).mockClear()
       vi.mocked(app.commandLine.getSwitchValue).mockImplementation((switchName: string) =>

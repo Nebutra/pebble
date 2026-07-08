@@ -7,7 +7,7 @@ import {
   type RpcAnyMethod
 } from '../core'
 import { OptionalFiniteNumber, OptionalString, requiredString } from '../schemas'
-import type { DriverState, OrcaRuntimeService } from '../../orca-runtime'
+import type { DriverState, PebbleRuntimeService } from '../../pebble-runtime'
 import {
   TerminalStreamOpcode,
   decodeTerminalStreamJson,
@@ -258,7 +258,7 @@ function* iterateTerminalOutputFrameChunks(
 }
 
 function isTerminalInputLockedForClient(
-  runtime: OrcaRuntimeService,
+  runtime: PebbleRuntimeService,
   ptyId: string,
   client: TerminalViewportClient | undefined
 ): boolean {
@@ -418,7 +418,7 @@ function requestedSnapshotScrollbackCandidates(requestedRows: number | undefined
 }
 
 async function serializeBudgetedRequestedSnapshot(
-  runtime: OrcaRuntimeService,
+  runtime: PebbleRuntimeService,
   ptyId: string,
   scrollbackRows: number | undefined
 ): Promise<SerializedSnapshot> {
@@ -476,7 +476,7 @@ function sendSnapshotFrames(
 }
 
 async function serializeBudgetedMobileSnapshot(
-  runtime: OrcaRuntimeService,
+  runtime: PebbleRuntimeService,
   ptyId: string,
   isMobile: boolean
 ): Promise<SerializedSnapshot> {
@@ -512,7 +512,7 @@ async function serializeBudgetedMobileSnapshot(
 // cols and replay it, so scrollback rewraps. Alt-screen TUIs are PTY-repainted
 // and have no scrollback, so they keep the geometry-only Resized frame.
 async function sendMobileResizeRestream(
-  runtime: OrcaRuntimeService,
+  runtime: PebbleRuntimeService,
   ptyId: string,
   sendFrame: (opcode: TerminalStreamOpcode, payload?: Uint8Array<ArrayBufferLike>) => void,
   event: { cols: number; rows: number; displayMode: string; reason: string; seq?: number },
@@ -548,7 +548,7 @@ async function sendMobileResizeRestream(
 }
 
 async function updateViewportForClient(
-  runtime: OrcaRuntimeService,
+  runtime: PebbleRuntimeService,
   ptyId: string,
   client: TerminalViewportClient,
   viewport: { cols: number; rows: number },

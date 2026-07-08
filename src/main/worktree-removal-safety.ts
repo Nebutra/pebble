@@ -12,22 +12,22 @@ import {
 
 type PathOps = typeof posix
 
-const ORCA_CREATION_SOURCES = new Set<NonNullable<WorktreeMeta['orcaCreationSource']>>([
+const PEBBLE_CREATION_SOURCES = new Set<NonNullable<WorktreeMeta['pebbleCreationSource']>>([
   'desktop',
   'runtime',
   'cli',
   'ssh'
 ])
-const ORCA_OWNED_PROVENANCE_META_KEYS = [
-  'orcaCreatedAt',
-  'orcaCreationSource',
-  'orcaCreationWorkspaceLayout',
+const PEBBLE_OWNED_PROVENANCE_META_KEYS = [
+  'pebbleCreatedAt',
+  'pebbleCreationSource',
+  'pebbleCreationWorkspaceLayout',
   'automationProvenance'
 ] as const
-type UnregisteredOrcaCleanupMeta = Pick<
+type UnregisteredPebbleCleanupMeta = Pick<
   WorktreeMeta,
-  | 'orcaCreatedAt'
-  | 'orcaCreationSource'
+  | 'pebbleCreatedAt'
+  | 'pebbleCreationSource'
   | 'createdAt'
   | 'createdWithAgent'
   | 'pushTarget'
@@ -169,24 +169,24 @@ export async function canSafelyRemoveOrphanedWorktreeDirectory(
   })
 }
 
-export function canCleanupUnregisteredOrcaWorktreeDirectory(args: {
-  meta: UnregisteredOrcaCleanupMeta | null | undefined
+export function canCleanupUnregisteredPebbleWorktreeDirectory(args: {
+  meta: UnregisteredPebbleCleanupMeta | null | undefined
 }): boolean {
-  if (hasCurrentOrcaCreationProvenance(args.meta)) {
+  if (hasCurrentPebbleCreationProvenance(args.meta)) {
     return true
   }
 
-  if (hasLegacyOrcaCreationEvidence(args.meta)) {
+  if (hasLegacyPebbleCreationEvidence(args.meta)) {
     return true
   }
 
   // Why: path shape alone is not authority; users can create plain Git
-  // worktrees inside Orca's workspace directory too.
+  // worktrees inside Pebble's workspace directory too.
   return false
 }
 
-export async function canCleanupUnregisteredOrcaLeftoverDirectory(args: {
-  meta: UnregisteredOrcaCleanupMeta | null | undefined
+export async function canCleanupUnregisteredPebbleLeftoverDirectory(args: {
+  meta: UnregisteredPebbleCleanupMeta | null | undefined
   worktreePath: string
   runtimeWorktreePath: string
   repo: Pick<Repo, 'path'>
@@ -198,8 +198,11 @@ export async function canCleanupUnregisteredOrcaLeftoverDirectory(args: {
   // Why: this recovery state has already lost the worktree .git marker, so the
   // existing .git-file orphan proof cannot establish ownership.
   // Why: without a surviving .git file, path shape alone is too weak to prove
-  // ownership for recursive deletion; require persisted Orca-created evidence.
-  if (!hasCurrentOrcaCreationProvenance(args.meta) && !hasLegacyOrcaCreationEvidence(args.meta)) {
+  // ownership for recursive deletion; require persisted product-created evidence.
+  if (
+    !hasCurrentPebbleCreationProvenance(args.meta) &&
+    !hasLegacyPebbleCreationEvidence(args.meta)
+  ) {
     return false
   }
 
@@ -231,18 +234,18 @@ export async function canCleanupUnregisteredOrcaLeftoverDirectory(args: {
   return !(await args.isGitRepository(args.runtimeWorktreePath))
 }
 
-function hasCurrentOrcaCreationProvenance(
-  meta: Pick<WorktreeMeta, 'orcaCreatedAt' | 'orcaCreationSource'> | null | undefined
+function hasCurrentPebbleCreationProvenance(
+  meta: Pick<WorktreeMeta, 'pebbleCreatedAt' | 'pebbleCreationSource'> | null | undefined
 ): boolean {
-  return (
-    typeof meta?.orcaCreatedAt === 'number' &&
-    !!meta.orcaCreationSource &&
-    ORCA_CREATION_SOURCES.has(meta.orcaCreationSource)
+  return Boolean(
+    typeof meta?.pebbleCreatedAt === 'number' &&
+    !!meta.pebbleCreationSource &&
+    PEBBLE_CREATION_SOURCES.has(meta.pebbleCreationSource)
   )
 }
 
-function hasLegacyOrcaCreationEvidence(
-  meta: UnregisteredOrcaCleanupMeta | null | undefined
+function hasLegacyPebbleCreationEvidence(
+  meta: UnregisteredPebbleCleanupMeta | null | undefined
 ): boolean {
   return Boolean(
     meta?.createdAt ||
@@ -254,11 +257,11 @@ function hasLegacyOrcaCreationEvidence(
   )
 }
 
-export function stripOrcaProvenanceMetaUpdates(
+export function stripPebbleProvenanceMetaUpdates(
   updates: Partial<WorktreeMeta> | null | undefined
 ): Partial<WorktreeMeta> {
   const sanitized = { ...updates }
-  for (const key of ORCA_OWNED_PROVENANCE_META_KEYS) {
+  for (const key of PEBBLE_OWNED_PROVENANCE_META_KEYS) {
     delete sanitized[key]
   }
   return sanitized

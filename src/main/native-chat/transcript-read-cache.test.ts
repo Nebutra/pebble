@@ -30,7 +30,7 @@ function jsonLines(records: unknown[]): string {
 }
 
 async function seedSession(sessionId: string, turns: number): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'orca-native-chat-cache-'))
+  const root = await mkdtemp(join(tmpdir(), 'pebble-native-chat-cache-'))
   tempRoots.push(root)
   const projectDir = join(root, '.claude', 'projects', '-repo')
   await mkdir(projectDir, { recursive: true })
@@ -97,7 +97,7 @@ describe('readNativeChatTranscriptCached', () => {
   // worktree's cached parse be served to the other whenever their file mtimes
   // coincided, leaking A's chat transcript into C's panel (#7326).
   it('never serves one file’s parse for a different file that shares a sessionId', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'orca-native-chat-cache-xwt-'))
+    const root = await mkdtemp(join(tmpdir(), 'pebble-native-chat-cache-xwt-'))
     tempRoots.push(root)
     const fileA = join(root, 'worktree-a.jsonl')
     const fileC = join(root, 'worktree-c.jsonl')

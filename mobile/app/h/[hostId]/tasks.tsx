@@ -91,7 +91,7 @@ import { WORKTREE_CREATE_TIMEOUT_MS } from '../../../src/tasks/workspace-create-
 import {
   isSetupHookTrusted,
   normalizeSetupHookTrust,
-  trustedOrcaHooksWithSetupApproval,
+  trustedPebbleHooksWithSetupApproval,
   wasSetupHookPreviouslyApproved
 } from '../../../src/tasks/setup-hook-trust'
 import { colors, radii, spacing, typography } from '../../../src/theme/mobile-theme'
@@ -129,7 +129,7 @@ import {
 } from '../../../src/tasks/mobile-task-copy-feedback-timer'
 import type {
   BaseRefSearchResult,
-  PersistedTrustedOrcaHooks,
+  PersistedTrustedPebbleHooks,
   SparsePreset,
   TuiAgent
 } from '../../../../src/shared/types'
@@ -660,7 +660,7 @@ type WorkspaceCreateArgs = {
   sparseCheckoutOverride?: { directories: string[]; presetId?: string }
 }
 
-type OrcaYamlTrustPrompt = WorkspaceCreateArgs & {
+type PebbleYamlTrustPrompt = WorkspaceCreateArgs & {
   repoId: string
   repoName: string
   scriptContent: string
@@ -688,7 +688,7 @@ function workspaceAgentIconId(agent: WorkspaceAgentChoice): string {
   return agent === 'blank' ? '__blank__' : agent
 }
 
-type ProjectRepoNotInOrcaPrompt = {
+type ProjectRepoNotInPebblePrompt = {
   owner: string
   repo: string
   url: string | null
@@ -2140,8 +2140,8 @@ function getRepoBadgeColor(repo: RepoSummary | undefined, fallbackName: string):
 }
 
 function setupSourceLabel(source: string | null): string {
-  if (source === 'orca.yaml') {
-    return 'orca.yaml'
+  if (source === 'pebble.yaml') {
+    return 'pebble.yaml'
   }
   if (source === 'legacy') {
     return 'local hooks'
@@ -2386,8 +2386,8 @@ export default function MobileTasksScreen() {
   const [linearSubIssueTitle, setLinearSubIssueTitle] = useState('')
   const [taskStateHydrated, setTaskStateHydrated] = useState(false)
   const [runtimeTaskSettings, setRuntimeTaskSettings] = useState<RuntimeTaskSettings>({})
-  const [trustedOrcaHooks, setTrustedOrcaHooks] = useState<PersistedTrustedOrcaHooks>({})
-  const [orcaYamlTrustPrompt, setOrcaYamlTrustPrompt] = useState<OrcaYamlTrustPrompt | null>(null)
+  const [trustedPebbleHooks, setTrustedPebbleHooks] = useState<PersistedTrustedPebbleHooks>({})
+  const [pebbleYamlTrustPrompt, setPebbleYamlTrustPrompt] = useState<PebbleYamlTrustPrompt | null>(null)
   const [githubProjectSettings, setGithubProjectSettings] = useState<GitHubProjectSettings>(
     EMPTY_GITHUB_PROJECT_SETTINGS
   )
@@ -2443,8 +2443,8 @@ export default function MobileTasksScreen() {
   const [projectIssueTypesLoading, setProjectIssueTypesLoading] = useState(false)
   const [projectIssueTypesError, setProjectIssueTypesError] = useState('')
   const [projectMutating, setProjectMutating] = useState(false)
-  const [projectRepoNotInOrca, setProjectRepoNotInOrca] =
-    useState<ProjectRepoNotInOrcaPrompt | null>(null)
+  const [projectRepoNotInPebble, setProjectRepoNotInPebble] =
+    useState<ProjectRepoNotInPebblePrompt | null>(null)
   // Why: project detail text inputs rerender this screen while comments stay
   // unchanged; keep grouping out of the typing path.
   const projectDetailCommentGroups = useMemo(
@@ -2833,19 +2833,19 @@ export default function MobileTasksScreen() {
       if (!client) {
         return
       }
-      const next = trustedOrcaHooksWithSetupApproval({
-        trust: trustedOrcaHooks,
+      const next = trustedPebbleHooksWithSetupApproval({
+        trust: trustedPebbleHooks,
         repoId,
         contentHash,
         alwaysTrust
       })
-      const response = await client.sendRequest('ui.set', { trustedOrcaHooks: next })
+      const response = await client.sendRequest('ui.set', { trustedPebbleHooks: next })
       if (!isSuccess(response)) {
         throw new Error(response.error.message)
       }
-      setTrustedOrcaHooks(next)
+      setTrustedPebbleHooks(next)
     },
-    [client, trustedOrcaHooks]
+    [client, trustedPebbleHooks]
   )
 
   const resetWorkspaceCreateState = useCallback((): void => {
@@ -2879,7 +2879,7 @@ export default function MobileTasksScreen() {
     setShowWorkspaceBaseBranchPicker(false)
     setShowWorkspaceSparsePicker(false)
     setSetupPrompt(null)
-    setOrcaYamlTrustPrompt(null)
+    setPebbleYamlTrustPrompt(null)
   }, [])
 
   useEffect(() => {
@@ -2888,8 +2888,8 @@ export default function MobileTasksScreen() {
       defaultRepoSelectionRef.current = null
       repoSelectionHydratedRef.current = false
       setRuntimeTaskSettings({})
-      setTrustedOrcaHooks({})
-      setOrcaYamlTrustPrompt(null)
+      setTrustedPebbleHooks({})
+      setPebbleYamlTrustPrompt(null)
       setGithubProjectHiddenFieldIdsByView({})
       setTaskStateHydrated(false)
       setTasksSupportState({ kind: 'unknown', client: null })
@@ -2917,7 +2917,7 @@ export default function MobileTasksScreen() {
       setPendingGitHubProjectViewSelection(null)
       setActionItem(null)
       setProjectRowItem(null)
-      setProjectRepoNotInOrca(null)
+      setProjectRepoNotInPebble(null)
       setDetailPayload(null)
       setProjectRowDetail(null)
       setShowCreateTask(false)
@@ -2959,7 +2959,7 @@ export default function MobileTasksScreen() {
     setPendingGitHubProjectViewSelection(null)
     setActionItem(null)
     setProjectRowItem(null)
-    setProjectRepoNotInOrca(null)
+    setProjectRepoNotInPebble(null)
     setDetailPayload(null)
     setProjectRowDetail(null)
     setShowCreateTask(false)
@@ -3012,7 +3012,7 @@ export default function MobileTasksScreen() {
         setPendingGitHubProjectViewSelection(null)
         setActionItem(null)
         setProjectRowItem(null)
-        setProjectRepoNotInOrca(null)
+        setProjectRepoNotInPebble(null)
         setDetailPayload(null)
         setProjectRowDetail(null)
         setShowCreateTask(false)
@@ -3024,7 +3024,7 @@ export default function MobileTasksScreen() {
         setMergeMethodTaskItem(null)
         setMergeMethodProjectRow(null)
         resetWorkspaceCreateState()
-        setError('Update Orca desktop to use Tasks on mobile.')
+        setError('Update Pebble desktop to use Tasks on mobile.')
         setTaskStateHydrated(false)
         return
       }
@@ -3051,12 +3051,12 @@ export default function MobileTasksScreen() {
             uiResponse.result as {
               ui?: {
                 taskResumeState?: TaskResumeState
-                trustedOrcaHooks?: PersistedTrustedOrcaHooks
+                trustedPebbleHooks?: PersistedTrustedPebbleHooks
               }
             }
           ).ui
         : null
-      setTrustedOrcaHooks(uiState?.trustedOrcaHooks ?? {})
+      setTrustedPebbleHooks(uiState?.trustedPebbleHooks ?? {})
       const resume = uiState?.taskResumeState ?? {}
       taskResumeRef.current = resume
       setGithubProjectHiddenFieldIdsByView(resume.githubProjectHiddenFieldIdsByView ?? {})
@@ -3891,7 +3891,7 @@ export default function MobileTasksScreen() {
           return
         }
         if (explicitView && explicitView.layout !== 'TABLE_LAYOUT') {
-          throw new Error("Orca doesn't support this GitHub Project layout yet.")
+          throw new Error("Pebble doesn't support this GitHub Project layout yet.")
         }
         if (!explicitView && !rememberedView) {
           // Why: desktop asks which Project view to open the first time a project
@@ -4892,7 +4892,7 @@ export default function MobileTasksScreen() {
     setWorkspaceSparseSaving(false)
     setWorkspaceAgentOverridden(false)
     setWorkspaceAgent(null)
-    setOrcaYamlTrustPrompt(null)
+    setPebbleYamlTrustPrompt(null)
     setShowWorkspaceAgentPicker(false)
     setShowWorkspaceCreateRepoPicker(false)
     setShowWorkspaceAdvanced(false)
@@ -5481,16 +5481,16 @@ export default function MobileTasksScreen() {
           setupResolution.setupTrust &&
           setupResolution.setupTrust.contentHash !== approvedSetupContentHash &&
           !isSetupHookTrusted(
-            trustedOrcaHooks,
+            trustedPebbleHooks,
             targetRepo.id,
             setupResolution.setupTrust.contentHash
           )
         ) {
-          // Why: desktop prompts before running repo-owned orca.yaml hooks. Mobile
+          // Why: desktop prompts before running repo-owned pebble.yaml hooks. Mobile
           // stores the same trust hash in persisted UI state so either surface can
           // approve the script version for future workspace creates.
           setSetupPrompt(null)
-          setOrcaYamlTrustPrompt({
+          setPebbleYamlTrustPrompt({
             item,
             ...(repoIdOverride ? { repoIdOverride } : {}),
             setupOverride: 'run',
@@ -5504,7 +5504,7 @@ export default function MobileTasksScreen() {
             repoName: targetRepo.displayName,
             scriptContent: setupResolution.setupTrust.scriptContent,
             contentHash: setupResolution.setupTrust.contentHash,
-            previouslyApproved: wasSetupHookPreviouslyApproved(trustedOrcaHooks, targetRepo.id)
+            previouslyApproved: wasSetupHookPreviouslyApproved(trustedPebbleHooks, targetRepo.id)
           })
           return
         }
@@ -5647,7 +5647,7 @@ export default function MobileTasksScreen() {
       runtimeTaskSettings,
       taskStateHydrated,
       tasksSupported,
-      trustedOrcaHooks,
+      trustedPebbleHooks,
       workspaceDetectedAgentIds
     ]
   )
@@ -5660,12 +5660,12 @@ export default function MobileTasksScreen() {
       const kind = projectRowType(row)
       const repo = findProjectRowRepo(row)
       if (!kind || !row.content.number || !row.content.url) {
-        setError('Add the project item repository to Orca before creating a workspace.')
+        setError('Add the project item repository to Pebble before creating a workspace.')
         return
       }
       if (!repo) {
         const slug = splitRepositorySlug(row.content.repository)
-        setProjectRepoNotInOrca({
+        setProjectRepoNotInPebble({
           owner: slug?.owner ?? 'Unknown',
           repo: slug?.repo ?? row.content.repository ?? 'repository',
           url: row.content.url ?? null
@@ -9202,7 +9202,7 @@ export default function MobileTasksScreen() {
       {!tasksSupported ? (
         tasksUnsupported ? (
           <View style={styles.centered}>
-            <Text style={styles.emptyText}>Update Orca desktop</Text>
+            <Text style={styles.emptyText}>Update Pebble desktop</Text>
             <Text style={styles.centeredHint}>
               This mobile Tasks view needs a newer desktop runtime.
             </Text>
@@ -10283,7 +10283,7 @@ export default function MobileTasksScreen() {
         onSelect={(viewId) => {
           const view = githubProjectViews.find((candidate) => candidate.id === viewId)
           if (view && view.layout !== 'TABLE_LAYOUT') {
-            setGithubProjectError("Orca doesn't support this GitHub Project layout yet.")
+            setGithubProjectError("Pebble doesn't support this GitHub Project layout yet.")
             return
           }
           if (pendingGitHubProjectViewSelection) {
@@ -11447,20 +11447,20 @@ export default function MobileTasksScreen() {
       </BottomDrawer>
 
       <BottomDrawer
-        visible={taskUiReady && orcaYamlTrustPrompt != null}
-        onClose={() => setOrcaYamlTrustPrompt(null)}
+        visible={taskUiReady && pebbleYamlTrustPrompt != null}
+        onClose={() => setPebbleYamlTrustPrompt(null)}
         zIndex={TASK_SECONDARY_DRAWER_Z_INDEX + 1}
       >
-        {orcaYamlTrustPrompt ? (
+        {pebbleYamlTrustPrompt ? (
           <View>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>
-                {orcaYamlTrustPrompt.previouslyApproved
-                  ? `${orcaYamlTrustPrompt.repoName}'s setup script changed`
-                  : `Run setup from ${orcaYamlTrustPrompt.repoName}?`}
+                {pebbleYamlTrustPrompt.previouslyApproved
+                  ? `${pebbleYamlTrustPrompt.repoName}'s setup script changed`
+                  : `Run setup from ${pebbleYamlTrustPrompt.repoName}?`}
               </Text>
               <Text style={styles.sheetSubtitle}>
-                This repository's orca.yaml runs on your machine before the workspace starts. Only
+                This repository's pebble.yaml runs on your machine before the workspace starts. Only
                 run it if you trust this repository.
               </Text>
             </View>
@@ -11468,36 +11468,36 @@ export default function MobileTasksScreen() {
             <View style={styles.setupPromptBox}>
               <View style={styles.detailSectionHeader}>
                 <Text style={styles.detailSectionTitle}>
-                  {orcaYamlTrustPrompt.previouslyApproved ? 'New setup script' : 'Setup script'}
+                  {pebbleYamlTrustPrompt.previouslyApproved ? 'New setup script' : 'Setup script'}
                 </Text>
               </View>
-              <Text style={styles.setupPromptCommand}>{orcaYamlTrustPrompt.scriptContent}</Text>
+              <Text style={styles.setupPromptCommand}>{pebbleYamlTrustPrompt.scriptContent}</Text>
             </View>
 
             <View style={styles.actionGroup}>
               <Pressable
                 style={styles.actionRow}
-                disabled={creatingKey === orcaYamlTrustPrompt.item.key}
+                disabled={creatingKey === pebbleYamlTrustPrompt.item.key}
                 onPress={() =>
                   void (async () => {
                     try {
                       await persistSetupHookTrust(
-                        orcaYamlTrustPrompt.repoId,
-                        orcaYamlTrustPrompt.contentHash,
+                        pebbleYamlTrustPrompt.repoId,
+                        pebbleYamlTrustPrompt.contentHash,
                         false
                       )
-                      setOrcaYamlTrustPrompt(null)
+                      setPebbleYamlTrustPrompt(null)
                       await createWorkspace(
-                        orcaYamlTrustPrompt.item,
-                        orcaYamlTrustPrompt.repoIdOverride,
+                        pebbleYamlTrustPrompt.item,
+                        pebbleYamlTrustPrompt.repoIdOverride,
                         'run',
-                        orcaYamlTrustPrompt.agentOverride,
-                        orcaYamlTrustPrompt.workspaceNameOverride,
-                        orcaYamlTrustPrompt.noteOverride,
-                        orcaYamlTrustPrompt.baseBranchOverride,
-                        orcaYamlTrustPrompt.branchNameOverride,
-                        orcaYamlTrustPrompt.sparseCheckoutOverride,
-                        orcaYamlTrustPrompt.contentHash
+                        pebbleYamlTrustPrompt.agentOverride,
+                        pebbleYamlTrustPrompt.workspaceNameOverride,
+                        pebbleYamlTrustPrompt.noteOverride,
+                        pebbleYamlTrustPrompt.baseBranchOverride,
+                        pebbleYamlTrustPrompt.branchNameOverride,
+                        pebbleYamlTrustPrompt.sparseCheckoutOverride,
+                        pebbleYamlTrustPrompt.contentHash
                       )
                     } catch (err) {
                       setError(err instanceof Error ? err.message : 'Failed to trust setup script.')
@@ -11511,27 +11511,27 @@ export default function MobileTasksScreen() {
               <View style={styles.actionSeparator} />
               <Pressable
                 style={styles.actionRow}
-                disabled={creatingKey === orcaYamlTrustPrompt.item.key}
+                disabled={creatingKey === pebbleYamlTrustPrompt.item.key}
                 onPress={() =>
                   void (async () => {
                     try {
                       await persistSetupHookTrust(
-                        orcaYamlTrustPrompt.repoId,
-                        orcaYamlTrustPrompt.contentHash,
+                        pebbleYamlTrustPrompt.repoId,
+                        pebbleYamlTrustPrompt.contentHash,
                         true
                       )
-                      setOrcaYamlTrustPrompt(null)
+                      setPebbleYamlTrustPrompt(null)
                       await createWorkspace(
-                        orcaYamlTrustPrompt.item,
-                        orcaYamlTrustPrompt.repoIdOverride,
+                        pebbleYamlTrustPrompt.item,
+                        pebbleYamlTrustPrompt.repoIdOverride,
                         'run',
-                        orcaYamlTrustPrompt.agentOverride,
-                        orcaYamlTrustPrompt.workspaceNameOverride,
-                        orcaYamlTrustPrompt.noteOverride,
-                        orcaYamlTrustPrompt.baseBranchOverride,
-                        orcaYamlTrustPrompt.branchNameOverride,
-                        orcaYamlTrustPrompt.sparseCheckoutOverride,
-                        orcaYamlTrustPrompt.contentHash
+                        pebbleYamlTrustPrompt.agentOverride,
+                        pebbleYamlTrustPrompt.workspaceNameOverride,
+                        pebbleYamlTrustPrompt.noteOverride,
+                        pebbleYamlTrustPrompt.baseBranchOverride,
+                        pebbleYamlTrustPrompt.branchNameOverride,
+                        pebbleYamlTrustPrompt.sparseCheckoutOverride,
+                        pebbleYamlTrustPrompt.contentHash
                       )
                     } catch (err) {
                       setError(err instanceof Error ? err.message : 'Failed to trust setup script.')
@@ -11545,10 +11545,10 @@ export default function MobileTasksScreen() {
               <View style={styles.actionSeparator} />
               <Pressable
                 style={styles.actionRow}
-                disabled={creatingKey === orcaYamlTrustPrompt.item.key}
+                disabled={creatingKey === pebbleYamlTrustPrompt.item.key}
                 onPress={() => {
-                  const prompt = orcaYamlTrustPrompt
-                  setOrcaYamlTrustPrompt(null)
+                  const prompt = pebbleYamlTrustPrompt
+                  setPebbleYamlTrustPrompt(null)
                   void createWorkspace(
                     prompt.item,
                     prompt.repoIdOverride,
@@ -11571,28 +11571,28 @@ export default function MobileTasksScreen() {
       </BottomDrawer>
 
       <BottomDrawer
-        visible={taskUiReady && projectRepoNotInOrca != null}
+        visible={taskUiReady && projectRepoNotInPebble != null}
         onClose={() => {
-          setProjectRepoNotInOrca(null)
+          setProjectRepoNotInPebble(null)
         }}
       >
-        {projectRepoNotInOrca ? (
+        {projectRepoNotInPebble ? (
           <View>
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Repository not in Orca</Text>
+              <Text style={styles.sheetTitle}>Repository not in Pebble</Text>
               <Text style={styles.sheetSubtitle}>
-                {projectRepoNotInOrca.owner}/{projectRepoNotInOrca.repo} is not added to Orca. Add
+                {projectRepoNotInPebble.owner}/{projectRepoNotInPebble.repo} is not added to Pebble. Add
                 this repository from the desktop app, then refresh mobile Tasks.
               </Text>
             </View>
 
             <View style={styles.actionGroup}>
-              {projectRepoNotInOrca.url ? (
+              {projectRepoNotInPebble.url ? (
                 <Pressable
                   style={styles.actionRow}
                   onPress={() => {
-                    if (projectRepoNotInOrca.url) {
-                      void Linking.openURL(projectRepoNotInOrca.url)
+                    if (projectRepoNotInPebble.url) {
+                      void Linking.openURL(projectRepoNotInPebble.url)
                     }
                   }}
                 >
@@ -11600,20 +11600,20 @@ export default function MobileTasksScreen() {
                   <Text style={styles.actionText}>Open in GitHub</Text>
                 </Pressable>
               ) : null}
-              {projectRepoNotInOrca.url ? <View style={styles.actionSeparator} /> : null}
+              {projectRepoNotInPebble.url ? <View style={styles.actionSeparator} /> : null}
               <Pressable
                 style={styles.actionRow}
                 onPress={() =>
                   void copyTextToClipboard(
-                    `project-repo:${projectRepoNotInOrca.owner}/${projectRepoNotInOrca.repo}`,
-                    `${projectRepoNotInOrca.owner}/${projectRepoNotInOrca.repo}`
+                    `project-repo:${projectRepoNotInPebble.owner}/${projectRepoNotInPebble.repo}`,
+                    `${projectRepoNotInPebble.owner}/${projectRepoNotInPebble.repo}`
                   )
                 }
               >
                 <Copy size={16} color={colors.textPrimary} />
                 <Text style={styles.actionText}>
                   {copiedLinkKey ===
-                  `project-repo:${projectRepoNotInOrca.owner}/${projectRepoNotInOrca.repo}`
+                  `project-repo:${projectRepoNotInPebble.owner}/${projectRepoNotInPebble.repo}`
                     ? 'Copied'
                     : 'Copy repository'}
                 </Text>
@@ -12649,7 +12649,7 @@ export default function MobileTasksScreen() {
                   </Pressable>
                   {!projectRowHostedRepo ? (
                     <Text style={styles.emptyInlineText}>
-                      Merge requires this repository in Orca.
+                      Merge requires this repository in Pebble.
                     </Text>
                   ) : null}
                 </>

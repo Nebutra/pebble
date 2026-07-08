@@ -118,36 +118,36 @@ describe('WorkspaceDirectorySetting', () => {
 
     typePath('o')
     typePath('or')
-    typePath('orca-workspaces')
+    typePath('pebble-workspaces')
 
     expect(updateSettings).not.toHaveBeenCalled()
 
     blurInput()
 
     expect(updateSettings).toHaveBeenCalledTimes(1)
-    expect(updateSettings).toHaveBeenCalledWith({ workspaceDir: 'orca-workspaces' })
+    expect(updateSettings).toHaveBeenCalledWith({ workspaceDir: 'pebble-workspaces' })
   })
 
   it('commits Enter once even though Enter also blurs the input', () => {
     const updateSettings = vi.fn()
     renderWorkspaceDirectorySetting({ updateSettings })
 
-    typePath('orca-workspaces')
+    typePath('pebble-workspaces')
     pressInputKey('Enter')
     blurInput()
 
     expect(updateSettings).toHaveBeenCalledTimes(1)
-    expect(updateSettings).toHaveBeenCalledWith({ workspaceDir: 'orca-workspaces' })
+    expect(updateSettings).toHaveBeenCalledWith({ workspaceDir: 'pebble-workspaces' })
   })
 
   it('does not commit Enter while IME composition is active', () => {
     const updateSettings = vi.fn()
     renderWorkspaceDirectorySetting({ updateSettings })
 
-    typePath('orca-workspaces')
+    typePath('pebble-workspaces')
     pressInputKey('Enter', { isComposing: true })
 
-    expect(getInput().value).toBe('orca-workspaces')
+    expect(getInput().value).toBe('pebble-workspaces')
     expect(updateSettings).not.toHaveBeenCalled()
   })
 
@@ -155,7 +155,7 @@ describe('WorkspaceDirectorySetting', () => {
     const updateSettings = vi.fn()
     renderWorkspaceDirectorySetting({ updateSettings })
 
-    typePath('orca-workspaces')
+    typePath('pebble-workspaces')
     pressInputKey('Escape')
     blurInput()
 
@@ -167,10 +167,10 @@ describe('WorkspaceDirectorySetting', () => {
     const updateSettings = vi.fn()
     renderWorkspaceDirectorySetting({ updateSettings })
 
-    typePath('orca-workspaces')
+    typePath('pebble-workspaces')
     pressInputKey('Escape', { isComposing: true })
 
-    expect(getInput().value).toBe('orca-workspaces')
+    expect(getInput().value).toBe('pebble-workspaces')
     expect(updateSettings).not.toHaveBeenCalled()
   })
 
@@ -179,7 +179,7 @@ describe('WorkspaceDirectorySetting', () => {
     pickFolderMock.mockResolvedValue('/Users/alice/workspaces')
     renderWorkspaceDirectorySetting({ updateSettings })
 
-    typePath('orca-w')
+    typePath('pebble-w')
     await clickBrowseAfterInputBlur()
 
     expect(updateSettings).toHaveBeenCalledTimes(1)
@@ -191,7 +191,7 @@ describe('WorkspaceDirectorySetting', () => {
     pickFolderMock.mockResolvedValue(null)
     renderWorkspaceDirectorySetting({ updateSettings })
 
-    typePath('orca-w')
+    typePath('pebble-w')
     await clickBrowseAfterInputBlur()
 
     expect(getInput().value).toBe(getDefaultSettings('/tmp').workspaceDir)
@@ -202,12 +202,12 @@ describe('WorkspaceDirectorySetting', () => {
     const updateSettings = vi.fn()
     renderWorkspaceDirectorySetting({ updateSettings })
 
-    typePath('orca-workspaces')
+    typePath('pebble-workspaces')
     blurInput()
     blurInput()
 
     expect(updateSettings).toHaveBeenCalledTimes(2)
-    expect(updateSettings).toHaveBeenNthCalledWith(1, { workspaceDir: 'orca-workspaces' })
-    expect(updateSettings).toHaveBeenNthCalledWith(2, { workspaceDir: 'orca-workspaces' })
+    expect(updateSettings).toHaveBeenNthCalledWith(1, { workspaceDir: 'pebble-workspaces' })
+    expect(updateSettings).toHaveBeenNthCalledWith(2, { workspaceDir: 'pebble-workspaces' })
   })
 })

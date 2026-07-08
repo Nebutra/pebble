@@ -1,0 +1,103 @@
+# Pebble production icon DAG.
+#
+# The selected logo is fixed. These tasks should preserve the pebble outline and
+# `>_` prompt while adapting material, icon field, and production proofs.
+tasks:
+  - id: icon-classic
+    name: 01-icon-classic
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs:
+      - "resources/brand/generated/pebble-logo/selected-logo.png"
+      - "resources/brand/generated/pebble-foundation/01-foundation-material-board.png"
+    prompt: >-
+      Create the production classic app icon for Pebble using the referenced
+      selected logo and material board. Preserve the exact concept: one compact
+      rounded pebble with a clean white terminal prompt symbol `>_` cut into
+      the face. Rounded square app icon field, warm Pebble Mist background,
+      matte stone pebble, subtle upper-left highlight, soft depth, precise
+      terminal prompt geometry, high contrast, readable at 48 px. No extra
+      stones, no body-part resemblance, no mascot, no animal, no fake text, no
+      letter P, no legacy whale mark, no watermark.
+
+  - id: icon-soft
+    name: 02-icon-soft
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs:
+      - "@icon-classic"
+      - "resources/brand/generated/pebble-foundation/01-foundation-material-board.png"
+    prompt: >-
+      Create a softer lifestyle variant of the referenced Pebble app icon.
+      Preserve the same pebble outline and exact `>_` terminal prompt concept.
+      Use warmer Shell Pink and Clay Rose light, gentle ceramic texture, subtle
+      paper-like icon field, Xiaohongshu-friendly softness, still professional
+      and technical, high contrast at small sizes. No extra stones, no text
+      beyond the prompt symbol, no body-part resemblance, no mascot, no animal,
+      no watermark.
+
+  - id: icon-mineral
+    name: 03-icon-mineral
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs:
+      - "@icon-classic"
+      - "resources/brand/generated/pebble-foundation/01-foundation-material-board.png"
+    prompt: >-
+      Create a cooler technical mineral variant of the referenced Pebble app
+      icon. Preserve the same pebble outline and exact `>_` terminal prompt
+      concept. Use Tide Blue, Warm Stone, and Ink Graphite accents, restrained
+      mineral surface, precise edge clarity, calm engineering product feeling,
+      readable at 48 px. No extra stones, no text beyond the prompt symbol, no
+      body-part resemblance, no mascot, no animal, no watermark.
+
+  - id: glyph-chromakey
+    name: 04-glyph-chromakey
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs:
+      - "resources/brand/generated/pebble-logo/selected-logo.png"
+    prompt: >-
+      Create a flat monochrome production glyph from the referenced Pebble
+      selected logo. Preserve the outer rounded pebble silhouette and the `>_`
+      terminal prompt relationship. Single solid black glyph with the prompt
+      knocked out as clean negative space, no texture, no shadow, no gradient,
+      no antialias fuzz, centered with generous safe area, pure chroma key
+      green background #00FF00, no extra marks, no mascot, no animal, no
+      watermark.
+
+  - id: icon-legibility-proof
+    name: 05-icon-legibility-proof
+    provider: mox
+    model: gpt-image-2
+    ratio: "1:1"
+    refs:
+      - "@icon-classic"
+      - "@glyph-chromakey"
+    prompt: >-
+      Create a simple legibility proof sheet using the referenced Pebble icon
+      and monochrome glyph. Show the same mark at large, medium, and tiny app
+      icon sizes on light and dark neutral backgrounds. No labels, no readable
+      text, no extra decoration, no mascot, no animal, no watermark.
+
+  - id: icon-family-contact-sheet
+    name: 06-icon-family-contact-sheet
+    provider: mox
+    model: gpt-image-2
+    ratio: "16:9"
+    refs:
+      - "@icon-classic"
+      - "@icon-soft"
+      - "@icon-mineral"
+      - "@glyph-chromakey"
+      - "@icon-legibility-proof"
+    prompt: >-
+      Create a clean icon family contact sheet from the referenced Pebble
+      assets. Arrange classic, soft, mineral, monochrome glyph, and legibility
+      proof as a coherent production set on a warm neutral background. Preserve
+      the same `>_` pebble identity, no generated labels, no fake text, no
+      mascot, no animal, no watermark.

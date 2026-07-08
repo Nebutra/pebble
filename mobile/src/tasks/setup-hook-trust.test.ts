@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   isSetupHookTrusted,
   normalizeSetupHookTrust,
-  trustedOrcaHooksWithSetupApproval,
+  trustedPebbleHooksWithSetupApproval,
   wasSetupHookPreviouslyApproved
 } from './setup-hook-trust'
-import type { PersistedTrustedOrcaHooks } from '../../../src/shared/types'
+import type { PersistedTrustedPebbleHooks } from '../../../src/shared/types'
 
 describe('setup hook trust', () => {
   it('trusts a setup script only when the approved hash matches', () => {
-    const trust: PersistedTrustedOrcaHooks = {
+    const trust: PersistedTrustedPebbleHooks = {
       'repo-1': { setup: { contentHash: 'hash-1', approvedAt: 1000 } }
     }
 
@@ -18,7 +18,7 @@ describe('setup hook trust', () => {
   })
 
   it('treats an always-trusted repo as trusted for changed setup scripts', () => {
-    const trust: PersistedTrustedOrcaHooks = {
+    const trust: PersistedTrustedPebbleHooks = {
       'repo-1': { all: { approvedAt: 1000 } }
     }
 
@@ -26,14 +26,14 @@ describe('setup hook trust', () => {
   })
 
   it('preserves unrelated trust entries when approving setup', () => {
-    const trust: PersistedTrustedOrcaHooks = {
+    const trust: PersistedTrustedPebbleHooks = {
       'repo-1': {
         archive: { contentHash: 'archive-hash', approvedAt: 1000 }
       }
     }
 
     expect(
-      trustedOrcaHooksWithSetupApproval({
+      trustedPebbleHooksWithSetupApproval({
         trust,
         repoId: 'repo-1',
         contentHash: 'setup-hash',
@@ -49,14 +49,14 @@ describe('setup hook trust', () => {
   })
 
   it('records always-trust without dropping existing script approvals', () => {
-    const trust: PersistedTrustedOrcaHooks = {
+    const trust: PersistedTrustedPebbleHooks = {
       'repo-1': {
         setup: { contentHash: 'setup-hash', approvedAt: 1000 }
       }
     }
 
     expect(
-      trustedOrcaHooksWithSetupApproval({
+      trustedPebbleHooksWithSetupApproval({
         trust,
         repoId: 'repo-1',
         contentHash: 'ignored-for-all',

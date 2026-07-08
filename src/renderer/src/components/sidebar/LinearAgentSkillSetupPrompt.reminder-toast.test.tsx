@@ -11,7 +11,7 @@ import {
   _linearAgentSkillSetupPromptInternalsForTests
 } from './LinearAgentSkillSetupPrompt'
 
-const HOST_DISMISS_STORAGE_KEY = 'orca.linearTicketsSkill.setupDismissed.host'
+const HOST_DISMISS_STORAGE_KEY = 'pebble.linearTicketsSkill.setupDismissed.host'
 
 const mocks = vi.hoisted(() => ({
   skillState: {
@@ -45,8 +45,8 @@ vi.mock('@/hooks/useInstalledAgentSkills', async (importOriginal) => ({
 
 vi.mock('@/lib/agent-skill-cli-prerequisite', () => ({
   AGENT_SKILL_CLI_PREREQUISITE_NOTICE: 'CLI registration notice',
-  ensureOrcaCliAvailableForAgentSkillTerminal: mocks.ensureCli,
-  isOrcaCliAvailableOnPath: (status: CliInstallStatus | null | undefined) =>
+  ensurePebbleCliAvailableForAgentSkillTerminal: mocks.ensureCli,
+  isPebbleCliAvailableOnPath: (status: CliInstallStatus | null | undefined) =>
     status?.state === 'installed' && status.pathConfigured
 }))
 
@@ -90,15 +90,15 @@ let container: HTMLDivElement | null = null
 function cliStatus(overrides: Partial<CliInstallStatus>): CliInstallStatus {
   return {
     platform: 'darwin',
-    commandName: 'orca',
-    commandPath: '/usr/local/bin/orca',
+    commandName: 'pebble',
+    commandPath: '/usr/local/bin/pebble',
     pathDirectory: '/usr/local/bin',
     pathConfigured: true,
-    launcherPath: '/Applications/Orca.app/Contents/MacOS/Orca',
+    launcherPath: '/Applications/Pebble.app/Contents/MacOS/Pebble',
     installMethod: 'symlink',
     supported: true,
     state: 'installed',
-    currentTarget: '/Applications/Orca.app/Contents/MacOS/Orca',
+    currentTarget: '/Applications/Pebble.app/Contents/MacOS/Pebble',
     unsupportedReason: null,
     detail: null,
     ...overrides
@@ -205,11 +205,11 @@ describe('LinearAgentSkillSetupPrompt reminder toast', () => {
       'Enable agents to read and edit the attached Linear ticket.'
     )
     expect(toast.warning).toHaveBeenCalledWith(
-      'Orca CLI and Linear skill are missing',
+      'Pebble CLI and Linear skill are missing',
       expect.objectContaining({
-        id: 'linear-agent-skill-setup-orca.linearTicketsSkill.setupDismissed.host',
+        id: 'linear-agent-skill-setup-pebble.linearTicketsSkill.setupDismissed.host',
         description:
-          'Install the Orca CLI and the Linear skill to enable your agents to read and edit Linear tasks.',
+          'Install the Pebble CLI and the Linear skill to enable your agents to read and edit Linear tasks.',
         action: {
           label: 'Set up',
           onClick: expect.any(Function)
@@ -218,15 +218,15 @@ describe('LinearAgentSkillSetupPrompt reminder toast', () => {
     )
   })
 
-  it('does not repeat the Orca CLI in CLI-only reminder toast copy', async () => {
+  it('does not repeat the Pebble CLI in CLI-only reminder toast copy', async () => {
     mocks.skillState.installed = true
     await snoozeInitialModal({ linked: true, remote: false, surface: 'modal' })
     await renderPrompt({ linked: true, remote: false, surface: 'modal' })
 
     expect(toast.warning).toHaveBeenCalledWith(
-      'Orca CLI is missing',
+      'Pebble CLI is missing',
       expect.objectContaining({
-        description: 'Install the Orca CLI to enable your agents to read and edit Linear tasks.'
+        description: 'Install the Pebble CLI to enable your agents to read and edit Linear tasks.'
       })
     )
   })
@@ -236,10 +236,10 @@ describe('LinearAgentSkillSetupPrompt reminder toast', () => {
     await renderPrompt({ linked: true, remote: true, surface: 'modal' })
 
     expect(toast.warning).toHaveBeenCalledWith(
-      'Orca CLI and Linear skill are missing',
+      'Pebble CLI and Linear skill are missing',
       expect.objectContaining({
         description:
-          'Install the Orca CLI and the Linear skill to enable your agents to read and edit Linear tasks. Remote agent environments may need their own setup.'
+          'Install the Pebble CLI and the Linear skill to enable your agents to read and edit Linear tasks. Remote agent environments may need their own setup.'
       })
     )
   })
@@ -261,10 +261,10 @@ describe('LinearAgentSkillSetupPrompt reminder toast', () => {
     await renderPrompt(wslProps)
 
     expect(toast.warning).toHaveBeenCalledWith(
-      'Orca CLI and Linear skill are missing',
+      'Pebble CLI and Linear skill are missing',
       expect.objectContaining({
         description:
-          'Install the Orca CLI and the Linear skill to enable your agents to read and edit Linear tasks. This setup runs in the selected WSL agent runtime.'
+          'Install the Pebble CLI and the Linear skill to enable your agents to read and edit Linear tasks. This setup runs in the selected WSL agent runtime.'
       })
     )
   })
@@ -285,7 +285,7 @@ describe('LinearAgentSkillSetupPrompt reminder toast', () => {
     )
     expect(document.body.textContent).toContain('Mock install')
     expect(toast.dismiss).toHaveBeenCalledWith(
-      'linear-agent-skill-setup-orca.linearTicketsSkill.setupDismissed.host'
+      'linear-agent-skill-setup-pebble.linearTicketsSkill.setupDismissed.host'
     )
   })
 

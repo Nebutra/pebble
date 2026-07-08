@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: this file owns the loopback HTTP adapter, the on-disk last-status persistence layer (hydrate, sanitize, TTL, atomic write, drop), and the relay ingest path in one place so the cache lifecycle (set → schedule → drain) lives next to the surfaces that mutate it. Splitting would force mutual `private` accessor scaffolding for a single class. */
-// Why: this module is the Orca-main-process adapter for the shared
+// Why: this module is the Pebble main-process adapter for the shared
 // agent-hook listener pipeline (`src/shared/agent-hook-listener.ts`). The
 // listener internals (request parsing, payload normalization, endpoint-file
 // writing, validation) live in `shared/` so the relay can host the same
@@ -9,7 +9,7 @@
 //   - the `ingestRemote` entry point that bypasses HTTP for relay-forwarded
 //     events (see docs/design/agent-status-over-ssh.md §5)
 //   - the on-disk last-status cache (`last-status.json`) that survives
-//     Orca restart so retained dashboard rows reappear on relaunch
+//     Pebble restart so retained dashboard rows reappear on relaunch
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { chmodSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
@@ -18,7 +18,7 @@ import { join } from 'node:path'
 import { track } from '../telemetry/client'
 import { getCohortAtEmit } from '../telemetry/cohort-classifier'
 import { AGENT_KIND_VALUES, type AgentKind } from '../../shared/telemetry-events'
-import { ORCA_HOOK_PROTOCOL_VERSION } from '../../shared/agent-hook-types'
+import { PEBBLE_HOOK_PROTOCOL_VERSION } from '../../shared/agent-hook-types'
 import {
   clearAllListenerCaches,
   clearPaneCacheState,
@@ -87,7 +87,7 @@ type PaneKeyAliasEntry = {
   updatedAt: number
 }
 
-// Why: name of the on-disk cache that survives Orca restart. Lives next to
+// Why: name of the on-disk cache that survives Pebble restart. Lives next to
 // the endpoint file in userData/agent-hooks/ so all hook-server-owned cross-
 // restart artifacts stay co-located.
 const LAST_STATUS_FILE_NAME = 'last-status.json'
@@ -424,7 +424,7 @@ export class AgentHookServer {
   private server: ReturnType<typeof createServer> | null = null
   private port = 0
   private token = ''
-  // Why: identifies this Orca instance so hook scripts can stamp requests and
+  // Why: identifies this Pebble instance so hook scripts can stamp requests and
   // the server can detect dev vs. prod cross-talk. Set at start() from the
   // caller's knowledge of whether this is a packaged build.
   private env = 'production'
@@ -947,7 +947,7 @@ export class AgentHookServer {
       return body
     }
     // Why: pre-migration live shells keep posting their immutable numeric
-    // ORCA_PANE_KEY. The reattach path proves the UUID leaf once, then this
+    // PEBBLE_PANE_KEY. The reattach path proves the UUID leaf once, then this
     // bridge lets hook caches and renderer state use only the stable key.
     return { ...record, paneKey: stablePaneKey }
   }
@@ -1008,8 +1008,8 @@ export class AgentHookServer {
 
   /** Ingest a payload that arrived over the relay JSON-RPC channel rather
    *  than the local HTTP server. `connectionId` is the SshChannelMultiplexer
-   *  identity Orca holds (the wire envelope carries connectionId: null and
-   *  Orca stamps the real value here). The relay has already normalized the
+   *  identity Pebble holds (the wire envelope carries connectionId: null and
+   *  Pebble stamps the real value here). The relay has already normalized the
    *  payload via the shared listener module, but main is still the SSH trust
    *  boundary: re-run the canonical status normalizer before caching or
    *  persisting anything. The `env`/`version` fields are forwarded verbatim
@@ -1184,7 +1184,8 @@ export class AgentHookServer {
         return
       }
 
-      if (req.headers['x-orca-agent-hook-token'] !== this.token) {
+      const requestToken = req.headers['x-pebble-agent-hook-token']
+      if (requestToken !== this.token) {
         res.writeHead(403)
         res.end()
         return
@@ -1270,7 +1271,7 @@ export class AgentHookServer {
     this.assistantMessageRetryTimers.clear()
     // Why: intentionally do NOT delete the endpoint file on stop(). A stale
     // file points at a dead port, which matches the fail-open policy. Unlink
-    // would introduce a TOCTOU race vs. a concurrent Orca instance.
+    // would introduce a TOCTOU race vs. a concurrent Pebble instance.
     this.endpointDir = null
     this.endpointFilePathCache = null
     this.endpointFileWritten = false
@@ -1414,16 +1415,16 @@ export class AgentHookServer {
     }
 
     const env: Record<string, string> = {
-      ORCA_AGENT_HOOK_PORT: String(this.port),
-      ORCA_AGENT_HOOK_TOKEN: this.token,
-      ORCA_AGENT_HOOK_ENV: this.env,
-      ORCA_AGENT_HOOK_VERSION: ORCA_HOOK_PROTOCOL_VERSION
+      PEBBLE_AGENT_HOOK_PORT: String(this.port),
+      PEBBLE_AGENT_HOOK_TOKEN: this.token,
+      PEBBLE_AGENT_HOOK_ENV: this.env,
+      PEBBLE_AGENT_HOOK_VERSION: PEBBLE_HOOK_PROTOCOL_VERSION
     }
     // Why: managed hooks source this file at invocation time. Packaged builds
     // use a stable file for restart handoff; dev callers pass a per-instance
     // namespace so parallel `pnpm dev` runs do not steal each other's hooks.
     if (this.endpointFileWritten && this.endpointFilePathCache) {
-      env.ORCA_AGENT_HOOK_ENDPOINT = this.endpointFilePathCache
+      env.PEBBLE_AGENT_HOOK_ENDPOINT = this.endpointFilePathCache
     }
     return env
   }
@@ -1446,7 +1447,7 @@ export class AgentHookServer {
       port: this.port,
       token: this.token,
       env: this.env,
-      version: ORCA_HOOK_PROTOCOL_VERSION
+      version: PEBBLE_HOOK_PROTOCOL_VERSION
     })
     this.endpointFileWritten = ok
   }

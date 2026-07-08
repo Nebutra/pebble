@@ -14,14 +14,16 @@ function gitLiteralPathspec(filePath: string): string {
 }
 
 async function createRepoWithGlobNamedFiles(): Promise<string> {
-  const repo = await mkdtemp(path.join(tmpdir(), 'orca-status-pathspec-'))
+  const repo = await mkdtemp(path.join(tmpdir(), 'pebble-status-pathspec-'))
   tempRoots.push(repo)
   execFileSync('git', ['init', '-q'], { cwd: repo })
   execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: repo })
   execFileSync('git', ['config', 'user.name', 'Test User'], { cwd: repo })
   await writeFile(path.join(repo, globNamedFile), 'selected')
   await writeFile(path.join(repo, globMatchedFile), 'keep')
-  execFileSync('git', ['add', gitLiteralPathspec(globNamedFile), globMatchedFile], { cwd: repo })
+  execFileSync('git', ['add', '-f', gitLiteralPathspec(globNamedFile), globMatchedFile], {
+    cwd: repo
+  })
   execFileSync('git', ['commit', '-q', '-m', 'initial'], { cwd: repo })
   await writeFile(path.join(repo, globNamedFile), 'selected modified')
   await writeFile(path.join(repo, globMatchedFile), 'keep modified')
@@ -58,7 +60,9 @@ describe('git status pathspec literals', () => {
 
   it('unstages a tracked path with Git glob characters as one literal path', async () => {
     const repo = await createRepoWithGlobNamedFiles()
-    execFileSync('git', ['add', gitLiteralPathspec(globNamedFile), globMatchedFile], { cwd: repo })
+    execFileSync('git', ['add', '-f', gitLiteralPathspec(globNamedFile), globMatchedFile], {
+      cwd: repo
+    })
 
     await unstageFile(repo, globNamedFile)
 
@@ -68,7 +72,9 @@ describe('git status pathspec literals', () => {
 
   it('bulk unstages tracked paths with Git glob characters as literal paths', async () => {
     const repo = await createRepoWithGlobNamedFiles()
-    execFileSync('git', ['add', gitLiteralPathspec(globNamedFile), globMatchedFile], { cwd: repo })
+    execFileSync('git', ['add', '-f', gitLiteralPathspec(globNamedFile), globMatchedFile], {
+      cwd: repo
+    })
 
     await bulkUnstageFiles(repo, [globNamedFile])
 

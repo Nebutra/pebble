@@ -185,13 +185,13 @@ export function NotificationStep({
                 <Settings className="size-4" />
                 {translate(
                   'auto.components.onboarding.NotificationStep.d2dba86837',
-                  'Allow Orca in macOS'
+                  'Allow Pebble in macOS'
                 )}
               </div>
               <p className="max-w-[58ch] text-[13px] leading-relaxed text-muted-foreground">
                 {translate(
                   'auto.components.onboarding.NotificationStep.aa36281b00',
-                  'Open System Settings and make sure Orca is allowed to send notifications.'
+                  'Open System Settings and make sure Pebble is allowed to send notifications.'
                 )}
               </p>
             </div>
@@ -219,7 +219,7 @@ export function NotificationStep({
           <p className="text-[13px] leading-relaxed text-muted-foreground">
             {translate(
               'auto.components.onboarding.NotificationStep.0fe570690c',
-              'Pick the alert Orca plays after a desktop notification is delivered.'
+              'Pick the alert Pebble plays after a desktop notification is delivered.'
             )}
           </p>
         </div>

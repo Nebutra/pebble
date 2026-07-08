@@ -87,7 +87,7 @@ export default function SettingsScreen() {
       <View style={[styles.section, styles.sectionSpacer]}>
         <Pressable
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => void Linking.openURL('https://www.onorca.dev/privacy')}
+          onPress={() => void Linking.openURL('https://www.nebutra.com/pebble/docs/privacy')}
         >
           <Shield size={16} color={colors.textSecondary} />
           <Text style={styles.rowLabel}>Privacy Policy</Text>
@@ -95,7 +95,7 @@ export default function SettingsScreen() {
         <View style={styles.separator} />
         <Pressable
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => void Linking.openURL('https://github.com/stablyai/orca/issues')}
+          onPress={() => void Linking.openURL('https://github.com/nebutra/pebble/issues')}
         >
           <LifeBuoy size={16} color={colors.textSecondary} />
           <Text style={styles.rowLabel}>Support</Text>

@@ -1,15 +1,15 @@
-import { test, expect } from './helpers/orca-app'
+import { test, expect } from './helpers/pebble-app'
 import { getStoreState, waitForSessionReady } from './helpers/store'
-import type { ElectronApplication } from '@stablyai/playwright-test'
+import type { ElectronApplication } from '@nebutra/playwright-test'
 
 async function openFeatureTourFromMenu(electronApp: ElectronApplication): Promise<void> {
   await electronApp.evaluate(({ BrowserWindow, Menu }) => {
     const featureTourItem = Menu.getApplicationMenu()
       ?.items.find((item) => item.label === 'Help')
-      ?.submenu?.items.find((item) => item.label === 'Explore Orca')
+      ?.submenu?.items.find((item) => item.label === 'Explore Pebble')
 
     if (!featureTourItem) {
-      throw new Error('Explore Orca menu item was not registered')
+      throw new Error('Explore Pebble menu item was not registered')
     }
 
     const window = BrowserWindow.getAllWindows()[0]
@@ -24,36 +24,36 @@ async function openFeatureTourFromMenu(electronApp: ElectronApplication): Promis
 }
 
 test.describe('Feature tour modal', () => {
-  test.beforeEach(async ({ orcaPage }) => {
-    await waitForSessionReady(orcaPage)
+  test.beforeEach(async ({ pebblePage }) => {
+    await waitForSessionReady(pebblePage)
   })
 
   test('opens from the Help menu and renders the workflow rail', async ({
     electronApp,
-    orcaPage
+    pebblePage
   }) => {
     await openFeatureTourFromMenu(electronApp)
 
-    await expect(orcaPage.getByRole('dialog', { name: 'Get to know Orca' })).toBeVisible({
+    await expect(pebblePage.getByRole('dialog', { name: 'Get to know Pebble' })).toBeVisible({
       timeout: 10_000
     })
-    await expect(orcaPage.getByText('Reopen any time from Help > Explore Orca.')).toBeVisible()
+    await expect(pebblePage.getByText('Reopen any time from Help > Explore Pebble.')).toBeVisible()
 
     // Five workflow rows in the rail.
-    const rail = orcaPage.getByRole('navigation', { name: 'Workflows' })
+    const rail = pebblePage.getByRole('navigation', { name: 'Workflows' })
     await expect(rail.getByRole('tab')).toHaveCount(5)
     await expect(rail.getByRole('tab', { name: /Workspaces/i })).toHaveAttribute(
       'aria-selected',
       'true'
     )
 
-    await expect(orcaPage.locator('[data-ws-id]')).toHaveCount(3)
+    await expect(pebblePage.locator('[data-ws-id]')).toHaveCount(3)
 
     // ArrowDown moves selection through the rail.
     await rail.getByRole('tab', { name: /Workspaces/i }).focus()
-    await orcaPage.keyboard.press('ArrowDown')
+    await pebblePage.keyboard.press('ArrowDown')
     await expect(rail.getByRole('tab', { name: /Tasks/i })).toHaveAttribute('aria-selected', 'true')
-    await orcaPage.keyboard.press('ArrowDown')
+    await pebblePage.keyboard.press('ArrowDown')
     await expect(rail.getByRole('tab', { name: /Agents/i })).toHaveAttribute(
       'aria-selected',
       'true'
@@ -62,20 +62,20 @@ test.describe('Feature tour modal', () => {
     await rail.getByRole('tab', { name: /Workbench/i }).click()
     await rail.getByRole('button', { name: /Browser/i }).click()
     await expect(
-      orcaPage.getByText(
-        "Run your app in Orca's browser, send selected UI elements to agents, and let your agents interact with your webpage."
+      pebblePage.getByText(
+        "Run your app in Pebble's browser, send selected UI elements to agents, and let your agents interact with your webpage."
       )
     ).toBeVisible()
-    await expect(orcaPage.getByRole('heading', { name: 'Browser Use skill' })).toBeVisible()
+    await expect(pebblePage.getByRole('heading', { name: 'Browser Use skill' })).toBeVisible()
     await expect(
-      orcaPage.getByText("Enables agents to navigate and verify pages in Orca's browser.")
+      pebblePage.getByText("Enables agents to navigate and verify pages in Pebble's browser.")
     ).toBeVisible()
-    await expect(orcaPage.getByRole('heading', { name: 'CLI skill' })).toHaveCount(0)
-    await expect(orcaPage.getByText('With the Orca CLI skill', { exact: false })).toHaveCount(0)
+    await expect(pebblePage.getByRole('heading', { name: 'CLI skill' })).toHaveCount(0)
+    await expect(pebblePage.getByText('With the Pebble CLI skill', { exact: false })).toHaveCount(0)
   })
 
-  test('shows unified task copy without leaving the walkthrough', async ({ orcaPage }) => {
-    await orcaPage.evaluate(() => {
+  test('shows unified task copy without leaving the walkthrough', async ({ pebblePage }) => {
+    await pebblePage.evaluate(() => {
       const store = window.__store
       if (!store) {
         throw new Error('window.__store is not available')
@@ -109,25 +109,25 @@ test.describe('Feature tour modal', () => {
       store.getState().openModal('feature-wall', { source: 'help_menu' })
     })
 
-    await expect(orcaPage.getByRole('dialog', { name: 'Get to know Orca' })).toBeVisible({
+    await expect(pebblePage.getByRole('dialog', { name: 'Get to know Pebble' })).toBeVisible({
       timeout: 10_000
     })
-    await orcaPage
+    await pebblePage
       .getByRole('navigation', { name: 'Workflows' })
       .getByRole('tab', { name: /Tasks/i })
       .click()
-    await expect(orcaPage.getByText('Start work directly from GitHub or Linear.')).toBeVisible()
-    await expect(orcaPage.getByText('Connect GitHub or Linear once')).toHaveCount(0)
-    await expect(orcaPage.getByRole('dialog', { name: 'Get to know Orca' })).toBeVisible()
+    await expect(pebblePage.getByText('Start work directly from GitHub or Linear.')).toBeVisible()
+    await expect(pebblePage.getByText('Connect GitHub or Linear once')).toHaveCount(0)
+    await expect(pebblePage.getByRole('dialog', { name: 'Get to know Pebble' })).toBeVisible()
     await expect
-      .poll(async () => getStoreState<string>(orcaPage, 'activeView'))
+      .poll(async () => getStoreState<string>(pebblePage, 'activeView'))
       .not.toBe('settings')
   })
 
   test('continue advances through workflow substeps before the next workflow', async ({
-    orcaPage
+    pebblePage
   }) => {
-    await orcaPage.evaluate(() => {
+    await pebblePage.evaluate(() => {
       const store = window.__store
       if (!store) {
         throw new Error('window.__store is not available')
@@ -135,8 +135,8 @@ test.describe('Feature tour modal', () => {
       store.getState().openModal('feature-wall', { source: 'help_menu' })
     })
 
-    const rail = orcaPage.getByRole('navigation', { name: 'Workflows' })
-    const continueButton = orcaPage.getByRole('button', { name: /^Continue/ })
+    const rail = pebblePage.getByRole('navigation', { name: 'Workflows' })
+    const continueButton = pebblePage.getByRole('button', { name: /^Continue/ })
 
     await continueButton.click()
     await expect(rail.getByRole('tab', { name: /Tasks/i })).toHaveAttribute('aria-selected', 'true')
@@ -179,18 +179,18 @@ test.describe('Feature tour modal', () => {
   })
 
   test('does not pre-check configured workflows until the user visits them', async ({
-    orcaPage
+    pebblePage
   }) => {
-    await orcaPage.evaluate(() => {
+    await pebblePage.evaluate(() => {
       for (const key of [
-        'orca.featureWall.visitedWorkflows.v1',
-        'orca.featureWall.visitedAgentSteps.v1',
-        'orca.featureWall.visitedWorkbenchSteps.v1',
-        'orca.featureWall.visitedReviewSteps.v1',
-        'orca.featureWall.completedWorkflows.v1',
-        'orca.featureWall.completedAgentSteps.v1',
-        'orca.featureWall.completedWorkbenchSteps.v1',
-        'orca.featureWall.completedReviewSteps.v1'
+        'pebble.featureWall.visitedWorkflows.v1',
+        'pebble.featureWall.visitedAgentSteps.v1',
+        'pebble.featureWall.visitedWorkbenchSteps.v1',
+        'pebble.featureWall.visitedReviewSteps.v1',
+        'pebble.featureWall.completedWorkflows.v1',
+        'pebble.featureWall.completedAgentSteps.v1',
+        'pebble.featureWall.completedWorkbenchSteps.v1',
+        'pebble.featureWall.completedReviewSteps.v1'
       ]) {
         localStorage.removeItem(key)
       }
@@ -227,7 +227,7 @@ test.describe('Feature tour modal', () => {
       store.getState().openModal('feature-wall', { source: 'help_menu' })
     })
 
-    const rail = orcaPage.getByRole('navigation', { name: 'Workflows' })
+    const rail = pebblePage.getByRole('navigation', { name: 'Workflows' })
     const workspacesTab = rail.locator('[data-feature-wall-workflow-id="workspaces"]')
     const tasksTab = rail.locator('[data-feature-wall-workflow-id="tasks"]')
     await expect(workspacesTab.locator('[aria-label="Completed"]')).toHaveCount(1)
@@ -238,15 +238,15 @@ test.describe('Feature tour modal', () => {
   })
 
   test('keeps persisted completed setup-backed substeps checked when reopened', async ({
-    orcaPage
+    pebblePage
   }) => {
-    await orcaPage.evaluate(() => {
+    await pebblePage.evaluate(() => {
       localStorage.setItem(
-        'orca.featureWall.completedAgentSteps.v1',
+        'pebble.featureWall.completedAgentSteps.v1',
         JSON.stringify(['orchestration'])
       )
       localStorage.setItem(
-        'orca.featureWall.completedWorkbenchSteps.v1',
+        'pebble.featureWall.completedWorkbenchSteps.v1',
         JSON.stringify(['browser'])
       )
       const store = window.__store
@@ -256,7 +256,7 @@ test.describe('Feature tour modal', () => {
       store.getState().openModal('feature-wall', { source: 'help_menu' })
     })
 
-    const rail = orcaPage.getByRole('navigation', { name: 'Workflows' })
+    const rail = pebblePage.getByRole('navigation', { name: 'Workflows' })
 
     await rail.getByRole('tab', { name: /Agents/i }).click()
     await expect(

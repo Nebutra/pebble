@@ -1,6 +1,6 @@
-import type { ElectronApplication, Page } from '@stablyai/playwright-test'
+import type { ElectronApplication, Page } from '@nebutra/playwright-test'
 import { PNG } from 'pngjs'
-import { test, expect } from './helpers/orca-app'
+import { test, expect } from './helpers/pebble-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import {
   splitActiveTerminalPane,
@@ -283,22 +283,22 @@ async function dispatchDocumentVisibilityCycle(page: Page): Promise<void> {
 test.describe('terminal document visibility WebGL recovery @headful', () => {
   test('clears the WebGL atlas and keeps terminal text painted after document visibility resumes', async ({
     electronApp,
-    orcaPage
+    pebblePage
   }, testInfo) => {
-    await waitForSessionReady(orcaPage)
-    await waitForActiveWorktree(orcaPage)
-    await ensureTerminalVisible(orcaPage)
-    await waitForActiveTerminalManager(orcaPage, 30_000)
-    await splitActiveTerminalPane(orcaPage, 'vertical')
-    await waitForPaneCount(orcaPage, 2)
+    await waitForSessionReady(pebblePage)
+    await waitForActiveWorktree(pebblePage)
+    await ensureTerminalVisible(pebblePage)
+    await waitForActiveTerminalManager(pebblePage, 30_000)
+    await splitActiveTerminalPane(pebblePage, 'vertical')
+    await waitForPaneCount(pebblePage, 2)
 
-    const webglActive = await forceWebgl(orcaPage)
+    const webglActive = await forceWebgl(pebblePage)
     test.skip(!webglActive, 'WebGL was not active in this headful environment')
 
-    await writeStableTerminalContent(orcaPage)
-    expect(await patchAtlasCounter(orcaPage)).toBe(true)
-    expect(await countPatchedWebglAddons(orcaPage)).toBeGreaterThanOrEqual(2)
-    const baseline = await terminalScreenshots(orcaPage)
+    await writeStableTerminalContent(pebblePage)
+    expect(await patchAtlasCounter(pebblePage)).toBe(true)
+    expect(await countPatchedWebglAddons(pebblePage)).toBeGreaterThanOrEqual(2)
+    const baseline = await terminalScreenshots(pebblePage)
     expect(baseline.length).toBeGreaterThanOrEqual(2)
     const baselineInkPixels = baseline.map(countTerminalInkPixels)
     for (const inkPixels of baselineInkPixels) {
@@ -309,35 +309,35 @@ test.describe('terminal document visibility WebGL recovery @headful', () => {
       // Why: this is the app-level background/foreground path where the
       // TerminalPane stays mounted and visible, so React pane visibility does
       // not run its normal resume recovery.
-      await resetAtlasResetCount(orcaPage)
+      await resetAtlasResetCount(pebblePage)
       const browserWindowVisibilityWorked = await tryBrowserWindowVisibilityCycle(
         electronApp,
-        orcaPage
+        pebblePage
       )
       console.log(
         `[visibility-webgl] browserWindowVisibilityWorked=${browserWindowVisibilityWorked}`
       )
       if (browserWindowVisibilityWorked) {
         await expect
-          .poll(() => readAtlasResetCount(orcaPage), {
+          .poll(() => readAtlasResetCount(pebblePage), {
             timeout: 2_000,
             message: 'BrowserWindow visibility resume did not clear the WebGL atlas'
           })
           .toBeGreaterThan(0)
       } else {
-        await resetAtlasResetCount(orcaPage)
-        await dispatchDocumentVisibilityCycle(orcaPage)
+        await resetAtlasResetCount(pebblePage)
+        await dispatchDocumentVisibilityCycle(pebblePage)
         await expect
-          .poll(() => readAtlasResetCount(orcaPage), {
+          .poll(() => readAtlasResetCount(pebblePage), {
             timeout: 2_000,
             message: 'document visibility resume did not clear the WebGL atlas'
           })
           .toBeGreaterThan(0)
       }
 
-      await waitForTerminalPaint(orcaPage)
+      await waitForTerminalPaint(pebblePage)
 
-      const afterResume = await terminalScreenshots(orcaPage)
+      const afterResume = await terminalScreenshots(pebblePage)
       for (const [index, baselineShot] of baseline.entries()) {
         await testInfo.attach(`visibility-webgl-baseline-${index}`, {
           body: baselineShot,

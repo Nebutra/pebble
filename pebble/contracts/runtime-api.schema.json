@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pebble.local/contracts/runtime-api.schema.json",
+  "title": "Pebble Runtime API",
+  "type": "object",
+  "required": ["version", "resources"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "pebble.runtime.v1"
+    },
+    "resources": {
+      "type": "object",
+      "required": [
+        "status",
+        "events",
+        "projects",
+        "worktrees",
+        "sessions",
+        "agents",
+        "orchestration",
+        "automations",
+        "externalTasks",
+        "sourceControl",
+        "files",
+        "releases",
+        "settings",
+        "browser",
+        "computer",
+        "emulator",
+        "providers",
+        "mobileRelay"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/resource"
+        },
+        "events": {
+          "$ref": "#/$defs/resource"
+        },
+        "projects": {
+          "$ref": "#/$defs/resource"
+        },
+        "worktrees": {
+          "$ref": "#/$defs/resource"
+        },
+        "sessions": {
+          "$ref": "#/$defs/resource"
+        },
+        "agents": {
+          "$ref": "#/$defs/resource"
+        },
+        "orchestration": {
+          "$ref": "#/$defs/resource"
+        },
+        "automations": {
+          "$ref": "#/$defs/resource"
+        },
+        "externalTasks": {
+          "$ref": "#/$defs/resource"
+        },
+        "sourceControl": {
+          "$ref": "#/$defs/resource"
+        },
+        "files": {
+          "$ref": "#/$defs/resource"
+        },
+        "releases": {
+          "$ref": "#/$defs/resource"
+        },
+        "settings": {
+          "$ref": "#/$defs/resource"
+        },
+        "browser": {
+          "$ref": "#/$defs/resource"
+        },
+        "computer": {
+          "$ref": "#/$defs/resource"
+        },
+        "emulator": {
+          "$ref": "#/$defs/resource"
+        },
+        "providers": {
+          "$ref": "#/$defs/resource"
+        },
+        "mobileRelay": {
+          "$ref": "#/$defs/resource"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "resource": {
+      "type": "object",
+      "required": ["path", "methods"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "methods": {
+          "type": "array",
+          "items": {
+            "enum": ["GET", "POST", "PATCH", "DELETE", "STREAM"]
+          },
+          "minItems": 1
+        },
+        "routes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/resource"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

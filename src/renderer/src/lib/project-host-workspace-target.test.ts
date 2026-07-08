@@ -57,27 +57,27 @@ function makeSetup(
 
 describe('project-host workspace target resolution', () => {
   it('falls back to a local setup for a local-only repo', () => {
-    const repo = makeRepo('orca')
+    const repo = makeRepo('pebble')
 
     const resolution = resolveWorkspaceCreationTarget({ eligibleRepos: [repo] })
 
     expect(resolution).toMatchObject({
       status: 'ready',
       target: {
-        projectId: 'repo:orca',
+        projectId: 'repo:pebble',
         hostId: 'local',
-        projectHostSetupId: 'orca',
-        repoId: 'orca'
+        projectHostSetupId: 'pebble',
+        repoId: 'pebble'
       }
     })
   })
 
   it('chooses the focused host setup when one project exists on multiple hosts', () => {
-    const repos = [makeRepo('orca-local'), makeRepo('orca-ssh', { connectionId: 'openclaw-2' })]
-    const projects = [makeProject('github:stablyai/orca', ['orca-local', 'orca-ssh'])]
+    const repos = [makeRepo('pebble-local'), makeRepo('pebble-ssh', { connectionId: 'openclaw-2' })]
+    const projects = [makeProject('github:nebutra/pebble', ['pebble-local', 'pebble-ssh'])]
     const projectHostSetups = [
-      makeSetup('orca-local', 'github:stablyai/orca', 'local', 'orca-local'),
-      makeSetup('orca-ssh', 'github:stablyai/orca', 'ssh:openclaw-2', 'orca-ssh')
+      makeSetup('pebble-local', 'github:nebutra/pebble', 'local', 'pebble-local'),
+      makeSetup('pebble-ssh', 'github:nebutra/pebble', 'ssh:openclaw-2', 'pebble-ssh')
     ]
 
     expect(
@@ -85,68 +85,68 @@ describe('project-host workspace target resolution', () => {
         eligibleRepos: repos,
         projects,
         projectHostSetups,
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         focusedHostScope: 'ssh:openclaw-2'
       })
-    ).toBe('orca-ssh')
+    ).toBe('pebble-ssh')
   })
 
   it('resolves an explicit project and host to the matching setup', () => {
     const repos = [
-      makeRepo('orca-local'),
-      makeRepo('orca-runtime', { executionHostId: 'runtime:gpu-1' })
+      makeRepo('pebble-local'),
+      makeRepo('pebble-runtime', { executionHostId: 'runtime:gpu-1' })
     ]
-    const projects = [makeProject('github:stablyai/orca', ['orca-local', 'orca-runtime'])]
+    const projects = [makeProject('github:nebutra/pebble', ['pebble-local', 'pebble-runtime'])]
     const projectHostSetups = [
-      makeSetup('orca-local', 'github:stablyai/orca', 'local', 'orca-local'),
-      makeSetup('orca-runtime', 'github:stablyai/orca', 'runtime:gpu-1', 'orca-runtime')
+      makeSetup('pebble-local', 'github:nebutra/pebble', 'local', 'pebble-local'),
+      makeSetup('pebble-runtime', 'github:nebutra/pebble', 'runtime:gpu-1', 'pebble-runtime')
     ]
 
     const resolution = resolveWorkspaceCreationTarget({
       eligibleRepos: repos,
       projects,
       projectHostSetups,
-      projectId: 'github:stablyai/orca',
+      projectId: 'github:nebutra/pebble',
       hostId: 'runtime:gpu-1'
     })
 
     expect(resolution).toMatchObject({
       status: 'ready',
       target: {
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         hostId: 'runtime:gpu-1',
-        projectHostSetupId: 'orca-runtime',
-        repoId: 'orca-runtime'
+        projectHostSetupId: 'pebble-runtime',
+        repoId: 'pebble-runtime'
       }
     })
   })
 
   it('does not merge same-name repos without shared project identity', () => {
     const repos = [
-      makeRepo('personal-orca', { displayName: 'orca' }),
-      makeRepo('work-orca', { displayName: 'orca', connectionId: 'work-linux' })
+      makeRepo('personal-pebble', { displayName: 'pebble' }),
+      makeRepo('work-pebble', { displayName: 'pebble', connectionId: 'work-linux' })
     ]
 
     expect(
       resolveWorkspaceCreationRepoId({
         eligibleRepos: repos,
-        projectId: 'repo:personal-orca',
+        projectId: 'repo:personal-pebble',
         focusedHostScope: 'ssh:work-linux'
       })
-    ).toBe('personal-orca')
+    ).toBe('personal-pebble')
   })
 
   it('reports unavailable when the project is not set up on the selected host', () => {
-    const repo = makeRepo('orca')
-    const projects = [makeProject('github:stablyai/orca', ['orca'])]
-    const projectHostSetups = [makeSetup('orca', 'github:stablyai/orca', 'local', 'orca')]
+    const repo = makeRepo('pebble')
+    const projects = [makeProject('github:nebutra/pebble', ['pebble'])]
+    const projectHostSetups = [makeSetup('pebble', 'github:nebutra/pebble', 'local', 'pebble')]
 
     expect(
       resolveWorkspaceCreationTarget({
         eligibleRepos: [repo],
         projects,
         projectHostSetups,
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         hostId: 'ssh:openclaw-2'
       })
     ).toEqual({
@@ -156,11 +156,11 @@ describe('project-host workspace target resolution', () => {
   })
 
   it('reports setup-not-ready when the selected host has pending setup metadata', () => {
-    const repo = makeRepo('orca')
-    const projects = [makeProject('github:stablyai/orca', ['orca'])]
+    const repo = makeRepo('pebble')
+    const projects = [makeProject('github:nebutra/pebble', ['pebble'])]
     const projectHostSetups = [
-      makeSetup('orca', 'github:stablyai/orca', 'local', 'orca'),
-      makeSetup('gpu-pending', 'github:stablyai/orca', 'runtime:gpu', '', {
+      makeSetup('pebble', 'github:nebutra/pebble', 'local', 'pebble'),
+      makeSetup('gpu-pending', 'github:nebutra/pebble', 'runtime:gpu', '', {
         path: '',
         setupState: 'setting-up',
         setupMethod: 'provisioned'
@@ -172,7 +172,7 @@ describe('project-host workspace target resolution', () => {
         eligibleRepos: [repo],
         projects,
         projectHostSetups,
-        projectId: 'github:stablyai/orca',
+        projectId: 'github:nebutra/pebble',
         hostId: 'runtime:gpu'
       })
     ).toEqual({
@@ -182,10 +182,10 @@ describe('project-host workspace target resolution', () => {
   })
 
   it('reports unavailable when an explicit setup is not ready', () => {
-    const repo = makeRepo('orca')
-    const projects = [makeProject('github:stablyai/orca', ['orca'])]
+    const repo = makeRepo('pebble')
+    const projects = [makeProject('github:nebutra/pebble', ['pebble'])]
     const projectHostSetups = [
-      makeSetup('orca', 'github:stablyai/orca', 'local', 'orca', { setupState: 'setting-up' })
+      makeSetup('pebble', 'github:nebutra/pebble', 'local', 'pebble', { setupState: 'setting-up' })
     ]
 
     expect(
@@ -193,7 +193,7 @@ describe('project-host workspace target resolution', () => {
         eligibleRepos: [repo],
         projects,
         projectHostSetups,
-        projectHostSetupId: 'orca'
+        projectHostSetupId: 'pebble'
       })
     ).toEqual({
       status: 'unavailable',

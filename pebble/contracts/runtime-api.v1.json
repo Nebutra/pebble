@@ -1,0 +1,351 @@
+{
+  "version": "pebble.runtime.v1",
+  "resources": {
+    "status": {
+      "path": "/v1/status",
+      "methods": ["GET"]
+    },
+    "events": {
+      "path": "/v1/events",
+      "methods": ["STREAM"]
+    },
+    "projects": {
+      "path": "/v1/projects",
+      "methods": ["GET", "POST", "PATCH", "DELETE"],
+      "routes": {
+        "projects": {
+          "path": "/v1/projects",
+          "methods": ["GET", "POST"]
+        },
+        "project": {
+          "path": "/v1/projects/{id}",
+          "methods": ["PATCH", "DELETE"]
+        }
+      }
+    },
+    "worktrees": {
+      "path": "/v1/worktrees",
+      "methods": ["GET", "POST", "DELETE"],
+      "routes": {
+        "worktrees": {
+          "path": "/v1/worktrees",
+          "methods": ["GET", "POST"]
+        },
+        "worktree": {
+          "path": "/v1/worktrees/{id}",
+          "methods": ["DELETE"]
+        }
+      }
+    },
+    "sessions": {
+      "path": "/v1/sessions",
+      "methods": ["GET", "POST", "PATCH", "DELETE", "STREAM"]
+    },
+    "agents": {
+      "path": "/v1/agents",
+      "methods": ["GET", "POST", "PATCH", "DELETE", "STREAM"],
+      "routes": {
+        "profiles": {
+          "path": "/v1/agents/profiles",
+          "methods": ["GET", "POST"]
+        },
+        "profile": {
+          "path": "/v1/agents/profiles/{id}",
+          "methods": ["PATCH", "DELETE"]
+        },
+        "runs": {
+          "path": "/v1/agents/runs",
+          "methods": ["GET", "POST"]
+        },
+        "run": {
+          "path": "/v1/agents/runs/{id}",
+          "methods": ["DELETE"]
+        }
+      }
+    },
+    "orchestration": {
+      "path": "/v1/orchestration",
+      "methods": ["GET", "POST", "PATCH", "DELETE", "STREAM"],
+      "routes": {
+        "tasks": {
+          "path": "/v1/orchestration/tasks",
+          "methods": ["GET", "POST"]
+        },
+        "task": {
+          "path": "/v1/orchestration/tasks/{id}",
+          "methods": ["PATCH"]
+        },
+        "messages": {
+          "path": "/v1/orchestration/messages",
+          "methods": ["GET", "POST"]
+        },
+        "messageReply": {
+          "path": "/v1/orchestration/messages/{id}/reply",
+          "methods": ["POST"]
+        },
+        "dispatches": {
+          "path": "/v1/orchestration/dispatches",
+          "methods": ["GET", "POST"]
+        },
+        "dispatch": {
+          "path": "/v1/orchestration/dispatches/{id}",
+          "methods": ["PATCH"]
+        }
+      }
+    },
+    "automations": {
+      "path": "/v1/automations",
+      "methods": ["GET", "POST", "PATCH", "DELETE", "STREAM"],
+      "routes": {
+        "automations": {
+          "path": "/v1/automations",
+          "methods": ["GET", "POST"]
+        },
+        "automation": {
+          "path": "/v1/automations/{id}",
+          "methods": ["PATCH", "DELETE"]
+        },
+        "runs": {
+          "path": "/v1/automations/runs",
+          "methods": ["GET"]
+        },
+        "automationRuns": {
+          "path": "/v1/automations/{id}/runs",
+          "methods": ["GET", "POST"]
+        },
+        "evaluate": {
+          "path": "/v1/automations/evaluate",
+          "methods": ["POST"]
+        }
+      }
+    },
+    "externalTasks": {
+      "path": "/v1/external-tasks",
+      "methods": ["GET", "POST", "PATCH", "DELETE", "STREAM"],
+      "routes": {
+        "items": {
+          "path": "/v1/external-tasks",
+          "methods": ["GET", "POST"]
+        },
+        "item": {
+          "path": "/v1/external-tasks/{id}",
+          "methods": ["PATCH", "DELETE"]
+        }
+      }
+    },
+    "sourceControl": {
+      "path": "/v1/source-control",
+      "methods": ["GET", "POST", "PATCH", "STREAM"],
+      "routes": {
+        "projections": {
+          "path": "/v1/source-control",
+          "methods": ["GET"]
+        },
+        "projectionUpdates": {
+          "path": "/v1/source-control/projections",
+          "methods": ["POST"]
+        },
+        "status": {
+          "path": "/v1/source-control/status",
+          "methods": ["GET"]
+        },
+        "diff": {
+          "path": "/v1/source-control/diff",
+          "methods": ["GET"]
+        }
+      }
+    },
+    "files": {
+      "path": "/v1/files",
+      "methods": ["GET", "POST", "STREAM"],
+      "routes": {
+        "tree": {
+          "path": "/v1/files/tree",
+          "methods": ["GET"]
+        },
+        "read": {
+          "path": "/v1/files/read",
+          "methods": ["GET"]
+        },
+        "write": {
+          "path": "/v1/files/write",
+          "methods": ["POST"]
+        },
+        "treeSnapshots": {
+          "path": "/v1/files/tree-snapshots",
+          "methods": ["POST"]
+        },
+        "contentSnapshots": {
+          "path": "/v1/files/content-snapshots",
+          "methods": ["POST"]
+        }
+      }
+    },
+    "releases": {
+      "path": "/v1/releases",
+      "methods": ["GET", "POST", "PATCH"],
+      "routes": {
+        "plans": {
+          "path": "/v1/releases",
+          "methods": ["GET", "POST"]
+        },
+        "plan": {
+          "path": "/v1/releases/{id}",
+          "methods": ["PATCH"]
+        },
+        "artifacts": {
+          "path": "/v1/releases/{id}/artifacts",
+          "methods": ["POST"]
+        },
+        "checks": {
+          "path": "/v1/releases/{id}/checks",
+          "methods": ["POST"]
+        },
+        "manifest": {
+          "path": "/v1/releases/{id}/manifest",
+          "methods": ["GET"]
+        },
+        "publish": {
+          "path": "/v1/releases/{id}/publish",
+          "methods": ["POST"]
+        }
+      }
+    },
+    "settings": {
+      "path": "/v1/settings",
+      "methods": ["GET", "POST"],
+      "routes": {
+        "settings": {
+          "path": "/v1/settings",
+          "methods": ["GET", "POST"]
+        },
+        "keybindings": {
+          "path": "/v1/settings/keybindings",
+          "methods": ["GET", "POST"]
+        }
+      }
+    },
+    "browser": {
+      "path": "/v1/browser",
+      "methods": ["GET", "POST", "PATCH", "DELETE", "STREAM"],
+      "routes": {
+        "tabs": {
+          "path": "/v1/browser/tabs",
+          "methods": ["GET", "POST"]
+        },
+        "tab": {
+          "path": "/v1/browser/tabs/{id}",
+          "methods": ["PATCH", "DELETE"]
+        },
+        "tabCommands": {
+          "path": "/v1/browser/tabs/{id}/commands",
+          "methods": ["POST"]
+        },
+        "profiles": {
+          "path": "/v1/browser/profiles",
+          "methods": ["GET", "POST"]
+        },
+        "permissions": {
+          "path": "/v1/browser/permissions",
+          "methods": ["GET", "POST"]
+        },
+        "downloads": {
+          "path": "/v1/browser/downloads",
+          "methods": ["GET", "POST"]
+        },
+        "download": {
+          "path": "/v1/browser/downloads/{id}",
+          "methods": ["PATCH"]
+        },
+        "downloadCommands": {
+          "path": "/v1/browser/downloads/{id}/commands/start",
+          "methods": ["POST"]
+        }
+      }
+    },
+    "computer": {
+      "path": "/v1/computer",
+      "methods": ["GET", "POST", "PATCH", "STREAM"],
+      "routes": {
+        "actions": {
+          "path": "/v1/computer/actions",
+          "methods": ["GET", "POST"]
+        },
+        "claimActions": {
+          "path": "/v1/computer/actions/claim",
+          "methods": ["POST"]
+        },
+        "action": {
+          "path": "/v1/computer/actions/{id}",
+          "methods": ["PATCH"]
+        }
+      }
+    },
+    "emulator": {
+      "path": "/v1/emulator",
+      "methods": ["GET", "POST", "PATCH", "DELETE", "STREAM"],
+      "routes": {
+        "devices": {
+          "path": "/v1/emulator/devices",
+          "methods": ["GET", "POST"]
+        },
+        "device": {
+          "path": "/v1/emulator/devices/{id}",
+          "methods": ["PATCH"]
+        },
+        "sessions": {
+          "path": "/v1/emulator/sessions",
+          "methods": ["GET", "POST"]
+        },
+        "session": {
+          "path": "/v1/emulator/sessions/{id}",
+          "methods": ["DELETE"]
+        },
+        "sessionCommands": {
+          "path": "/v1/emulator/sessions/{id}/commands",
+          "methods": ["POST"]
+        }
+      }
+    },
+    "mobileRelay": {
+      "path": "/v1/mobile-relay",
+      "methods": ["GET", "POST", "DELETE", "STREAM"],
+      "routes": {
+        "status": {
+          "path": "/v1/mobile-relay/status",
+          "methods": ["GET"]
+        },
+        "pairingCodes": {
+          "path": "/v1/mobile-relay/pairing-codes",
+          "methods": ["POST"]
+        },
+        "pairings": {
+          "path": "/v1/mobile-relay/pairings",
+          "methods": ["GET"]
+        },
+        "projection": {
+          "path": "/v1/mobile-relay/projection",
+          "methods": ["GET"]
+        },
+        "websocket": {
+          "path": "/v1/mobile-relay",
+          "methods": ["STREAM"]
+        }
+      }
+    },
+    "providers": {
+      "path": "/v1/providers",
+      "methods": ["GET", "POST"],
+      "routes": {
+        "providers": {
+          "path": "/v1/providers",
+          "methods": ["GET"]
+        },
+        "providerRegistration": {
+          "path": "/v1/providers",
+          "methods": ["POST"]
+        }
+      }
+    }
+  }
+}

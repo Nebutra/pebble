@@ -33,7 +33,7 @@ describe('CdpWsProxy', () => {
   function expectPdfStreamHandle(response: Record<string, unknown>): string {
     const result = response.result as Record<string, unknown>
     expect(result.data).toBe('')
-    expect(result.stream).toEqual(expect.stringMatching(/^orca-pdf-[\da-f-]{36}-\d+$/))
+    expect(result.stream).toEqual(expect.stringMatching(/^pebble-pdf-[\da-f-]{36}-\d+$/))
     return result.stream as string
   }
 
@@ -363,7 +363,7 @@ describe('CdpWsProxy', () => {
       id: 16,
       error: {
         code: -32000,
-        message: 'Page.reload parameter "loaderId" is not supported for Orca tab reloads'
+        message: 'Page.reload parameter "loaderId" is not supported for Pebble tab reloads'
       }
     })
     expect(mock.webContents.reload).not.toHaveBeenCalled()

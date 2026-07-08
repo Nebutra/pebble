@@ -5,27 +5,27 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
-const RUNTIME_METADATA_FILE = 'orca-runtime.json'
-let orcaDevUserDataPath: string | null = null
-let orcaServeProcess: ChildProcess | null = null
-let orcaServeStdout = ''
-let orcaServeStderr = ''
+const RUNTIME_METADATA_FILE = 'pebble-runtime.json'
+let pebbleDevUserDataPath: string | null = null
+let pebbleServeProcess: ChildProcess | null = null
+let pebbleServeStdout = ''
+let pebbleServeStderr = ''
 
 export type CliResult = {
   stdout: string
   stderr: string
 }
 
-type RunOrcaCliOptions = {
+type RunPebbleCliOptions = {
   retryMissingRuntimeMetadata?: boolean
 }
 
-export async function runOrcaCli(
+export async function runPebbleCli(
   args: string[],
-  options: RunOrcaCliOptions = {}
+  options: RunPebbleCliOptions = {}
 ): Promise<CliResult> {
   try {
-    return await runOrcaCliOnce(args)
+    return await runPebbleCliOnce(args)
   } catch (error) {
     if (
       options.retryMissingRuntimeMetadata !== false &&
@@ -33,20 +33,20 @@ export async function runOrcaCli(
     ) {
       // Why: Windows CI can let the dev runtime exit while launching the
       // fixture app; reopen once so the desktop action gets a live runtime.
-      await ensureOrcaRuntimeLaunched()
-      return await runOrcaCliOnce(args)
+      await ensurePebbleRuntimeLaunched()
+      return await runPebbleCliOnce(args)
     }
     throw error
   }
 }
 
-async function runOrcaCliOnce(args: string[]): Promise<CliResult> {
-  const devCli = join(process.cwd(), 'config/scripts/orca-dev.mjs')
-  const command = process.env.ORCA_COMPUTER_CLI ?? process.execPath
-  const cliArgs = process.env.ORCA_COMPUTER_CLI ? args : [devCli, ...args]
+async function runPebbleCliOnce(args: string[]): Promise<CliResult> {
+  const devCli = join(process.cwd(), 'config/scripts/pebble-dev.mjs')
+  const command = process.env.PEBBLE_COMPUTER_CLI ?? process.execPath
+  const cliArgs = process.env.PEBBLE_COMPUTER_CLI ? args : [devCli, ...args]
   const env = { ...process.env }
-  if (!process.env.ORCA_COMPUTER_CLI && !env.ORCA_DEV_USER_DATA_PATH) {
-    env.ORCA_DEV_USER_DATA_PATH = await getComputerE2eOrcaDevUserDataPath()
+  if (!process.env.PEBBLE_COMPUTER_CLI && !env.PEBBLE_DEV_USER_DATA_PATH) {
+    env.PEBBLE_DEV_USER_DATA_PATH = await getComputerE2ePebbleDevUserDataPath()
   }
   try {
     const result = await execFileAsync(command, cliArgs, {
@@ -63,21 +63,21 @@ async function runOrcaCliOnce(args: string[]): Promise<CliResult> {
   }
 }
 
-export async function ensureOrcaRuntimeLaunched(): Promise<void> {
-  if (!process.env.ORCA_COMPUTER_CLI && process.platform === 'win32') {
-    await ensureOrcaRuntimeServed()
+export async function ensurePebbleRuntimeLaunched(): Promise<void> {
+  if (!process.env.PEBBLE_COMPUTER_CLI && process.platform === 'win32') {
+    await ensurePebbleRuntimeServed()
     return
   }
-  await runOrcaCli(['open', '--json'], { retryMissingRuntimeMetadata: false })
-  await waitForOrcaRuntimeReady()
+  await runPebbleCli(['open', '--json'], { retryMissingRuntimeMetadata: false })
+  await waitForPebbleRuntimeReady()
 }
 
-export async function stopOrcaRuntime(): Promise<void> {
-  const processToStop = orcaServeProcess
+export async function stopPebbleRuntime(): Promise<void> {
+  const processToStop = pebbleServeProcess
   if (!processToStop?.pid) {
     return
   }
-  orcaServeProcess = null
+  pebbleServeProcess = null
   if (process.platform === 'win32') {
     try {
       await execFileAsync('taskkill.exe', ['/PID', String(processToStop.pid), '/T', '/F'])
@@ -93,17 +93,17 @@ export function parseJsonOutput<T>(stdout: string): T {
   return JSON.parse(stdout) as T
 }
 
-async function getComputerE2eOrcaDevUserDataPath(): Promise<string> {
-  if (!orcaDevUserDataPath) {
-    // Why: the shared orca-dev profile can keep an older runtime alive across
+async function getComputerE2ePebbleDevUserDataPath(): Promise<string> {
+  if (!pebbleDevUserDataPath) {
+    // Why: the shared pebble-dev profile can keep an older runtime alive across
     // local test runs, making computer-use E2E exercise stale provider code.
-    orcaDevUserDataPath = await mkdtemp(join(tmpdir(), 'orca-computer-runtime-'))
+    pebbleDevUserDataPath = await mkdtemp(join(tmpdir(), 'pebble-computer-runtime-'))
   }
-  return orcaDevUserDataPath
+  return pebbleDevUserDataPath
 }
 
-async function waitForOrcaRuntimeReady(): Promise<void> {
-  const userDataPath = await getComputerE2eOrcaDevUserDataPath()
+async function waitForPebbleRuntimeReady(): Promise<void> {
+  const userDataPath = await getComputerE2ePebbleDevUserDataPath()
   const metadataPath = join(userDataPath, RUNTIME_METADATA_FILE)
   const deadline = Date.now() + 15000
   let lastError: unknown = null
@@ -113,7 +113,7 @@ async function waitForOrcaRuntimeReady(): Promise<void> {
       await access(metadataPath)
       const status = parseJsonOutput<{
         result: { runtime: { reachable: boolean } }
-      }>((await runOrcaCli(['status', '--json'], { retryMissingRuntimeMetadata: false })).stdout)
+      }>((await runPebbleCli(['status', '--json'], { retryMissingRuntimeMetadata: false })).stdout)
       if (status.result.runtime.reachable) {
         return
       }
@@ -125,45 +125,45 @@ async function waitForOrcaRuntimeReady(): Promise<void> {
 
   const detail = [
     lastError instanceof Error ? `Last error: ${lastError.message}` : null,
-    orcaServeStdout.trim() ? `serve stdout: ${orcaServeStdout.trim()}` : null,
-    orcaServeStderr.trim() ? `serve stderr: ${orcaServeStderr.trim()}` : null
+    pebbleServeStdout.trim() ? `serve stdout: ${pebbleServeStdout.trim()}` : null,
+    pebbleServeStderr.trim() ? `serve stderr: ${pebbleServeStderr.trim()}` : null
   ]
     .filter(Boolean)
     .join(' ')
-  throw new Error(`Orca runtime metadata was not ready at ${metadataPath}.${detail}`)
+  throw new Error(`Pebble runtime metadata was not ready at ${metadataPath}.${detail}`)
 }
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function ensureOrcaRuntimeServed(): Promise<void> {
-  if (!orcaServeProcess || orcaServeProcess.exitCode !== null) {
-    const devCli = join(process.cwd(), 'config/scripts/orca-dev.mjs')
+async function ensurePebbleRuntimeServed(): Promise<void> {
+  if (!pebbleServeProcess || pebbleServeProcess.exitCode !== null) {
+    const devCli = join(process.cwd(), 'config/scripts/pebble-dev.mjs')
     const env = {
       ...process.env,
-      ORCA_DEV_USER_DATA_PATH: await getComputerE2eOrcaDevUserDataPath()
+      PEBBLE_DEV_USER_DATA_PATH: await getComputerE2ePebbleDevUserDataPath()
     }
-    orcaServeStdout = ''
-    orcaServeStderr = ''
-    orcaServeProcess = spawn(process.execPath, [devCli, 'serve', '--no-pairing', '--json'], {
+    pebbleServeStdout = ''
+    pebbleServeStderr = ''
+    pebbleServeProcess = spawn(process.execPath, [devCli, 'serve', '--no-pairing', '--json'], {
       env,
       windowsHide: true
     })
-    orcaServeProcess.stdout?.on('data', (chunk) => {
-      orcaServeStdout += String(chunk)
+    pebbleServeProcess.stdout?.on('data', (chunk) => {
+      pebbleServeStdout += String(chunk)
     })
-    orcaServeProcess.stderr?.on('data', (chunk) => {
-      orcaServeStderr += String(chunk)
+    pebbleServeProcess.stderr?.on('data', (chunk) => {
+      pebbleServeStderr += String(chunk)
     })
-    orcaServeProcess.once('exit', () => {
-      orcaServeProcess = null
+    pebbleServeProcess.once('exit', () => {
+      pebbleServeProcess = null
     })
     process.once('exit', () => {
-      orcaServeProcess?.kill()
+      pebbleServeProcess?.kill()
     })
   }
-  await waitForOrcaRuntimeReady()
+  await waitForPebbleRuntimeReady()
 }
 
 function isMissingRuntimeMetadataError(args: string[], error: unknown): boolean {
@@ -176,6 +176,6 @@ function isMissingRuntimeMetadataError(args: string[], error: unknown): boolean 
   const message = String((error as { message?: unknown }).message)
   return (
     message.includes('"code": "runtime_unavailable"') &&
-    message.includes('Could not read Orca runtime metadata')
+    message.includes('Could not read Pebble runtime metadata')
   )
 }

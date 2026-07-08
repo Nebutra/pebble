@@ -405,7 +405,7 @@ const execFileAsync = promisify(execFile)
 // costs a full powershell.exe spawn (300-800ms cold, worse under Defender).
 // Async because the sync version measurably froze the Electron main thread at
 // startup for the whole spawn (benchmark: ~0.5s warm, 3s timeout cap cold).
-// Timed under ORCA_STARTUP_DIAGNOSTICS so the cold-start benchmark can
+// Timed under PEBBLE_STARTUP_DIAGNOSTICS so the cold-start benchmark can
 // attribute startup cost to these checks.
 async function queryWindowsProcessCommandLine(pid: number): Promise<string | null> {
   const startedAt = performance.now()

@@ -18,7 +18,7 @@ const exposeStore = preloadEnv?.MODE === 'e2e' || isEnvFlagEnabled(preloadEnv?.V
 // Renderer code should consume a typed config object from this bridge instead
 // of reading test-only env vars directly.
 export const preloadE2EConfig = createE2EConfig({
-  headless: process.env.ORCA_E2E_HEADLESS === '1',
+  headless: process.env.PEBBLE_E2E_HEADLESS === '1',
   exposeStore,
-  userDataDir: process.env.ORCA_E2E_USER_DATA_DIR ?? null
+  userDataDir: process.env.PEBBLE_E2E_USER_DATA_DIR ?? null
 })

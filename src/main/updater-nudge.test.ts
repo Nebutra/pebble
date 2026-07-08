@@ -23,6 +23,9 @@ describe('updater-nudge', () => {
       })
 
       const result = await fetchNudge()
+      expect(netFetchMock.mock.calls[0]?.[0]).toBe(
+        'https://www.nebutra.com/pebble/whats-new/nudge.json'
+      )
       expect(result).toEqual({ id: 'campaign-1', minVersion: '1.1.0', maxVersion: '1.1.19' })
     })
 

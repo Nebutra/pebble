@@ -18,14 +18,14 @@ let fakeWorktrees = createMockWorktrees(FAKE_REPOS, MOCK_WORKTREE_COUNT)
 const FAKE_TERMINALS = [
   {
     handle: 'term-1',
-    worktreeId: fakeWorktrees[0]?.worktreeId ?? 'repo-1::/tmp/orca-mobile-repro/orca',
+    worktreeId: fakeWorktrees[0]?.worktreeId ?? 'repo-1::/tmp/pebble-mobile-repro/pebble',
     title: 'Claude — auth refactor',
     isActive: true,
     hasRunningProcess: true
   },
   {
     handle: 'term-2',
-    worktreeId: fakeWorktrees[0]?.worktreeId ?? 'repo-1::/tmp/orca-mobile-repro/orca',
+    worktreeId: fakeWorktrees[0]?.worktreeId ?? 'repo-1::/tmp/pebble-mobile-repro/pebble',
     title: 'zsh',
     isActive: false,
     hasRunningProcess: false
@@ -155,7 +155,7 @@ export function handleRequest(
             hideDefaultBranchWorkspace: false,
             filterRepoIds: [],
             collapsedGroups: [],
-            trustedOrcaHooks: {}
+            trustedPebbleHooks: {}
           }
         })
       )
@@ -222,7 +222,7 @@ export function handleRequest(
       respond(
         success(request.id, {
           worktree: {
-            id: next?.worktreeId ?? `repo-1::/tmp/orca-mobile-repro/${name}`,
+            id: next?.worktreeId ?? `repo-1::/tmp/pebble-mobile-repro/${name}`,
             worktreeId: next?.worktreeId
           }
         })

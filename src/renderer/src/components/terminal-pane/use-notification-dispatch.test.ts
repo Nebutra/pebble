@@ -136,7 +136,7 @@ describe('dispatchTerminalNotification', () => {
           }
         ]
       },
-      repos: [{ id: 'repo1', displayName: 'orca', connectionId: null }],
+      repos: [{ id: 'repo1', displayName: 'pebble', connectionId: null }],
       settings: { experimentalTerminalAttention: true, notifications: { customSoundPath: null } },
       markWorktreeUnread: vi.fn(),
       markTerminalTabUnread: vi.fn(),
@@ -173,7 +173,7 @@ describe('dispatchTerminalNotification', () => {
         }),
         worktreeId: 'wt-primary',
         paneKey,
-        repoLabel: 'orca',
+        repoLabel: 'pebble',
         worktreeLabel: 'master',
         terminalTitle: 'codex',
         isActiveWorktree: false,
@@ -336,7 +336,7 @@ describe('dispatchTerminalNotification', () => {
     expect(mockState.markTerminalPaneUnread).toHaveBeenCalledWith(siblingPaneKey)
   })
 
-  it('marks the selected worktree unread when Orca is backgrounded', () => {
+  it('marks the selected worktree unread when Pebble is backgrounded', () => {
     mockState.settings.experimentalTerminalAttention = false
     mockState.activeWorktreeId = 'wt-primary'
     stubDocumentFocus({ visibilityState: 'hidden', focused: false })

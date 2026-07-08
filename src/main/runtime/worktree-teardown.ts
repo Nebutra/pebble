@@ -1,9 +1,9 @@
 import type { IPtyProvider } from '../providers/types'
-import type { OrcaRuntimeService } from './orca-runtime'
+import type { PebbleRuntimeService } from './pebble-runtime'
 import { listRegisteredPtys } from '../memory/pty-registry'
 
 export type WorktreeTeardownDeps = {
-  runtime?: OrcaRuntimeService
+  runtime?: PebbleRuntimeService
   localProvider: IPtyProvider
   onPtyStopped?: (ptyId: string) => void
 }

@@ -165,8 +165,8 @@ export async function submitFolderWorkspaceCreate({
       ? linkedName
       : name.trim() || linkedName || `${projectGroup.name} workspace`
   const launchPlatform = getFolderWorkspaceAgentLaunchPlatform(projectGroup)
-  // Why: an SSH folder group runs the plain `orca` relay shim, so the Linux-only
-  // `orca-ide` rename must not be applied for remote launches.
+  // Why: an SSH folder group runs the plain `pebble` relay shim, so the Linux-only
+  // `pebble-ide` rename must not be applied for remote launches.
   const launchIsRemote = Boolean(projectGroup.connectionId)
   const startupPlan =
     quickAgent && linkedWorkItem

@@ -52,7 +52,7 @@ export async function getNotificationPermissionState(): Promise<NotificationPerm
 
 // Why: permissions must be requested before scheduling any local notification.
 // Read the OS state every time because users can change it in Settings while
-// Orca remains alive in the background.
+// Pebble remains alive in the background.
 export async function ensureNotificationPermissions(): Promise<boolean> {
   const existing = await getNotificationPermissionState()
   if (existing.granted) {
@@ -65,7 +65,7 @@ export async function ensureNotificationPermissions(): Promise<boolean> {
 
 function configureNotificationChannel(): void {
   if (Platform.OS === 'android') {
-    void Notifications.setNotificationChannelAsync('orca-desktop', {
+    void Notifications.setNotificationChannelAsync('pebble-desktop', {
       name: 'Desktop Notifications',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250],
@@ -95,7 +95,7 @@ async function showLocalNotification(event: NotificationEvent, hostId: string): 
         title: event.title,
         body: event.body,
         data: buildLocalNotificationData(event, hostId),
-        ...(Platform.OS === 'android' ? { channelId: 'orca-desktop' } : {})
+        ...(Platform.OS === 'android' ? { channelId: 'pebble-desktop' } : {})
       },
       trigger: null
     })
@@ -133,7 +133,7 @@ async function showLocalNotification(event: NotificationEvent, hostId: string): 
         title: event.title,
         body: event.body,
         data: buildLocalNotificationData(event, hostId),
-        ...(Platform.OS === 'android' ? { channelId: 'orca-desktop' } : {})
+        ...(Platform.OS === 'android' ? { channelId: 'pebble-desktop' } : {})
       },
       trigger: null
     })

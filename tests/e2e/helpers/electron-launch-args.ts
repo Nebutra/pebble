@@ -1,4 +1,4 @@
-export function getOrcaElectronLaunchArgs(mainPath: string, headful: boolean): string[] {
+export function getPebbleElectronLaunchArgs(mainPath: string, headful: boolean): string[] {
   if (headful || process.platform !== 'linux') {
     return [mainPath]
   }

@@ -20,7 +20,7 @@ import { lazyWithRetry } from '@/lib/lazy-with-retry'
 const WorktreeMetaDialog = lazyWithRetry(() => import('./WorktreeMetaDialog'))
 const RemoveFolderDialog = lazyWithRetry(() => import('./RemoveFolderDialog'))
 const WorktreeVisibilityDialog = lazyWithRetry(() => import('./WorktreeVisibilityDialog'))
-const OrcaYamlTrustDialog = lazyWithRetry(() => import('./OrcaYamlTrustDialog'))
+const PebbleYamlTrustDialog = lazyWithRetry(() => import('./PebbleYamlTrustDialog'))
 
 const MIN_WIDTH = 220
 const MAX_WIDTH = 500
@@ -206,7 +206,7 @@ function Sidebar({
         {activeModal === 'edit-meta' ? <WorktreeMetaDialog /> : null}
         {activeModal === 'confirm-remove-folder' ? <RemoveFolderDialog /> : null}
         {activeModal === 'worktree-visibility' ? <WorktreeVisibilityDialog /> : null}
-        {activeModal === 'confirm-orca-yaml-hooks' ? <OrcaYamlTrustDialog /> : null}
+        {activeModal === 'confirm-pebble-yaml-hooks' ? <PebbleYamlTrustDialog /> : null}
       </React.Suspense>
       {sidebarOpen ? (
         <WorkspaceKanbanDrawer

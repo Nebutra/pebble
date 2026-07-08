@@ -15,7 +15,7 @@ async function createRepoWithNewlineWorktree(): Promise<{
   repoPath: string
   worktreePath: string
 }> {
-  const root = await mkdtemp(path.join(tmpdir(), 'orca-worktree-paths-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'pebble-worktree-paths-'))
   tempRoots.push(root)
   const repoPath = path.join(root, 'repo')
   const requestedWorktreePath = path.join(root, 'linked\nworktree')

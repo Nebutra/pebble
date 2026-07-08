@@ -1,4 +1,4 @@
-import type { PersistedTrustedOrcaHooks } from '../../../src/shared/types'
+import type { PersistedTrustedPebbleHooks } from '../../../src/shared/types'
 
 export type SetupHookTrust = {
   contentHash: string
@@ -6,7 +6,7 @@ export type SetupHookTrust = {
 }
 
 export function isSetupHookTrusted(
-  trust: PersistedTrustedOrcaHooks,
+  trust: PersistedTrustedPebbleHooks,
   repoId: string,
   contentHash: string
 ): boolean {
@@ -15,19 +15,19 @@ export function isSetupHookTrusted(
 }
 
 export function wasSetupHookPreviouslyApproved(
-  trust: PersistedTrustedOrcaHooks,
+  trust: PersistedTrustedPebbleHooks,
   repoId: string
 ): boolean {
   return Boolean(trust[repoId]?.setup?.contentHash)
 }
 
-export function trustedOrcaHooksWithSetupApproval(args: {
-  trust: PersistedTrustedOrcaHooks
+export function trustedPebbleHooksWithSetupApproval(args: {
+  trust: PersistedTrustedPebbleHooks
   repoId: string
   contentHash: string
   alwaysTrust: boolean
   approvedAt?: number
-}): PersistedTrustedOrcaHooks {
+}): PersistedTrustedPebbleHooks {
   const approvedAt = args.approvedAt ?? Date.now()
   const existing = args.trust[args.repoId]
   const nextRepo = args.alwaysTrust

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
 import {
   effectiveExternalWorktreeVisibility,
+  isManagedWorktreeOwnership,
   isLegacyRepoForExternalWorktreeVisibility
 } from '../../../../shared/worktree-ownership'
 import { translate } from '@/i18n/i18n'
@@ -39,7 +40,8 @@ export default function WorktreeVisibilityDialog(): React.JSX.Element | null {
   const otherCount =
     detected?.authoritative === true
       ? detected.worktrees.filter(
-          (worktree) => !worktree.selectedCheckout && worktree.ownership !== 'orca-managed'
+          (worktree) =>
+            !worktree.selectedCheckout && !isManagedWorktreeOwnership(worktree.ownership)
         ).length
       : 0
   const hiddenWorktreeLabel = `${hiddenCount} ${hiddenCount === 1 ? 'worktree' : 'worktrees'}`
@@ -72,7 +74,7 @@ export default function WorktreeVisibilityDialog(): React.JSX.Element | null {
           <DialogTitle>
             {translate(
               'auto.components.sidebar.WorktreeVisibilityDialog.83a5ba8dd1',
-              'Non-Orca worktrees'
+              'Non-Pebble worktrees'
             )}
           </DialogTitle>
           <DialogDescription>{repo.displayName}</DialogDescription>

@@ -142,7 +142,7 @@ function remoteCodexSources(
       remoteHome,
       '.local',
       'share',
-      'orca',
+      'pebble',
       'codex-runtime-home',
       'home'
     )

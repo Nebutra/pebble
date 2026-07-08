@@ -19,6 +19,7 @@ import type { GlobalSettings } from '../../shared/types'
 const testState = {
   userDataDir: '',
   fakeHomeDir: '',
+  previousPebbleUserDataPath: undefined as string | undefined,
   previousUserDataPath: undefined as string | undefined
 }
 
@@ -71,10 +72,10 @@ function createSettings(overrides: Partial<GlobalSettings> = {}): GlobalSettings
     terminalLigatures: 'auto',
     terminalCursorStyle: 'block',
     terminalCursorBlink: false,
-    terminalThemeDark: 'orca-dark',
+    terminalThemeDark: 'pebble-dark',
     terminalDividerColorDark: '#000000',
     terminalUseSeparateLightTheme: false,
-    terminalThemeLight: 'orca-light',
+    terminalThemeLight: 'pebble-light',
     terminalDividerColorLight: '#ffffff',
     terminalInactivePaneOpacity: 0.5,
     terminalActivePaneOpacity: 1,
@@ -194,7 +195,7 @@ function createRuntimeHome() {
 function createManagedHome(rootDir: string, accountId: string, config = '', auth = ''): string {
   const managedHomePath = join(rootDir, 'codex-accounts', accountId, 'home')
   mkdirSync(managedHomePath, { recursive: true })
-  writeFileSync(join(managedHomePath, '.orca-managed-home'), `${accountId}\n`, 'utf-8')
+  writeFileSync(join(managedHomePath, '.pebble-managed-home'), `${accountId}\n`, 'utf-8')
   if (config) {
     writeFileSync(join(managedHomePath, 'config.toml'), config, 'utf-8')
   }
@@ -223,20 +224,27 @@ describe('CodexAccountService config sync', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
-    testState.userDataDir = mkdtempSync(join(tmpdir(), 'orca-codex-accounts-'))
-    testState.fakeHomeDir = mkdtempSync(join(tmpdir(), 'orca-codex-home-'))
-    testState.previousUserDataPath = process.env.ORCA_USER_DATA_PATH
-    process.env.ORCA_USER_DATA_PATH = testState.userDataDir
+    testState.userDataDir = mkdtempSync(join(tmpdir(), 'pebble-codex-accounts-'))
+    testState.fakeHomeDir = mkdtempSync(join(tmpdir(), 'pebble-codex-home-'))
+    testState.previousPebbleUserDataPath = process.env.PEBBLE_USER_DATA_PATH
+    testState.previousUserDataPath = process.env.PEBBLE_USER_DATA_PATH
+    process.env.PEBBLE_USER_DATA_PATH = testState.userDataDir
+    process.env.PEBBLE_USER_DATA_PATH = testState.userDataDir
     mkdirSync(join(testState.fakeHomeDir, '.codex'), { recursive: true })
   })
 
   afterEach(() => {
     rmSync(testState.userDataDir, { recursive: true, force: true })
     rmSync(testState.fakeHomeDir, { recursive: true, force: true })
-    if (testState.previousUserDataPath === undefined) {
-      delete process.env.ORCA_USER_DATA_PATH
+    if (testState.previousPebbleUserDataPath === undefined) {
+      delete process.env.PEBBLE_USER_DATA_PATH
     } else {
-      process.env.ORCA_USER_DATA_PATH = testState.previousUserDataPath
+      process.env.PEBBLE_USER_DATA_PATH = testState.previousPebbleUserDataPath
+    }
+    if (testState.previousUserDataPath === undefined) {
+      delete process.env.PEBBLE_USER_DATA_PATH
+    } else {
+      process.env.PEBBLE_USER_DATA_PATH = testState.previousUserDataPath
     }
   })
 
@@ -575,7 +583,7 @@ describe('CodexAccountService config sync', () => {
       (_command: string, _args: string[], options: { env: NodeJS.ProcessEnv }) => {
         const loginHome = options.env.CODEX_HOME
         expect(loginHome).toBeTruthy()
-        expect(readFileSync(join(loginHome!, '.orca-managed-home'), 'utf-8')).toBe('account-1\n')
+        expect(readFileSync(join(loginHome!, '.pebble-managed-home'), 'utf-8')).toBe('account-1\n')
         expect(readFileSync(join(loginHome!, 'config.toml'), 'utf-8')).toBe(canonicalConfig)
 
         const child = new EventEmitter() as EventEmitter & {
@@ -734,7 +742,7 @@ describe('CodexAccountService config sync', () => {
     )
 
     await expect(service.reauthenticateAccount('account-1')).rejects.toThrow(
-      'Managed Codex home is missing Orca ownership marker.'
+      'Managed Codex home is missing Pebble ownership marker.'
     )
     expect(spawnMock).not.toHaveBeenCalled()
     warnSpy.mockRestore()
@@ -750,7 +758,8 @@ describe('CodexAccountService config sync', () => {
 
     const wslManagedHomePath = join(testState.userDataDir, 'wsl-managed-home')
     const wslConfigPath = join(testState.userDataDir, 'wsl-config.toml')
-    const wslLinuxHomePath = '/home/alice/.local/share/orca/codex-accounts/account-id-for-test/home'
+    const wslLinuxHomePath =
+      '/home/alice/.local/share/pebble/codex-accounts/account-id-for-test/home'
     writeFileSync(
       wslConfigPath,
       'sandbox_mode = "danger-full-access"\nmodel_instructions_file = "instructions.md"\n',
@@ -767,7 +776,7 @@ describe('CodexAccountService config sync', () => {
         return `${wslLinuxHomePath}\n`
       }
       mkdirSync(wslManagedHomePath, { recursive: true })
-      writeFileSync(join(wslManagedHomePath, '.orca-managed-home'), 'account-id-for-test\n')
+      writeFileSync(join(wslManagedHomePath, '.pebble-managed-home'), 'account-id-for-test\n')
       return ''
     })
     const spawnMock = vi.fn((command: string, args: string[]) => {
@@ -865,7 +874,8 @@ describe('CodexAccountService config sync', () => {
     })
 
     const wslManagedHomePath = join(testState.userDataDir, 'wsl-managed-home')
-    const wslLinuxHomePath = '/home/alice/.local/share/orca/codex-accounts/account-id-for-test/home'
+    const wslLinuxHomePath =
+      '/home/alice/.local/share/pebble/codex-accounts/account-id-for-test/home'
 
     const execFileSyncMock = vi.fn((_command: string, args: string[]) => {
       const script = decodeEncodedWslBashCommand(String(args.at(-1)))
@@ -881,7 +891,7 @@ describe('CodexAccountService config sync', () => {
         throw new Error('codex missing')
       }
       mkdirSync(wslManagedHomePath, { recursive: true })
-      writeFileSync(join(wslManagedHomePath, '.orca-managed-home'), 'account-id-for-test\n')
+      writeFileSync(join(wslManagedHomePath, '.pebble-managed-home'), 'account-id-for-test\n')
       return ''
     })
     const spawnMock = vi.fn()
@@ -936,9 +946,9 @@ describe('CodexAccountService config sync', () => {
     })
 
     const wslManagedHomePath = join(testState.userDataDir, 'wsl-account', 'home')
-    const wslLinuxHomePath = '/home/alice/.local/share/orca/codex-accounts/account-1/home'
+    const wslLinuxHomePath = '/home/alice/.local/share/pebble/codex-accounts/account-1/home'
     mkdirSync(wslManagedHomePath, { recursive: true })
-    writeFileSync(join(wslManagedHomePath, '.orca-managed-home'), 'account-1\n', 'utf-8')
+    writeFileSync(join(wslManagedHomePath, '.pebble-managed-home'), 'account-1\n', 'utf-8')
     writeFileSync(
       join(wslManagedHomePath, 'auth.json'),
       JSON.stringify({
@@ -1059,13 +1069,13 @@ describe('CodexAccountService config sync', () => {
     })
 
     const wslManagedHomePath = join(testState.userDataDir, 'wsl-account', 'home')
-    const wslLinuxHomePath = '/home/alice/.local/share/orca/codex-accounts/account-1/home'
+    const wslLinuxHomePath = '/home/alice/.local/share/pebble/codex-accounts/account-1/home'
 
     const execFileSyncMock = vi.fn((_command: string, args: string[]) => {
       const script = decodeEncodedWslBashCommand(String(args.at(-1)))
       if (script.includes('mkdir -p -- "$candidate"')) {
         mkdirSync(wslManagedHomePath, { recursive: true })
-        writeFileSync(join(wslManagedHomePath, '.orca-managed-home'), 'account-1\n', 'utf-8')
+        writeFileSync(join(wslManagedHomePath, '.pebble-managed-home'), 'account-1\n', 'utf-8')
         return ''
       }
       if (script.includes('readlink -f')) {
@@ -1083,7 +1093,7 @@ describe('CodexAccountService config sync', () => {
         '-ic',
         `export CODEX_HOME='${wslLinuxHomePath}'; exec codex login`
       ])
-      expect(readFileSync(join(wslManagedHomePath, '.orca-managed-home'), 'utf-8')).toBe(
+      expect(readFileSync(join(wslManagedHomePath, '.pebble-managed-home'), 'utf-8')).toBe(
         'account-1\n'
       )
       const child = new EventEmitter() as EventEmitter & {
@@ -1175,9 +1185,9 @@ describe('CodexAccountService config sync', () => {
     })
 
     const wslManagedHomePath = join(testState.userDataDir, 'wsl-account', 'home')
-    const wslLinuxHomePath = '/home/alice/.local/share/orca/codex-accounts/account-1/home'
+    const wslLinuxHomePath = '/home/alice/.local/share/pebble/codex-accounts/account-1/home'
     mkdirSync(wslManagedHomePath, { recursive: true })
-    writeFileSync(join(wslManagedHomePath, '.orca-managed-home'), 'account-1\n', 'utf-8')
+    writeFileSync(join(wslManagedHomePath, '.pebble-managed-home'), 'account-1\n', 'utf-8')
 
     vi.doMock('node:child_process', () => ({
       execFileSync: vi.fn((_command: string, args: string[]) => {
@@ -1355,7 +1365,7 @@ describe('CodexAccountService config sync', () => {
       '{"account":"host"}\n'
     )
     const wslManagedHomePath =
-      '\\\\wsl.localhost\\Ubuntu\\home\\alice\\.local\\share\\orca\\codex-accounts\\wsl-account\\home'
+      '\\\\wsl.localhost\\Ubuntu\\home\\alice\\.local\\share\\pebble\\codex-accounts\\wsl-account\\home'
     const settings = createSettings({
       codexManagedAccounts: [
         {
@@ -1378,7 +1388,7 @@ describe('CodexAccountService config sync', () => {
           managedHomePath: wslManagedHomePath,
           managedHomeRuntime: 'wsl',
           wslDistro: 'Ubuntu',
-          wslLinuxHomePath: '/home/alice/.local/share/orca/codex-accounts/wsl-account/home',
+          wslLinuxHomePath: '/home/alice/.local/share/pebble/codex-accounts/wsl-account/home',
           providerAccountId: null,
           workspaceLabel: null,
           workspaceAccountId: null,

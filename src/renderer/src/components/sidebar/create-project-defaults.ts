@@ -35,7 +35,7 @@ export function getDefaultCreateProjectParent(homeDir: string): string {
   if (!trimmedHomeDir) {
     return ''
   }
-  return joinCreateProjectPath(joinCreateProjectPath(trimmedHomeDir, 'orca'), 'projects')
+  return joinCreateProjectPath(joinCreateProjectPath(trimmedHomeDir, 'pebble'), 'projects')
 }
 
 export function getCreateProjectDefaultParentAutoFill({
@@ -84,7 +84,7 @@ export function formatCreateProjectParentSummary({
     return runtimeEnvironmentId || isRemoteHost ? missingServerLocationLabel : missingLocationLabel
   }
   if (defaultParent && trimmedParent === defaultParent && !runtimeEnvironmentId && !isRemoteHost) {
-    return '~/orca/projects'
+    return '~/pebble/projects'
   }
   return trimmedParent
 }

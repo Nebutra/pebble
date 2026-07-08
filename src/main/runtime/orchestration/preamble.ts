@@ -29,18 +29,18 @@ export type PreambleParams = {
 // cadence tuning is a single-line change (Q1 in DESIGN_DOC_PREAMBLE_FIX.md).
 const HEARTBEAT_INTERVAL_MIN = 5
 
-// Why: the dispatch preamble teaches agents about Orca's CLI commands for
+// Why: the dispatch preamble teaches agents about Pebble's CLI commands for
 // structured communication. Behavioral rules (body summary, heartbeat cadence,
 // no-AskUserQuestion) live as inline comments above the relevant CLI example,
 // not as a separate prose block — LLM readers anchor on examples and skim
 // trailing prose, so rules must land at the point of use.
 export function buildDispatchPreamble(params: PreambleParams): string {
-  // Why: in dev mode, agents must use orca-dev to connect to the dev runtime's
+  // Why: in dev mode, agents must use pebble-dev to connect to the dev runtime's
   // socket. Without this, agents inside the dev Electron app would call the
-  // production CLI and talk to the wrong Orca instance (Section 6.4).
-  const cli = params.devMode ? 'orca-dev' : 'orca'
+  // production CLI and talk to the wrong Pebble instance (Section 6.4).
+  const cli = params.devMode ? 'pebble-dev' : 'pebble'
 
-  const header = `You are working inside Orca, a multi-agent IDE. You are a dispatched worker.
+  const header = `You are working inside Pebble, a multi-agent IDE. You are a dispatched worker.
 Your coordinator's terminal handle is: ${params.coordinatorHandle}
 Your task ID is: ${params.taskId}
 

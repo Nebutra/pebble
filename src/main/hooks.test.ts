@@ -3,7 +3,7 @@ import type { Repo } from '../shared/types'
 
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { getDefaultTabsLaunch, parseOrcaYaml } from './hooks'
+import { getDefaultTabsLaunch, parsePebbleYaml } from './hooks'
 
 // Mock fs and path used by loadHooks
 vi.mock('fs', () => ({
@@ -35,15 +35,15 @@ vi.mock('./git/runner', () => ({
 
 const TEST_REPO_PATH = join('/test/repo')
 const TEST_WORKTREE_PATH = join('/test/worktree')
-const TEST_REPO_ORCA_YAML_PATH = join(TEST_REPO_PATH, 'orca.yaml')
-const TEST_WORKTREE_ORCA_YAML_PATH = join(TEST_WORKTREE_PATH, 'orca.yaml')
-const TEST_ISSUE_COMMAND_PATH = join(TEST_REPO_PATH, '.orca', 'issue-command')
+const TEST_REPO_PEBBLE_YAML_PATH = join(TEST_REPO_PATH, 'pebble.yaml')
+const TEST_WORKTREE_PEBBLE_YAML_PATH = join(TEST_WORKTREE_PATH, 'pebble.yaml')
+const TEST_ISSUE_COMMAND_PATH = join(TEST_REPO_PATH, '.pebble', 'issue-command')
 const TEST_GITIGNORE_PATH = join(TEST_REPO_PATH, '.gitignore')
 
-describe('parseOrcaYaml', () => {
+describe('parsePebbleYaml', () => {
   it('parses YAML with setup script only', () => {
     const yaml = `scripts:\n  setup: |\n    echo "setting up"\n    npm install\n`
-    const result = parseOrcaYaml(yaml)
+    const result = parsePebbleYaml(yaml)
     expect(result).toEqual({
       scripts: {
         setup: 'echo "setting up"\nnpm install'
@@ -53,7 +53,7 @@ describe('parseOrcaYaml', () => {
 
   it('parses YAML with archive script only', () => {
     const yaml = `scripts:\n  archive: |\n    echo "archiving"\n`
-    const result = parseOrcaYaml(yaml)
+    const result = parsePebbleYaml(yaml)
     expect(result).toEqual({
       scripts: {
         archive: 'echo "archiving"'
@@ -71,7 +71,7 @@ describe('parseOrcaYaml', () => {
       '    echo "archive"',
       '    rm -rf node_modules'
     ].join('\n')
-    const result = parseOrcaYaml(yaml)
+    const result = parsePebbleYaml(yaml)
     expect(result).toEqual({
       scripts: {
         setup: 'echo "setup"\nnpm install',
@@ -82,12 +82,12 @@ describe('parseOrcaYaml', () => {
 
   it('returns null when there is no scripts block', () => {
     const yaml = `other:\n  key: value\n`
-    expect(parseOrcaYaml(yaml)).toBeNull()
+    expect(parsePebbleYaml(yaml)).toBeNull()
   })
 
   it('parses YAML with inline scalar scripts', () => {
     const yaml = `scripts:\n  setup: npm install\n  archive: sleep 5\n`
-    const result = parseOrcaYaml(yaml)
+    const result = parsePebbleYaml(yaml)
     expect(result).toEqual({
       scripts: {
         setup: 'npm install',
@@ -98,12 +98,12 @@ describe('parseOrcaYaml', () => {
 
   it('returns null when scripts block has no setup or archive', () => {
     const yaml = `scripts:\n  unknown: |\n    echo "nope"\n`
-    expect(parseOrcaYaml(yaml)).toBeNull()
+    expect(parsePebbleYaml(yaml)).toBeNull()
   })
 
   it('handles multiline block scalar scripts', () => {
     const yaml = ['scripts:', '  setup: |', '    line1', '    line2', '    line3'].join('\n')
-    const result = parseOrcaYaml(yaml)
+    const result = parsePebbleYaml(yaml)
     expect(result).toEqual({
       scripts: {
         setup: 'line1\nline2\nline3'
@@ -113,7 +113,7 @@ describe('parseOrcaYaml', () => {
 
   it('stops parsing when it hits another top-level key', () => {
     const yaml = ['scripts:', '  setup: |', '    echo "setup"', 'other:', '  key: value'].join('\n')
-    const result = parseOrcaYaml(yaml)
+    const result = parsePebbleYaml(yaml)
     expect(result).toEqual({
       scripts: {
         setup: 'echo "setup"'
@@ -122,7 +122,7 @@ describe('parseOrcaYaml', () => {
   })
 
   it('returns null for empty string', () => {
-    expect(parseOrcaYaml('')).toBeNull()
+    expect(parsePebbleYaml('')).toBeNull()
   })
 
   it('parses a top-level issueCommand block scalar', () => {
@@ -131,7 +131,7 @@ describe('parseOrcaYaml', () => {
       '  claude -p "Read issue #{{issue}}"',
       '  codex exec "Review docs/design-{{issue}}.md"'
     ].join('\n')
-    const result = parseOrcaYaml(yaml)
+    const result = parsePebbleYaml(yaml)
     expect(result).toEqual({
       scripts: {},
       issueCommand:
@@ -147,7 +147,7 @@ describe('parseOrcaYaml', () => {
       'issueCommand: |',
       '  claude -p "Read issue #{{issue}}"'
     ].join('\n')
-    const result = parseOrcaYaml(yaml)
+    const result = parsePebbleYaml(yaml)
     expect(result).toEqual({
       scripts: {
         setup: 'pnpm install'
@@ -156,7 +156,7 @@ describe('parseOrcaYaml', () => {
     })
   })
 
-  it('parses default terminal tabs from orca.yaml', () => {
+  it('parses default terminal tabs from pebble.yaml', () => {
     const yaml = [
       'defaultTabs:',
       '  - title: Claude',
@@ -168,7 +168,7 @@ describe('parseOrcaYaml', () => {
       '  - title: Notes'
     ].join('\n')
 
-    expect(parseOrcaYaml(yaml)).toEqual({
+    expect(parsePebbleYaml(yaml)).toEqual({
       scripts: {},
       defaultTabs: [
         { title: 'Claude', color: '#f97316', command: 'claude' },
@@ -188,35 +188,35 @@ describe('parseOrcaYaml', () => {
       '  - title: ""'
     ].join('\n')
 
-    expect(parseOrcaYaml(yaml)).toEqual({
+    expect(parsePebbleYaml(yaml)).toEqual({
       scripts: {},
       defaultTabs: [{ title: 'Server', command: 'pnpm dev' }]
     })
   })
 
-  it('parses environmentRecipes from orca.yaml', () => {
+  it('parses environmentRecipes from pebble.yaml', () => {
     const yaml = [
       'environmentRecipes:',
       '  - id: cloud-sandbox',
       '    name: Cloud Sandbox',
       '    description: Starts a per-workspace VM.',
-      '    create: ./scripts/orca-vm/start-cloud-sandbox.sh',
-      '    suspend: ./scripts/orca-vm/suspend-cloud-sandbox.sh',
-      '    resume: ./scripts/orca-vm/resume-cloud-sandbox.sh',
-      '    destroy: ./scripts/orca-vm/destroy-cloud-sandbox.sh'
+      '    create: ./scripts/pebble-vm/start-cloud-sandbox.sh',
+      '    suspend: ./scripts/pebble-vm/suspend-cloud-sandbox.sh',
+      '    resume: ./scripts/pebble-vm/resume-cloud-sandbox.sh',
+      '    destroy: ./scripts/pebble-vm/destroy-cloud-sandbox.sh'
     ].join('\n')
 
-    expect(parseOrcaYaml(yaml)).toEqual({
+    expect(parsePebbleYaml(yaml)).toEqual({
       scripts: {},
       environmentRecipes: [
         {
           id: 'cloud-sandbox',
           name: 'Cloud Sandbox',
           description: 'Starts a per-workspace VM.',
-          create: './scripts/orca-vm/start-cloud-sandbox.sh',
-          suspend: './scripts/orca-vm/suspend-cloud-sandbox.sh',
-          resume: './scripts/orca-vm/resume-cloud-sandbox.sh',
-          destroy: './scripts/orca-vm/destroy-cloud-sandbox.sh'
+          create: './scripts/pebble-vm/start-cloud-sandbox.sh',
+          suspend: './scripts/pebble-vm/suspend-cloud-sandbox.sh',
+          resume: './scripts/pebble-vm/resume-cloud-sandbox.sh',
+          destroy: './scripts/pebble-vm/destroy-cloud-sandbox.sh'
         }
       ]
     })
@@ -227,17 +227,17 @@ describe('parseOrcaYaml', () => {
       'environmentRecipes:',
       '  - id: manual-sandbox',
       '    name: Manual Sandbox',
-      '    command: ./scripts/orca-vm/start-manual-sandbox.sh',
+      '    command: ./scripts/pebble-vm/start-manual-sandbox.sh',
       '    cleanup: none'
     ].join('\n')
 
-    expect(parseOrcaYaml(yaml)).toEqual({
+    expect(parsePebbleYaml(yaml)).toEqual({
       scripts: {},
       environmentRecipes: [
         {
           id: 'manual-sandbox',
           name: 'Manual Sandbox',
-          create: './scripts/orca-vm/start-manual-sandbox.sh',
+          create: './scripts/pebble-vm/start-manual-sandbox.sh',
           destroyDisabled: true
         }
       ]
@@ -249,27 +249,27 @@ describe('parseOrcaYaml', () => {
       'environmentRecipes:',
       '  - id: cloud-sandbox',
       '    name: Cloud Sandbox',
-      '    create: ./scripts/orca-vm/start-cloud-sandbox.sh',
+      '    create: ./scripts/pebble-vm/start-cloud-sandbox.sh',
       '  - id: cloud-sandbox',
       '    name: Duplicate Cloud Sandbox',
-      '    create: ./scripts/orca-vm/start-duplicate.sh',
+      '    create: ./scripts/pebble-vm/start-duplicate.sh',
       '  - id: missing-create',
       '    name: Missing Create',
       '  - name: Missing Id',
-      '    create: ./scripts/orca-vm/start-missing-id.sh',
+      '    create: ./scripts/pebble-vm/start-missing-id.sh',
       '  - id: "Cloud Sandbox"',
       '    name: Unsafe Id',
-      '    create: ./scripts/orca-vm/start-unsafe-id.sh',
+      '    create: ./scripts/pebble-vm/start-unsafe-id.sh',
       '  - 42'
     ].join('\n')
 
-    expect(parseOrcaYaml(yaml)).toEqual({
+    expect(parsePebbleYaml(yaml)).toEqual({
       scripts: {},
       environmentRecipes: [
         {
           id: 'cloud-sandbox',
           name: 'Cloud Sandbox',
-          create: './scripts/orca-vm/start-cloud-sandbox.sh'
+          create: './scripts/pebble-vm/start-cloud-sandbox.sh'
         }
       ],
       environmentRecipeDiagnostics: [
@@ -292,21 +292,21 @@ describe('parseOrcaYaml', () => {
   })
 })
 
-describe('hasUnrecognizedOrcaYamlKeys', () => {
+describe('hasUnrecognizedPebbleYamlKeys', () => {
   it('returns true when the file contains only keys this version does not handle', async () => {
     const fs = await import('node:fs')
     vi.mocked(fs.readFileSync).mockReturnValue('futureFeature: |\n  some config\n')
 
-    const { hasUnrecognizedOrcaYamlKeys } = await import('./hooks')
-    expect(hasUnrecognizedOrcaYamlKeys('/test/repo')).toBe(true)
+    const { hasUnrecognizedPebbleYamlKeys } = await import('./hooks')
+    expect(hasUnrecognizedPebbleYamlKeys('/test/repo')).toBe(true)
   })
 
   it('returns true when an unknown key has no trailing space (block-value form)', async () => {
     const fs = await import('node:fs')
     vi.mocked(fs.readFileSync).mockReturnValue('futureFeature:\n  nested: value\n')
 
-    const { hasUnrecognizedOrcaYamlKeys } = await import('./hooks')
-    expect(hasUnrecognizedOrcaYamlKeys('/test/repo')).toBe(true)
+    const { hasUnrecognizedPebbleYamlKeys } = await import('./hooks')
+    expect(hasUnrecognizedPebbleYamlKeys('/test/repo')).toBe(true)
   })
 
   it('returns true when the file mixes recognised and unrecognised keys', async () => {
@@ -315,8 +315,8 @@ describe('hasUnrecognizedOrcaYamlKeys', () => {
       'scripts:\n  setup: |\n    pnpm install\nnewFeature: enabled\n'
     )
 
-    const { hasUnrecognizedOrcaYamlKeys } = await import('./hooks')
-    expect(hasUnrecognizedOrcaYamlKeys('/test/repo')).toBe(true)
+    const { hasUnrecognizedPebbleYamlKeys } = await import('./hooks')
+    expect(hasUnrecognizedPebbleYamlKeys('/test/repo')).toBe(true)
   })
 
   it('returns false when the file contains only recognised keys', async () => {
@@ -333,20 +333,20 @@ describe('hasUnrecognizedOrcaYamlKeys', () => {
         'environmentRecipes:',
         '  - id: cloud-sandbox',
         '    name: Cloud Sandbox',
-        '    create: ./scripts/orca-vm/start-cloud-sandbox.sh'
+        '    create: ./scripts/pebble-vm/start-cloud-sandbox.sh'
       ].join('\n')
     )
 
-    const { hasUnrecognizedOrcaYamlKeys } = await import('./hooks')
-    expect(hasUnrecognizedOrcaYamlKeys('/test/repo')).toBe(false)
+    const { hasUnrecognizedPebbleYamlKeys } = await import('./hooks')
+    expect(hasUnrecognizedPebbleYamlKeys('/test/repo')).toBe(false)
   })
 
   it('returns false when the file is empty or has no top-level keys', async () => {
     const fs = await import('node:fs')
     vi.mocked(fs.readFileSync).mockReturnValue('# just a comment\n')
 
-    const { hasUnrecognizedOrcaYamlKeys } = await import('./hooks')
-    expect(hasUnrecognizedOrcaYamlKeys('/test/repo')).toBe(false)
+    const { hasUnrecognizedPebbleYamlKeys } = await import('./hooks')
+    expect(hasUnrecognizedPebbleYamlKeys('/test/repo')).toBe(false)
   })
 
   it('returns false when the file cannot be read', async () => {
@@ -355,22 +355,22 @@ describe('hasUnrecognizedOrcaYamlKeys', () => {
       throw new Error('ENOENT')
     })
 
-    const { hasUnrecognizedOrcaYamlKeys } = await import('./hooks')
-    expect(hasUnrecognizedOrcaYamlKeys('/test/repo')).toBe(false)
+    const { hasUnrecognizedPebbleYamlKeys } = await import('./hooks')
+    expect(hasUnrecognizedPebbleYamlKeys('/test/repo')).toBe(false)
   })
 })
 
 describe('readIssueCommand', () => {
-  it('prefers the local override over the shared orca.yaml command', async () => {
+  it('prefers the local override over the shared pebble.yaml command', async () => {
     const fs = await import('node:fs')
     vi.mocked(fs.existsSync).mockImplementation(
-      (path) => path === TEST_ISSUE_COMMAND_PATH || path === TEST_REPO_ORCA_YAML_PATH
+      (path) => path === TEST_ISSUE_COMMAND_PATH || path === TEST_REPO_PEBBLE_YAML_PATH
     )
     vi.mocked(fs.readFileSync).mockImplementation((path) => {
       if (path === TEST_ISSUE_COMMAND_PATH) {
         return 'local command\n'
       }
-      if (path === TEST_REPO_ORCA_YAML_PATH) {
+      if (path === TEST_REPO_PEBBLE_YAML_PATH) {
         return 'issueCommand: |\n  shared command\n'
       }
       return ''
@@ -386,11 +386,11 @@ describe('readIssueCommand', () => {
     })
   })
 
-  it('falls back to the shared orca.yaml command when no local override exists', async () => {
+  it('falls back to the shared pebble.yaml command when no local override exists', async () => {
     const fs = await import('node:fs')
-    vi.mocked(fs.existsSync).mockImplementation((path) => path === TEST_REPO_ORCA_YAML_PATH)
+    vi.mocked(fs.existsSync).mockImplementation((path) => path === TEST_REPO_PEBBLE_YAML_PATH)
     vi.mocked(fs.readFileSync).mockImplementation((path) => {
-      if (path === TEST_REPO_ORCA_YAML_PATH) {
+      if (path === TEST_REPO_PEBBLE_YAML_PATH) {
         return 'issueCommand: |\n  shared command\n'
       }
       return ''
@@ -408,10 +408,10 @@ describe('readIssueCommand', () => {
 })
 
 describe('writeIssueCommand', () => {
-  it('writes only the local override file and keeps .orca ignored locally', async () => {
+  it('writes only the local override file and keeps .pebble ignored locally', async () => {
     const fs = await import('node:fs')
     vi.mocked(fs.existsSync).mockImplementation(
-      (path) => path === TEST_GITIGNORE_PATH || path === join(TEST_REPO_PATH, '.orca')
+      (path) => path === TEST_GITIGNORE_PATH || path === join(TEST_REPO_PATH, '.pebble')
     )
     vi.mocked(fs.readFileSync).mockImplementation((path) => {
       if (path === TEST_GITIGNORE_PATH) {
@@ -425,7 +425,7 @@ describe('writeIssueCommand', () => {
 
     expect(vi.mocked(fs.writeFileSync)).toHaveBeenCalledWith(
       TEST_GITIGNORE_PATH,
-      'node_modules/\n.orca\n',
+      'node_modules/\n.pebble\n',
       'utf-8'
     )
     expect(vi.mocked(fs.writeFileSync)).toHaveBeenCalledWith(
@@ -513,7 +513,7 @@ describe('getEffectiveHooks', () => {
       hookSettings
     }) as unknown as Repo
 
-  it('uses hooks from orca.yaml when present', async () => {
+  it('uses hooks from pebble.yaml when present', async () => {
     const fs = await import('node:fs')
     vi.mocked(fs.existsSync).mockReturnValue(true)
     vi.mocked(fs.readFileSync).mockReturnValue('scripts:\n  setup: |\n    echo "yaml setup"\n')
@@ -530,16 +530,16 @@ describe('getEffectiveHooks', () => {
     })
   })
 
-  it("loads setup hooks from the target worktree's orca.yaml when a worktree path is provided", async () => {
+  it("loads setup hooks from the target worktree's pebble.yaml when a worktree path is provided", async () => {
     const fs = await import('node:fs')
     vi.mocked(fs.existsSync).mockImplementation(
-      (path) => path === TEST_REPO_ORCA_YAML_PATH || path === TEST_WORKTREE_ORCA_YAML_PATH
+      (path) => path === TEST_REPO_PEBBLE_YAML_PATH || path === TEST_WORKTREE_PEBBLE_YAML_PATH
     )
     vi.mocked(fs.readFileSync).mockImplementation((path) => {
-      if (path === TEST_REPO_ORCA_YAML_PATH) {
+      if (path === TEST_REPO_PEBBLE_YAML_PATH) {
         return 'scripts:\n  setup: |\n    echo old-version\n'
       }
-      if (path === TEST_WORKTREE_ORCA_YAML_PATH) {
+      if (path === TEST_WORKTREE_PEBBLE_YAML_PATH) {
         return 'scripts:\n  setup: |\n    echo new-version\n'
       }
       return ''
@@ -649,7 +649,7 @@ describe('getEffectiveHooks', () => {
     })
   })
 
-  it('uses local settings by default even when orca.yaml defines only one command', async () => {
+  it('uses local settings by default even when pebble.yaml defines only one command', async () => {
     const fs = await import('node:fs')
     vi.mocked(fs.existsSync).mockReturnValue(true)
     vi.mocked(fs.readFileSync).mockReturnValue('scripts:\n  archive: |\n    echo "yaml archive"\n')
@@ -711,7 +711,7 @@ describe('getEffectiveHooks', () => {
     })
   })
 
-  it('treats legacy shared-first policy as orca.yaml only', async () => {
+  it('treats legacy shared-first policy as pebble.yaml only', async () => {
     const fs = await import('node:fs')
     vi.mocked(fs.existsSync).mockReturnValue(true)
     vi.mocked(fs.readFileSync).mockReturnValue('scripts:\n  archive: |\n    echo "yaml archive"\n')
@@ -917,10 +917,10 @@ describe('runHook', () => {
       expect(options).toEqual(
         expect.objectContaining({
           env: expect.objectContaining({
-            ORCA_ROOT_PATH: '/mnt/c/Users/jinwo/git/orca',
-            ORCA_WORKTREE_PATH: '/home/jin/feature',
-            CONDUCTOR_ROOT_PATH: '/mnt/c/Users/jinwo/git/orca',
-            GHOSTX_ROOT_PATH: '/mnt/c/Users/jinwo/git/orca'
+            PEBBLE_ROOT_PATH: '/mnt/c/Users/jinwo/git/pebble',
+            PEBBLE_WORKTREE_PATH: '/home/jin/feature',
+            CONDUCTOR_ROOT_PATH: '/mnt/c/Users/jinwo/git/pebble',
+            GHOSTX_ROOT_PATH: '/mnt/c/Users/jinwo/git/pebble'
           })
         })
       )
@@ -941,7 +941,7 @@ describe('runHook', () => {
       const { runHook } = await import('./hooks')
       const result = await runHook('setup', '\\\\wsl.localhost\\Ubuntu\\home\\jin\\feature', {
         ...makeRepo(),
-        path: 'C:\\Users\\jinwo\\git\\orca'
+        path: 'C:\\Users\\jinwo\\git\\pebble'
       })
 
       expect(result).toEqual({ success: true, output: '' })
@@ -968,10 +968,10 @@ describe('runHook', () => {
       expect(options).toEqual(
         expect.objectContaining({
           env: expect.objectContaining({
-            ORCA_ROOT_PATH: '/mnt/c/Users/jinwo/git/orca',
-            ORCA_WORKTREE_PATH: '/mnt/c/Users/jinwo/git/orca-feature',
-            CONDUCTOR_ROOT_PATH: '/mnt/c/Users/jinwo/git/orca',
-            GHOSTX_ROOT_PATH: '/mnt/c/Users/jinwo/git/orca'
+            PEBBLE_ROOT_PATH: '/mnt/c/Users/jinwo/git/pebble',
+            PEBBLE_WORKTREE_PATH: '/mnt/c/Users/jinwo/git/pebble-feature',
+            CONDUCTOR_ROOT_PATH: '/mnt/c/Users/jinwo/git/pebble',
+            GHOSTX_ROOT_PATH: '/mnt/c/Users/jinwo/git/pebble'
           })
         })
       )
@@ -992,10 +992,10 @@ describe('runHook', () => {
       const { runHook } = await import('./hooks')
       const result = await runHook(
         'setup',
-        'C:\\Users\\jinwo\\git\\orca-feature',
+        'C:\\Users\\jinwo\\git\\pebble-feature',
         {
           ...makeRepo(),
-          path: 'C:\\Users\\jinwo\\git\\orca'
+          path: 'C:\\Users\\jinwo\\git\\pebble'
         },
         undefined,
         { wslDistro: 'Ubuntu' }
@@ -1010,7 +1010,7 @@ describe('runHook', () => {
           '--',
           'bash',
           '-c',
-          "cd '/mnt/c/Users/jinwo/git/orca-feature' && echo hello"
+          "cd '/mnt/c/Users/jinwo/git/pebble-feature' && echo hello"
         ],
         expect.any(Object),
         expect.any(Function)
@@ -1026,7 +1026,7 @@ describe('runHook', () => {
 
   it('writes Windows-path setup runners through WSL git when the project runtime targets WSL', async () => {
     gitExecFileSyncMock.mockReset()
-    gitExecFileSyncMock.mockReturnValue('/mnt/c/Users/jinwo/git/orca/.git/orca/setup-runner.sh\n')
+    gitExecFileSyncMock.mockReturnValue('/mnt/c/Users/jinwo/git/pebble/.git/pebble/setup-runner.sh\n')
 
     const fs = await import('node:fs')
     const mkdirSyncMock = vi.mocked(fs.mkdirSync)
@@ -1044,17 +1044,17 @@ describe('runHook', () => {
       const result = createSetupRunnerScript(
         {
           ...makeRepo(),
-          path: 'C:\\Users\\jinwo\\git\\orca'
+          path: 'C:\\Users\\jinwo\\git\\pebble'
         },
-        'C:\\Users\\jinwo\\git\\orca-feature',
+        'C:\\Users\\jinwo\\git\\pebble-feature',
         'echo hello',
         { wslDistro: 'Ubuntu' }
       )
 
       expect(gitExecFileSyncMock).toHaveBeenCalledWith(
-        ['rev-parse', '--git-path', 'orca/setup-runner.sh'],
+        ['rev-parse', '--git-path', 'pebble/setup-runner.sh'],
         {
-          cwd: 'C:\\Users\\jinwo\\git\\orca-feature',
+          cwd: 'C:\\Users\\jinwo\\git\\pebble-feature',
           wslDistro: 'Ubuntu'
         }
       )
@@ -1095,7 +1095,7 @@ describe('runHook', () => {
       const { runHook } = await import('./hooks')
       const promise = runHook('setup', '\\\\wsl.localhost\\Ubuntu\\home\\jin\\feature', {
         ...makeRepo(),
-        path: 'C:\\Users\\jinwo\\git\\orca'
+        path: 'C:\\Users\\jinwo\\git\\pebble'
       })
       let settled = false
       void promise.finally(() => {
@@ -1138,7 +1138,7 @@ describe('createSetupRunnerScript', () => {
 
   it('omits waitForAgentStartup unless the repo explicitly waits for setup', async () => {
     gitExecFileSyncMock.mockReset()
-    gitExecFileSyncMock.mockReturnValue('/test/repo/.git/orca/setup-runner.sh\n')
+    gitExecFileSyncMock.mockReturnValue('/test/repo/.git/pebble/setup-runner.sh\n')
     const { createSetupRunnerScript } = await import('./hooks')
 
     expect(

@@ -11,7 +11,7 @@ export function parseReportGateArgs(argv, env = process.env) {
     forwardedArgs.shift()
   }
 
-  let reportPath = env.ORCA_E2E_TERMINAL_PERF_REPORT_PATH || DEFAULT_REPORT_PATH
+  let reportPath = env.PEBBLE_E2E_TERMINAL_PERF_REPORT_PATH || DEFAULT_REPORT_PATH
   const passthroughArgs = []
   for (let index = 0; index < forwardedArgs.length; index += 1) {
     const arg = forwardedArgs[index]
@@ -63,7 +63,7 @@ export function runTerminalScalePerfReportGate({
   spawnSyncImpl = spawnSync
 } = {}) {
   const { passthroughArgs, reportPath } = parseReportGateArgs(argv, env)
-  const tempDir = mkdtempSync(join(tmpdir(), 'orca-terminal-scale-perf-'))
+  const tempDir = mkdtempSync(join(tmpdir(), 'pebble-terminal-scale-perf-'))
   const tempReportPath = join(tempDir, 'report.json')
 
   let scaleExitCode

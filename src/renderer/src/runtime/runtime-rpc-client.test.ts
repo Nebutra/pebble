@@ -12,8 +12,8 @@ import {
   RUNTIME_PROTOCOL_VERSION
 } from '../../../shared/protocol-version'
 import {
-  ORCA_RUNTIME_RPC_BROWSER_UI_SOURCE,
-  ORCA_RUNTIME_RPC_FEATURE_INTERACTION_SOURCE_KEY
+  PEBBLE_RUNTIME_RPC_BROWSER_UI_SOURCE,
+  PEBBLE_RUNTIME_RPC_FEATURE_INTERACTION_SOURCE_KEY
 } from '../../../shared/runtime-rpc-feature-interaction-source'
 
 const runtimeCall = vi.fn()
@@ -79,7 +79,7 @@ describe('runtime RPC client routing', () => {
       method: 'browser.viewport',
       params: {
         page: 'page-1',
-        [ORCA_RUNTIME_RPC_FEATURE_INTERACTION_SOURCE_KEY]: ORCA_RUNTIME_RPC_BROWSER_UI_SOURCE
+        [PEBBLE_RUNTIME_RPC_FEATURE_INTERACTION_SOURCE_KEY]: PEBBLE_RUNTIME_RPC_BROWSER_UI_SOURCE
       }
     })
     expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
@@ -213,7 +213,7 @@ describe('runtime RPC client routing', () => {
       method: 'browser.viewport',
       params: {
         page: 'page-1',
-        [ORCA_RUNTIME_RPC_FEATURE_INTERACTION_SOURCE_KEY]: ORCA_RUNTIME_RPC_BROWSER_UI_SOURCE
+        [PEBBLE_RUNTIME_RPC_FEATURE_INTERACTION_SOURCE_KEY]: PEBBLE_RUNTIME_RPC_BROWSER_UI_SOURCE
       },
       timeoutMs: undefined
     })

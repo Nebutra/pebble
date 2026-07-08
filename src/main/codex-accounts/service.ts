@@ -35,6 +35,10 @@ import {
 
 const LOGIN_TIMEOUT_MS = 120_000
 const MAX_LOGIN_OUTPUT_CHARS = 4_000
+const MANAGED_HOME_MARKER = '.pebble-managed-home'
+const LEGACY_MANAGED_HOME_MARKER = '.pebble-managed-home'
+const MANAGED_WSL_CODEX_ACCOUNTS_ROOT = '/.local/share/pebble/codex-accounts'
+const LEGACY_MANAGED_WSL_CODEX_ACCOUNTS_ROOT = '/.local/share/pebble/codex-accounts'
 
 type CodexOAuthCredentials = {
   idToken: string | null
@@ -69,6 +73,23 @@ type ManagedHomeLocation = {
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`
+}
+
+function hasManagedHomeMarker(path: string): boolean {
+  return (
+    existsSync(join(path, MANAGED_HOME_MARKER)) ||
+    existsSync(join(path, LEGACY_MANAGED_HOME_MARKER))
+  )
+}
+
+function managedWslCodexAccountsRootForPath(linuxPath: string): string | null {
+  if (linuxPath.includes(`${MANAGED_WSL_CODEX_ACCOUNTS_ROOT}/`)) {
+    return MANAGED_WSL_CODEX_ACCOUNTS_ROOT
+  }
+  if (linuxPath.includes(`${LEGACY_MANAGED_WSL_CODEX_ACCOUNTS_ROOT}/`)) {
+    return LEGACY_MANAGED_WSL_CODEX_ACCOUNTS_ROOT
+  }
+  return null
 }
 
 export class CodexAccountService {
@@ -129,7 +150,7 @@ export class CodexAccountService {
       await this.runCodexLogin(managedHomePath)
       const identity = this.readIdentityFromHome(managedHomePath)
       if (!identity.email) {
-        throw new Error('Codex login completed, but Orca could not resolve the account email.')
+        throw new Error('Codex login completed, but Pebble could not resolve the account email.')
       }
 
       const now = Date.now()
@@ -184,7 +205,7 @@ export class CodexAccountService {
     await this.runCodexLogin(managedHomePath)
     const identity = this.readIdentityFromHome(managedHomePath)
     if (!identity.email) {
-      throw new Error('Codex login completed, but Orca could not resolve the account email.')
+      throw new Error('Codex login completed, but Pebble could not resolve the account email.')
     }
 
     const settings = this.store.getSettings()
@@ -355,8 +376,8 @@ export class CodexAccountService {
     mkdirSync(managedHomePath, { recursive: true })
     // Why: Codex expects CODEX_HOME to be a concrete directory it can own. We
     // pre-create the directory and leave a marker so future cleanup code can
-    // prove the path belongs to Orca before deleting anything.
-    writeFileSync(join(managedHomePath, '.orca-managed-home'), `${accountId}\n`, 'utf-8')
+    // prove the path belongs to Pebble before deleting anything.
+    writeFileSync(join(managedHomePath, MANAGED_HOME_MARKER), `${accountId}\n`, 'utf-8')
     return {
       managedHomePath: this.assertManagedHomePath(managedHomePath),
       managedHomeRuntime: 'host',
@@ -389,8 +410,8 @@ export class CodexAccountService {
       throw new Error('Could not resolve the active WSL home directory for Codex login.')
     }
 
-    const wslLinuxHomePath = `${home.replace(/\/$/, '')}/.local/share/orca/codex-accounts/${accountId}/home`
-    const markerPath = `${wslLinuxHomePath}/.orca-managed-home`
+    const wslLinuxHomePath = `${home.replace(/\/$/, '')}${MANAGED_WSL_CODEX_ACCOUNTS_ROOT}/${accountId}/home`
+    const markerPath = `${wslLinuxHomePath}/${MANAGED_HOME_MARKER}`
     execFileSync(
       'wsl.exe',
       [
@@ -457,7 +478,7 @@ export class CodexAccountService {
     }
 
     const trustedManagedHomePath = this.assertManagedHomePath(managedHomePath)
-    // Why: Orca account switching is meant to swap Codex credentials and quota
+    // Why: Pebble account switching is meant to swap Codex credentials and quota
     // identity, not silently fork the user's sandbox/config defaults. Syncing
     // one canonical config into every managed home keeps auth isolated per
     // account while preserving consistent Codex behavior. Managed homes are
@@ -490,11 +511,11 @@ export class CodexAccountService {
       return this.readCanonicalConfig()
     }
 
-    const managedRootMarker = '/.local/share/orca/codex-accounts/'
-    const markerIndex = wslInfo.linuxPath.indexOf(managedRootMarker)
-    if (markerIndex < 0) {
+    const managedRootMarker = managedWslCodexAccountsRootForPath(wslInfo.linuxPath)
+    if (!managedRootMarker) {
       return null
     }
+    const markerIndex = wslInfo.linuxPath.indexOf(`${managedRootMarker}/`)
     const wslHome = wslInfo.linuxPath.slice(0, markerIndex)
     const configPath = toWindowsWslPath(`${wslHome}/.codex/config.toml`, wslInfo.distro)
     if (!existsSync(configPath)) {
@@ -557,9 +578,9 @@ export class CodexAccountService {
     }
 
     // Why: explicit re-auth is allowed to recover from a lost empty container,
-    // but only at the exact Orca-owned account path persisted for this account.
+    // but only at the exact Pebble-owned account path persisted for this account.
     mkdirSync(expectedManagedHomePath, { recursive: true })
-    writeFileSync(join(expectedManagedHomePath, '.orca-managed-home'), `${account.id}\n`, 'utf-8')
+    writeFileSync(join(expectedManagedHomePath, MANAGED_HOME_MARKER), `${account.id}\n`, 'utf-8')
     return this.assertManagedHomePath(expectedManagedHomePath)
   }
 
@@ -571,7 +592,8 @@ export class CodexAccountService {
       account.managedHomeRuntime !== 'wsl' ||
       account.wslDistro !== wslInfo.distro ||
       account.wslLinuxHomePath !== wslInfo.linuxPath ||
-      !wslInfo.linuxPath.endsWith(`/.local/share/orca/codex-accounts/${account.id}/home`)
+      (!wslInfo.linuxPath.endsWith(`${MANAGED_WSL_CODEX_ACCOUNTS_ROOT}/${account.id}/home`) &&
+        !wslInfo.linuxPath.endsWith(`${LEGACY_MANAGED_WSL_CODEX_ACCOUNTS_ROOT}/${account.id}/home`))
     ) {
       return
     }
@@ -589,9 +611,11 @@ export class CodexAccountService {
             'set -euo pipefail',
             `candidate=${shellQuote(wslInfo.linuxPath)}`,
             `expected_marker=${shellQuote(account.id)}`,
-            'marker="$candidate/.orca-managed-home"',
-            'if [ -e "$candidate" ] && [ ! -f "$marker" ]; then exit 41; fi',
+            `marker="$candidate/${MANAGED_HOME_MARKER}"`,
+            `legacy_marker="$candidate/${LEGACY_MANAGED_HOME_MARKER}"`,
+            'if [ -e "$candidate" ] && [ ! -f "$marker" ] && [ ! -f "$legacy_marker" ]; then exit 41; fi',
             'if [ -f "$marker" ] && [ "$(cat "$marker")" != "$expected_marker" ]; then exit 42; fi',
+            'if [ ! -f "$marker" ] && [ -f "$legacy_marker" ] && [ "$(cat "$legacy_marker")" != "$expected_marker" ]; then exit 42; fi',
             'mkdir -p -- "$candidate"',
             'printf "%s\\n" "$expected_marker" > "$marker"'
           ].join('\n')
@@ -620,11 +644,9 @@ export class CodexAccountService {
   private assertManagedHomePath(candidatePath: string): string {
     const wslInfo = parseWslUncPath(candidatePath)
     if (wslInfo) {
-      if (
-        !wslInfo.linuxPath.includes('/.local/share/orca/codex-accounts/') ||
-        !wslInfo.linuxPath.endsWith('/home')
-      ) {
-        throw new Error('Managed WSL Codex home is outside Orca account storage.')
+      const managedRoot = managedWslCodexAccountsRootForPath(wslInfo.linuxPath)
+      if (!managedRoot || !wslInfo.linuxPath.endsWith('/home')) {
+        throw new Error('Managed WSL Codex home is outside Pebble account storage.')
       }
 
       if (process.platform === 'win32') {
@@ -641,10 +663,10 @@ export class CodexAccountService {
                 [
                   'set -euo pipefail',
                   `candidate=${shellQuote(wslInfo.linuxPath)}`,
-                  'managed_root="${HOME%/}/.local/share/orca/codex-accounts"',
+                  `managed_root="\${HOME%/}${managedRoot}"`,
                   'candidate_real=$(readlink -f -- "$candidate")',
                   'managed_root_real=$(readlink -f -- "$managed_root")',
-                  'test -f "$candidate_real/.orca-managed-home"',
+                  `test -f "$candidate_real/${MANAGED_HOME_MARKER}" || test -f "$candidate_real/${LEGACY_MANAGED_HOME_MARKER}"`,
                   'case "$candidate_real" in "$managed_root_real"/*/home) printf "%s\\n" "$candidate_real" ;; *) exit 35 ;; esac'
                 ].join('\n')
               )
@@ -656,20 +678,20 @@ export class CodexAccountService {
           }
           return toWindowsWslPath(canonicalLinuxPath, wslInfo.distro)
         } catch (error) {
-          throw new Error('Managed WSL Codex home is outside Orca account storage.', {
+          throw new Error('Managed WSL Codex home is outside Pebble account storage.', {
             cause: error
           })
         }
       }
 
       if (wslInfo.linuxPath.split('/').includes('..')) {
-        throw new Error('Managed WSL Codex home is outside Orca account storage.')
+        throw new Error('Managed WSL Codex home is outside Pebble account storage.')
       }
       if (!existsSync(candidatePath)) {
         throw new Error('Managed Codex home directory does not exist on disk.')
       }
-      if (!existsSync(join(candidatePath, '.orca-managed-home'))) {
-        throw new Error('Managed Codex home is missing Orca ownership marker.')
+      if (!hasManagedHomeMarker(candidatePath)) {
+        throw new Error('Managed Codex home is missing Pebble ownership marker.')
       }
       return candidatePath
     }
@@ -692,7 +714,7 @@ export class CodexAccountService {
     // macOS, userData sits under /var/folders/... which realpath resolves to
     // /private/var/folders/...; comparing a canonical candidate against a
     // non-canonical root would spuriously reject every managed home. In dev
-    // mode (orca-dev/ vs orca/) this check also filters out production-rooted
+    // mode (pebble-dev/ vs pebble/) this check also filters out production-rooted
     // paths before downstream sync runs.
     if (
       canonicalCandidate !== canonicalRoot &&
@@ -707,11 +729,11 @@ export class CodexAccountService {
       relativePath === '' || relativePath.startsWith('..') || relativePath.includes(`..${sep}`)
 
     if (escaped) {
-      throw new Error('Managed Codex home escaped Orca account storage.')
+      throw new Error('Managed Codex home escaped Pebble account storage.')
     }
 
-    if (!existsSync(join(canonicalCandidate, '.orca-managed-home'))) {
-      throw new Error('Managed Codex home is missing Orca ownership marker.')
+    if (!hasManagedHomeMarker(canonicalCandidate)) {
+      throw new Error('Managed Codex home is missing Pebble ownership marker.')
     }
 
     return canonicalCandidate
@@ -738,14 +760,14 @@ export class CodexAccountService {
               'set -euo pipefail',
               `candidate=${shellQuote(linuxHomePath)}`,
               `expected_marker=${shellQuote(expectedAccountId)}`,
-              'managed_root="${HOME%/}/.local/share/orca/codex-accounts"',
+              `managed_root="\${HOME%/}${MANAGED_WSL_CODEX_ACCOUNTS_ROOT}"`,
               'candidate_real=$(readlink -f -- "$candidate" 2>/dev/null || true)',
               'managed_root_real=$(readlink -f -- "$managed_root" 2>/dev/null || true)',
               'test -n "$candidate_real"',
               'test -n "$managed_root_real"',
               'case "$candidate_real" in "$managed_root_real"/*/home) ;; *) exit 0 ;; esac',
-              'test -f "$candidate_real/.orca-managed-home"',
-              'test "$(cat "$candidate_real/.orca-managed-home")" = "$expected_marker"',
+              `test -f "$candidate_real/${MANAGED_HOME_MARKER}"`,
+              `test "$(cat "$candidate_real/${MANAGED_HOME_MARKER}")" = "$expected_marker"`,
               'rm -rf -- "$candidate_real"',
               'parent_dir=$(dirname -- "$candidate_real")',
               'case "$parent_dir" in "$managed_root_real"/*) rmdir -- "$parent_dir" 2>/dev/null || true ;; esac'

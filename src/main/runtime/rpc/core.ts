@@ -1,10 +1,10 @@
-// Why: this is the single boundary between raw RPC frames and the OrcaRuntimeService.
+// Why: this is the single boundary between raw RPC frames and the PebbleRuntimeService.
 // Keeping the schema, handler, and result type attached to one object makes the
 // CLI-facing contract greppable and lets the dispatcher verify every payload
 // against the same shape the handler consumed during development.
 import { ZodError, type ZodType } from 'zod'
 import type { TerminalStreamFrame } from '../../../shared/terminal-stream-protocol'
-import type { OrcaRuntimeService } from '../orca-runtime'
+import type { PebbleRuntimeService } from '../pebble-runtime'
 
 export type RpcEnvelopeMeta = {
   runtimeId: string
@@ -39,7 +39,7 @@ export type RpcRequest = {
 }
 
 export type RpcContext = {
-  runtime: OrcaRuntimeService
+  runtime: PebbleRuntimeService
   // Why: long-poll handlers (e.g. orchestration.check with wait=true) need to
   // observe the underlying socket's lifetime so they can release their slot
   // and resolve their inner waiters immediately when a client disconnects

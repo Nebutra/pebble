@@ -106,7 +106,7 @@ describe('importCookiesFromFile', () => {
   let cookiesSetMock: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'orca-cookie-test-'))
+    tmpDir = mkdtempSync(join(tmpdir(), 'pebble-cookie-test-'))
     cookiesSetMock = vi.fn().mockResolvedValue(undefined)
     sessionFromPartitionMock.mockReset()
     sessionFromPartitionMock.mockReturnValue({
@@ -299,7 +299,7 @@ describe('importCookiesFromBrowser Safari', () => {
   let cookiesSetMock: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'orca-safari-cookie-test-'))
+    tmpDir = mkdtempSync(join(tmpdir(), 'pebble-safari-cookie-test-'))
     cookiesSetMock = vi.fn().mockResolvedValue(undefined)
     sessionFromPartitionMock.mockReset()
     sessionFromPartitionMock.mockReturnValue({

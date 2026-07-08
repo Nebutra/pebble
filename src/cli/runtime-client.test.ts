@@ -31,7 +31,7 @@ function writeMetadata(
   pid = 123
 ): void {
   writeFileSync(
-    join(userDataPath, 'orca-runtime.json'),
+    join(userDataPath, 'pebble-runtime.json'),
     JSON.stringify({
       runtimeId: 'runtime-1',
       pid,
@@ -69,7 +69,7 @@ function findUnusedPid(seed = 200_000): number {
 // EACCES errors on listen(), so the suite is skipped on that platform.
 describe.skipIf(process.platform === 'win32')('RuntimeClient', () => {
   it('returns the full RPC envelope for successful calls', async () => {
-    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-client-'))
+    const userDataPath = mkdtempSync(join(tmpdir(), 'pebble-runtime-client-'))
     const endpoint = join(userDataPath, 'runtime.sock')
     const server = createServer((socket) => {
       sockets.add(socket)
@@ -102,7 +102,7 @@ describe.skipIf(process.platform === 'win32')('RuntimeClient', () => {
   })
 
   it('reports not_running when no runtime metadata exists', async () => {
-    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-client-'))
+    const userDataPath = mkdtempSync(join(tmpdir(), 'pebble-runtime-client-'))
     const client = new RuntimeClient(userDataPath, 100)
 
     const status = await client.getCliStatus()
@@ -124,7 +124,7 @@ describe.skipIf(process.platform === 'win32')('RuntimeClient', () => {
   })
 
   it('reports stale_bootstrap when bootstrap artifacts exist but no runtime is reachable', async () => {
-    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-client-'))
+    const userDataPath = mkdtempSync(join(tmpdir(), 'pebble-runtime-client-'))
     writeMetadata(userDataPath, join(userDataPath, 'missing.sock'), 'token', findUnusedPid())
 
     const client = new RuntimeClient(userDataPath, 100)
@@ -135,7 +135,7 @@ describe.skipIf(process.platform === 'win32')('RuntimeClient', () => {
   })
 
   it('reports graph_not_ready when the runtime is reachable but graph is unavailable', async () => {
-    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-client-'))
+    const userDataPath = mkdtempSync(join(tmpdir(), 'pebble-runtime-client-'))
     const endpoint = join(userDataPath, 'runtime.sock')
     const server = createServer((socket) => {
       sockets.add(socket)
@@ -170,8 +170,8 @@ describe.skipIf(process.platform === 'win32')('RuntimeClient', () => {
     expect(status.result.graph.state).toBe('unavailable')
   })
 
-  it('openOrca succeeds immediately when the runtime is already reachable', async () => {
-    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-client-'))
+  it('openPebble succeeds immediately when the runtime is already reachable', async () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'pebble-runtime-client-'))
     const endpoint = join(userDataPath, 'runtime.sock')
     const server = createServer((socket) => {
       sockets.add(socket)
@@ -200,14 +200,14 @@ describe.skipIf(process.platform === 'win32')('RuntimeClient', () => {
     writeMetadata(userDataPath, endpoint)
 
     const client = new RuntimeClient(userDataPath, 100)
-    const status = await client.openOrca(100)
+    const status = await client.openPebble(100)
 
     expect(status.result.runtime.state).toBe('ready')
     expect(status.result.runtime.reachable).toBe(true)
   })
 
   it('times out if the runtime never responds', async () => {
-    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-client-'))
+    const userDataPath = mkdtempSync(join(tmpdir(), 'pebble-runtime-client-'))
     const endpoint = join(userDataPath, 'runtime.sock')
     const server = createServer((socket) => {
       sockets.add(socket)
@@ -227,7 +227,7 @@ describe.skipIf(process.platform === 'win32')('RuntimeClient', () => {
   })
 
   it('allows a per-call timeout override for long runtime requests', async () => {
-    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-client-'))
+    const userDataPath = mkdtempSync(join(tmpdir(), 'pebble-runtime-client-'))
     const endpoint = join(userDataPath, 'runtime.sock')
     const server = createServer((socket) => {
       sockets.add(socket)
@@ -259,7 +259,7 @@ describe.skipIf(process.platform === 'win32')('RuntimeClient', () => {
   })
 
   it('preserves structured runtime failures', async () => {
-    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-client-'))
+    const userDataPath = mkdtempSync(join(tmpdir(), 'pebble-runtime-client-'))
     const endpoint = join(userDataPath, 'runtime.sock')
     const server = createServer((socket) => {
       sockets.add(socket)
@@ -292,7 +292,7 @@ describe.skipIf(process.platform === 'win32')('RuntimeClient', () => {
   })
 
   it('rejects invalid runtime response frames', async () => {
-    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-client-'))
+    const userDataPath = mkdtempSync(join(tmpdir(), 'pebble-runtime-client-'))
     const endpoint = join(userDataPath, 'runtime.sock')
     const server = createServer((socket) => {
       sockets.add(socket)
@@ -313,7 +313,7 @@ describe.skipIf(process.platform === 'win32')('RuntimeClient', () => {
   })
 
   it('rejects mismatched response ids from the runtime', async () => {
-    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-client-'))
+    const userDataPath = mkdtempSync(join(tmpdir(), 'pebble-runtime-client-'))
     const endpoint = join(userDataPath, 'runtime.sock')
     const server = createServer((socket) => {
       sockets.add(socket)

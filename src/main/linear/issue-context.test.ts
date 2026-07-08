@@ -44,7 +44,7 @@ function rawIssue(identifier: string) {
     id: `${identifier}-id`,
     identifier,
     title: `Title ${identifier}`,
-    url: `https://linear.app/stably/issue/${identifier}`,
+    url: `https://linear.app/nebutra/issue/${identifier}`,
     labels: { nodes: [] }
   }
 }
@@ -57,10 +57,10 @@ describe('Linear issue context', () => {
   })
 
   it('resolves --current worktree links written as split Linear CLI metadata', async () => {
-    const stably = workspace('workspace-stably', 'stably')
-    const rawRequest = vi.fn().mockResolvedValue({ data: { issue: rawIssue('STA-335') } })
-    getStatus.mockReturnValue({ workspaces: [stably] })
-    getClients.mockReturnValue([makeEntry({ workspace: stably, rawRequest })])
+    const nebutra = workspace('workspace-nebutra', 'nebutra')
+    const rawRequest = vi.fn().mockResolvedValue({ data: { issue: rawIssue('NEB-335') } })
+    getStatus.mockReturnValue({ workspaces: [nebutra] })
+    getClients.mockReturnValue([makeEntry({ workspace: nebutra, rawRequest })])
     const { readLinearIssueContext } = await import('./issue-context')
 
     await expect(
@@ -71,23 +71,23 @@ describe('Linear issue context', () => {
           depth: 0
         },
         async () => ({
-          identifier: 'STA-335',
+          identifier: 'NEB-335',
           workspaceId: null,
-          organizationUrlKey: 'stably',
+          organizationUrlKey: 'nebutra',
           worktreeId: 'repo::/tmp/repo/feature',
           worktreePath: '/tmp/repo/feature'
         })
       )
     ).resolves.toMatchObject({
-      issue: { identifier: 'STA-335' },
+      issue: { identifier: 'NEB-335' },
       meta: {
         resolved: {
-          workspaceId: 'workspace-stably',
+          workspaceId: 'workspace-nebutra',
           worktreeId: 'repo::/tmp/repo/feature',
           worktreePath: '/tmp/repo/feature'
         }
       }
     })
-    expect(getClients).toHaveBeenCalledWith('workspace-stably')
+    expect(getClients).toHaveBeenCalledWith('workspace-nebutra')
   })
 })

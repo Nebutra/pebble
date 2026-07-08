@@ -69,7 +69,7 @@ export function WslCliRegistration({
 
   const isEnabled = status?.state === 'installed'
   const isSupported = status?.supported ?? false
-  const commandName = status?.commandName ?? 'orca-ide'
+  const commandName = status?.commandName ?? 'pebble-ide'
 
   const handleInstall = async (): Promise<void> => {
     setBusyAction('install')
@@ -161,7 +161,7 @@ export function WslCliRegistration({
                 : (status?.detail ??
                   translate(
                     'auto.components.settings.WslCliRegistration.7aa456a460',
-                    'Register `orca-ide` in ~/.local/bin inside WSL.'
+                    'Register `pebble-ide` in ~/.local/bin inside WSL.'
                   ))}
             </p>
           </div>
@@ -243,11 +243,11 @@ export function WslCliRegistration({
               {isEnabled
                 ? translate(
                     'auto.components.settings.WslCliRegistration.d8216eb22e',
-                    'This removes the WSL shell command. Orca itself remains installed on Windows.'
+                    'This removes the WSL shell command. Pebble itself remains installed on Windows.'
                   )
                 : translate(
                     'auto.components.settings.WslCliRegistration.7ee4e52b99',
-                    'Orca will register {{value0}} so the command works from WSL terminals.',
+                    'Pebble will register {{value0}} so the command works from WSL terminals.',
                     { value0: status?.commandPath ?? commandName }
                   )}
             </DialogDescription>

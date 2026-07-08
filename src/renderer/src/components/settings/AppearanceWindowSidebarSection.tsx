@@ -238,7 +238,7 @@ export function AppearanceWindowSidebarSection({
                   <SearchableSetting
                     title={translate(
                       'auto.components.settings.AppearancePane.9da1020447',
-                      'Show Orca Mobile Button'
+                      'Show Pebble Mobile Button'
                     )}
                     description={sidebarEntries[2]?.description}
                     keywords={sidebarEntries[2]?.keywords ?? ['mobile', 'phone', 'sidebar']}
@@ -246,13 +246,13 @@ export function AppearanceWindowSidebarSection({
                     <SettingsSwitchRow
                       label={translate(
                         'auto.components.settings.AppearancePane.9da1020447',
-                        'Show Orca Mobile Button'
+                        'Show Pebble Mobile Button'
                       )}
                       // Why: clarify where the shortcut still lives after hiding it, so users
                       // don't think the feature is gone.
                       description={translate(
                         'auto.components.settings.AppearancePane.61d842eca0',
-                        'Show the Orca Mobile shortcut in the sidebar. It remains available from Toolbox.'
+                        'Show the Pebble Mobile shortcut in the sidebar. It remains available from Toolbox.'
                       )}
                       checked={settings.showMobileButton !== false}
                       onChange={() =>

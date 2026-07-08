@@ -69,7 +69,7 @@ function createResolvedConfig(
   }
 }
 
-function expectNoOrcaControlMasterArgs(args: string[]): void {
+function expectNoPebbleControlMasterArgs(args: string[]): void {
   expect(args).not.toContain('ControlMaster=auto')
   expect(args.some((arg) => arg.startsWith('ControlPath='))).toBe(false)
   expect(args).not.toContain('ControlPersist=300')
@@ -273,17 +273,17 @@ describe('spawnSystemSsh', () => {
         configHost: '127.0.0.1',
         host: '127.0.0.1',
         port: 2222,
-        identityFile: '/tmp/orca-docker-key',
+        identityFile: '/tmp/pebble-docker-key',
         identitiesOnly: true
       })
     )
 
-    expect(args).toEqual(expect.arrayContaining(['-p', '2222', '-i', '/tmp/orca-docker-key']))
+    expect(args).toEqual(expect.arrayContaining(['-p', '2222', '-i', '/tmp/pebble-docker-key']))
     expect(args).toContain('IdentitiesOnly=yes')
     expect(args).toContain('deploy@127.0.0.1')
   })
 
-  it('does not inject Orca ControlMaster flags when ssh config already owns muxing', () => {
+  it('does not inject Pebble ControlMaster flags when ssh config already owns muxing', () => {
     const args = buildSshArgs(createTarget({ configHost: 'workbox', source: 'ssh-config' }), {
       resolvedConfig: createResolvedConfig({
         controlMaster: 'auto',
@@ -292,12 +292,12 @@ describe('spawnSystemSsh', () => {
       })
     })
 
-    expectNoOrcaControlMasterArgs(args)
+    expectNoPebbleControlMasterArgs(args)
     expect(args).not.toContain('-S')
     expect(args).toContain('deploy@workbox')
   })
 
-  it('injects Orca ControlMaster flags when ssh config only sets ControlPersist', () => {
+  it('injects Pebble ControlMaster flags when ssh config only sets ControlPersist', () => {
     const args = buildSshArgs(createTarget({ configHost: 'workbox', source: 'ssh-config' }), {
       resolvedConfig: createResolvedConfig({
         controlMaster: 'no',
@@ -311,7 +311,7 @@ describe('spawnSystemSsh', () => {
     expect(args).not.toContain('-S')
   })
 
-  it('injects Orca ControlMaster flags when ssh config only sets ControlPath', () => {
+  it('injects Pebble ControlMaster flags when ssh config only sets ControlPath', () => {
     const args = buildSshArgs(createTarget({ configHost: 'workbox', source: 'ssh-config' }), {
       resolvedConfig: createResolvedConfig({
         controlMaster: 'no',
@@ -325,7 +325,7 @@ describe('spawnSystemSsh', () => {
     expect(args).not.toContain('-S')
   })
 
-  it('injects Orca ControlMaster flags when ssh config omits ControlPath', () => {
+  it('injects Pebble ControlMaster flags when ssh config omits ControlPath', () => {
     const args = buildSshArgs(createTarget({ configHost: 'workbox', source: 'ssh-config' }), {
       resolvedConfig: createResolvedConfig({
         controlMaster: 'auto'
@@ -338,23 +338,23 @@ describe('spawnSystemSsh', () => {
     expect(args).not.toContain('-S')
   })
 
-  it('does not inject Orca ControlMaster flags for unresolved ssh-config targets', () => {
+  it('does not inject Pebble ControlMaster flags for unresolved ssh-config targets', () => {
     const args = buildSshArgs(createTarget({ configHost: 'workbox', source: 'ssh-config' }))
 
-    expectNoOrcaControlMasterArgs(args)
+    expectNoPebbleControlMasterArgs(args)
     expect(args).not.toContain('-S')
     expect(args).toContain('deploy@workbox')
   })
 
-  it('does not inject Orca ControlMaster flags for unresolved legacy config aliases', () => {
+  it('does not inject Pebble ControlMaster flags for unresolved legacy config aliases', () => {
     const args = buildSshArgs(createTarget({ configHost: 'workbox', host: 'resolved.example.com' }))
 
-    expectNoOrcaControlMasterArgs(args)
+    expectNoPebbleControlMasterArgs(args)
     expect(args).not.toContain('-S')
     expect(args).toContain('deploy@workbox')
   })
 
-  it('can inject Orca ControlMaster flags for ssh-config targets with resolved config', () => {
+  it('can inject Pebble ControlMaster flags for ssh-config targets with resolved config', () => {
     const args = buildSshArgs(createTarget({ configHost: 'workbox', source: 'ssh-config' }), {
       resolvedConfig: createResolvedConfig()
     })
@@ -371,10 +371,10 @@ describe('spawnSystemSsh', () => {
 
     expect(standaloneControlIdx).toBeGreaterThan(-1)
     expect(args[standaloneControlIdx + 1]).toBe('none')
-    expectNoOrcaControlMasterArgs(args)
+    expectNoPebbleControlMasterArgs(args)
   })
 
-  it('adds keepalive options to Orca-owned ControlMaster connections', () => {
+  it('adds keepalive options to Pebble-owned ControlMaster connections', () => {
     const args = buildSshArgs(createTarget(), { resolvedConfig: createResolvedConfig() })
 
     expect(args).toContain('ControlMaster=auto')
@@ -413,7 +413,7 @@ describe('spawnSystemSsh', () => {
     expect(args[exitOnForwardFailureIdx - 1]).toBe('-o')
     expect(exitOnForwardFailureIdx).toBeLessThan(terminatorIdx)
     expect(standaloneControlIdx).toBe(-1)
-    expectNoOrcaControlMasterArgs(args)
+    expectNoPebbleControlMasterArgs(args)
     expect(args).toContain('127.0.0.1:5173:127.0.0.1:3000')
     expect(args[terminatorIdx + 1]).toBe('deploy@fdpass-host')
     expect(spawnMock).toHaveBeenCalledWith(
@@ -497,7 +497,7 @@ describe('spawnSystemSsh', () => {
 
     const promise = writeFileViaSystemSsh(
       createTarget(),
-      'C:/Users/me/.orca-remote/relay/.version',
+      'C:/Users/me/.pebble-remote/relay/.version',
       '0.1.0',
       { hostPlatform }
     )
@@ -518,7 +518,7 @@ describe('spawnSystemSsh', () => {
 
     const promise = writeFileViaSystemSsh(
       createTarget(),
-      'C:/Users/me/.orca-remote/relay/.version',
+      'C:/Users/me/.pebble-remote/relay/.version',
       '0.1.0',
       { hostPlatform, disableControlMaster: true }
     )
@@ -532,7 +532,7 @@ describe('spawnSystemSsh', () => {
   })
 
   it('uploads directories to Windows system SSH targets in one PowerShell batch', async () => {
-    const localDir = mkdtempSync(join(tmpdir(), 'orca-system-ssh-upload-'))
+    const localDir = mkdtempSync(join(tmpdir(), 'pebble-system-ssh-upload-'))
     writeFileSync(join(localDir, 'relay.js'), 'console.log("relay")')
     const spawned: EventedProcess[] = []
     spawnMock.mockImplementation(() => {
@@ -546,7 +546,7 @@ describe('spawnSystemSsh', () => {
       await uploadDirectoryViaSystemSsh(
         createTarget(),
         localDir,
-        'C:/Users/me/.orca-remote/relay',
+        'C:/Users/me/.pebble-remote/relay',
         { hostPlatform: getRemoteHostPlatform('win32-x64') }
       )
     } finally {
@@ -565,10 +565,10 @@ describe('spawnSystemSsh', () => {
     }[]
     expect(payload).toEqual(
       expect.arrayContaining([
-        { kind: 'directory', path: 'C:/Users/me/.orca-remote/relay' },
+        { kind: 'directory', path: 'C:/Users/me/.pebble-remote/relay' },
         {
           kind: 'file',
-          path: 'C:/Users/me/.orca-remote/relay/relay.js',
+          path: 'C:/Users/me/.pebble-remote/relay/relay.js',
           contentsBase64: Buffer.from('console.log("relay")').toString('base64')
         }
       ])
@@ -576,7 +576,7 @@ describe('spawnSystemSsh', () => {
   })
 
   it('forces standalone SSH for Windows upload packages when requested', async () => {
-    const localDir = mkdtempSync(join(tmpdir(), 'orca-system-ssh-upload-'))
+    const localDir = mkdtempSync(join(tmpdir(), 'pebble-system-ssh-upload-'))
     writeFileSync(join(localDir, 'relay.js'), 'console.log("relay")')
     spawnMock.mockImplementation(() => {
       const proc = createEventedProcess()
@@ -588,7 +588,7 @@ describe('spawnSystemSsh', () => {
       await uploadDirectoryViaSystemSsh(
         createTarget(),
         localDir,
-        'C:/Users/me/.orca-remote/relay',
+        'C:/Users/me/.pebble-remote/relay',
         { hostPlatform: getRemoteHostPlatform('win32-x64'), disableControlMaster: true }
       )
     } finally {

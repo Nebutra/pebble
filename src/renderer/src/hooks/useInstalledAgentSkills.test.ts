@@ -56,7 +56,7 @@ function deferred<T>(): {
 
 describe('hasInstalledAgentSkill', () => {
   it('matches installed skills by summarized name', () => {
-    expect(hasInstalledAgentSkill([skill({ name: 'orca-cli' })], 'orca-cli')).toBe(true)
+    expect(hasInstalledAgentSkill([skill({ name: 'pebble-cli' })], 'pebble-cli')).toBe(true)
   })
 
   it('matches installed skills by directory name when frontmatter has a display name', () => {
@@ -64,18 +64,18 @@ describe('hasInstalledAgentSkill', () => {
       hasInstalledAgentSkill(
         [
           skill({
-            name: 'Orca CLI',
-            directoryPath: 'C:\\Users\\test\\.agents\\skills\\orca-cli'
+            name: 'Pebble CLI',
+            directoryPath: 'C:\\Users\\test\\.agents\\skills\\pebble-cli'
           })
         ],
-        'orca-cli'
+        'pebble-cli'
       )
     ).toBe(true)
   })
 
   it('ignores non-installed discovery entries', () => {
     expect(
-      hasInstalledAgentSkill([skill({ name: 'orca-cli', installed: false })], 'orca-cli')
+      hasInstalledAgentSkill([skill({ name: 'pebble-cli', installed: false })], 'pebble-cli')
     ).toBe(false)
   })
 
@@ -84,24 +84,24 @@ describe('hasInstalledAgentSkill', () => {
       hasInstalledAgentSkill(
         [
           skill({
-            name: 'orca-cli',
+            name: 'pebble-cli',
             sourceKind: 'repo',
             sourceLabel: 'Repo test .agents',
             rootPath: '/repo/.agents/skills',
-            directoryPath: '/repo/.agents/skills/orca-cli',
-            skillFilePath: '/repo/.agents/skills/orca-cli/SKILL.md'
+            directoryPath: '/repo/.agents/skills/pebble-cli',
+            skillFilePath: '/repo/.agents/skills/pebble-cli/SKILL.md'
           }),
           skill({
             id: 'skill-2',
-            name: 'orca-cli',
+            name: 'pebble-cli',
             sourceKind: 'plugin',
             sourceLabel: 'Codex plugin cache',
             rootPath: '/Users/test/.codex/plugins/cache',
-            directoryPath: '/Users/test/.codex/plugins/cache/vendor/orca-cli',
-            skillFilePath: '/Users/test/.codex/plugins/cache/vendor/orca-cli/SKILL.md'
+            directoryPath: '/Users/test/.codex/plugins/cache/vendor/pebble-cli',
+            skillFilePath: '/Users/test/.codex/plugins/cache/vendor/pebble-cli/SKILL.md'
           })
         ],
-        'orca-cli',
+        'pebble-cli',
         { sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS }
       )
     ).toBe(false)
@@ -109,7 +109,7 @@ describe('hasInstalledAgentSkill', () => {
 
   it('counts home skills when matching global installs', () => {
     expect(
-      hasInstalledAgentSkill([skill({ name: 'orca-cli' })], 'orca-cli', {
+      hasInstalledAgentSkill([skill({ name: 'pebble-cli' })], 'pebble-cli', {
         sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
       })
     ).toBe(true)
@@ -119,7 +119,7 @@ describe('hasInstalledAgentSkill', () => {
     expect(
       hasInstalledAgentSkillNamed(
         [skill({ name: 'linear-tickets' })],
-        ['orca-linear', 'linear-tickets']
+        ['pebble-linear', 'linear-tickets']
       )
     ).toBe(true)
   })
@@ -133,7 +133,7 @@ describe('hasInstalledAgentSkill', () => {
             directoryPath: '/Users/test/.agents/skills/linear-tickets'
           })
         ],
-        ['orca-linear', 'linear-tickets']
+        ['pebble-linear', 'linear-tickets']
       )
     ).toBe(true)
   })
@@ -144,16 +144,16 @@ describe('hasInstalledAgentSkill', () => {
         [
           skill({
             name: 'Linear Tickets',
-            directoryPath: 'C:\\Users\\test\\.agents\\skills\\orca-linear'
+            directoryPath: 'C:\\Users\\test\\.agents\\skills\\pebble-linear'
           })
         ],
-        ['orca-linear', 'linear-tickets']
+        ['pebble-linear', 'linear-tickets']
       )
     ).toBe(true)
   })
 
   it('keeps aliases opt-in for unrelated single-name checks', () => {
-    expect(hasInstalledAgentSkill([skill({ name: 'linear-tickets' })], 'orca-linear')).toBe(false)
+    expect(hasInstalledAgentSkill([skill({ name: 'linear-tickets' })], 'pebble-linear')).toBe(false)
   })
 })
 
@@ -218,7 +218,7 @@ describe('discoverInstalledAgentSkills', () => {
 
     expect(discover).toHaveBeenCalledTimes(2)
 
-    const freshResult = discoveryResult([skill({ name: 'orca-cli' })])
+    const freshResult = discoveryResult([skill({ name: 'pebble-cli' })])
     secondScan.resolve(freshResult)
     await expect(forcedRefresh).resolves.toBe(freshResult)
   })

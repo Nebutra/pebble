@@ -13,7 +13,7 @@ describe('normalizeGitErrorMessage', () => {
   it('keeps the submodule name when a recursive push is rejected', () => {
     const error = new Error(
       "Command failed: git push\nPushing submodule 'find-cmux-followers'\n" +
-        'To https://github.com/stablyai/orca-internal\n' +
+        'To https://github.com/nebutra/pebble-internal\n' +
         ' ! [rejected]        master -> master (fetch first)\n' +
         "Unable to push submodule 'find-cmux-followers'\n" +
         'fatal: failed to push all needed submodules'

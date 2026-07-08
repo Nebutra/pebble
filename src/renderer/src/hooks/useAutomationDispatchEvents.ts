@@ -23,8 +23,8 @@ import {
 } from '@/components/automations/automation-run-output-snapshot'
 import { translate } from '@/i18n/i18n'
 import { createBrowserUuid } from '@/lib/browser-uuid'
+import { dispatchAutomationsChangedEvent } from '@/lib/automation-change-event'
 
-const AUTOMATIONS_CHANGED_EVENT = 'orca:automations-changed'
 const activeReuseDispatchTabIds = new Set<string>()
 
 function acquireReuseDispatchTab(tabId: string): (() => void) | null {
@@ -51,7 +51,7 @@ export function useAutomationDispatchEvents(): void {
       async ({ automation, run, dispatchToken }) => {
         const markDispatchResult = async (result: AutomationDispatchResult): Promise<void> => {
           await window.api.automations.markDispatchResult(result)
-          window.dispatchEvent(new Event(AUTOMATIONS_CHANGED_EVENT))
+          dispatchAutomationsChangedEvent()
         }
         const state = useAppStore.getState()
         const focusBeforeDispatch = {

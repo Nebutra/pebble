@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const callMock = vi.fn()
 const getTerminalHandleMock = vi.hoisted(() => vi.fn())
-const originalTerminalHandle = process.env.ORCA_TERMINAL_HANDLE
+const originalTerminalHandle = process.env.PEBBLE_TERMINAL_HANDLE
 function lifecycleGroupRecipientError(type: 'worker_done' | 'heartbeat'): string {
   return `${type} messages must be sent to a concrete coordinator terminal handle, not a group address.`
 }
@@ -16,9 +16,9 @@ import { ORCHESTRATION_HANDLERS } from './orchestration'
 afterEach(() => {
   getTerminalHandleMock.mockReset()
   if (originalTerminalHandle === undefined) {
-    delete process.env.ORCA_TERMINAL_HANDLE
+    delete process.env.PEBBLE_TERMINAL_HANDLE
   } else {
-    process.env.ORCA_TERMINAL_HANDLE = originalTerminalHandle
+    process.env.PEBBLE_TERMINAL_HANDLE = originalTerminalHandle
   }
 })
 
@@ -66,7 +66,7 @@ describe('orchestration send structured payload flags', () => {
   beforeEach(() => {
     callMock.mockReset().mockResolvedValue({ result: { message: { id: 'msg_1' } } })
     getTerminalHandleMock.mockReset()
-    delete process.env.ORCA_TERMINAL_HANDLE
+    delete process.env.PEBBLE_TERMINAL_HANDLE
   })
 
   const invokeSend = (flags: Map<string, string | boolean>) =>
@@ -199,7 +199,7 @@ describe('orchestration timeout flag validation', () => {
 
   beforeEach(() => {
     callMock.mockReset()
-    delete process.env.ORCA_TERMINAL_HANDLE
+    delete process.env.PEBBLE_TERMINAL_HANDLE
   })
 
   const invokeCheck = (flags: Map<string, string | boolean>) =>
@@ -229,7 +229,7 @@ describe('orchestration timeout flag validation', () => {
   })
 
   it('passes a parsed check timeout into the RPC payload', async () => {
-    process.env.ORCA_TERMINAL_HANDLE = 'term_worker'
+    process.env.PEBBLE_TERMINAL_HANDLE = 'term_worker'
     callMock.mockResolvedValue({ result: { messages: [], count: 0 } })
 
     await invokeCheck(
@@ -262,7 +262,7 @@ describe('orchestration timeout flag validation', () => {
   })
 
   it('uses the parsed ask timeout for both runtime wait and client timeout', async () => {
-    process.env.ORCA_TERMINAL_HANDLE = 'term_worker'
+    process.env.PEBBLE_TERMINAL_HANDLE = 'term_worker'
     callMock.mockResolvedValue({
       result: {
         answer: 'yes',

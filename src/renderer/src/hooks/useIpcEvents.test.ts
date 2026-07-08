@@ -1001,7 +1001,7 @@ describe('useIpcEvents browser tab create routing', () => {
         },
         browser: {
           onGuestLoadFailed: () => () => {},
-          onOpenLinkInOrcaTab: () => () => {},
+          onOpenLinkInPebbleTab: () => () => {},
           onNavigationUpdate: () => () => {},
           onActivateView: (listener: NonNullable<typeof activateViewListenerRef.current>) => {
             activateViewListenerRef.current = listener
@@ -1221,7 +1221,7 @@ describe('useIpcEvents updater integration', () => {
         },
         browser: {
           onGuestLoadFailed: () => () => {},
-          onOpenLinkInOrcaTab: () => () => {},
+          onOpenLinkInPebbleTab: () => () => {},
           onNavigationUpdate: () => () => {},
           onActivateView: () => () => {},
           onPaneFocus: () => () => {}
@@ -1461,7 +1461,7 @@ describe('useIpcEvents updater integration', () => {
         },
         browser: {
           onGuestLoadFailed: () => () => {},
-          onOpenLinkInOrcaTab: () => () => {},
+          onOpenLinkInPebbleTab: () => () => {},
           onNavigationUpdate: () => () => {},
           onActivateView: () => () => {},
           onPaneFocus: () => () => {}
@@ -1951,7 +1951,7 @@ describe('useIpcEvents updater integration', () => {
         },
         browser: {
           onGuestLoadFailed: () => () => {},
-          onOpenLinkInOrcaTab: () => () => {},
+          onOpenLinkInPebbleTab: () => () => {},
           onNavigationUpdate: () => () => {},
           onActivateView: () => () => {},
           onPaneFocus: () => () => {}
@@ -2110,7 +2110,7 @@ describe('useIpcEvents updater integration', () => {
     expect(focusTerminalTabSurface).toHaveBeenCalledWith('tab-new', undefined)
     expect(dispatchEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: 'orca-background-mount-terminal-worktree',
+        type: 'pebble-background-mount-terminal-worktree',
         detail: { worktreeId: 'wt-3' }
       })
     )
@@ -2173,7 +2173,7 @@ describe('useIpcEvents updater integration', () => {
     expect(focusTerminalTabSurface).toHaveBeenCalledWith('tab-new', undefined)
     expect(dispatchEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: 'orca-background-mount-terminal-worktree',
+        type: 'pebble-background-mount-terminal-worktree',
         detail: { worktreeId: 'wt-2' }
       })
     )
@@ -2523,7 +2523,7 @@ describe('useIpcEvents updater integration', () => {
     })
     expect(dispatchEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: 'orca-split-terminal-pane',
+        type: 'pebble-split-terminal-pane',
         detail: {
           tabId: 'tab-existing',
           paneRuntimeId: -1,
@@ -2809,7 +2809,7 @@ describe('useIpcEvents browser tab close routing', () => {
         },
         browser: {
           onGuestLoadFailed: () => () => {},
-          onOpenLinkInOrcaTab: () => () => {},
+          onOpenLinkInPebbleTab: () => () => {},
           onNavigationUpdate: () => () => {},
           onActivateView: () => () => {},
           onPaneFocus: () => () => {}
@@ -3286,7 +3286,7 @@ describe('useIpcEvents browser tab close routing', () => {
         },
         browser: {
           onGuestLoadFailed: () => () => {},
-          onOpenLinkInOrcaTab: () => () => {},
+          onOpenLinkInPebbleTab: () => () => {},
           onNavigationUpdate: () => () => {},
           onActivateView: () => () => {},
           onPaneFocus: () => () => {}
@@ -3502,7 +3502,7 @@ describe('useIpcEvents browser tab close routing', () => {
         },
         browser: {
           onGuestLoadFailed: () => () => {},
-          onOpenLinkInOrcaTab: () => () => {},
+          onOpenLinkInPebbleTab: () => () => {},
           onNavigationUpdate: () => () => {},
           onActivateView: () => () => {},
           onPaneFocus: () => () => {}
@@ -3713,7 +3713,7 @@ describe('useIpcEvents browser tab close routing', () => {
         },
         browser: {
           onGuestLoadFailed: () => () => {},
-          onOpenLinkInOrcaTab: () => () => {},
+          onOpenLinkInPebbleTab: () => () => {},
           onNavigationUpdate: () => () => {},
           onActivateView: () => () => {},
           onPaneFocus: () => () => {}
@@ -3942,7 +3942,7 @@ describe('useIpcEvents CLI-created worktree activation', () => {
         },
         browser: {
           onGuestLoadFailed: () => () => {},
-          onOpenLinkInOrcaTab: () => () => {},
+          onOpenLinkInPebbleTab: () => () => {},
           onNavigationUpdate: () => () => {},
           onActivateView: () => () => {},
           onPaneFocus: () => () => {}
@@ -4188,7 +4188,7 @@ describe('useIpcEvents CLI-created worktree activation', () => {
         },
         browser: {
           onGuestLoadFailed: () => () => {},
-          onOpenLinkInOrcaTab: () => () => {},
+          onOpenLinkInPebbleTab: () => () => {},
           onNavigationUpdate: () => () => {},
           onActivateView: () => () => {},
           onPaneFocus: () => () => {}
@@ -4419,7 +4419,7 @@ describe('useIpcEvents agent status snapshot integration', () => {
         browser: {
           onGuestLoadFailed: () => () => {},
           onPaneFocus: () => () => {},
-          onOpenLinkInOrcaTab: () => () => {},
+          onOpenLinkInPebbleTab: () => () => {},
           onNavigationUpdate: () => () => {},
           onActivateView: () => () => {}
         },

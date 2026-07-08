@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["vite/client", "node"],
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@renderer/*": ["../../src/renderer/src/*"],
+      "@/*": ["../../src/renderer/src/*"]
+    }
+  },
+  "include": [
+    "src",
+    "../../src/renderer/src/env.d.ts",
+    "../../src/renderer/src/**/*",
+    "../../src/preload/api-types.ts",
+    "../../src/shared/**/*",
+    "../../src/types/**/*"
+  ],
+  "exclude": [
+    "../../src/**/*.test.ts",
+    "../../src/**/*.test.tsx",
+    "../../src/**/__tests__/**",
+    "../../src/**/*.spec.ts",
+    "../../src/**/*.spec.tsx"
+  ],
+  "references": []
+}

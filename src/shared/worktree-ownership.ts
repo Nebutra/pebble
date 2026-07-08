@@ -12,7 +12,7 @@ import type {
   DetectedWorktree,
   ExternalWorktreeVisibility,
   GlobalSettings,
-  OrcaWorkspaceLayout,
+  PebbleWorkspaceLayout,
   Repo,
   Worktree,
   WorktreeMeta,
@@ -20,6 +20,11 @@ import type {
 } from './types'
 
 export const EXTERNAL_WORKTREE_VISIBILITY_ROLLOUT_AT = Date.UTC(2026, 4, 23)
+export const MANAGED_WORKTREE_OWNERSHIP = 'pebble-managed' as const
+
+export function isManagedWorktreeOwnership(ownership: WorktreeOwnership): boolean {
+  return ownership === MANAGED_WORKTREE_OWNERSHIP
+}
 
 export function isLegacyRepoForExternalWorktreeVisibility(repo: Repo): boolean {
   if (typeof repo.externalWorktreeVisibilityLegacy === 'boolean') {
@@ -44,11 +49,11 @@ export function effectiveExternalWorktreeVisibility(
   return isLegacyRepoForVisibility ? 'show' : 'hide'
 }
 
-export function buildKnownOrcaWorkspaceLayouts(
+export function buildKnownPebbleWorkspaceLayouts(
   settings: Pick<GlobalSettings, 'workspaceDir' | 'nestWorkspaces' | 'workspaceDirHistory'>,
   repo?: Pick<Repo, 'path' | 'connectionId' | 'worktreeBasePath'>
-): OrcaWorkspaceLayout[] {
-  const layouts: OrcaWorkspaceLayout[] = []
+): PebbleWorkspaceLayout[] {
+  const layouts: PebbleWorkspaceLayout[] = []
   const repoBasePath = getRepoWorktreeBasePath(repo)
   if (repo && repoBasePath) {
     layouts.push({
@@ -89,8 +94,8 @@ export function buildKnownOrcaWorkspaceLayouts(
 }
 
 function appendWorkspaceLayouts(
-  target: OrcaWorkspaceLayout[],
-  source: readonly OrcaWorkspaceLayout[]
+  target: PebbleWorkspaceLayout[],
+  source: readonly PebbleWorkspaceLayout[]
 ): void {
   // Why: workspace history is persisted user data and can grow large enough
   // for `push(...source)` to exceed the JavaScript call argument limit.
@@ -130,7 +135,7 @@ function shouldIncludeWorkspaceLayout(
 function buildWslWorkspaceLayouts(
   repoPath: string,
   settings: Pick<GlobalSettings, 'nestWorkspaces' | 'workspaceDirHistory'>
-): OrcaWorkspaceLayout[] {
+): PebbleWorkspaceLayout[] {
   const parsed = parseWslUncPath(repoPath)
   if (!parsed) {
     return []
@@ -140,7 +145,7 @@ function buildWslWorkspaceLayouts(
   if (!linuxHome) {
     return []
   }
-  const root = `//wsl.localhost/${parsed.distro}${linuxHome}/orca/workspaces`
+  const root = `//wsl.localhost/${parsed.distro}${linuxHome}/pebble/workspaces`
   const historicalModes = (settings.workspaceDirHistory ?? []).map(
     (layout) => layout.nestWorkspaces
   )
@@ -153,19 +158,19 @@ export function classifyWorktreeOwnership(args: {
   worktree: Pick<Worktree, 'path' | 'isMainWorktree'>
   meta?: WorktreeMeta
   settings: Pick<GlobalSettings, 'workspaceDir' | 'nestWorkspaces' | 'workspaceDirHistory'>
-  knownOrcaLayouts: OrcaWorkspaceLayout[]
+  knownPebbleLayouts: PebbleWorkspaceLayout[]
 }): WorktreeOwnership {
-  if (hasStrongOrcaMetadata(args.meta)) {
-    return 'orca-managed'
+  if (hasStrongPebbleMetadata(args.meta)) {
+    return MANAGED_WORKTREE_OWNERSHIP
   }
 
-  if (isUnderFlatOrUntrustedOrcaRoot(args.worktree.path, args.knownOrcaLayouts)) {
+  if (isUnderFlatOrUntrustedPebbleRoot(args.worktree.path, args.knownPebbleLayouts)) {
     return 'unknown-legacy'
   }
 
-  if (canClassifyAsExternal(args.worktree.path, args.knownOrcaLayouts)) {
-    // Why: a plain `git worktree add` can target Orca's nested workspace
-    // folder. Only metadata proves Orca created it.
+  if (canClassifyAsExternal(args.worktree.path, args.knownPebbleLayouts)) {
+    // Why: a plain `git worktree add` can target Pebble's nested workspace
+    // folder. Only product metadata proves Pebble created it.
     return 'external'
   }
 
@@ -177,7 +182,7 @@ export function toDetectedWorktree(args: {
   worktree: Worktree
   meta?: WorktreeMeta
   settings: Pick<GlobalSettings, 'workspaceDir' | 'nestWorkspaces' | 'workspaceDirHistory'>
-  knownOrcaLayouts: OrcaWorkspaceLayout[]
+  knownPebbleLayouts: PebbleWorkspaceLayout[]
   isLegacyRepoForVisibility?: boolean
 }): DetectedWorktree {
   const ownership = classifyWorktreeOwnership(args)
@@ -212,7 +217,7 @@ export function shouldShowWorktree(args: {
   if (args.isSelectedCheckout) {
     return true
   }
-  if (args.ownership === 'orca-managed') {
+  if (isManagedWorktreeOwnership(args.ownership)) {
     return true
   }
   if (
@@ -234,10 +239,10 @@ export function areRuntimePathsEqual(leftPath: string, rightPath: string): boole
   )
 }
 
-function hasStrongOrcaMetadata(meta: WorktreeMeta | undefined): boolean {
+function hasStrongPebbleMetadata(meta: WorktreeMeta | undefined): boolean {
   return Boolean(
-    meta?.orcaCreatedAt ||
-    meta?.orcaCreationWorkspaceLayout ||
+    meta?.pebbleCreatedAt ||
+    meta?.pebbleCreationWorkspaceLayout ||
     meta?.createdAt ||
     meta?.createdWithAgent ||
     meta?.pushTarget ||
@@ -247,11 +252,11 @@ function hasStrongOrcaMetadata(meta: WorktreeMeta | undefined): boolean {
   )
 }
 
-function isUnderFlatOrUntrustedOrcaRoot(
+function isUnderFlatOrUntrustedPebbleRoot(
   worktreePath: string,
-  knownOrcaLayouts: OrcaWorkspaceLayout[]
+  knownPebbleLayouts: PebbleWorkspaceLayout[]
 ): boolean {
-  for (const layout of knownOrcaLayouts) {
+  for (const layout of knownPebbleLayouts) {
     const relative = relativePathInsideRoot(layout.path, worktreePath)
     if (relative === null) {
       continue
@@ -265,12 +270,12 @@ function isUnderFlatOrUntrustedOrcaRoot(
 
 function canClassifyAsExternal(
   worktreePath: string,
-  knownOrcaLayouts: OrcaWorkspaceLayout[]
+  knownPebbleLayouts: PebbleWorkspaceLayout[]
 ): boolean {
-  if (knownOrcaLayouts.length === 0) {
+  if (knownPebbleLayouts.length === 0) {
     return false
   }
-  for (const layout of knownOrcaLayouts) {
+  for (const layout of knownPebbleLayouts) {
     const relative = relativePathInsideRoot(layout.path, worktreePath)
     if (relative === null) {
       continue

@@ -4,7 +4,7 @@ import type { SFTPWrapper } from 'ssh2'
 
 vi.mock('electron', () => ({
   app: {
-    getPath: () => '/tmp/orca-user-data'
+    getPath: () => '/tmp/pebble-user-data'
   }
 }))
 
@@ -123,49 +123,49 @@ describe('remote hook service installers', () => {
     try {
       const installers = [
         {
-          path: '/home/dev/.orca/agent-hooks/claude-hook.sh',
+          path: '/home/dev/.pebble/agent-hooks/claude-hook.sh',
           install: (sftp: SFTPWrapper) => new ClaudeHookService().installRemote(sftp, '/home/dev')
         },
         {
-          path: '/home/dev/.orca/agent-hooks/openclaude-hook.sh',
+          path: '/home/dev/.pebble/agent-hooks/openclaude-hook.sh',
           install: (sftp: SFTPWrapper) => openClaudeHookService.installRemote(sftp, '/home/dev')
         },
         {
-          path: '/home/dev/.orca/agent-hooks/codex-hook.sh',
+          path: '/home/dev/.pebble/agent-hooks/codex-hook.sh',
           install: (sftp: SFTPWrapper) => new CodexHookService().installRemote(sftp, '/home/dev')
         },
         {
-          path: '/home/dev/.orca/agent-hooks/gemini-hook.sh',
+          path: '/home/dev/.pebble/agent-hooks/gemini-hook.sh',
           install: (sftp: SFTPWrapper) => new GeminiHookService().installRemote(sftp, '/home/dev')
         },
         {
-          path: '/home/dev/.orca/agent-hooks/antigravity-hook.sh',
+          path: '/home/dev/.pebble/agent-hooks/antigravity-hook.sh',
           install: (sftp: SFTPWrapper) =>
             new AntigravityHookService().installRemote(sftp, '/home/dev')
         },
         {
-          path: '/home/dev/.config/amp/plugins/orca-agent-status.ts',
+          path: '/home/dev/.config/amp/plugins/pebble-agent-status.ts',
           install: (sftp: SFTPWrapper) => new AmpHookService().installRemote(sftp, '/home/dev')
         },
         {
-          path: '/home/dev/.orca/agent-hooks/cursor-hook.sh',
+          path: '/home/dev/.pebble/agent-hooks/cursor-hook.sh',
           install: (sftp: SFTPWrapper) => new CursorHookService().installRemote(sftp, '/home/dev')
         },
         {
-          path: '/home/dev/.orca/agent-hooks/command-code-hook.sh',
+          path: '/home/dev/.pebble/agent-hooks/command-code-hook.sh',
           install: (sftp: SFTPWrapper) =>
             new CommandCodeHookService().installRemote(sftp, '/home/dev')
         },
         {
-          path: '/home/dev/.orca/agent-hooks/grok-hook.sh',
+          path: '/home/dev/.pebble/agent-hooks/grok-hook.sh',
           install: (sftp: SFTPWrapper) => new GrokHookService().installRemote(sftp, '/home/dev')
         },
         {
-          path: '/home/dev/.orca/agent-hooks/copilot-hook.sh',
+          path: '/home/dev/.pebble/agent-hooks/copilot-hook.sh',
           install: (sftp: SFTPWrapper) => new CopilotHookService().installRemote(sftp, '/home/dev')
         },
         {
-          path: '/home/dev/.orca/agent-hooks/devin-hook.sh',
+          path: '/home/dev/.pebble/agent-hooks/devin-hook.sh',
           install: (sftp: SFTPWrapper) => new DevinHookService().installRemote(sftp, '/home/dev')
         }
       ]
@@ -221,11 +221,11 @@ describe('remote hook service installers', () => {
       'Stop'
     ]) {
       const command = hooks.hooks[eventName]?.[0]?.hooks?.[0]?.command
-      expect(command).toContain('/home/dev/.orca/agent-hooks/codex-hook.sh')
+      expect(command).toContain('/home/dev/.pebble/agent-hooks/codex-hook.sh')
       expect(command).toMatch(/^if \[ -x /)
     }
-    expect(fs.files.get('/home/dev/.orca/agent-hooks/codex-hook.sh')).toContain('#!/bin/sh')
-    expect(fs.modes.get('/home/dev/.orca/agent-hooks/codex-hook.sh')).toBe(0o755)
+    expect(fs.files.get('/home/dev/.pebble/agent-hooks/codex-hook.sh')).toContain('#!/bin/sh')
+    expect(fs.modes.get('/home/dev/.pebble/agent-hooks/codex-hook.sh')).toBe(0o755)
     const toml = fs.files.get('/home/dev/.codex/config.toml')
     expect(toml).toContain('/home/dev/.codex/hooks.json:permission_request:0:0')
     expect(toml).toContain('trusted_hash = "sha256:')
@@ -241,7 +241,7 @@ describe('remote hook service installers', () => {
     expect(status.managedHooksPresent).toBe(true)
     expect(status.detail).toContain('trust entries could not be written')
     expect(fs.files.get('/home/dev/.codex/hooks.json')).toContain('codex-hook.sh')
-    expect(fs.files.get('/home/dev/.orca/agent-hooks/codex-hook.sh')).toContain('#!/bin/sh')
+    expect(fs.files.get('/home/dev/.pebble/agent-hooks/codex-hook.sh')).toContain('#!/bin/sh')
   })
 
   it('installs remote Gemini, Antigravity, Cursor, Command Code, Grok, and Devin configs using their CLI-specific schemas', async () => {
@@ -273,7 +273,7 @@ describe('remote hook service installers', () => {
     }
     for (const eventName of ['BeforeAgent', 'AfterAgent', 'AfterTool', 'BeforeTool']) {
       const command = geminiConfig.hooks[eventName]?.[0]?.hooks?.[0]?.command
-      expect(command).toContain('/home/dev/.orca/agent-hooks/gemini-hook.sh')
+      expect(command).toContain('/home/dev/.pebble/agent-hooks/gemini-hook.sh')
       expect(command).toMatch(/^if \[ -x /)
     }
     expect(geminiConfig.hooks.PreToolUse).toBeUndefined()
@@ -281,26 +281,26 @@ describe('remote hook service installers', () => {
     const antigravityConfig = JSON.parse(
       antigravity.fs.files.get('/home/dev/.gemini/config/hooks.json')!
     ) as {
-      'orca-status': Record<
+      'pebble-status': Record<
         string,
         { matcher?: string; command?: string; hooks?: { command: string }[] }[]
       >
     }
     for (const eventName of ['PreInvocation', 'PostInvocation', 'Stop']) {
-      const command = antigravityConfig['orca-status'][eventName]?.[0]?.command
-      expect(command).toContain('/home/dev/.orca/agent-hooks/antigravity-hook.sh')
-      expect(command).toContain(`ORCA_ANTIGRAVITY_EVENT='${eventName}'`)
+      const command = antigravityConfig['pebble-status'][eventName]?.[0]?.command
+      expect(command).toContain('/home/dev/.pebble/agent-hooks/antigravity-hook.sh')
+      expect(command).toContain(`PEBBLE_ANTIGRAVITY_EVENT='${eventName}'`)
     }
-    expect(antigravityConfig['orca-status'].PreToolUse).toBeUndefined()
+    expect(antigravityConfig['pebble-status'].PreToolUse).toBeUndefined()
     for (const eventName of ['PostToolUse']) {
-      const definition = antigravityConfig['orca-status'][eventName]?.[0]
+      const definition = antigravityConfig['pebble-status'][eventName]?.[0]
       const command = definition?.hooks?.[0]?.command
       expect(definition?.matcher).toBe('*')
-      expect(command).toContain('/home/dev/.orca/agent-hooks/antigravity-hook.sh')
-      expect(command).toContain(`ORCA_ANTIGRAVITY_EVENT='${eventName}'`)
+      expect(command).toContain('/home/dev/.pebble/agent-hooks/antigravity-hook.sh')
+      expect(command).toContain(`PEBBLE_ANTIGRAVITY_EVENT='${eventName}'`)
     }
 
-    const ampPlugin = amp.fs.files.get('/home/dev/.config/amp/plugins/orca-agent-status.ts')
+    const ampPlugin = amp.fs.files.get('/home/dev/.config/amp/plugins/pebble-agent-status.ts')
     expect(ampPlugin).toContain('/hook/amp')
     expect(ampPlugin).toContain("amp.on('tool.call'")
     expect(ampPlugin).toContain('return { action: "allow" }')
@@ -321,7 +321,7 @@ describe('remote hook service installers', () => {
       'afterAgentResponse'
     ]) {
       const definition = cursorConfig.hooks[eventName]?.[0]
-      expect(definition?.command).toContain('/home/dev/.orca/agent-hooks/cursor-hook.sh')
+      expect(definition?.command).toContain('/home/dev/.pebble/agent-hooks/cursor-hook.sh')
       expect(definition?.hooks).toBeUndefined()
     }
 
@@ -333,14 +333,14 @@ describe('remote hook service installers', () => {
     for (const eventName of ['PreToolUse', 'PostToolUse', 'Stop']) {
       const definition = commandCodeConfig.hooks[eventName]?.[0]
       const command = definition?.hooks?.[0]?.command
-      expect(command).toContain('/home/dev/.orca/agent-hooks/command-code-hook.sh')
+      expect(command).toContain('/home/dev/.pebble/agent-hooks/command-code-hook.sh')
       expect(command).toMatch(/^if \[ -x /)
     }
     expect(commandCodeConfig.hooks.PreToolUse?.[0]?.matcher).toBe('.*')
     expect(commandCodeConfig.hooks.PostToolUse?.[0]?.matcher).toBe('.*')
     expect(commandCodeConfig.hooks.Stop?.[0]?.matcher).toBeUndefined()
 
-    const grokConfig = JSON.parse(grok.fs.files.get('/home/dev/.grok/hooks/orca-status.json')!) as {
+    const grokConfig = JSON.parse(grok.fs.files.get('/home/dev/.grok/hooks/pebble-status.json')!) as {
       hooks: Record<string, { matcher?: string; hooks?: { command: string }[] }[]>
     }
     for (const eventName of [
@@ -355,7 +355,7 @@ describe('remote hook service installers', () => {
     ]) {
       const definition = grokConfig.hooks[eventName]?.[0]
       const command = definition?.hooks?.[0]?.command
-      expect(command).toContain('/home/dev/.orca/agent-hooks/grok-hook.sh')
+      expect(command).toContain('/home/dev/.pebble/agent-hooks/grok-hook.sh')
       expect(command).toMatch(/^if \[ -x /)
     }
     expect(grokConfig.hooks.PreToolUse?.[0]?.matcher).toBe('*')
@@ -374,17 +374,17 @@ describe('remote hook service installers', () => {
     ]) {
       const definition = devinConfig.hooks[eventName]?.[0]
       const command = definition?.hooks?.[0]?.command
-      expect(command).toContain('/home/dev/.orca/agent-hooks/devin-hook.sh')
+      expect(command).toContain('/home/dev/.pebble/agent-hooks/devin-hook.sh')
       expect(command).toMatch(/^if \[ -x /)
     }
     for (const eventName of ['PreToolUse', 'PostToolUse', 'PermissionRequest']) {
       const definition = devinConfig.hooks[eventName]?.[0]
       const command = definition?.hooks?.[0]?.command
       expect(definition?.matcher).toBeUndefined()
-      expect(command).toContain('/home/dev/.orca/agent-hooks/devin-hook.sh')
+      expect(command).toContain('/home/dev/.pebble/agent-hooks/devin-hook.sh')
       expect(command).toMatch(/^if \[ -x /)
     }
-    expect(devin.fs.files.get('/home/dev/.orca/agent-hooks/devin-hook.sh')).toContain('/hook/devin')
+    expect(devin.fs.files.get('/home/dev/.pebble/agent-hooks/devin-hook.sh')).toContain('/hook/devin')
   })
 
   it('installs remote Kimi hooks as a managed config.toml block preserving user config', async () => {
@@ -410,9 +410,9 @@ describe('remote hook service installers', () => {
       expect(config).toContain(`event = "${eventName}"`)
     }
     // The command points at the POSIX managed script via the `[ -x ]` guard.
-    expect(config).toContain('/home/dev/.orca/agent-hooks/kimi-hook.sh')
+    expect(config).toContain('/home/dev/.pebble/agent-hooks/kimi-hook.sh')
     expect(config).toMatch(/command = "if \[ -x /)
-    expect(fs.files.get('/home/dev/.orca/agent-hooks/kimi-hook.sh')).toContain('/hook/kimi')
+    expect(fs.files.get('/home/dev/.pebble/agent-hooks/kimi-hook.sh')).toContain('/hook/kimi')
   })
 
   it('does not overwrite malformed remote Devin JSONC', async () => {
@@ -432,7 +432,7 @@ describe('remote hook service installers', () => {
         detail: 'Could not parse remote Devin config.json'
       })
       expect(fs.files.get('/home/dev/.config/devin/config.json')).toBe(original)
-      expect(fs.files.get('/home/dev/.orca/agent-hooks/devin-hook.sh')).toBeUndefined()
+      expect(fs.files.get('/home/dev/.pebble/agent-hooks/devin-hook.sh')).toBeUndefined()
     } finally {
       warn.mockRestore()
     }
@@ -444,7 +444,7 @@ describe('remote hook service installers', () => {
       '/home/dev/.gemini/config/hooks.json',
       `${JSON.stringify(
         {
-          'orca-status': {
+          'pebble-status': {
             PreToolUse: [
               {
                 matcher: '*',
@@ -477,10 +477,10 @@ describe('remote hook service installers', () => {
     await new AntigravityHookService().installRemote(sftp, '/home/dev')
 
     const config = JSON.parse(fs.files.get('/home/dev/.gemini/config/hooks.json')!) as {
-      'orca-status': Record<string, { hooks?: { command: string }[] }[]>
+      'pebble-status': Record<string, { hooks?: { command: string }[] }[]>
     }
-    expect(config['orca-status'].PreToolUse).toBeUndefined()
-    const postToolCommands = config['orca-status'].PostToolUse.flatMap((definition) =>
+    expect(config['pebble-status'].PreToolUse).toBeUndefined()
+    const postToolCommands = config['pebble-status'].PostToolUse.flatMap((definition) =>
       (definition.hooks ?? []).map((hook) => hook.command)
     )
     expect(postToolCommands).toContain('echo user-authored')
@@ -540,7 +540,7 @@ describe('remote hook service installers', () => {
     fs.dirs.add('/home/dev/.copilot')
     fs.dirs.add('/home/dev/.copilot/hooks')
     fs.files.set(
-      '/home/dev/.copilot/hooks/orca.json',
+      '/home/dev/.copilot/hooks/pebble.json',
       JSON.stringify({
         version: 99,
         disableAllHooks: true,
@@ -551,8 +551,8 @@ describe('remote hook service installers', () => {
     const status = await new CopilotHookService().installRemote(sftp, '/home/dev/')
 
     expect(status.state).toBe('installed')
-    expect(status.configPath).toBe('/home/dev/.copilot/hooks/orca.json')
-    const config = JSON.parse(fs.files.get('/home/dev/.copilot/hooks/orca.json')!) as {
+    expect(status.configPath).toBe('/home/dev/.copilot/hooks/pebble.json')
+    const config = JSON.parse(fs.files.get('/home/dev/.copilot/hooks/pebble.json')!) as {
       version: number
       disableAllHooks?: boolean
       hooks: Record<string, { bash?: string; timeoutSec?: number }[]>
@@ -574,13 +574,13 @@ describe('remote hook service installers', () => {
       'Notification'
     ]) {
       const definition = config.hooks[eventName]?.[0]
-      expect(definition?.bash).toContain('/home/dev/.orca/agent-hooks/copilot-hook.sh')
-      expect(definition?.bash).toContain(`ORCA_COPILOT_HOOK_EVENT='${eventName}'`)
+      expect(definition?.bash).toContain('/home/dev/.pebble/agent-hooks/copilot-hook.sh')
+      expect(definition?.bash).toContain(`PEBBLE_COPILOT_HOOK_EVENT='${eventName}'`)
       expect(definition?.timeoutSec).toBe(5)
     }
     expect(config.disableAllHooks).toBeUndefined()
-    expect(fs.files.get('/home/dev/.orca/agent-hooks/copilot-hook.sh')).toContain('#!/bin/sh')
-    expect(fs.modes.get('/home/dev/.orca/agent-hooks/copilot-hook.sh')).toBe(0o755)
+    expect(fs.files.get('/home/dev/.pebble/agent-hooks/copilot-hook.sh')).toContain('#!/bin/sh')
+    expect(fs.modes.get('/home/dev/.pebble/agent-hooks/copilot-hook.sh')).toBe(0o755)
   })
 
   it('installs remote Hermes plugin files and enables the plugin', async () => {
@@ -590,18 +590,18 @@ describe('remote hook service installers', () => {
 
     expect(status.state).toBe('installed')
     expect(status.configPath).toBe('/home/dev/.hermes/config.yaml')
-    expect(fs.files.get('/home/dev/.hermes/plugins/orca-status/plugin.yaml')).toContain(
+    expect(fs.files.get('/home/dev/.hermes/plugins/pebble-status/plugin.yaml')).toContain(
       'pre_llm_call'
     )
-    expect(fs.files.get('/home/dev/.hermes/plugins/orca-status/__init__.py')).toContain(
+    expect(fs.files.get('/home/dev/.hermes/plugins/pebble-status/__init__.py')).toContain(
       '/hook/hermes'
     )
-    expect(fs.files.get('/home/dev/.hermes/config.yaml')).toContain('orca-status')
+    expect(fs.files.get('/home/dev/.hermes/config.yaml')).toContain('pebble-status')
   })
 
   it('does not overwrite a remote user-authored Amp plugin file', async () => {
     const { sftp, fs } = createFakeSftp({
-      '/home/dev/.config/amp/plugins/orca-agent-status.ts':
+      '/home/dev/.config/amp/plugins/pebble-agent-status.ts':
         'export default function userPlugin() {}\n'
     })
 
@@ -612,7 +612,7 @@ describe('remote hook service installers', () => {
       state: 'partial',
       managedHooksPresent: false
     })
-    expect(fs.files.get('/home/dev/.config/amp/plugins/orca-agent-status.ts')).toBe(
+    expect(fs.files.get('/home/dev/.config/amp/plugins/pebble-agent-status.ts')).toBe(
       'export default function userPlugin() {}\n'
     )
   })

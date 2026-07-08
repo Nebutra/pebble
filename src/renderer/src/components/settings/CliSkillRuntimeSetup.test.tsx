@@ -48,8 +48,8 @@ describe('CliSkillRuntimeSetup runtime helpers', () => {
 
   it('treats missing runtime as a Windows host fallback for skill updates', () => {
     expect(
-      buildSkillCommandForRuntime('npx skills update orca-cli --global', undefined, 'win32')
-    ).toBe(buildAgentFeatureSkillInstallCommand(['orca-cli']))
+      buildSkillCommandForRuntime('npx skills update pebble-cli --global', undefined, 'win32')
+    ).toBe(buildAgentFeatureSkillInstallCommand(['pebble-cli']))
   })
 
   it('keeps non-Windows host skill updates on the update path', () => {

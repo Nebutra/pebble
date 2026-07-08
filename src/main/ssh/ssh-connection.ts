@@ -5,7 +5,7 @@ import type { ChildProcess } from 'node:child_process'
 import type { ClientChannel, ConnectConfig, SFTPWrapper } from 'ssh2'
 import type { SshTarget, SshConnectionState, SshConnectionStatus } from '../../shared/ssh-types'
 import {
-  getOrcaControlSocketPath,
+  getPebbleControlSocketPath,
   spawnSystemSsh,
   spawnSystemSshCommand,
   uploadDirectoryViaSystemSsh,
@@ -104,7 +104,7 @@ export class SshConnection {
       return true
     }
     return (
-      getOrcaControlSocketPath(this.target, {
+      getPebbleControlSocketPath(this.target, {
         ...this.getSystemSshBuildArgsOptions()
       }) !== null
     )
@@ -483,7 +483,7 @@ export class SshConnection {
         this.proxyProcess?.kill()
         this.proxyProcess = null
         try {
-          // Why: on macOS, per-app network policy can block Orca's direct
+          // Why: on macOS, per-app network policy can block Pebble's direct
           // TCP socket while the system OpenSSH binary is still allowed.
           await this.doSystemSshProbeWithControlMasterRetry(connectGeneration, resolved)
           return
@@ -614,7 +614,7 @@ export class SshConnection {
 
     // Why: this probe runs before remote platform detection. A raw echo works
     // under POSIX shells, cmd.exe, and PowerShell; `/bin/sh` wrapping does not.
-    const channel = this.spawnTrackedSystemSshCommand('echo ORCA-SYSTEM-SSH-OK', {
+    const channel = this.spawnTrackedSystemSshCommand('echo PEBBLE-SYSTEM-SSH-OK', {
       wrapCommand: false
     })
     try {
@@ -653,7 +653,7 @@ export class SshConnection {
               reject(new Error('SSH connection attempt was cancelled'))
               return
             }
-            if (code !== 0 || !stdout.includes('ORCA-SYSTEM-SSH-OK')) {
+            if (code !== 0 || !stdout.includes('PEBBLE-SYSTEM-SSH-OK')) {
               reject(
                 new Error(
                   `System SSH probe failed${code != null ? ` (exit ${code})` : ''}.${stderr ? ` stderr: ${stderr.trim()}` : ''}`
@@ -690,7 +690,7 @@ export class SshConnection {
   ): Promise<void> {
     this.systemSshResolvedConfig = cloneResolvedConfig(resolved)
     this.systemSshControlMasterDisabledForSession = false
-    const controlPath = getOrcaControlSocketPath(this.target, {
+    const controlPath = getPebbleControlSocketPath(this.target, {
       resolvedConfig: this.systemSshResolvedConfig
     })
     try {
@@ -1063,7 +1063,7 @@ export class SshConnection {
         throw this.createCancelledConnectAttemptError()
       }
       this.systemSshResolvedConfig = cloneResolvedConfig(resolved)
-      const controlPath = getOrcaControlSocketPath(this.target, {
+      const controlPath = getPebbleControlSocketPath(this.target, {
         resolvedConfig: this.systemSshResolvedConfig
       })
       const proc = await this.spawnSystemSshWithControlMasterRetry(controlPath, connectGeneration)
@@ -1137,7 +1137,7 @@ export function shouldUseSystemSshTransport(
   resolved: Pick<SshResolvedConfig, 'proxyUseFdpass' | 'proxyCommand' | 'proxyJump'> | null
 ): boolean {
   return (
-    process.env.ORCA_SSH_FORCE_SYSTEM_TRANSPORT === '1' ||
+    process.env.PEBBLE_SSH_FORCE_SYSTEM_TRANSPORT === '1' ||
     target.proxyCommand != null ||
     target.jumpHost != null ||
     resolved?.proxyUseFdpass === true ||

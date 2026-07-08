@@ -2,14 +2,14 @@
    agnostic agent-hook listener. The HTTP request parser, payload normalizer,
    per-CLI extractors, and on-disk endpoint-file writer all share invariants
    (size caps, warn-once Sets, shell-safe value rules) that must not drift
-   between Orca's main process and the relay. Splitting by line count would
+   between Pebble's main process and the relay. Splitting by line count would
    force the same invariants to be re-derived in two places. */
 
 // Why: extracted from `src/main/agent-hooks/server.ts` so the relay can host
 // the same listener pipeline on the remote without dragging Electron in. The
 // module uses only Node builtins (http/fs/crypto/net/path/url/os) — none of
 // which pull `electron` — so it is safe to import from `src/relay/`. See
-// docs/design/agent-status-over-ssh.md §3 ("relay normalizes; Orca routes").
+// docs/design/agent-status-over-ssh.md §3 ("relay normalizes; Pebble routes").
 import type { IncomingMessage } from 'node:http'
 import { createHash, randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
@@ -28,7 +28,7 @@ import {
 import { join } from 'node:path'
 
 import { parseAgentStatusPayload, type ParsedAgentStatusPayload } from './agent-status-types'
-import { ORCA_HOOK_PROTOCOL_VERSION } from './agent-hook-types'
+import { PEBBLE_HOOK_PROTOCOL_VERSION } from './agent-hook-types'
 import { REMOTE_AGENT_HOOK_ENV, type AgentHookSource } from './agent-hook-relay'
 import {
   extractAgentProviderSession,
@@ -63,12 +63,12 @@ function capOpenCodeHookText(text: string): string {
 
 /** Bound paneKey size — `${tabId}:${leafUuid}` is well under 200 chars in
  *  practice; cap defends per-pane caches against pathological input.
- *  Exported so non-HTTP ingest paths (e.g. Orca's `ingestRemote`) can apply
+ *  Exported so non-HTTP ingest paths (e.g. Pebble's `ingestRemote`) can apply
  *  the same cap as defense-in-depth. */
 export const MAX_PANE_KEY_LEN = 200
 
 /** Per-listener-instance state that holds caches needing per-PTY teardown
- *  (last prompt, last tool snapshot, last status replay). Both Orca's main
+ *  (last prompt, last tool snapshot, last status replay). Both Pebble's main
  *  process and the relay get their own instance — they never share. */
 export type HookListenerState = {
   warnedVersions: Set<string>
@@ -150,13 +150,13 @@ export function warnOnHookEnvOrVersionMismatch(
   const { version, env, expectedEnv } = fields
   if (
     version &&
-    version !== ORCA_HOOK_PROTOCOL_VERSION &&
+    version !== PEBBLE_HOOK_PROTOCOL_VERSION &&
     !state.warnedVersions.has(version) &&
     state.warnedVersions.size < MAX_WARNED_KEYS
   ) {
     state.warnedVersions.add(version)
     console.warn(
-      `[agent-hooks] received hook v${version}; server expects v${ORCA_HOOK_PROTOCOL_VERSION}. ` +
+      `[agent-hooks] received hook v${version}; server expects v${PEBBLE_HOOK_PROTOCOL_VERSION}. ` +
         'Reinstall agent hooks from Settings to upgrade the managed script.'
     )
   }
@@ -166,7 +166,7 @@ export function warnOnHookEnvOrVersionMismatch(
       state.warnedEnvs.add(key)
       console.warn(
         `[agent-hooks] received ${env} hook on ${expectedEnv} server. ` +
-          'Likely a stale terminal from another Orca install.'
+          'Likely a stale terminal from another Pebble install.'
       )
     }
   }
@@ -174,12 +174,12 @@ export function warnOnHookEnvOrVersionMismatch(
 
 export type AgentHookEventPayload = {
   paneKey: string
-  /** Ephemeral Orca launch identity stamped into the PTY env for this process. */
+  /** Ephemeral Pebble launch identity stamped into the PTY env for this process. */
   launchToken?: string
   tabId?: string
   worktreeId?: string
   /** Identifies the SSH connection the event arrived on, or null for local.
-   *  Stamped only on the remote-ingest path (Orca's `ingestRemote`); the
+   *  Stamped only on the remote-ingest path (Pebble's `ingestRemote`); the
    *  HTTP path always sets null because it cannot know which mux a request
    *  came from. See docs/design/agent-status-over-ssh.md §5. */
   connectionId: string | null
@@ -2206,7 +2206,7 @@ function normalizeClaudeEvent(
 
 // Why: Devin uses Claude-compatible hook payload shapes but has its own
 // documented lifecycle event set. Keep attribution as Devin while normalizing
-// those event names into Orca's shared status states.
+// those event names into Pebble's shared status states.
 function normalizeDevinEvent(
   state: HookListenerState,
   eventName: unknown,
@@ -2274,7 +2274,7 @@ function isKimiUserInputTool(toolName: string | undefined): boolean {
 
 // Why: Kimi Code emits Claude-compatible hook payloads and reuses Claude's
 // lifecycle event names (UserPromptSubmit/PreToolUse/Stop/...). Normalize them
-// into Orca's shared status states while attributing the status to Kimi so the
+// into Pebble's shared status states while attributing the status to Kimi so the
 // sidebar shows the Kimi icon and label instead of falling back to Claude.
 function normalizeKimiEvent(
   state: HookListenerState,
@@ -3309,7 +3309,7 @@ export function normalizeHookPayload(
   }
 
   // Why: connectionId stays null at the listener layer. The local server keeps
-  // it null; the relay forwards null on the wire and Orca's `ingestRemote`
+  // it null; the relay forwards null on the wire and Pebble's `ingestRemote`
   // stamps the real value from `mux` identity on receive. See
   // docs/design/agent-status-over-ssh.md §5.
   const providerSession = extractAgentProviderSession(source, hookPayloadRecord)
@@ -3404,10 +3404,10 @@ export function writeEndpointFile(
   const tmpPath = join(endpointDir, `.endpoint-${process.pid}-${randomUUID()}.tmp`)
   const prefix = process.platform === 'win32' ? 'set ' : ''
   const valuesToWrite: [string, string][] = [
-    ['ORCA_AGENT_HOOK_PORT', String(fields.port)],
-    ['ORCA_AGENT_HOOK_TOKEN', fields.token],
-    ['ORCA_AGENT_HOOK_ENV', fields.env],
-    ['ORCA_AGENT_HOOK_VERSION', fields.version]
+    ['PEBBLE_AGENT_HOOK_PORT', String(fields.port)],
+    ['PEBBLE_AGENT_HOOK_TOKEN', fields.token],
+    ['PEBBLE_AGENT_HOOK_ENV', fields.env],
+    ['PEBBLE_AGENT_HOOK_VERSION', fields.version]
   ]
   for (const [key, value] of valuesToWrite) {
     if (!isShellSafeEndpointValue(value)) {
@@ -3422,7 +3422,7 @@ export function writeEndpointFile(
   let tmpWritten = false
   try {
     // Why: 0o700 — match the file's owner-only policy so the directory does
-    // not leak the existence of this Orca/relay install to other local users.
+    // not leak the existence of this Pebble/relay install to other local users.
     mkdirSync(endpointDir, { recursive: true, mode: 0o700 })
     if (process.platform !== 'win32') {
       // Why: mkdirSync's mode only applies on creation — a pre-existing

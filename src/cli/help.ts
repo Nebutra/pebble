@@ -2,38 +2,38 @@
 import type { CommandSpec } from './args'
 import { findCommandSpec, isCommandGroup, supportsBrowserPageFlag } from './args'
 
-const ROOT_HELP_TEXT = `orca
+const ROOT_HELP_TEXT = `pebble
 
-Usage: orca <command> [options]
+Usage: pebble <command> [options]
 
 Startup:
-  open                      Launch Orca and wait for the runtime to be reachable
-  serve                     Start a headless Orca runtime server
+  open                      Launch Pebble and wait for the runtime to be reachable
+  serve                     Start a headless Pebble runtime server
   status                    Show app/runtime/graph readiness
 
 Diagnostics:
-  diagnostics memory        Collect a memory snapshot for Orca and managed terminals
+  diagnostics memory        Collect a memory snapshot for Pebble and managed terminals
 
 Environments:
-  environment add           Save a remote Orca runtime from a pairing code
-  environment list          List saved remote Orca runtimes
-  environment show          Show one saved remote Orca runtime
-  environment rm            Remove a saved remote Orca runtime
+  environment add           Save a remote Pebble runtime from a pairing code
+  environment list          List saved remote Pebble runtimes
+  environment show          Show one saved remote Pebble runtime
+  environment rm            Remove a saved remote Pebble runtime
 
 Environment Recipes:
   vm recipe doctor          Validate a per-workspace environment recipe
 
 Automations:
-  automations list          List scheduled Orca automations
-  automations show          Show one Orca automation
-  automations create        Create a scheduled Orca automation
-  automations edit          Edit an Orca automation
-  automations remove        Remove an Orca automation and its run history
-  automations run           Run an Orca automation now
+  automations list          List scheduled Pebble automations
+  automations show          Show one Pebble automation
+  automations create        Create a scheduled Pebble automation
+  automations edit          Edit an Pebble automation
+  automations remove        Remove an Pebble automation and its run history
+  automations run           Run an Pebble automation now
   automations runs          List automation run history
 
 Projects:
-  project list              List durable projects known to Orca
+  project list              List durable projects known to Pebble
   project setups            List project host setups
   project setup-existing-folder Make a project available on a host by importing an existing folder
   project setup-clone       Make a project available on a host by cloning a repository
@@ -42,28 +42,28 @@ Projects:
   project setup-delete      Remove a project host setup
 
 Repos:
-  repo list                 List repos registered in Orca
-  repo add                  Add a project to Orca by filesystem path
+  repo list                 List repos registered in Pebble
+  repo add                  Add a project to Pebble by filesystem path
   repo show                 Show one registered repo
   repo set-base-ref         Set the repo's default base ref for future worktrees
   repo search-refs          Search branch/tag refs within a repo
 
 Worktrees:
-  worktree list             List Orca-managed worktrees
+  worktree list             List Pebble-managed worktrees
   worktree show             Show one worktree
-  worktree current          Show the Orca-managed worktree for the current directory
-  worktree create           Create a new Orca-managed worktree
-  worktree set              Update Orca metadata for a worktree
-  worktree rm               Remove a worktree from Orca and git
+  worktree current          Show the Pebble-managed worktree for the current directory
+  worktree create           Create a new Pebble-managed worktree
+  worktree set              Update Pebble metadata for a worktree
+  worktree rm               Remove a worktree from Pebble and git
   worktree ps               Show a compact orchestration summary across worktrees
 
 Files:
-  file open                 Open a workspace file in the Orca editor
-  file diff                 Open a workspace file diff in the Orca editor
+  file open                 Open a workspace file in the Pebble editor
+  file diff                 Open a workspace file diff in the Pebble editor
   file open-changed         Open all git-changed files for a workspace
 
 Terminals:
-  terminal list             List live Orca-managed terminals
+  terminal list             List live Pebble-managed terminals
   terminal show             Show terminal metadata and preview
   terminal read             Read bounded terminal output
   terminal send             Send input to a live terminal
@@ -113,7 +113,7 @@ Linear:
   linear                    Read Linear ticket context for agents
 
 Mobile Emulator (iOS Simulator):
-  emulator list             List available/running emulators (Orca-managed + raw serve-sim)
+  emulator list             List available/running emulators (Pebble-managed + raw serve-sim)
   emulator attach <device>  Attach/start helper and make active for the worktree
   emulator tap <x> <y>      Tap at normalized 0..1 coords (preferred for single taps)
   emulator type <text>      Type text (US ASCII only)
@@ -188,51 +188,51 @@ Browser Automation:
   exec                      Run any agent-browser command (--command "...")
 
 Common Commands:
-  orca open [--json]
-  orca serve [--port <port>] [--pairing-address <host>] [--mobile-pairing] [--no-pairing] [--project-root <path>] [--recipe-json] [--json]
-  orca status [--json]
-  orca diagnostics memory [--json]
-  orca environment add --name <name> --pairing-code <code> [--json]
-  orca environment list [--json]
-  orca environment show --environment <selector> [--json]
-  orca environment rm --environment <selector> [--json]
-  orca worktree list [--repo <selector>] [--limit <n>] [--json]
-  orca worktree create --name <name> [--repo <selector>|--project <id> [--host <host-id>]|--project-host-setup <id>] [--agent <id>] [--prompt <text>] [--setup run|skip|inherit] [--base-branch <ref>] [--issue <number>] [--linear-issue <identifier-or-url>] [--comment <text>] [--parent-worktree <selector>] [--no-parent] [--run-hooks] [--activate] [--json]
-  orca worktree show --worktree <selector> [--json]
-  orca worktree current [--json]
-  orca worktree set --worktree <selector> [--display-name <name>] [--issue <number|null>] [--linear-issue <identifier-or-url|null>] [--comment <text>] [--workspace-status <id>] [--parent-worktree <selector>|--no-parent] [--json]
-  orca worktree rm --worktree <selector> [--force] [--run-hooks] [--json]
-  orca worktree ps [--limit <n>] [--json]
-  orca file open <path> [--worktree <selector>] [--json]
-  orca file diff <path> [--staged] [--worktree <selector>] [--json]
-  orca file open-changed [--mode edit|diff|both] [--worktree <selector>] [--json]
-  orca terminal list [--worktree <selector>] [--limit <n>] [--json]
-  orca terminal show [--terminal <handle>] [--json]
-  orca terminal read [--terminal <handle>] [--cursor <n>] [--limit <n>] [--json]
-  orca terminal send [--terminal <handle>] [--text <text>] [--enter] [--interrupt] [--json]
-  orca terminal wait [--terminal <handle>] --for exit|tui-idle [--timeout-ms <ms>] [--json]
-  orca terminal stop --worktree <selector> [--json]
-  orca terminal create [--worktree <selector>] [--title <name>] [--command <text>] [--focus] [--json]
-  orca terminal split [--terminal <handle>] [--direction horizontal|vertical] [--json]
-  orca terminal switch [--terminal <handle>] [--json]
-  orca terminal close [--terminal <handle>] [--json]
-  orca project list [--json]
-  orca project setups [--project <id>] [--host <host-id>] [--json]
-  orca project setup-existing-folder --project <id> --host <host-id> --path <path> [--kind git|folder] [--display-name <name>] [--json]
-  orca project setup-clone --project <id> --host <host-id> --url <clone-url> --destination <path> [--display-name <name>] [--json]
-  orca project setup-create --project <id> --host <host-id> [--setup-id <id>] [--path <path>] [--kind git|folder] [--display-name <name>] [--worktree-base-path <path>] [--git-username <name>] [--state ready|not-set-up|setting-up|error|unsupported] [--method imported-existing-folder|cloned|provisioned] [--json]
-  orca project setup-update --setup <setup-id> [--display-name <name>] [--path <path>] [--worktree-base-path <path>] [--git-username <name>] [--kind git|folder] [--state ready|not-set-up|setting-up|error|unsupported] [--method legacy-repo|imported-existing-folder|cloned|provisioned] [--json]
-  orca project setup-delete --setup <setup-id> [--json]
-  orca repo list [--json]
-  orca repo add --path <path> [--json]
-  orca repo show --repo <selector> [--json]
-  orca repo set-base-ref --repo <selector> --ref <ref> [--json]
-  orca repo search-refs --repo <selector> --query <text> [--limit <n>] [--json]
+  pebble open [--json]
+  pebble serve [--port <port>] [--pairing-address <host>] [--mobile-pairing] [--no-pairing] [--project-root <path>] [--recipe-json] [--json]
+  pebble status [--json]
+  pebble diagnostics memory [--json]
+  pebble environment add --name <name> --pairing-code <code> [--json]
+  pebble environment list [--json]
+  pebble environment show --environment <selector> [--json]
+  pebble environment rm --environment <selector> [--json]
+  pebble worktree list [--repo <selector>] [--limit <n>] [--json]
+  pebble worktree create --name <name> [--repo <selector>|--project <id> [--host <host-id>]|--project-host-setup <id>] [--agent <id>] [--prompt <text>] [--setup run|skip|inherit] [--base-branch <ref>] [--issue <number>] [--linear-issue <identifier-or-url>] [--comment <text>] [--parent-worktree <selector>] [--no-parent] [--run-hooks] [--activate] [--json]
+  pebble worktree show --worktree <selector> [--json]
+  pebble worktree current [--json]
+  pebble worktree set --worktree <selector> [--display-name <name>] [--issue <number|null>] [--linear-issue <identifier-or-url|null>] [--comment <text>] [--workspace-status <id>] [--parent-worktree <selector>|--no-parent] [--json]
+  pebble worktree rm --worktree <selector> [--force] [--run-hooks] [--json]
+  pebble worktree ps [--limit <n>] [--json]
+  pebble file open <path> [--worktree <selector>] [--json]
+  pebble file diff <path> [--staged] [--worktree <selector>] [--json]
+  pebble file open-changed [--mode edit|diff|both] [--worktree <selector>] [--json]
+  pebble terminal list [--worktree <selector>] [--limit <n>] [--json]
+  pebble terminal show [--terminal <handle>] [--json]
+  pebble terminal read [--terminal <handle>] [--cursor <n>] [--limit <n>] [--json]
+  pebble terminal send [--terminal <handle>] [--text <text>] [--enter] [--interrupt] [--json]
+  pebble terminal wait [--terminal <handle>] --for exit|tui-idle [--timeout-ms <ms>] [--json]
+  pebble terminal stop --worktree <selector> [--json]
+  pebble terminal create [--worktree <selector>] [--title <name>] [--command <text>] [--focus] [--json]
+  pebble terminal split [--terminal <handle>] [--direction horizontal|vertical] [--json]
+  pebble terminal switch [--terminal <handle>] [--json]
+  pebble terminal close [--terminal <handle>] [--json]
+  pebble project list [--json]
+  pebble project setups [--project <id>] [--host <host-id>] [--json]
+  pebble project setup-existing-folder --project <id> --host <host-id> --path <path> [--kind git|folder] [--display-name <name>] [--json]
+  pebble project setup-clone --project <id> --host <host-id> --url <clone-url> --destination <path> [--display-name <name>] [--json]
+  pebble project setup-create --project <id> --host <host-id> [--setup-id <id>] [--path <path>] [--kind git|folder] [--display-name <name>] [--worktree-base-path <path>] [--git-username <name>] [--state ready|not-set-up|setting-up|error|unsupported] [--method imported-existing-folder|cloned|provisioned] [--json]
+  pebble project setup-update --setup <setup-id> [--display-name <name>] [--path <path>] [--worktree-base-path <path>] [--git-username <name>] [--kind git|folder] [--state ready|not-set-up|setting-up|error|unsupported] [--method legacy-repo|imported-existing-folder|cloned|provisioned] [--json]
+  pebble project setup-delete --setup <setup-id> [--json]
+  pebble repo list [--json]
+  pebble repo add --path <path> [--json]
+  pebble repo show --repo <selector> [--json]
+  pebble repo set-base-ref --repo <selector> --ref <ref> [--json]
+  pebble repo search-refs --repo <selector> --query <text> [--limit <n>] [--json]
 
 Selectors:
   --repo <selector>         Registered repo selector such as id:<id>, name:<name>, or path:<path>
   --worktree <selector>     Worktree selector such as id:<id>, name:<displayName>, branch:<branch>, issue:<number>, path:<path>, or active/current
-  --terminal <handle>       Runtime-issued terminal handle returned by \`orca terminal list --json\`
+  --terminal <handle>       Runtime-issued terminal handle returned by \`pebble terminal list --json\`
   --parent-worktree <selector> Parent worktree selector such as id:<id>, branch:<branch>, issue:<number>, path:<path>, or active/current
   --no-parent               Force no parent lineage for unrelated worktree creation/update
 
@@ -247,31 +247,31 @@ Wait Options:
 
 Output Options:
   --json                    Emit machine-readable JSON instead of human text
-  --pairing-code <code>      Connect to a remote Orca runtime using an orca://pair?... code
+  --pairing-code <code>      Connect to a remote Pebble runtime using an pebble://pair?... code
   --environment <selector>   Connect using a saved environment id or name
   --help                    Show this help message
 
 Behavior:
-  Most commands require a running Orca runtime. If Orca is not open yet, run \`orca open\` first.
-  Remote runtime access can also be supplied with ORCA_PAIRING_CODE or ORCA_ENVIRONMENT.
+  Most commands require a running Pebble runtime. If Pebble is not open yet, run \`pebble open\` first.
+  Remote runtime access can also be supplied with PEBBLE_PAIRING_CODE or PEBBLE_ENVIRONMENT.
   Use selectors for discovery and handles for repeated live terminal operations.
 
 Agent Sessions And Worktrees:
   \`worktree create --agent\` creates a new checkout with an agent.
   To start a fresh agent in the current worktree, use:
-    orca terminal create --worktree active --command "codex"
+    pebble terminal create --worktree active --command "codex"
 
 Browser Workflow:
-  1. Create or navigate:  orca tab create --url https://example.com
-                          orca goto --url https://example.com
-  2. Inspect the page:    orca snapshot
+  1. Create or navigate:  pebble tab create --url https://example.com
+                          pebble goto --url https://example.com
+  2. Inspect the page:    pebble snapshot
      (Returns an accessibility tree with element refs like e1, e2, e3)
-     For concurrent workflows, prefer: orca tab list --json
+     For concurrent workflows, prefer: pebble tab list --json
      then reuse tabs[].browserPageId with --page <id> on later commands.
-  3. Interact:            orca click --element e2
-                          orca fill --element e5 --value "search query"
-                          orca keypress --key Enter
-  4. Re-inspect:          orca snapshot
+  3. Interact:            pebble click --element e2
+                          pebble fill --element e5 --value "search query"
+                          pebble keypress --key Enter
+  4. Re-inspect:          pebble snapshot
      (Element refs change after navigation — always re-snapshot before interacting)
 
 Browser Options:
@@ -295,36 +295,36 @@ Browser Options:
   --worktree <selector>     Scope commands to a specific worktree's browser tabs
 
 Examples:
-  $ orca open
-  $ orca status --json
-  $ orca diagnostics memory --json
-  $ orca repo list
-  $ orca worktree create --name agent-task --agent codex --prompt "hi"
-  $ orca worktree create --repo name:orca --name cli-test-1 --issue 273
-  $ orca worktree create --repo name:orca --name linear-task --linear-issue https://linear.app/stably/issue/STA-335/test-issue
-  $ orca worktree create --name linear-task --linear-issue STA-335
-  $ orca worktree show --worktree branch:Jinwoo-H/cli
-  $ orca worktree current
-  $ orca worktree set --worktree active --comment "waiting on review"
-  $ orca worktree set --worktree active --linear-issue null
-  $ orca worktree ps --limit 10
-  $ orca file open-changed --mode diff
-  $ orca file open src/App.tsx
-  $ orca terminal create --worktree active --command "codex"
-  $ orca terminal list --worktree path:/Users/me/orca/workspaces/orca/cli-test-1 --json
-  $ orca terminal send --terminal term_123 --text "hi" --enter
-  $ orca terminal wait --terminal term_123 --for exit --timeout-ms 60000 --json
-  $ orca tab current --json
-  $ orca tab show --page page_123 --json
-  $ orca tab create --url https://example.com --profile work
-  $ orca tab profile clone --page page_123 --profile work --json
-  $ orca snapshot
-  $ orca click --element e3
-  $ orca fill --element e5 --value "hello"
-  $ orca goto --url https://example.com/login
-  $ orca keypress --key Enter
-  $ orca eval --expression "document.title"
-  $ orca tab list --json`
+  $ pebble open
+  $ pebble status --json
+  $ pebble diagnostics memory --json
+  $ pebble repo list
+  $ pebble worktree create --name agent-task --agent codex --prompt "hi"
+  $ pebble worktree create --repo name:pebble --name cli-test-1 --issue 273
+  $ pebble worktree create --repo name:pebble --name linear-task --linear-issue https://linear.app/nebutra/issue/NEB-335/test-issue
+  $ pebble worktree create --name linear-task --linear-issue STA-335
+  $ pebble worktree show --worktree branch:Jinwoo-H/cli
+  $ pebble worktree current
+  $ pebble worktree set --worktree active --comment "waiting on review"
+  $ pebble worktree set --worktree active --linear-issue null
+  $ pebble worktree ps --limit 10
+  $ pebble file open-changed --mode diff
+  $ pebble file open src/App.tsx
+  $ pebble terminal create --worktree active --command "codex"
+  $ pebble terminal list --worktree path:/Users/me/pebble/workspaces/pebble/cli-test-1 --json
+  $ pebble terminal send --terminal term_123 --text "hi" --enter
+  $ pebble terminal wait --terminal term_123 --for exit --timeout-ms 60000 --json
+  $ pebble tab current --json
+  $ pebble tab show --page page_123 --json
+  $ pebble tab create --url https://example.com --profile work
+  $ pebble tab profile clone --page page_123 --profile work --json
+  $ pebble snapshot
+  $ pebble click --element e3
+  $ pebble fill --element e5 --value "hello"
+  $ pebble goto --url https://example.com/login
+  $ pebble keypress --key Enter
+  $ pebble eval --expression "document.title"
+  $ pebble tab list --json`
 
 export function printHelp(specs: CommandSpec[], commandPath: string[] = []): void {
   const exactSpec = findCommandSpec(specs, commandPath)
@@ -346,7 +346,7 @@ export function printHelp(specs: CommandSpec[], commandPath: string[] = []): voi
 }
 
 export function formatCommandHelp(spec: CommandSpec): string {
-  const lines = [`orca ${spec.path.join(' ')}`, '', `Usage: ${spec.usage}`, '', spec.summary]
+  const lines = [`pebble ${spec.path.join(' ')}`, '', `Usage: ${spec.usage}`, '', spec.summary]
   const displayedFlags = supportsBrowserPageFlag(spec.path)
     ? [...spec.allowedFlags, 'page']
     : spec.allowedFlags
@@ -377,11 +377,11 @@ export function formatCommandHelp(spec: CommandSpec): string {
 
 export function formatGroupHelp(specs: CommandSpec[], group: string): string {
   const groupSpecs = specs.filter((spec) => spec.path[0] === group)
-  const lines = [`orca ${group}`, '', `Usage: orca ${group} <command> [options]`, '', 'Commands:']
+  const lines = [`pebble ${group}`, '', `Usage: pebble ${group} <command> [options]`, '', 'Commands:']
   for (const spec of groupSpecs) {
     lines.push(`  ${spec.path.slice(1).join(' ').padEnd(18)} ${spec.summary}`)
   }
-  lines.push('', `Run \`orca ${group} <command> --help\` for command-specific usage.`)
+  lines.push('', `Run \`pebble ${group} <command> --help\` for command-specific usage.`)
   return lines.join('\n')
 }
 
@@ -458,19 +458,19 @@ export function formatFlagHelp(flag: string): string {
     agent: '--agent <id>          Launch a known TUI agent in the first terminal',
     'base-branch': '--base-branch <ref>    Base branch/ref to create the worktree from',
     command: '--command <text>       Command to run in the terminal on startup',
-    comment: '--comment <text>       Comment stored in Orca metadata',
+    comment: '--comment <text>       Comment stored in Pebble metadata',
     cursor: '--cursor <n>           Line cursor from a previous read (returns only new output)',
     action: '--action <name>       Secondary accessibility action name',
-    activate: '--activate             Reveal the new worktree in the Orca app',
+    activate: '--activate             Reveal the new worktree in the Pebble app',
     app: '--app <app>            App name, bundle ID, or pid:N',
     direction:
       '--direction <dir>      Direction: up|down|left|right for scroll, horizontal|vertical for split',
-    'display-name': '--display-name <name>  Override the Orca display name',
+    'display-name': '--display-name <name>  Override the Pebble display name',
     'element-index': '--element-index <n>   Element index from get-app-state',
     title: '--title <text>         Custom title for the terminal tab (omit to reset)',
     enter: '--enter                Append Enter after sending text',
     force: '--force                Force worktree removal when supported',
-    focus: '--focus                Reveal the created terminal session in Orca',
+    focus: '--focus                Reveal the created terminal session in Pebble',
     for: '--for exit|tui-idle    Wait condition to satisfy',
     'from-element-index': '--from-element-index <n> Source element index from get-app-state',
     'from-x': '--from-x <x>           Source window-local x coordinate',
@@ -546,14 +546,14 @@ export function formatFlagHelp(flag: string): string {
     expression: '--expression <js>     JavaScript expression to evaluate',
     amount: '--amount <pixels>      Scroll distance in pixels',
     index: '--index <n>            Tab index to switch to',
-    page: '--page <id>            Stable browser page id from `orca tab list --json`',
+    page: '--page <id>            Stable browser page id from `pebble tab list --json`',
     profile: '--profile <id>        Browser profile id',
     'show-profile': '--show-profile        Include tab profile in text output',
     format: '--format <png|jpeg>    Screenshot image format'
   }
 
   if (flag === 'current') {
-    return '--current              Use the current Orca worktree linked Linear issue'
+    return '--current              Use the current Pebble worktree linked Linear issue'
   }
   if (flag === 'comments') {
     return '--comments             Include threaded Linear comments'

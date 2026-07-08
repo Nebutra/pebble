@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { RpcDispatcher } from '../dispatcher'
 import type { RpcRequest } from '../core'
-import type { OrcaRuntimeService } from '../../orca-runtime'
+import type { PebbleRuntimeService } from '../../pebble-runtime'
 import { SESSION_TAB_METHODS } from './session-tabs'
 
 function makeRequest(method: string, params?: unknown): RpcRequest {
@@ -21,7 +21,7 @@ describe('session tab RPC methods', () => {
         activeTabType: 'terminal',
         tabs: []
       })
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -45,7 +45,7 @@ describe('session tab RPC methods', () => {
       moveMobileSessionTab: vi.fn().mockResolvedValue({
         moved: true
       })
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -71,7 +71,7 @@ describe('session tab RPC methods', () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
       moveMobileSessionTab: vi.fn()
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -93,7 +93,7 @@ describe('session tab RPC methods', () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
       moveMobileSessionTab: vi.fn().mockResolvedValue({ moved: true })
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -132,7 +132,7 @@ describe('session tab RPC methods', () => {
         publicationEpoch: 'epoch-1',
         snapshotVersion: 1
       })
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -188,7 +188,7 @@ describe('session tab RPC methods', () => {
         publicationEpoch: 'epoch-1',
         snapshotVersion: 1
       })
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -226,7 +226,7 @@ describe('session tab RPC methods', () => {
         publicationEpoch: 'epoch-1',
         snapshotVersion: 1
       })
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -252,7 +252,7 @@ describe('session tab RPC methods', () => {
     const runtime = {
       getRuntimeId: () => 'test-runtime',
       createMobileSessionTerminal: vi.fn()
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     const response = await dispatcher.dispatch(
@@ -299,7 +299,7 @@ describe('session tab RPC methods', () => {
         return unsubscribe
       }),
       registerSubscriptionCleanup: vi.fn()
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
     const messages: string[] = []
 
@@ -342,7 +342,7 @@ describe('session tab RPC methods', () => {
       listAllMobileSessionTabs: vi.fn(() => []),
       onMobileSessionTabsChanged: vi.fn(() => vi.fn()),
       registerSubscriptionCleanup: vi.fn()
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     await dispatcher.dispatchStreaming(
@@ -382,7 +382,7 @@ describe('session tab RPC methods', () => {
       }),
       onMobileSessionTabsChanged: vi.fn(() => vi.fn()),
       registerSubscriptionCleanup: vi.fn()
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     await dispatcher.dispatchStreaming(
@@ -417,7 +417,7 @@ describe('session tab RPC methods', () => {
       }),
       onMobileSessionTabsChanged: vi.fn(() => vi.fn()),
       registerSubscriptionCleanup: vi.fn()
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     await dispatcher.dispatchStreaming(
@@ -458,7 +458,7 @@ describe('session tab RPC methods', () => {
       }),
       cleanupSubscription,
       cleanupSubscriptionsByPrefix: vi.fn()
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
     const messages: string[] = []
 
@@ -491,7 +491,7 @@ describe('session tab RPC methods', () => {
       }),
       cleanupSubscription,
       cleanupSubscriptionsByPrefix
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     await dispatcher.dispatchStreaming(
@@ -511,7 +511,7 @@ describe('session tab RPC methods', () => {
       getRuntimeId: () => 'test-runtime',
       cleanupSubscription,
       cleanupSubscriptionsByPrefix
-    } as unknown as OrcaRuntimeService
+    } as unknown as PebbleRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })
 
     await dispatcher.dispatchStreaming(

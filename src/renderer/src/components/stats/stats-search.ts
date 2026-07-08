@@ -6,7 +6,7 @@ export const getStatsPaneSearchEntries = createLocalizedCatalog(() => [
     title: translate('auto.components.stats.stats.search.cb2430ae6a', 'Stats & Usage'),
     description: translate(
       'auto.components.stats.stats.search.26bb901fcd',
-      'Orca stats plus combined Claude, Codex, and OpenCode usage analytics, tokens, cache, models, and sessions.'
+      'Pebble stats plus combined Claude, Codex, and OpenCode usage analytics, tokens, cache, models, and sessions.'
     ),
     keywords: [
       translate('auto.components.stats.stats.search.372debfac0', 'stats'),

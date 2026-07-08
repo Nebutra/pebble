@@ -378,7 +378,7 @@ describe('PtyHandler', () => {
       const spawnOptions = mockPtySpawn.mock.calls[0]?.[2] as
         | { env?: Record<string, string> }
         | undefined
-      expect(spawnOptions?.env?.ORCA_SHELL_READY_MARKER).toBe('1')
+      expect(spawnOptions?.env?.PEBBLE_SHELL_READY_MARKER).toBe('1')
       expect(handler.retainedStartupCommandCount).toBe(0)
     }
   )
@@ -414,7 +414,7 @@ describe('PtyHandler', () => {
       const spawnOptions = mockPtySpawn.mock.calls[0]?.[2] as
         | { env?: Record<string, string> }
         | undefined
-      expect(spawnOptions?.env?.ORCA_SHELL_READY_MARKER).toBe('1')
+      expect(spawnOptions?.env?.PEBBLE_SHELL_READY_MARKER).toBe('1')
       expect(handler.retainedStartupCommandCount).toBe(0)
     }
   )
@@ -452,7 +452,7 @@ describe('PtyHandler', () => {
       const spawnOptions = mockPtySpawn.mock.calls[0]?.[2] as
         | { env?: Record<string, string> }
         | undefined
-      expect(spawnOptions?.env?.ORCA_SHELL_READY_MARKER).toBe('1')
+      expect(spawnOptions?.env?.PEBBLE_SHELL_READY_MARKER).toBe('1')
     }
   )
 
@@ -491,7 +491,7 @@ describe('PtyHandler', () => {
       const spawnOptions = mockPtySpawn.mock.calls[0]?.[2] as
         | { env?: Record<string, string> }
         | undefined
-      expect(spawnOptions?.env?.ORCA_SHELL_READY_MARKER).toBe('1')
+      expect(spawnOptions?.env?.PEBBLE_SHELL_READY_MARKER).toBe('1')
     }
   )
 
@@ -537,7 +537,7 @@ describe('PtyHandler', () => {
       vi.advanceTimersByTime(1499)
       expect(term.write).not.toHaveBeenCalled()
 
-      dataCallback?.('\x1b]777;orca-shell-ready\x07user@remote $ ')
+      dataCallback?.('\x1b]777;pebble-shell-ready\x07user@remote $ ')
       vi.advanceTimersByTime(49)
       expect(term.write).not.toHaveBeenCalled()
       vi.advanceTimersByTime(1)
@@ -591,21 +591,21 @@ describe('PtyHandler', () => {
         rmSync(homeDir, { recursive: true, force: true })
       }
 
-      dataCallback?.('\x1b]777;orca-shell-ready')
+      dataCallback?.('\x1b]777;pebble-shell-ready')
       vi.advanceTimersByTime(1500)
 
       expect(term.write).toHaveBeenCalledWith('echo fallback\n')
       vi.advanceTimersByTime(8)
       expect(dispatcher.notify).toHaveBeenCalledWith('pty.data', {
         id: 'pty-1',
-        data: '\x1b]777;orca-shell-ready'
+        data: '\x1b]777;pebble-shell-ready'
       })
 
       const result = await dispatcher.callRequest('pty.attach', {
         id: 'pty-1',
         suppressReplayNotification: true
       })
-      expect(result).toEqual({ replay: '\x1b]777;orca-shell-ready' })
+      expect(result).toEqual({ replay: '\x1b]777;pebble-shell-ready' })
     }
   )
 
@@ -822,10 +822,10 @@ describe('PtyHandler', () => {
   })
 
   it('uses attach identity metadata without exporting it to the shell env', async () => {
-    const oldPaneKey = process.env.ORCA_PANE_KEY
-    const oldTabId = process.env.ORCA_TAB_ID
-    delete process.env.ORCA_PANE_KEY
-    delete process.env.ORCA_TAB_ID
+    const oldPaneKey = process.env.PEBBLE_PANE_KEY
+    const oldTabId = process.env.PEBBLE_TAB_ID
+    delete process.env.PEBBLE_PANE_KEY
+    delete process.env.PEBBLE_TAB_ID
     try {
       await dispatcher.callRequest('pty.spawn', {
         env: { FOO: 'bar' },
@@ -834,20 +834,20 @@ describe('PtyHandler', () => {
       })
     } finally {
       if (oldPaneKey === undefined) {
-        delete process.env.ORCA_PANE_KEY
+        delete process.env.PEBBLE_PANE_KEY
       } else {
-        process.env.ORCA_PANE_KEY = oldPaneKey
+        process.env.PEBBLE_PANE_KEY = oldPaneKey
       }
       if (oldTabId === undefined) {
-        delete process.env.ORCA_TAB_ID
+        delete process.env.PEBBLE_TAB_ID
       } else {
-        process.env.ORCA_TAB_ID = oldTabId
+        process.env.PEBBLE_TAB_ID = oldTabId
       }
     }
 
     const spawnOptions = mockPtySpawn.mock.calls[0][2] as { env: Record<string, string> }
-    expect(spawnOptions.env.ORCA_PANE_KEY).toBeUndefined()
-    expect(spawnOptions.env.ORCA_TAB_ID).toBeUndefined()
+    expect(spawnOptions.env.PEBBLE_PANE_KEY).toBeUndefined()
+    expect(spawnOptions.env.PEBBLE_TAB_ID).toBeUndefined()
 
     await expect(
       dispatcher.callRequest('pty.attach', {
@@ -987,7 +987,7 @@ describe('PtyHandler', () => {
     const exits: { id: string; paneKey?: string }[] = []
     handler.setExitListener((evt) => exits.push(evt))
 
-    await dispatcher.callRequest('pty.spawn', { env: { ORCA_PANE_KEY: 'tab-fallback:0' } })
+    await dispatcher.callRequest('pty.spawn', { env: { PEBBLE_PANE_KEY: 'tab-fallback:0' } })
     await dispatcher.callRequest('pty.shutdown', { id: 'pty-1', immediate: false })
     vi.advanceTimersByTime(5000)
     onExitCb!({ exitCode: 137 })
@@ -1149,28 +1149,28 @@ describe('PtyHandler', () => {
 
   it('applies env augmenters after process.env and renderer-supplied env (augmenter wins on key conflict)', async () => {
     handler.addEnvAugmenter(() => ({
-      ORCA_AGENT_HOOK_PORT: '12345',
-      ORCA_AGENT_HOOK_TOKEN: 'abc-uuid',
+      PEBBLE_AGENT_HOOK_PORT: '12345',
+      PEBBLE_AGENT_HOOK_TOKEN: 'abc-uuid',
       // Why: also override a key the renderer supplied below so the test pins
       // the documented "augmenter wins on key conflict" invariant — see the
       // doc-comment on addEnvAugmenter in pty-handler.ts.
-      ORCA_PANE_KEY: 'augmenter-wins'
+      PEBBLE_PANE_KEY: 'augmenter-wins'
     }))
 
     await dispatcher.callRequest('pty.spawn', {
       cols: 80,
       rows: 24,
-      env: { ORCA_PANE_KEY: 'tab-1:0', ORCA_TAB_ID: 'tab-1' }
+      env: { PEBBLE_PANE_KEY: 'tab-1:0', PEBBLE_TAB_ID: 'tab-1' }
     })
 
     expect(mockPtySpawn).toHaveBeenCalled()
     const callArgs = mockPtySpawn.mock.calls[0][2] as { env: Record<string, string> }
-    expect(callArgs.env.ORCA_AGENT_HOOK_PORT).toBe('12345')
-    expect(callArgs.env.ORCA_AGENT_HOOK_TOKEN).toBe('abc-uuid')
+    expect(callArgs.env.PEBBLE_AGENT_HOOK_PORT).toBe('12345')
+    expect(callArgs.env.PEBBLE_AGENT_HOOK_TOKEN).toBe('abc-uuid')
     // Augmenter override beats the renderer-supplied value:
-    expect(callArgs.env.ORCA_PANE_KEY).toBe('augmenter-wins')
+    expect(callArgs.env.PEBBLE_PANE_KEY).toBe('augmenter-wins')
     // Renderer-supplied keys not in augmenter map flow through:
-    expect(callArgs.env.ORCA_TAB_ID).toBe('tab-1')
+    expect(callArgs.env.PEBBLE_TAB_ID).toBe('tab-1')
   })
 
   it('passes the PTY id and renderer paneKey to env augmenters', async () => {
@@ -1183,7 +1183,7 @@ describe('PtyHandler', () => {
     })
 
     await dispatcher.callRequest('pty.spawn', {
-      env: { ORCA_PANE_KEY: 'tab-context:0' }
+      env: { PEBBLE_PANE_KEY: 'tab-context:0' }
     })
     await dispatcher.callRequest('pty.spawn', {})
 
@@ -1192,7 +1192,7 @@ describe('PtyHandler', () => {
     expect(seenContexts[0]).toMatchObject({
       id: 'pty-1',
       paneKey: 'tab-context:0',
-      env: { ORCA_PANE_KEY: 'tab-context:0' }
+      env: { PEBBLE_PANE_KEY: 'tab-context:0' }
     })
     expect(seenContexts[1]).toMatchObject({ id: 'pty-2', paneKey: undefined })
     expect(firstEnv.env.OVERLAY_ID).toBe('tab-context:0')
@@ -1246,12 +1246,12 @@ describe('PtyHandler', () => {
     async () => {
       const oldShell = process.env.SHELL
       const oldHome = process.env.HOME
-      const oldOrcaPi = process.env.ORCA_PI_CODING_AGENT_DIR
+      const oldPebblePi = process.env.PEBBLE_PI_CODING_AGENT_DIR
       const homeDir = mkdtempSync(join(tmpdir(), 'relay-pty-shell-launch-'))
 
       process.env.SHELL = '/bin/bash'
       process.env.HOME = homeDir
-      delete process.env.ORCA_PI_CODING_AGENT_DIR
+      delete process.env.PEBBLE_PI_CODING_AGENT_DIR
       try {
         if (!existsSync('/bin/bash')) {
           return
@@ -1259,8 +1259,8 @@ describe('PtyHandler', () => {
 
         handler.addEnvAugmenter(() => ({
           OPENCODE_CONFIG_DIR: '/remote/overlay/opencode',
-          ORCA_OPENCODE_CONFIG_DIR: '/remote/overlay/opencode',
-          ORCA_OMP_STATUS_EXTENSION: '/remote/.omp/agent/extensions/orca-agent-status.ts'
+          PEBBLE_OPENCODE_CONFIG_DIR: '/remote/overlay/opencode',
+          PEBBLE_OMP_STATUS_EXTENSION: '/remote/.omp/agent/extensions/pebble-agent-status.ts'
         }))
 
         await dispatcher.callRequest('pty.spawn', { env: { HOME: homeDir } })
@@ -1275,24 +1275,24 @@ describe('PtyHandler', () => {
         } else {
           process.env.HOME = oldHome
         }
-        if (oldOrcaPi === undefined) {
-          delete process.env.ORCA_PI_CODING_AGENT_DIR
+        if (oldPebblePi === undefined) {
+          delete process.env.PEBBLE_PI_CODING_AGENT_DIR
         } else {
-          process.env.ORCA_PI_CODING_AGENT_DIR = oldOrcaPi
+          process.env.PEBBLE_PI_CODING_AGENT_DIR = oldPebblePi
         }
       }
 
       const shellArgs = mockPtySpawn.mock.calls[0][1]
       const spawnOptions = mockPtySpawn.mock.calls[0][2] as { env: Record<string, string> }
-      const rcfile = join(homeDir, '.orca-relay', 'shell-ready', 'bash', 'rcfile')
+      const rcfile = join(homeDir, '.pebble-relay', 'shell-ready', 'bash', 'rcfile')
 
       expect(shellArgs).toEqual(['--rcfile', rcfile])
-      expect(spawnOptions.env.ORCA_OPENCODE_CONFIG_DIR).toBe('/remote/overlay/opencode')
-      expect(spawnOptions.env.ORCA_PI_CODING_AGENT_DIR).toBeUndefined()
+      expect(spawnOptions.env.PEBBLE_OPENCODE_CONFIG_DIR).toBe('/remote/overlay/opencode')
+      expect(spawnOptions.env.PEBBLE_PI_CODING_AGENT_DIR).toBeUndefined()
       expect(readFileSync(rcfile, 'utf8')).toContain(
-        'export OPENCODE_CONFIG_DIR="${ORCA_OPENCODE_CONFIG_DIR}"'
+        'export OPENCODE_CONFIG_DIR="${PEBBLE_OPENCODE_CONFIG_DIR}"'
       )
-      expect(readFileSync(rcfile, 'utf8')).not.toContain('ORCA_PI_CODING_AGENT_DIR')
+      expect(readFileSync(rcfile, 'utf8')).not.toContain('PEBBLE_PI_CODING_AGENT_DIR')
       expect(readFileSync(rcfile, 'utf8')).toContain('command omp --extension')
 
       rmSync(homeDir, { recursive: true, force: true })
@@ -1305,9 +1305,9 @@ describe('PtyHandler', () => {
       rows: 30,
       cwd: '/tmp',
       env: {
-        ORCA_PANE_KEY: 'tab-5:1',
-        ORCA_TAB_ID: 'tab-5',
-        ORCA_WORKTREE_ID: 'wt-5'
+        PEBBLE_PANE_KEY: 'tab-5:1',
+        PEBBLE_TAB_ID: 'tab-5',
+        PEBBLE_WORKTREE_ID: 'wt-5'
       }
     })
     const state = (await dispatcher.callRequest('pty.serialize', { ids: ['pty-1'] })) as string
@@ -1317,8 +1317,8 @@ describe('PtyHandler', () => {
     dispatcher = createMockDispatcher()
     handler = new PtyHandler(dispatcher as unknown as RelayDispatcher)
     handler.addEnvAugmenter(() => ({
-      ORCA_AGENT_HOOK_PORT: '12345',
-      ORCA_AGENT_HOOK_TOKEN: 'abc-uuid'
+      PEBBLE_AGENT_HOOK_PORT: '12345',
+      PEBBLE_AGENT_HOOK_TOKEN: 'abc-uuid'
     }))
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true)
     try {
@@ -1329,18 +1329,18 @@ describe('PtyHandler', () => {
 
     expect(mockPtySpawn).toHaveBeenCalledTimes(1)
     const callArgs = mockPtySpawn.mock.calls[0][2] as { env: Record<string, string> }
-    expect(callArgs.env.ORCA_PANE_KEY).toBe('tab-5:1')
-    expect(callArgs.env.ORCA_TAB_ID).toBe('tab-5')
-    expect(callArgs.env.ORCA_WORKTREE_ID).toBe('wt-5')
-    expect(callArgs.env.ORCA_AGENT_HOOK_PORT).toBe('12345')
-    expect(callArgs.env.ORCA_AGENT_HOOK_TOKEN).toBe('abc-uuid')
+    expect(callArgs.env.PEBBLE_PANE_KEY).toBe('tab-5:1')
+    expect(callArgs.env.PEBBLE_TAB_ID).toBe('tab-5')
+    expect(callArgs.env.PEBBLE_WORKTREE_ID).toBe('wt-5')
+    expect(callArgs.env.PEBBLE_AGENT_HOOK_PORT).toBe('12345')
+    expect(callArgs.env.PEBBLE_AGENT_HOOK_TOKEN).toBe('abc-uuid')
   })
 
   it('revive preserves attach identity metadata without exporting hook identity env', async () => {
-    const oldPaneKey = process.env.ORCA_PANE_KEY
-    const oldTabId = process.env.ORCA_TAB_ID
-    delete process.env.ORCA_PANE_KEY
-    delete process.env.ORCA_TAB_ID
+    const oldPaneKey = process.env.PEBBLE_PANE_KEY
+    const oldTabId = process.env.PEBBLE_TAB_ID
+    delete process.env.PEBBLE_PANE_KEY
+    delete process.env.PEBBLE_TAB_ID
     try {
       await dispatcher.callRequest('pty.spawn', {
         cols: 90,
@@ -1352,14 +1352,14 @@ describe('PtyHandler', () => {
       })
     } finally {
       if (oldPaneKey === undefined) {
-        delete process.env.ORCA_PANE_KEY
+        delete process.env.PEBBLE_PANE_KEY
       } else {
-        process.env.ORCA_PANE_KEY = oldPaneKey
+        process.env.PEBBLE_PANE_KEY = oldPaneKey
       }
       if (oldTabId === undefined) {
-        delete process.env.ORCA_TAB_ID
+        delete process.env.PEBBLE_TAB_ID
       } else {
-        process.env.ORCA_TAB_ID = oldTabId
+        process.env.PEBBLE_TAB_ID = oldTabId
       }
     }
     const state = (await dispatcher.callRequest('pty.serialize', { ids: ['pty-1'] })) as string
@@ -1369,27 +1369,27 @@ describe('PtyHandler', () => {
     dispatcher = createMockDispatcher()
     handler = new PtyHandler(dispatcher as unknown as RelayDispatcher)
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true)
-    delete process.env.ORCA_PANE_KEY
-    delete process.env.ORCA_TAB_ID
+    delete process.env.PEBBLE_PANE_KEY
+    delete process.env.PEBBLE_TAB_ID
     try {
       await dispatcher.callRequest('pty.revive', { state })
     } finally {
       killSpy.mockRestore()
       if (oldPaneKey === undefined) {
-        delete process.env.ORCA_PANE_KEY
+        delete process.env.PEBBLE_PANE_KEY
       } else {
-        process.env.ORCA_PANE_KEY = oldPaneKey
+        process.env.PEBBLE_PANE_KEY = oldPaneKey
       }
       if (oldTabId === undefined) {
-        delete process.env.ORCA_TAB_ID
+        delete process.env.PEBBLE_TAB_ID
       } else {
-        process.env.ORCA_TAB_ID = oldTabId
+        process.env.PEBBLE_TAB_ID = oldTabId
       }
     }
 
     const callArgs = mockPtySpawn.mock.calls[0][2] as { env: Record<string, string> }
-    expect(callArgs.env.ORCA_PANE_KEY).toBeUndefined()
-    expect(callArgs.env.ORCA_TAB_ID).toBeUndefined()
+    expect(callArgs.env.PEBBLE_PANE_KEY).toBeUndefined()
+    expect(callArgs.env.PEBBLE_TAB_ID).toBeUndefined()
 
     await expect(
       dispatcher.callRequest('pty.attach', {
@@ -1414,7 +1414,7 @@ describe('PtyHandler', () => {
     handler.setExitListener((evt) => exits.push(evt))
 
     await dispatcher.callRequest('pty.spawn', {
-      env: { ORCA_PANE_KEY: 'tab-2:1' }
+      env: { PEBBLE_PANE_KEY: 'tab-2:1' }
     })
     expect(onExitCb).toBeDefined()
     onExitCb!({ exitCode: 0 })
@@ -1437,7 +1437,7 @@ describe('PtyHandler', () => {
     handler.setExitListener((evt) => exits.push(evt))
 
     await dispatcher.callRequest('pty.spawn', {
-      env: { ORCA_PANE_KEY: 'tab-shutdown:0' }
+      env: { PEBBLE_PANE_KEY: 'tab-shutdown:0' }
     })
     await dispatcher.callRequest('pty.shutdown', { id: 'pty-1', immediate: true })
     onExitCb!({ exitCode: 0 })
@@ -1458,8 +1458,8 @@ describe('PtyHandler', () => {
     const exits: { id: string; paneKey?: string }[] = []
     handler.setExitListener((evt) => exits.push(evt))
 
-    await dispatcher.callRequest('pty.spawn', { env: { ORCA_PANE_KEY: 'tab-dispose:0' } })
-    await dispatcher.callRequest('pty.spawn', { env: { ORCA_PANE_KEY: 'tab-dispose:1' } })
+    await dispatcher.callRequest('pty.spawn', { env: { PEBBLE_PANE_KEY: 'tab-dispose:0' } })
+    await dispatcher.callRequest('pty.spawn', { env: { PEBBLE_PANE_KEY: 'tab-dispose:1' } })
     expect(handler.activePtyCount).toBe(2)
 
     handler.dispose()

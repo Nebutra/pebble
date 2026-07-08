@@ -49,7 +49,7 @@ describe('tui agent startup plans', () => {
     expect(plan?.launchCommand).toBe('claude "fix ^"quoted^" ^& ^%PATH^%"')
   })
 
-  it('does not launch Codex with the Orca profile when agent status hooks are enabled', () => {
+  it('does not launch Codex with the Pebble profile when agent status hooks are enabled', () => {
     const plan = buildAgentStartupPlan({
       agent: 'codex',
       prompt: 'fix it',
@@ -79,7 +79,7 @@ describe('tui agent startup plans', () => {
     })
   })
 
-  it('launches Claude without Orca settings injection', () => {
+  it('launches Claude without Pebble settings injection', () => {
     const plan = buildAgentStartupPlan({
       agent: 'claude',
       prompt: 'fix it',
@@ -91,7 +91,7 @@ describe('tui agent startup plans', () => {
     expect(plan?.launchCommand).not.toContain('--settings')
   })
 
-  it('uses the Linux Orca CLI command for Claude Agent Teams launches', () => {
+  it('uses the Linux Pebble CLI command for Claude Agent Teams launches', () => {
     const plan = buildAgentStartupPlan({
       agent: 'claude-agent-teams',
       prompt: '',
@@ -100,13 +100,13 @@ describe('tui agent startup plans', () => {
       allowEmptyPromptLaunch: true
     })
 
-    expect(plan?.launchCommand).toBe('orca-ide claude-teams')
+    expect(plan?.launchCommand).toBe('pebble-ide claude-teams')
   })
 
-  it('uses the plain orca shim for Claude Agent Teams on Linux SSH remotes', () => {
-    // Why: the SSH relay deploys the CLI shim as `orca` (not the local-only
-    // `orca-ide` GNOME-screen-reader workaround), so a remote launch must not
-    // emit `orca-ide claude-teams` — that name is not on the remote PATH and
+  it('uses the plain pebble shim for Claude Agent Teams on Linux SSH remotes', () => {
+    // Why: the SSH relay deploys the CLI shim as `pebble` (not the local-only
+    // `pebble-ide` desktop wrapper), so a remote launch must not
+    // emit `pebble-ide claude-teams` — that name is not on the remote PATH and
     // `claude-teams` is rejected by the relay's CLI switch (issue #6500).
     const plan = buildAgentStartupPlan({
       agent: 'claude-agent-teams',
@@ -117,11 +117,11 @@ describe('tui agent startup plans', () => {
       allowEmptyPromptLaunch: true
     })
 
-    expect(plan?.launchCommand).toBe('orca claude-teams')
+    expect(plan?.launchCommand).toBe('pebble claude-teams')
   })
 
-  it('keeps the Windows orca.cmd shim for Claude Agent Teams on SSH remotes', () => {
-    // Why: the Windows remote shim is also `orca.cmd`, matching the local
+  it('keeps the Windows pebble.cmd shim for Claude Agent Teams on SSH remotes', () => {
+    // Why: the Windows remote shim is also `pebble.cmd`, matching the local
     // win32 override, so remoteness must not alter the Windows command.
     const plan = buildAgentStartupPlan({
       agent: 'claude-agent-teams',
@@ -132,12 +132,12 @@ describe('tui agent startup plans', () => {
       allowEmptyPromptLaunch: true
     })
 
-    expect(plan?.launchCommand).toBe('orca.cmd claude-teams')
+    expect(plan?.launchCommand).toBe('pebble.cmd claude-teams')
   })
 
-  it('keeps the Linux orca-ide wrapper for local (non-remote) Claude Agent Teams', () => {
-    // Why: the `orca-ide` rename is still required for a local Linux desktop
-    // install (avoids shadowing the GNOME Orca screen reader), so an explicit
+  it('keeps the Linux pebble-ide wrapper for local (non-remote) Claude Agent Teams', () => {
+    // Why: the `pebble-ide` wrapper is still required for a local Linux desktop
+    // install, so an explicit
     // isRemote:false must preserve it.
     const plan = buildAgentStartupPlan({
       agent: 'claude-agent-teams',
@@ -148,7 +148,7 @@ describe('tui agent startup plans', () => {
       allowEmptyPromptLaunch: true
     })
 
-    expect(plan?.launchCommand).toBe('orca-ide claude-teams')
+    expect(plan?.launchCommand).toBe('pebble-ide claude-teams')
   })
 
   it('launches OpenClaude as a distinct argv agent', () => {
@@ -400,7 +400,7 @@ describe('tui agent startup plans', () => {
         cmdOverrides: {},
         platform: 'win32'
       })?.launchCommand
-    ).toBe('pi; Remove-Item Env:ORCA_PI_PREFILL -ErrorAction SilentlyContinue')
+    ).toBe('pi; Remove-Item Env:PEBBLE_PI_PREFILL -ErrorAction SilentlyContinue')
 
     expect(
       buildAgentDraftLaunchPlan({
@@ -410,12 +410,12 @@ describe('tui agent startup plans', () => {
         platform: 'win32',
         shell: 'cmd'
       })?.launchCommand
-    ).toBe('pi & set "ORCA_PI_PREFILL="')
+    ).toBe('pi & set "PEBBLE_PI_PREFILL="')
   })
 
-  it('returns an OMP draft plan with ORCA_OMP_PREFILL (OMP-scoped, not Pi-shared)', () => {
+  it('returns an OMP draft plan with PEBBLE_OMP_PREFILL (OMP-scoped, not Pi-shared)', () => {
     // Why: OMP owns its own managed prefill extension and env var.
-    // orca-prefill.ts reads ORCA_OMP_PREFILL for OMP launches — see
+    // pebble-prefill.ts reads PEBBLE_OMP_PREFILL for OMP launches — see
     // src/main/pi/titlebar-extension-service.ts — so a draft plan for OMP
     // MUST emit that name. A regression here would either silently drop the
     // draft (Pi var ignored by OMP) or honor a stale Pi-PTY draft.
@@ -427,9 +427,9 @@ describe('tui agent startup plans', () => {
     })
 
     expect(plan).not.toBeNull()
-    expect(plan?.env).toEqual({ ORCA_OMP_PREFILL: 'fix the omp regression' })
+    expect(plan?.env).toEqual({ PEBBLE_OMP_PREFILL: 'fix the omp regression' })
     expect(plan?.expectedProcess).toBe('omp')
-    expect(plan?.launchCommand).toBe('omp; unset ORCA_OMP_PREFILL')
+    expect(plan?.launchCommand).toBe('omp; unset PEBBLE_OMP_PREFILL')
   })
 
   it('returns null for oversized Windows flag drafts so callers paste after ready', () => {
@@ -480,15 +480,15 @@ describe('tui agent startup plans', () => {
       agent: 'pi',
       draft: 'prefill text',
       cmdOverrides: {},
-      agentEnv: { ORCA_AGENT_MODE: 'managed' },
+      agentEnv: { PEBBLE_AGENT_MODE: 'managed' },
       platform: 'linux'
     })
 
-    expect(plan?.env).toEqual({ ORCA_AGENT_MODE: 'managed', ORCA_PI_PREFILL: 'prefill text' })
+    expect(plan?.env).toEqual({ PEBBLE_AGENT_MODE: 'managed', PEBBLE_PI_PREFILL: 'prefill text' })
     expect(plan?.launchConfig).toEqual({
       agentCommand: 'pi',
       agentArgs: '',
-      agentEnv: { ORCA_AGENT_MODE: 'managed' }
+      agentEnv: { PEBBLE_AGENT_MODE: 'managed' }
     })
   })
 

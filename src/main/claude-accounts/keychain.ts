@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 
 const ACTIVE_CLAUDE_SERVICE = 'Claude Code-credentials'
-const ORCA_CLAUDE_SERVICE = 'Orca Claude Code Managed Credentials'
+const PEBBLE_CLAUDE_SERVICE = 'Pebble Claude Code Managed Credentials'
 const KEYCHAIN_COMMAND_TIMEOUT_MS = 3_000
 
 type SecurityCommandResult = {
@@ -64,18 +64,18 @@ export async function deleteActiveClaudeKeychainCredentialsStrict(
 export async function readManagedClaudeKeychainCredentials(
   accountId: string
 ): Promise<string | null> {
-  return readKeychainPassword(ORCA_CLAUDE_SERVICE, accountId)
+  return readKeychainPassword(PEBBLE_CLAUDE_SERVICE, accountId)
 }
 
 export async function writeManagedClaudeKeychainCredentials(
   accountId: string,
   contents: string
 ): Promise<void> {
-  await writeKeychainPassword(ORCA_CLAUDE_SERVICE, accountId, contents)
+  await writeKeychainPassword(PEBBLE_CLAUDE_SERVICE, accountId, contents)
 }
 
 export async function deleteManagedClaudeKeychainCredentials(accountId: string): Promise<void> {
-  await deleteKeychainPassword(ORCA_CLAUDE_SERVICE, accountId)
+  await deleteKeychainPassword(PEBBLE_CLAUDE_SERVICE, accountId)
 }
 
 function getKeychainUser(): string {

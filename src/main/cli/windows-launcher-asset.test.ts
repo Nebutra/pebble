@@ -3,8 +3,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('packaged Windows CLI launcher asset', () => {
-  it('walks from resources/bin back to the app root before locating Orca.exe', () => {
-    const launcherPath = join(process.cwd(), 'resources', 'win32', 'bin', 'orca.cmd')
+  it('walks from resources/bin back to the app root before locating Pebble.exe', () => {
+    const launcherPath = join(process.cwd(), 'resources', 'win32', 'bin', 'pebble.cmd')
     const launcher = readFileSync(launcherPath, 'utf8')
 
     expect(launcher).toContain('for %%I in ("%RESOURCES_DIR%\\..") do set "APP_DIR=%%~fI"')

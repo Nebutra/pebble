@@ -129,7 +129,7 @@ describe('browserManager', () => {
     expect(shellOpenExternalMock).toHaveBeenCalledWith('http://localhost:3000/')
   })
 
-  it('routes safe popup URLs into a new Orca browser tab for the owning renderer', () => {
+  it('routes safe popup URLs into a new Pebble browser tab for the owning renderer', () => {
     const rendererSendMock = vi.fn()
     const guest = {
       id: 103,
@@ -164,14 +164,14 @@ describe('browserManager', () => {
     expect(handler({ url: 'https://example.com/login' })).toEqual({ action: 'deny' })
 
     expect(shellOpenExternalMock).not.toHaveBeenCalled()
-    expect(rendererSendMock).toHaveBeenCalledWith('browser:open-link-in-orca-tab', {
+    expect(rendererSendMock).toHaveBeenCalledWith('browser:open-link-in-pebble-tab', {
       browserPageId: 'browser-1',
       url: 'https://example.com/login'
     })
     expect(rendererSendMock).toHaveBeenCalledWith('browser:popup', {
       browserPageId: 'browser-1',
       origin: 'https://example.com',
-      action: 'opened-in-orca'
+      action: 'opened-in-pebble'
     })
   })
 
@@ -328,7 +328,7 @@ describe('browserManager', () => {
 
     const restore = await browserManager.acquireAutomationVisibility(guest.id)
     const acquireScript = rendererExecuteJavaScriptMock.mock.calls[0]?.[0]
-    expect(acquireScript).toContain('__orcaBrowserAutomationVisibility')
+    expect(acquireScript).toContain('__pebbleBrowserAutomationVisibility')
     expect(acquireScript).toContain('bridge.acquire("page-automation")')
     expect(acquireScript).not.toContain('setActiveBrowserTab')
     expect(acquireScript).not.toContain('setActiveTabType')
@@ -623,7 +623,7 @@ describe('browserManager', () => {
     expect(restoreScript).toContain('state.setActiveTabType("terminal");')
   })
 
-  it('does not focus the Orca window while preparing a screenshot', async () => {
+  it('does not focus the Pebble window while preparing a screenshot', async () => {
     const rendererExecuteJavaScriptMock = vi.fn().mockResolvedValueOnce({
       prevTabType: 'terminal',
       prevActiveWorktreeId: 'wt-1',
@@ -673,7 +673,7 @@ describe('browserManager', () => {
     expect(browserWindowFromWebContentsMock).not.toHaveBeenCalled()
   })
 
-  it('offers opening a link in another Orca browser tab from the guest context menu', () => {
+  it('offers opening a link in another Pebble browser tab from the guest context menu', () => {
     const rendererSendMock = vi.fn()
     const guest = {
       id: 104,
@@ -1996,7 +1996,7 @@ describe('browserManager', () => {
         getType: vi.fn(() => 'webview'),
         getUserAgent: vi.fn(
           () =>
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) orca/1.0.0 Chrome/134.0.0.0 Electron/30.0.0 Safari/537.36'
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) pebble/1.0.0 Chrome/134.0.0.0 Electron/30.0.0 Safari/537.36'
         ),
         setBackgroundThrottling: guestSetBackgroundThrottlingMock,
         setWindowOpenHandler: guestSetWindowOpenHandlerMock,
@@ -2165,7 +2165,7 @@ describe('browserManager', () => {
         expect.any(Number),
         [
           expect.objectContaining({
-            code: expect.stringContaining('__orcaBrowserAnnotationViewportBridge')
+            code: expect.stringContaining('__pebbleBrowserAnnotationViewportBridge')
           })
         ],
         false

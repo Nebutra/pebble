@@ -25,8 +25,8 @@ import {
 // Why: Gemini CLI fires `BeforeAgent` when a turn starts and `AfterAgent` when
 // it completes. `AfterTool` marks the resumption of model work after a tool
 // call, which maps back to `working`. Gemini has no permission-prompt hook
-// (approvals flow through inline UI), so Orca cannot surface a waiting state
-// for Gemini — that is an upstream limitation, not an Orca bug.
+// (approvals flow through inline UI), so Pebble cannot surface a waiting state
+// for Gemini — that is an upstream limitation, not a Pebble bug.
 //
 // Gemini's native pre-tool event is BeforeTool, not Claude/Codex's PreToolUse.
 // Keep installing the pre-tool status hook, but sweep stale PreToolUse entries
@@ -61,13 +61,13 @@ function getManagedScript(target: 'local' | 'posix' = 'local'): string {
       // output, even if the env-var guards below cause an early exit.
       'echo {}',
       // Why: see claude/hook-service.ts for rationale. The endpoint file holds
-      // the live port/token for this Orca install; sourcing it here lets a
+      // the live port/token for this Pebble install; sourcing it here lets a
       // surviving PTY reach the current server even though its env points at
-      // the prior Orca's coordinates.
-      'if defined ORCA_AGENT_HOOK_ENDPOINT if exist "%ORCA_AGENT_HOOK_ENDPOINT%" call "%ORCA_AGENT_HOOK_ENDPOINT%" 2>nul',
-      'if "%ORCA_AGENT_HOOK_PORT%"=="" exit /b 0',
-      'if "%ORCA_AGENT_HOOK_TOKEN%"=="" exit /b 0',
-      'if "%ORCA_PANE_KEY%"=="" exit /b 0',
+      // the prior Pebble's coordinates.
+      'if defined PEBBLE_AGENT_HOOK_ENDPOINT if exist "%PEBBLE_AGENT_HOOK_ENDPOINT%" call "%PEBBLE_AGENT_HOOK_ENDPOINT%" 2>nul',
+      'if "%PEBBLE_AGENT_HOOK_PORT%"=="" exit /b 0',
+      'if "%PEBBLE_AGENT_HOOK_TOKEN%"=="" exit /b 0',
+      'if "%PEBBLE_PANE_KEY%"=="" exit /b 0',
       buildWindowsAgentHookPostCommand('gemini'),
       'exit /b 0',
       ''
@@ -81,12 +81,12 @@ function getManagedScript(target: 'local' | 'posix' = 'local'): string {
     // even if the env-var guards below cause an early exit.
     'printf "{}\\n"',
     // Why: see claude/hook-service.ts for rationale. Sourcing refreshes
-    // PORT/TOKEN/ENV/VERSION from the current Orca so a surviving PTY keeps
+    // PORT/TOKEN/ENV/VERSION from the current Pebble so a surviving PTY keeps
     // reporting after a restart.
-    'if [ -n "$ORCA_AGENT_HOOK_ENDPOINT" ] && [ -r "$ORCA_AGENT_HOOK_ENDPOINT" ]; then',
-    '  . "$ORCA_AGENT_HOOK_ENDPOINT" 2>/dev/null || :',
+    'if [ -n "$PEBBLE_AGENT_HOOK_ENDPOINT" ] && [ -r "$PEBBLE_AGENT_HOOK_ENDPOINT" ]; then',
+    '  . "$PEBBLE_AGENT_HOOK_ENDPOINT" 2>/dev/null || :',
     'fi',
-    'if [ -z "$ORCA_AGENT_HOOK_PORT" ] || [ -z "$ORCA_AGENT_HOOK_TOKEN" ] || [ -z "$ORCA_PANE_KEY" ]; then',
+    'if [ -z "$PEBBLE_AGENT_HOOK_PORT" ] || [ -z "$PEBBLE_AGENT_HOOK_TOKEN" ] || [ -z "$PEBBLE_PANE_KEY" ]; then',
     '  exit 0',
     'fi',
     'payload=$(cat)',
@@ -100,16 +100,16 @@ function getManagedScript(target: 'local' | 'posix' = 'local'): string {
     // Why: pipe payload to curl's stdin (`payload@-`) instead of an inline
     // `payload=$VALUE` arg, so tens-of-KB tool output stays off the curl
     // command line (EDR command-line false positives). Wire body is identical.
-    'printf \'%s\' "$payload" | curl -sS -X POST "http://127.0.0.1:${ORCA_AGENT_HOOK_PORT}/hook/gemini" \\',
+    'printf \'%s\' "$payload" | curl -sS -X POST "http://127.0.0.1:${PEBBLE_AGENT_HOOK_PORT}/hook/gemini" \\',
     '  --connect-timeout 0.5 --max-time 1.5 \\',
     '  -H "Content-Type: application/x-www-form-urlencoded" \\',
-    '  -H "X-Orca-Agent-Hook-Token: ${ORCA_AGENT_HOOK_TOKEN}" \\',
-    '  --data-urlencode "paneKey=${ORCA_PANE_KEY}" \\',
-    '  --data-urlencode "tabId=${ORCA_TAB_ID}" \\',
-    '  --data-urlencode "launchToken=${ORCA_AGENT_LAUNCH_TOKEN}" \\',
-    '  --data-urlencode "worktreeId=${ORCA_WORKTREE_ID}" \\',
-    '  --data-urlencode "env=${ORCA_AGENT_HOOK_ENV}" \\',
-    '  --data-urlencode "version=${ORCA_AGENT_HOOK_VERSION}" \\',
+    '  -H "X-Pebble-Agent-Hook-Token: ${PEBBLE_AGENT_HOOK_TOKEN}" \\',
+    '  --data-urlencode "paneKey=${PEBBLE_PANE_KEY}" \\',
+    '  --data-urlencode "tabId=${PEBBLE_TAB_ID}" \\',
+    '  --data-urlencode "launchToken=${PEBBLE_AGENT_LAUNCH_TOKEN}" \\',
+    '  --data-urlencode "worktreeId=${PEBBLE_WORKTREE_ID}" \\',
+    '  --data-urlencode "env=${PEBBLE_AGENT_HOOK_ENV}" \\',
+    '  --data-urlencode "version=${PEBBLE_AGENT_HOOK_VERSION}" \\',
     '  --data-urlencode "payload@-" >/dev/null 2>&1 || true',
     'exit 0',
     ''
@@ -186,7 +186,7 @@ export class GeminiHookService {
 
     const managedEvents = new Set<string>(GEMINI_EVENTS)
 
-    // Why: when Orca stops subscribing to an event, install() must sweep the
+    // Why: when Pebble stops subscribing to an event, install() must sweep the
     // old managed entry out of any leftover event bucket. Otherwise a stale
     // hook such as PreToolUse survives forever in ~/.gemini/settings.json and
     // continues firing even though the current build no longer wants it.
@@ -221,14 +221,14 @@ export class GeminiHookService {
     return this.getStatus()
   }
 
-  // Why: install Orca's managed Gemini hooks on the remote box. Mirrors
+  // Why: install Pebble's managed Gemini hooks on the remote box. Mirrors
   // ClaudeHookService.installRemote — POSIX-only, uses the same SFTP-backed
   // primitives, and lays down the same script body the local install
   // generates so a remote-side Gemini CLI behaves identically. See
   // docs/design/agent-status-over-ssh.md §8.
   async installRemote(sftp: SFTPWrapper, remoteHome: string): Promise<AgentHookInstallStatus> {
     const remoteConfigPath = `${remoteHome.replace(/\/$/, '')}/.gemini/settings.json`
-    const remoteScriptPath = `${remoteHome.replace(/\/$/, '')}/.orca/agent-hooks/gemini-hook.sh`
+    const remoteScriptPath = `${remoteHome.replace(/\/$/, '')}/.pebble/agent-hooks/gemini-hook.sh`
     try {
       const config = await readHooksJsonRemote(sftp, remoteConfigPath)
       if (!config) {
@@ -276,7 +276,7 @@ export class GeminiHookService {
 
       // Why: write the script first so an interrupted install never leaves
       // settings.json pointing at a missing script. See ClaudeHookService.
-      // Why: SSH remotes use POSIX `.sh` hook paths even when Orca itself is
+      // Why: SSH remotes use POSIX `.sh` hook paths even when Pebble itself is
       // running on Windows; never derive remote script syntax from local OS.
       await writeManagedScriptRemote(sftp, remoteScriptPath, getManagedScript('posix'))
       await writeHooksJsonRemote(sftp, remoteConfigPath, config)

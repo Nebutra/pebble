@@ -61,13 +61,13 @@ vi.mock('../providers/agent-foreground-process', () => ({
 
 import { createPtySubprocess, checkPtySpawnHealth } from './pty-subprocess'
 
-const ORCA_SHELL_WRAPPER_ENV = [
-  'ORCA_ATTRIBUTION_SHIM_DIR',
-  'ORCA_OPENCODE_CONFIG_DIR',
-  'ORCA_MIMOCODE_HOME',
-  'ORCA_PI_CODING_AGENT_DIR',
-  'ORCA_OMP_CODING_AGENT_DIR',
-  'ORCA_CODEX_HOME'
+const PEBBLE_SHELL_WRAPPER_ENV = [
+  'PEBBLE_ATTRIBUTION_SHIM_DIR',
+  'PEBBLE_OPENCODE_CONFIG_DIR',
+  'PEBBLE_MIMOCODE_HOME',
+  'PEBBLE_PI_CODING_AGENT_DIR',
+  'PEBBLE_OMP_CODING_AGENT_DIR',
+  'PEBBLE_CODEX_HOME'
 ] as const
 const POWERSHELL_OSC133_COMMAND_ARGS = ['-NoLogo', '-NoExit', '-EncodedCommand', expect.any(String)]
 const ZSH_SHELL_READY_DIR = /shell-ready[\\/]zsh/
@@ -98,7 +98,7 @@ function mockPtyProcess(pid = 12345) {
 }
 
 describe('createPtySubprocess', () => {
-  const savedWrapperEnv: Partial<Record<(typeof ORCA_SHELL_WRAPPER_ENV)[number], string>> = {}
+  const savedWrapperEnv: Partial<Record<(typeof PEBBLE_SHELL_WRAPPER_ENV)[number], string>> = {}
   let previousUserDataPath: string | undefined
   let previousPowerlevelWizardDisable: string | undefined
   let userDataPath: string
@@ -112,12 +112,12 @@ describe('createPtySubprocess', () => {
     )
     validateWorkingDirectoryMock.mockClear()
     isPwshAvailableMock.mockReturnValue(false)
-    previousUserDataPath = process.env.ORCA_USER_DATA_PATH
+    previousUserDataPath = process.env.PEBBLE_USER_DATA_PATH
     previousPowerlevelWizardDisable = process.env[POWERLEVEL10K_WIZARD_DISABLE_ENV]
     userDataPath = mkdtempSync(join(tmpdir(), 'daemon-pty-subprocess-test-'))
-    process.env.ORCA_USER_DATA_PATH = userDataPath
+    process.env.PEBBLE_USER_DATA_PATH = userDataPath
     delete process.env[POWERLEVEL10K_WIZARD_DISABLE_ENV]
-    for (const key of ORCA_SHELL_WRAPPER_ENV) {
+    for (const key of PEBBLE_SHELL_WRAPPER_ENV) {
       savedWrapperEnv[key] = process.env[key]
       delete process.env[key]
     }
@@ -125,9 +125,9 @@ describe('createPtySubprocess', () => {
 
   afterEach(() => {
     if (previousUserDataPath === undefined) {
-      delete process.env.ORCA_USER_DATA_PATH
+      delete process.env.PEBBLE_USER_DATA_PATH
     } else {
-      process.env.ORCA_USER_DATA_PATH = previousUserDataPath
+      process.env.PEBBLE_USER_DATA_PATH = previousUserDataPath
     }
     if (previousPowerlevelWizardDisable === undefined) {
       delete process.env[POWERLEVEL10K_WIZARD_DISABLE_ENV]
@@ -135,7 +135,7 @@ describe('createPtySubprocess', () => {
       process.env[POWERLEVEL10K_WIZARD_DISABLE_ENV] = previousPowerlevelWizardDisable
     }
     rmSync(userDataPath, { recursive: true, force: true })
-    for (const key of ORCA_SHELL_WRAPPER_ENV) {
+    for (const key of PEBBLE_SHELL_WRAPPER_ENV) {
       if (savedWrapperEnv[key] === undefined) {
         delete process.env[key]
       } else {
@@ -231,7 +231,7 @@ describe('createPtySubprocess', () => {
     spawnMock.mockReturnValue(proc)
     const platform = Object.getOwnPropertyDescriptor(process, 'platform')
     const originalCwd = process.cwd()
-    const deletedDaemonCwd = mkdtempSync(join(tmpdir(), 'orca-deleted-daemon-cwd-'))
+    const deletedDaemonCwd = mkdtempSync(join(tmpdir(), 'pebble-deleted-daemon-cwd-'))
     Object.defineProperty(process, 'platform', { value: 'darwin' })
 
     try {
@@ -274,7 +274,7 @@ describe('createPtySubprocess', () => {
     spawnMock.mockReturnValue(proc)
     const platform = Object.getOwnPropertyDescriptor(process, 'platform')
     const originalCwd = process.cwd()
-    const deletedDaemonCwd = mkdtempSync(join(tmpdir(), 'orca-deleted-daemon-cwd-'))
+    const deletedDaemonCwd = mkdtempSync(join(tmpdir(), 'pebble-deleted-daemon-cwd-'))
     Object.defineProperty(process, 'platform', { value: 'linux' })
 
     try {
@@ -527,7 +527,7 @@ describe('createPtySubprocess', () => {
         sessionId: 'test',
         cols: 80,
         rows: 24,
-        cwd: 'C:\\repo\\orca',
+        cwd: 'C:\\repo\\pebble',
         command: 'codex'
       })
 
@@ -571,10 +571,10 @@ describe('createPtySubprocess', () => {
 
     try {
       const handle = createPtySubprocess({
-        sessionId: 'repo::C:\\repo\\orca@@deadbeef',
+        sessionId: 'repo::C:\\repo\\pebble@@deadbeef',
         cols: 80,
         rows: 24,
-        cwd: 'C:\\repo\\orca',
+        cwd: 'C:\\repo\\pebble',
         command: 'codex'
       })
 
@@ -583,7 +583,7 @@ describe('createPtySubprocess', () => {
         proc.pid,
         'powershell.exe',
         expect.objectContaining({
-          contextPaths: expect.arrayContaining(['C:\\repo\\orca'])
+          contextPaths: expect.arrayContaining(['C:\\repo\\pebble'])
         })
       )
 
@@ -676,17 +676,17 @@ describe('createPtySubprocess', () => {
     }
   })
 
-  it('does not inherit parent Orca pane identity when caller omits pane env', () => {
+  it('does not inherit parent Pebble pane identity when caller omits pane env', () => {
     const proc = mockPtyProcess()
     spawnMock.mockReturnValue(proc)
     const saved = {
-      ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
-      ORCA_TAB_ID: process.env.ORCA_TAB_ID,
-      ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID
+      PEBBLE_PANE_KEY: process.env.PEBBLE_PANE_KEY,
+      PEBBLE_TAB_ID: process.env.PEBBLE_TAB_ID,
+      PEBBLE_WORKTREE_ID: process.env.PEBBLE_WORKTREE_ID
     }
-    process.env.ORCA_PANE_KEY = 'parent-tab:parent-leaf'
-    process.env.ORCA_TAB_ID = 'parent-tab'
-    process.env.ORCA_WORKTREE_ID = 'parent-worktree'
+    process.env.PEBBLE_PANE_KEY = 'parent-tab:parent-leaf'
+    process.env.PEBBLE_TAB_ID = 'parent-tab'
+    process.env.PEBBLE_WORKTREE_ID = 'parent-worktree'
 
     try {
       createPtySubprocess({ sessionId: 'test', cols: 80, rows: 24 })
@@ -701,22 +701,22 @@ describe('createPtySubprocess', () => {
     }
 
     const env = spawnMock.mock.calls.at(-1)?.[2].env
-    expect(env.ORCA_PANE_KEY).toBeUndefined()
-    expect(env.ORCA_TAB_ID).toBeUndefined()
-    expect(env.ORCA_WORKTREE_ID).toBeUndefined()
+    expect(env.PEBBLE_PANE_KEY).toBeUndefined()
+    expect(env.PEBBLE_TAB_ID).toBeUndefined()
+    expect(env.PEBBLE_WORKTREE_ID).toBeUndefined()
   })
 
-  it('preserves explicit child Orca pane identity over parent env', () => {
+  it('preserves explicit child Pebble pane identity over parent env', () => {
     const proc = mockPtyProcess()
     spawnMock.mockReturnValue(proc)
     const saved = {
-      ORCA_PANE_KEY: process.env.ORCA_PANE_KEY,
-      ORCA_TAB_ID: process.env.ORCA_TAB_ID,
-      ORCA_WORKTREE_ID: process.env.ORCA_WORKTREE_ID
+      PEBBLE_PANE_KEY: process.env.PEBBLE_PANE_KEY,
+      PEBBLE_TAB_ID: process.env.PEBBLE_TAB_ID,
+      PEBBLE_WORKTREE_ID: process.env.PEBBLE_WORKTREE_ID
     }
-    process.env.ORCA_PANE_KEY = 'parent-tab:parent-leaf'
-    process.env.ORCA_TAB_ID = 'parent-tab'
-    process.env.ORCA_WORKTREE_ID = 'parent-worktree'
+    process.env.PEBBLE_PANE_KEY = 'parent-tab:parent-leaf'
+    process.env.PEBBLE_TAB_ID = 'parent-tab'
+    process.env.PEBBLE_WORKTREE_ID = 'parent-worktree'
 
     try {
       createPtySubprocess({
@@ -724,9 +724,9 @@ describe('createPtySubprocess', () => {
         cols: 80,
         rows: 24,
         env: {
-          ORCA_PANE_KEY: 'child-tab:child-leaf',
-          ORCA_TAB_ID: 'child-tab',
-          ORCA_WORKTREE_ID: 'child-worktree'
+          PEBBLE_PANE_KEY: 'child-tab:child-leaf',
+          PEBBLE_TAB_ID: 'child-tab',
+          PEBBLE_WORKTREE_ID: 'child-worktree'
         }
       })
     } finally {
@@ -740,9 +740,9 @@ describe('createPtySubprocess', () => {
     }
 
     const env = spawnMock.mock.calls.at(-1)?.[2].env
-    expect(env.ORCA_PANE_KEY).toBe('child-tab:child-leaf')
-    expect(env.ORCA_TAB_ID).toBe('child-tab')
-    expect(env.ORCA_WORKTREE_ID).toBe('child-worktree')
+    expect(env.PEBBLE_PANE_KEY).toBe('child-tab:child-leaf')
+    expect(env.PEBBLE_TAB_ID).toBe('child-tab')
+    expect(env.PEBBLE_WORKTREE_ID).toBe('child-worktree')
   })
 
   it('does not inherit ELECTRON_RUN_AS_NODE from the daemon process env', () => {
@@ -781,15 +781,15 @@ describe('createPtySubprocess', () => {
       LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH
     }
     Object.defineProperty(process, 'platform', { value: 'linux' })
-    process.env.APPIMAGE = '/data/apps/orca.appimage'
-    process.env.APPDIR = '/tmp/.mount_orca123'
-    process.env.ARGV0 = '/data/apps/orca.appimage'
+    process.env.APPIMAGE = '/data/apps/pebble.appimage'
+    process.env.APPDIR = '/tmp/.mount_pebble123'
+    process.env.ARGV0 = '/data/apps/pebble.appimage'
     process.env.OWD = '/home/user/project'
-    process.env.APPIMAGE_LIBRARY_PATH = '/tmp/.mount_orca123/usr/lib'
-    process.env.PATH = ['/tmp/.mount_orca123', '/tmp/.mount_orca123/usr/sbin', '/usr/bin'].join(
+    process.env.APPIMAGE_LIBRARY_PATH = '/tmp/.mount_pebble123/usr/lib'
+    process.env.PATH = ['/tmp/.mount_pebble123', '/tmp/.mount_pebble123/usr/sbin', '/usr/bin'].join(
       delimiter
     )
-    process.env.LD_LIBRARY_PATH = ['/tmp/.mount_orca123/usr/lib', '/opt/audio/lib'].join(delimiter)
+    process.env.LD_LIBRARY_PATH = ['/tmp/.mount_pebble123/usr/lib', '/opt/audio/lib'].join(delimiter)
 
     try {
       createPtySubprocess({ sessionId: 'test', cols: 80, rows: 24 })
@@ -819,8 +819,8 @@ describe('createPtySubprocess', () => {
   it('does not inherit parent agent hook endpoint for development hook env', () => {
     const proc = mockPtyProcess()
     spawnMock.mockReturnValue(proc)
-    const previousEndpoint = process.env.ORCA_AGENT_HOOK_ENDPOINT
-    process.env.ORCA_AGENT_HOOK_ENDPOINT = '/tmp/stale-endpoint.env'
+    const previousEndpoint = process.env.PEBBLE_AGENT_HOOK_ENDPOINT
+    process.env.PEBBLE_AGENT_HOOK_ENDPOINT = '/tmp/stale-endpoint.env'
 
     try {
       createPtySubprocess({
@@ -828,32 +828,32 @@ describe('createPtySubprocess', () => {
         cols: 80,
         rows: 24,
         env: {
-          ORCA_AGENT_HOOK_ENV: 'development',
-          ORCA_AGENT_HOOK_PORT: '1234',
-          ORCA_AGENT_HOOK_TOKEN: 'token',
-          ORCA_AGENT_HOOK_VERSION: '1'
+          PEBBLE_AGENT_HOOK_ENV: 'development',
+          PEBBLE_AGENT_HOOK_PORT: '1234',
+          PEBBLE_AGENT_HOOK_TOKEN: 'token',
+          PEBBLE_AGENT_HOOK_VERSION: '1'
         }
       })
     } finally {
       if (previousEndpoint === undefined) {
-        delete process.env.ORCA_AGENT_HOOK_ENDPOINT
+        delete process.env.PEBBLE_AGENT_HOOK_ENDPOINT
       } else {
-        process.env.ORCA_AGENT_HOOK_ENDPOINT = previousEndpoint
+        process.env.PEBBLE_AGENT_HOOK_ENDPOINT = previousEndpoint
       }
     }
 
     const env = spawnMock.mock.calls.at(-1)?.[2].env
-    expect(env.ORCA_AGENT_HOOK_ENDPOINT).toBeUndefined()
-    expect(env.ORCA_AGENT_HOOK_ENV).toBe('development')
-    expect(env.ORCA_AGENT_HOOK_PORT).toBe('1234')
-    expect(env.ORCA_AGENT_HOOK_TOKEN).toBe('token')
+    expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toBeUndefined()
+    expect(env.PEBBLE_AGENT_HOOK_ENV).toBe('development')
+    expect(env.PEBBLE_AGENT_HOOK_PORT).toBe('1234')
+    expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBe('token')
   })
 
   it('preserves explicit development agent hook endpoint files', () => {
     const proc = mockPtyProcess()
     spawnMock.mockReturnValue(proc)
-    const previousEndpoint = process.env.ORCA_AGENT_HOOK_ENDPOINT
-    process.env.ORCA_AGENT_HOOK_ENDPOINT = '/tmp/stale-endpoint.env'
+    const previousEndpoint = process.env.PEBBLE_AGENT_HOOK_ENDPOINT
+    process.env.PEBBLE_AGENT_HOOK_ENDPOINT = '/tmp/stale-endpoint.env'
 
     try {
       createPtySubprocess({
@@ -861,26 +861,26 @@ describe('createPtySubprocess', () => {
         cols: 80,
         rows: 24,
         env: {
-          ORCA_AGENT_HOOK_ENV: 'development',
-          ORCA_AGENT_HOOK_PORT: '1234',
-          ORCA_AGENT_HOOK_TOKEN: 'token',
-          ORCA_AGENT_HOOK_VERSION: '1',
-          ORCA_AGENT_HOOK_ENDPOINT: '/tmp/fresh-endpoint.env'
+          PEBBLE_AGENT_HOOK_ENV: 'development',
+          PEBBLE_AGENT_HOOK_PORT: '1234',
+          PEBBLE_AGENT_HOOK_TOKEN: 'token',
+          PEBBLE_AGENT_HOOK_VERSION: '1',
+          PEBBLE_AGENT_HOOK_ENDPOINT: '/tmp/fresh-endpoint.env'
         }
       })
     } finally {
       if (previousEndpoint === undefined) {
-        delete process.env.ORCA_AGENT_HOOK_ENDPOINT
+        delete process.env.PEBBLE_AGENT_HOOK_ENDPOINT
       } else {
-        process.env.ORCA_AGENT_HOOK_ENDPOINT = previousEndpoint
+        process.env.PEBBLE_AGENT_HOOK_ENDPOINT = previousEndpoint
       }
     }
 
     const env = spawnMock.mock.calls.at(-1)?.[2].env
-    expect(env.ORCA_AGENT_HOOK_ENDPOINT).toBe('/tmp/fresh-endpoint.env')
-    expect(env.ORCA_AGENT_HOOK_ENV).toBe('development')
-    expect(env.ORCA_AGENT_HOOK_PORT).toBe('1234')
-    expect(env.ORCA_AGENT_HOOK_TOKEN).toBe('token')
+    expect(env.PEBBLE_AGENT_HOOK_ENDPOINT).toBe('/tmp/fresh-endpoint.env')
+    expect(env.PEBBLE_AGENT_HOOK_ENV).toBe('development')
+    expect(env.PEBBLE_AGENT_HOOK_PORT).toBe('1234')
+    expect(env.PEBBLE_AGENT_HOOK_TOKEN).toBe('token')
   })
 
   it('forwards write calls', () => {
@@ -1118,9 +1118,9 @@ describe('createPtySubprocess', () => {
           sessionId: 'test',
           cols: 80,
           rows: 24,
-          cwd: '/definitely-missing-orca-cwd'
+          cwd: '/definitely-missing-pebble-cwd'
         })
-      ).toThrow(/definitely-missing-orca-cwd/)
+      ).toThrow(/definitely-missing-pebble-cwd/)
     } finally {
       if (platform) {
         Object.defineProperty(process, 'platform', platform)
@@ -1159,7 +1159,7 @@ describe('createPtySubprocess', () => {
         rows: 24,
         env: {
           SHELL: '/bin/zsh',
-          ORCA_ATTRIBUTION_SHIM_DIR: '/tmp/orca-terminal-attribution/posix'
+          PEBBLE_ATTRIBUTION_SHIM_DIR: '/tmp/pebble-terminal-attribution/posix'
         }
       })
     } finally {
@@ -1171,7 +1171,7 @@ describe('createPtySubprocess', () => {
     const lastCall = spawnMock.mock.calls.at(-1)!
     expect(lastCall[1]).toEqual(['-l'])
     expect(lastCall[2].env.ZDOTDIR).toMatch(ZSH_SHELL_READY_DIR)
-    expect(lastCall[2].env.ORCA_SHELL_READY_MARKER).toBe('0')
+    expect(lastCall[2].env.PEBBLE_SHELL_READY_MARKER).toBe('0')
   })
 
   it('uses shell wrapper when OpenCode config must survive shell startup', () => {
@@ -1187,8 +1187,8 @@ describe('createPtySubprocess', () => {
         rows: 24,
         env: {
           SHELL: '/bin/zsh',
-          OPENCODE_CONFIG_DIR: '/tmp/orca-opencode-overlay',
-          ORCA_OPENCODE_CONFIG_DIR: '/tmp/orca-opencode-overlay'
+          OPENCODE_CONFIG_DIR: '/tmp/pebble-opencode-overlay',
+          PEBBLE_OPENCODE_CONFIG_DIR: '/tmp/pebble-opencode-overlay'
         }
       })
     } finally {
@@ -1200,7 +1200,7 @@ describe('createPtySubprocess', () => {
     const lastCall = spawnMock.mock.calls.at(-1)!
     expect(lastCall[1]).toEqual(['-l'])
     expect(lastCall[2].env.ZDOTDIR).toMatch(ZSH_SHELL_READY_DIR)
-    expect(lastCall[2].env.ORCA_SHELL_READY_MARKER).toBe('0')
+    expect(lastCall[2].env.PEBBLE_SHELL_READY_MARKER).toBe('0')
   })
 
   it('uses shell wrapper when MiMo home must survive shell startup', () => {
@@ -1216,8 +1216,8 @@ describe('createPtySubprocess', () => {
         rows: 24,
         env: {
           SHELL: '/bin/zsh',
-          MIMOCODE_HOME: '/tmp/orca-mimocode-overlay',
-          ORCA_MIMOCODE_HOME: '/tmp/orca-mimocode-overlay'
+          MIMOCODE_HOME: '/tmp/pebble-mimocode-overlay',
+          PEBBLE_MIMOCODE_HOME: '/tmp/pebble-mimocode-overlay'
         }
       })
     } finally {
@@ -1229,7 +1229,7 @@ describe('createPtySubprocess', () => {
     const lastCall = spawnMock.mock.calls.at(-1)!
     expect(lastCall[1]).toEqual(['-l'])
     expect(lastCall[2].env.ZDOTDIR).toMatch(ZSH_SHELL_READY_DIR)
-    expect(lastCall[2].env.ORCA_SHELL_READY_MARKER).toBe('0')
+    expect(lastCall[2].env.PEBBLE_SHELL_READY_MARKER).toBe('0')
   })
 
   it('uses shell wrapper when typed OMP commands need the status extension', () => {
@@ -1245,7 +1245,7 @@ describe('createPtySubprocess', () => {
         rows: 24,
         env: {
           SHELL: '/bin/zsh',
-          ORCA_OMP_STATUS_EXTENSION: '/tmp/.omp/agent/extensions/orca-agent-status.ts'
+          PEBBLE_OMP_STATUS_EXTENSION: '/tmp/.omp/agent/extensions/pebble-agent-status.ts'
         }
       })
     } finally {
@@ -1257,7 +1257,7 @@ describe('createPtySubprocess', () => {
     const lastCall = spawnMock.mock.calls.at(-1)!
     expect(lastCall[1]).toEqual(['-l'])
     expect(lastCall[2].env.ZDOTDIR).toMatch(ZSH_SHELL_READY_DIR)
-    expect(lastCall[2].env.ORCA_SHELL_READY_MARKER).toBe('0')
+    expect(lastCall[2].env.PEBBLE_SHELL_READY_MARKER).toBe('0')
   })
 
   it('uses shell wrapper when Codex home must survive shell startup', () => {
@@ -1273,8 +1273,8 @@ describe('createPtySubprocess', () => {
         rows: 24,
         env: {
           SHELL: '/bin/zsh',
-          CODEX_HOME: '/tmp/orca-codex-home',
-          ORCA_CODEX_HOME: '/tmp/orca-codex-home'
+          CODEX_HOME: '/tmp/pebble-codex-home',
+          PEBBLE_CODEX_HOME: '/tmp/pebble-codex-home'
         }
       })
     } finally {
@@ -1286,7 +1286,7 @@ describe('createPtySubprocess', () => {
     const lastCall = spawnMock.mock.calls.at(-1)!
     expect(lastCall[1]).toEqual(['-l'])
     expect(lastCall[2].env.ZDOTDIR).toMatch(ZSH_SHELL_READY_DIR)
-    expect(lastCall[2].env.ORCA_SHELL_READY_MARKER).toBe('0')
+    expect(lastCall[2].env.PEBBLE_SHELL_READY_MARKER).toBe('0')
   })
 
   it('uses shell wrapper when Agent Teams shim path must survive shell startup', () => {
@@ -1302,9 +1302,9 @@ describe('createPtySubprocess', () => {
         rows: 24,
         env: {
           SHELL: '/bin/zsh',
-          PATH: '/tmp/orca-agent-teams-bin:/usr/bin',
-          ORCA_AGENT_TEAMS_TEAM_ID: 'team-test',
-          ORCA_AGENT_TEAMS_SHIM_DIR: '/tmp/orca-agent-teams-bin'
+          PATH: '/tmp/pebble-agent-teams-bin:/usr/bin',
+          PEBBLE_AGENT_TEAMS_TEAM_ID: 'team-test',
+          PEBBLE_AGENT_TEAMS_SHIM_DIR: '/tmp/pebble-agent-teams-bin'
         }
       })
     } finally {
@@ -1316,7 +1316,7 @@ describe('createPtySubprocess', () => {
     const lastCall = spawnMock.mock.calls.at(-1)!
     expect(lastCall[1]).toEqual(['-l'])
     expect(lastCall[2].env.ZDOTDIR).toMatch(ZSH_SHELL_READY_DIR)
-    expect(lastCall[2].env.ORCA_SHELL_READY_MARKER).toBe('0')
+    expect(lastCall[2].env.PEBBLE_SHELL_READY_MARKER).toBe('0')
   })
 
   it('keeps plain Codex startup commands on the no-marker wrapper', () => {
@@ -1343,7 +1343,7 @@ describe('createPtySubprocess', () => {
     const lastCall = spawnMock.mock.calls.at(-1)!
     expect(lastCall[1]).toEqual(['-l'])
     expect(lastCall[2].env.ZDOTDIR).toMatch(ZSH_SHELL_READY_DIR)
-    expect(lastCall[2].env.ORCA_SHELL_READY_MARKER).toBe('0')
+    expect(lastCall[2].env.PEBBLE_SHELL_READY_MARKER).toBe('0')
   })
 
   it('uses shell-ready wrapper for delivery-hinted Codex startup commands', () => {
@@ -1371,7 +1371,7 @@ describe('createPtySubprocess', () => {
     const lastCall = spawnMock.mock.calls.at(-1)!
     expect(lastCall[1]).toEqual(['-l'])
     expect(lastCall[2].env.ZDOTDIR).toMatch(ZSH_SHELL_READY_DIR)
-    expect(lastCall[2].env.ORCA_SHELL_READY_MARKER).toBe('1')
+    expect(lastCall[2].env.PEBBLE_SHELL_READY_MARKER).toBe('1')
   })
 
   it('uses shell-ready wrapper for Codex native prefill flags', () => {
@@ -1398,7 +1398,7 @@ describe('createPtySubprocess', () => {
     const lastCall = spawnMock.mock.calls.at(-1)!
     expect(lastCall[1]).toEqual(['-l'])
     expect(lastCall[2].env.ZDOTDIR).toMatch(ZSH_SHELL_READY_DIR)
-    expect(lastCall[2].env.ORCA_SHELL_READY_MARKER).toBe('1')
+    expect(lastCall[2].env.PEBBLE_SHELL_READY_MARKER).toBe('1')
   })
 
   it('deletes requested env keys after merging daemon process env', () => {
@@ -1438,18 +1438,18 @@ describe('createPtySubprocess', () => {
       env: {
         SHELL: '/bin/bash',
         TERM: 'screen-256color',
-        PATH: '/tmp/orca-agent-teams-bin:/usr/bin',
-        ORCA_AGENT_TEAMS_TEAM_ID: 'team-test'
+        PATH: '/tmp/pebble-agent-teams-bin:/usr/bin',
+        PEBBLE_AGENT_TEAMS_TEAM_ID: 'team-test'
       },
-      envToDelete: ['TERM_PROGRAM', 'ORCA_ATTRIBUTION_SHIM_DIR']
+      envToDelete: ['TERM_PROGRAM', 'PEBBLE_ATTRIBUTION_SHIM_DIR']
     })
 
     const lastCall = spawnMock.mock.calls.at(-1)!
     expect(lastCall[2].name).toBe('screen-256color')
     expect(lastCall[2].env.TERM).toBe('screen-256color')
-    expect(lastCall[2].env.PATH.split(':')[0]).toBe('/tmp/orca-agent-teams-bin')
+    expect(lastCall[2].env.PATH.split(':')[0]).toBe('/tmp/pebble-agent-teams-bin')
     expect(lastCall[2].env.TERM_PROGRAM).toBeUndefined()
-    expect(lastCall[2].env.ORCA_ATTRIBUTION_SHIM_DIR).toBeUndefined()
+    expect(lastCall[2].env.PEBBLE_ATTRIBUTION_SHIM_DIR).toBeUndefined()
   })
 
   it('combines HOMEDRIVE and HOMEPATH for Windows default cwd', () => {
@@ -1463,7 +1463,7 @@ describe('createPtySubprocess', () => {
     Object.defineProperty(process, 'platform', { value: 'win32' })
     delete process.env.USERPROFILE
     process.env.HOMEDRIVE = 'D:'
-    process.env.HOMEPATH = '\\Users\\orca'
+    process.env.HOMEPATH = '\\Users\\pebble'
 
     try {
       createPtySubprocess({ sessionId: 'test', cols: 80, rows: 24 })
@@ -1491,7 +1491,7 @@ describe('createPtySubprocess', () => {
     expect(spawnMock).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Array),
-      expect.objectContaining({ cwd: 'D:\\Users\\orca' })
+      expect.objectContaining({ cwd: 'D:\\Users\\pebble' })
     )
   })
 
@@ -1655,7 +1655,7 @@ describe('createPtySubprocess', () => {
         sessionId: 'test',
         cols: 80,
         rows: 24,
-        cwd: 'C:\\repo\\orca',
+        cwd: 'C:\\repo\\pebble',
         shellOverride: 'powershell.exe',
         command: "& 'codex' '--no-alt-screen'"
       })
@@ -1685,7 +1685,7 @@ describe('createPtySubprocess', () => {
         sessionId: 'test',
         cols: 80,
         rows: 24,
-        cwd: 'C:\\repo\\orca',
+        cwd: 'C:\\repo\\pebble',
         shellOverride: 'cmd.exe',
         command: `codex ${'x'.repeat(7000)}`
       })
@@ -1744,10 +1744,10 @@ describe('createPtySubprocess', () => {
           sessionId: 'test',
           cols: 80,
           rows: 24,
-          cwd: 'C:\\definitely-missing-orca-cwd',
+          cwd: 'C:\\definitely-missing-pebble-cwd',
           shellOverride: 'powershell.exe'
         })
-      ).toThrow(/Working directory "C:\\definitely-missing-orca-cwd" does not exist/)
+      ).toThrow(/Working directory "C:\\definitely-missing-pebble-cwd" does not exist/)
     } finally {
       if (platform) {
         Object.defineProperty(process, 'platform', platform)
@@ -1799,10 +1799,10 @@ describe('createPtySubprocess', () => {
           sessionId: 'test',
           cols: 80,
           rows: 24,
-          cwd: 'C:\\definitely-missing-orca-wsl-cwd',
+          cwd: 'C:\\definitely-missing-pebble-wsl-cwd',
           shellOverride: 'wsl.exe'
         })
-      ).toThrow(/Working directory "C:\\definitely-missing-orca-wsl-cwd" does not exist/)
+      ).toThrow(/Working directory "C:\\definitely-missing-pebble-wsl-cwd" does not exist/)
     } finally {
       if (platform) {
         Object.defineProperty(process, 'platform', platform)
@@ -1951,7 +1951,7 @@ describe('createPtySubprocess', () => {
         cols: 80,
         rows: 24,
         cwd: '\\\\wsl.localhost\\Ubuntu\\home\\jin\\repo',
-        env: { CODEX_HOME: 'C:\\Users\\jin\\.codex', ORCA_CODEX_HOME: 'C:\\Users\\jin\\.codex' }
+        env: { CODEX_HOME: 'C:\\Users\\jin\\.codex', PEBBLE_CODEX_HOME: 'C:\\Users\\jin\\.codex' }
       })
     } finally {
       if (platform) {
@@ -1965,7 +1965,7 @@ describe('createPtySubprocess', () => {
       expect.objectContaining({
         env: expect.not.objectContaining({
           CODEX_HOME: expect.anything(),
-          ORCA_CODEX_HOME: expect.anything()
+          PEBBLE_CODEX_HOME: expect.anything()
         })
       })
     )
@@ -1986,9 +1986,9 @@ describe('createPtySubprocess', () => {
         cwd: 'C:\\Users\\jin\\repo',
         env: {
           CODEX_HOME:
-            '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\orca\\codex-accounts\\a\\home',
-          ORCA_CODEX_HOME:
-            '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\orca\\codex-accounts\\a\\home'
+            '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\pebble\\codex-accounts\\a\\home',
+          PEBBLE_CODEX_HOME:
+            '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\pebble\\codex-accounts\\a\\home'
         }
       })
     } finally {
@@ -2003,7 +2003,7 @@ describe('createPtySubprocess', () => {
       expect.objectContaining({
         env: expect.not.objectContaining({
           CODEX_HOME: expect.anything(),
-          ORCA_CODEX_HOME: expect.anything()
+          PEBBLE_CODEX_HOME: expect.anything()
         })
       })
     )
@@ -2026,9 +2026,9 @@ describe('createPtySubprocess', () => {
         shellOverride: 'wsl.exe',
         env: {
           CODEX_HOME:
-            '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\orca\\codex-accounts\\a\\home',
-          ORCA_CODEX_HOME:
-            '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\orca\\codex-accounts\\a\\home'
+            '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\pebble\\codex-accounts\\a\\home',
+          PEBBLE_CODEX_HOME:
+            '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\pebble\\codex-accounts\\a\\home'
         }
       })
     } finally {
@@ -2049,8 +2049,8 @@ describe('createPtySubprocess', () => {
       ['-d', 'Ubuntu', '--', 'sh', '-c', expect.stringContaining(`cd '${expectedLinuxCwd}'`)],
       expect.objectContaining({
         env: expect.objectContaining({
-          CODEX_HOME: '/home/jin/.local/share/orca/codex-accounts/a/home',
-          ORCA_CODEX_HOME: '/home/jin/.local/share/orca/codex-accounts/a/home',
+          CODEX_HOME: '/home/jin/.local/share/pebble/codex-accounts/a/home',
+          PEBBLE_CODEX_HOME: '/home/jin/.local/share/pebble/codex-accounts/a/home',
           WSLENV: expect.stringContaining('CODEX_HOME')
         })
       })
@@ -2087,16 +2087,16 @@ describe('createPtySubprocess', () => {
     )
   })
 
-  it('marks Orca terminal handles for WSL env import in daemon WSL terminals', () => {
+  it('marks Pebble terminal handles for WSL env import in daemon WSL terminals', () => {
     const proc = mockPtyProcess()
     spawnMock.mockReturnValue(proc)
     const platform = Object.getOwnPropertyDescriptor(process, 'platform')
     const savedCodexHome = process.env.CODEX_HOME
-    const savedOrcaCodexHome = process.env.ORCA_CODEX_HOME
+    const savedPebbleCodexHome = process.env.PEBBLE_CODEX_HOME
 
     Object.defineProperty(process, 'platform', { value: 'win32' })
     delete process.env.CODEX_HOME
-    delete process.env.ORCA_CODEX_HOME
+    delete process.env.PEBBLE_CODEX_HOME
 
     try {
       createPtySubprocess({
@@ -2105,7 +2105,7 @@ describe('createPtySubprocess', () => {
         rows: 24,
         cwd: '\\\\wsl.localhost\\Ubuntu\\home\\jin\\repo',
         env: {
-          ORCA_TERMINAL_HANDLE: 'term_wsl',
+          PEBBLE_TERMINAL_HANDLE: 'term_wsl',
           WSLENV: 'FOO/u'
         }
       })
@@ -2118,21 +2118,21 @@ describe('createPtySubprocess', () => {
       } else {
         process.env.CODEX_HOME = savedCodexHome
       }
-      if (savedOrcaCodexHome === undefined) {
-        delete process.env.ORCA_CODEX_HOME
+      if (savedPebbleCodexHome === undefined) {
+        delete process.env.PEBBLE_CODEX_HOME
       } else {
-        process.env.ORCA_CODEX_HOME = savedOrcaCodexHome
+        process.env.PEBBLE_CODEX_HOME = savedPebbleCodexHome
       }
     }
 
     const spawnCall = spawnMock.mock.calls.at(-1)!
     expect(spawnCall[0]).toBe('wsl.exe')
     expect(spawnCall[1]).toEqual(expect.any(Array))
-    expect(spawnCall[2].env.ORCA_TERMINAL_HANDLE).toBe('term_wsl')
+    expect(spawnCall[2].env.PEBBLE_TERMINAL_HANDLE).toBe('term_wsl')
     // Why: the daemon inherits optional agent-hook env in development. This
     // test owns only the terminal handle and Powerlevel10k WSLENV contract.
     expect(spawnCall[2].env.WSLENV?.split(':')).toEqual(
-      expect.arrayContaining(['FOO/u', 'ORCA_TERMINAL_HANDLE/u', POWERLEVEL10K_WIZARD_DISABLE_ENV])
+      expect.arrayContaining(['FOO/u', 'PEBBLE_TERMINAL_HANDLE/u', POWERLEVEL10K_WIZARD_DISABLE_ENV])
     )
   })
 
@@ -2380,16 +2380,16 @@ describe('checkPtySpawnHealth (retry on transient failure)', () => {
 
   beforeEach(() => {
     spawnMock.mockReset()
-    previousUserDataPath = process.env.ORCA_USER_DATA_PATH
+    previousUserDataPath = process.env.PEBBLE_USER_DATA_PATH
     userDataPath = mkdtempSync(join(tmpdir(), 'daemon-pty-health-test-'))
-    process.env.ORCA_USER_DATA_PATH = userDataPath
+    process.env.PEBBLE_USER_DATA_PATH = userDataPath
   })
 
   afterEach(() => {
     if (previousUserDataPath === undefined) {
-      delete process.env.ORCA_USER_DATA_PATH
+      delete process.env.PEBBLE_USER_DATA_PATH
     } else {
-      process.env.ORCA_USER_DATA_PATH = previousUserDataPath
+      process.env.PEBBLE_USER_DATA_PATH = previousUserDataPath
     }
     rmSync(userDataPath, { recursive: true, force: true })
   })

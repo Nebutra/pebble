@@ -24,18 +24,19 @@ type RedirectOptions = {
 
 // Why: set on the re-spawned node-mode child so a failure to honor
 // ELECTRON_RUN_AS_NODE can't make us redirect forever in a tight loop.
-const REDIRECT_ATTEMPT_ENV = 'ORCA_PACKAGED_CLI_ENTRY_REDIRECTED'
+const REDIRECT_ATTEMPT_ENV = 'PEBBLE_PACKAGED_CLI_ENTRY_REDIRECTED'
+const LEGACY_REDIRECT_ATTEMPT_ENV = 'PEBBLE_PACKAGED_CLI_ENTRY_REDIRECTED'
 
 /**
- * Why: on Windows the bundled `orca.cmd` runs `Orca.exe <unpacked CLI entry>`
+ * Why: on Windows the bundled `pebble.cmd` runs `Pebble.exe <unpacked CLI entry>`
  * with ELECTRON_RUN_AS_NODE=1. When that env var is dropped (e.g. a wrapper or
- * shell that resets it), Orca boots as a GUI, loses the single-instance lock to
+ * shell that resets it), Pebble boots as a GUI, loses the single-instance lock to
  * an already-running window, and exits silently with no stdout. This detects the
  * CLI-shaped launch — argv carrying the known in-package CLI entry path — and
  * re-runs it in Electron node mode BEFORE the lock gate, then exits with the
  * CLI's status.
  *
- * Security: the spawned program is always `execPath` (Orca.exe) and the script
+ * Security: the spawned program is always `execPath` (Pebble.exe) and the script
  * is always `cliEntryPath`, derived solely from `resourcesPath` + a fixed
  * relative path — never taken from argv. argv only contributes the trailing
  * CLI arguments forwarded to the already-trusted in-package CLI, and the
@@ -57,12 +58,12 @@ export function maybeRedirectPackagedCliEntryLaunch(options: RedirectOptions = {
   if (!isPackaged || !cliArgs) {
     return { redirected: false }
   }
-  if (env[REDIRECT_ATTEMPT_ENV] === '1') {
-    process.stderr.write('Unable to start the Orca CLI through Electron node mode.\n')
+  if (env[REDIRECT_ATTEMPT_ENV] === '1' || env[LEGACY_REDIRECT_ATTEMPT_ENV] === '1') {
+    process.stderr.write('Unable to start the Pebble CLI through Electron node mode.\n')
     return { redirected: true, status: 1 }
   }
   if (!exists(cliEntryPath)) {
-    process.stderr.write(`Unable to locate the Orca CLI entrypoint at ${cliEntryPath}\n`)
+    process.stderr.write(`Unable to locate the Pebble CLI entrypoint at ${cliEntryPath}\n`)
     return { redirected: true, status: 1 }
   }
 
@@ -116,12 +117,15 @@ function getPathApi(platform: NodeJS.Platform): typeof win32 | typeof posix {
 
 function buildElectronRunAsNodeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const childEnv = { ...env }
-  // Why: the CLI re-reads these from the ORCA_-prefixed copies; clearing the
+  // Why: the CLI re-reads these from the prefixed copies; clearing the
   // originals keeps Electron's own node bootstrap from inheriting them.
-  childEnv.ORCA_NODE_OPTIONS = env.NODE_OPTIONS ?? ''
-  childEnv.ORCA_NODE_REPL_EXTERNAL_MODULE = env.NODE_REPL_EXTERNAL_MODULE ?? ''
+  childEnv.PEBBLE_NODE_OPTIONS = env.NODE_OPTIONS ?? ''
+  childEnv.PEBBLE_NODE_REPL_EXTERNAL_MODULE = env.NODE_REPL_EXTERNAL_MODULE ?? ''
+  childEnv.PEBBLE_NODE_OPTIONS = env.NODE_OPTIONS ?? ''
+  childEnv.PEBBLE_NODE_REPL_EXTERNAL_MODULE = env.NODE_REPL_EXTERNAL_MODULE ?? ''
   childEnv.ELECTRON_RUN_AS_NODE = '1'
   childEnv[REDIRECT_ATTEMPT_ENV] = '1'
+  childEnv[LEGACY_REDIRECT_ATTEMPT_ENV] = '1'
   delete childEnv.NODE_OPTIONS
   delete childEnv.NODE_REPL_EXTERNAL_MODULE
   return childEnv

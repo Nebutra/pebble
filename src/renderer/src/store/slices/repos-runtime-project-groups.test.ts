@@ -27,48 +27,48 @@ beforeEach(() => {
 describe('repo slice runtime project groups', () => {
   it('keeps runtime copies of a grouped canonical project in the same project group', async () => {
     const gitRemoteIdentity = {
-      canonicalKey: 'github.com/stablyai/orca',
+      canonicalKey: 'github.com/nebutra/pebble',
       remoteName: 'origin',
-      remoteUrl: 'https://github.com/stablyai/orca.git'
+      remoteUrl: 'https://github.com/nebutra/pebble.git'
     }
-    const localOrca: Repo = {
-      id: 'local-orca',
-      path: '/Users/alice/stably/orca',
-      displayName: 'orca',
+    const localPebble: Repo = {
+      id: 'local-pebble',
+      path: '/Users/alice/nebutra/pebble',
+      displayName: 'pebble',
       badgeColor: '#000',
       addedAt: 1,
       executionHostId: 'local',
       gitRemoteIdentity,
-      projectGroupId: 'group-orca'
+      projectGroupId: 'group-pebble'
     }
-    const runtimeOrca: Repo = {
-      id: 'runtime-orca',
-      path: '/vercel/sandbox/orca',
-      displayName: 'orca',
+    const runtimePebble: Repo = {
+      id: 'runtime-pebble',
+      path: '/vercel/sandbox/pebble',
+      displayName: 'pebble',
       badgeColor: '#111',
       addedAt: 2,
       gitRemoteIdentity
     }
     runtimeEnvironmentCall.mockResolvedValue({
-      id: 'rpc-runtime-orca',
+      id: 'rpc-runtime-pebble',
       ok: true,
-      result: { repos: [runtimeOrca] },
+      result: { repos: [runtimePebble] },
       _meta: { runtimeId: 'runtime-remote' }
     })
     const store = createTestStore()
     store.setState({
       settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
-      repos: [localOrca]
+      repos: [localPebble]
     })
 
     await store.getState().fetchRepos()
 
     expect(store.getState().repos).toEqual([
-      localOrca,
+      localPebble,
       {
-        ...runtimeOrca,
+        ...runtimePebble,
         executionHostId: 'runtime:env-1',
-        projectGroupId: 'group-orca'
+        projectGroupId: 'group-pebble'
       }
     ])
   })

@@ -255,11 +255,11 @@ export type Repo = {
    *  identically to `'auto'`; writers leave it undefined on creation so
    *  existing persisted records stay forward-compatible. */
   issueSourcePreference?: IssueSourcePreference
-  /** Controls Orca's fork-default-branch sync offer for repos with upstream metadata. */
+  /** Controls Pebble's fork-default-branch sync offer for repos with upstream metadata. */
   forkSyncMode?: ForkSyncMode
-  /** Canonical identity for the repo remote Orca should use for provider-level grouping. */
+  /** Canonical identity for the repo remote Pebble should use for provider-level grouping. */
   gitRemoteIdentity?: GitRemoteIdentity | null
-  /** Controls whether worktrees Orca did not create appear in the sidebar. */
+  /** Controls whether worktrees Pebble did not create appear in the sidebar. */
   externalWorktreeVisibility?: ExternalWorktreeVisibility
   /** True when the repo predates hidden-by-default external worktrees. */
   externalWorktreeVisibilityLegacy?: boolean
@@ -479,12 +479,12 @@ export type Worktree = {
   /** User-authored sidebar ordering. Higher values render earlier in Manual sort. */
   manualOrder?: number
   lastActivityAt: number
-  /** Set once when Orca creates the worktree. Absent for worktrees discovered
+  /** Set once when Pebble creates the worktree. Absent for worktrees discovered
    *  on disk or persisted before this field existed. Used by the sidebar to
    *  grant newly-created worktrees a short grace window at the top of Recent,
    *  immune to ambient PTY-bump reordering in other worktrees. */
   createdAt?: number
-  /** Agent selected when Orca originally created the worktree. Used only to
+  /** Agent selected when Pebble originally created the worktree. Used only to
    *  seed a replacement terminal if the user later reopens the worktree after
    *  closing every visible surface. */
   createdWithAgent?: TuiAgent
@@ -502,7 +502,7 @@ export type Worktree = {
   sparsePresetId?: string
   /** Intended create base for stale-base probes. Persisted metadata, not UI drift state. */
   baseRef?: string
-  /** Remote/branch Orca should publish review commits to when it created this worktree. */
+  /** Remote/branch Pebble should publish review commits to when it created this worktree. */
   pushTarget?: GitPushTarget
   /** Path-derived worktree ids this worktree had before folder renames. */
   priorWorktreeIds?: string[]
@@ -537,7 +537,7 @@ export type GitPushTarget = {
   remoteName: string
   branchName: string
   remoteUrl?: string
-  /** True when Orca added this remote while preparing a fork-PR worktree. */
+  /** True when Pebble added this remote while preparing a fork-PR worktree. */
   remoteCreated?: boolean
 }
 
@@ -588,9 +588,9 @@ export type WorktreeMeta = {
   /** User-authored sidebar ordering. Higher values render earlier in Manual sort. */
   manualOrder?: number
   lastActivityAt: number
-  /** See {@link Worktree.createdAt}. Persisted to orca-data.json. */
+  /** See {@link Worktree.createdAt}. Persisted to pebble-data.json. */
   createdAt?: number
-  /** See {@link Worktree.createdWithAgent}. Persisted to orca-data.json. */
+  /** See {@link Worktree.createdWithAgent}. Persisted to pebble-data.json. */
   createdWithAgent?: TuiAgent
   /** See {@link Worktree.pendingFirstAgentMessageRename}. */
   pendingFirstAgentMessageRename?: boolean
@@ -601,15 +601,15 @@ export type WorktreeMeta = {
   sparsePresetId?: string
   /** Intended create base for stale-base probes. Persisted metadata, not UI drift state. */
   baseRef?: string
-  /** True when Orca checked out a pre-existing local branch that delete must not prune. */
+  /** True when Pebble checked out a pre-existing local branch that delete must not prune. */
   preserveBranchOnDelete?: boolean
   /** See {@link Worktree.pushTarget}. Persisted so refreshed worktree lists keep the target. */
   pushTarget?: GitPushTarget
-  /** Explicit marker stamped when Orca creates the worktree. */
-  orcaCreatedAt?: number
-  orcaCreationSource?: 'desktop' | 'runtime' | 'cli' | 'ssh'
-  /** Workspace layout active when Orca created the worktree. */
-  orcaCreationWorkspaceLayout?: OrcaWorkspaceLayout
+  /** Explicit marker stamped when Pebble creates the worktree. */
+  pebbleCreatedAt?: number
+  pebbleCreationSource?: 'desktop' | 'runtime' | 'cli' | 'ssh'
+  /** Workspace layout active when Pebble created the worktree. */
+  pebbleCreationWorkspaceLayout?: PebbleWorkspaceLayout
   /** User-assigned workspace board status for manual sidebar organization. */
   workspaceStatus?: WorkspaceStatus
   diffComments?: DiffComment[]
@@ -623,7 +623,8 @@ export type WorktreeMeta = {
   automationProvenance?: AutomationWorkspaceProvenance
 }
 
-export type WorktreeOwnership = 'orca-managed' | 'external' | 'unknown-legacy'
+export type ManagedWorktreeOwnership = 'pebble-managed' | 'pebble-managed'
+export type WorktreeOwnership = ManagedWorktreeOwnership | 'external' | 'unknown-legacy'
 
 export type DetectedWorktreeListSource = 'git' | 'metadata-fallback' | 'session-fallback'
 
@@ -699,7 +700,7 @@ export type WorktreeLineageWarning = {
 // Why: users leave review notes on specific lines of the modified side of
 // a diff so they can be handed back to an AI agent (pasted into a terminal
 // or used to bootstrap a new agent session). Stored on WorktreeMeta so the
-// existing persistence layer writes them to orca-data.json automatically.
+// existing persistence layer writes them to pebble-data.json automatically.
 export type DiffCommentSource = 'diff' | 'markdown'
 export type DiffReviewScope = 'unstaged' | 'staged' | 'branch'
 
@@ -814,7 +815,7 @@ export type TerminalTab = {
   worktreeId: string
   title: string
   /** Stable fallback label for default-named terminals ("Terminal 1", etc.).
-   *  Why: agent CLIs overwrite the live title via OSC updates, but Orca still
+   *  Why: agent CLIs overwrite the live title via OSC updates, but Pebble still
    *  needs the original terminal label for numbering and reset behavior. */
   defaultTitle?: string
   /** Stable opt-in label derived from the first known agent prompt. */
@@ -839,7 +840,7 @@ export type TerminalTab = {
   /** Why: explorer-created terminals can start below the workspace root while
    *  still belonging to that workspace for tab/session ownership. */
   startupCwd?: string
-  /** Why: the coding-harness agent Orca launched in this tab. Lets the tab bar
+  /** Why: the coding-harness agent Pebble launched in this tab. Lets the tab bar
    *  show the provider icon immediately, before the agent emits its first hook
    *  event (a freshly-launched, idle agent reports no live status yet). Live
    *  hook status overrides this once the agent does anything. Plain terminals
@@ -911,7 +912,7 @@ export type BrowserPage = {
 export type BrowserWorkspace = {
   id: string
   worktreeId: string
-  /** Stable display label for the outer Orca tab ("Browser 1", "Browser 2", …).
+  /** Stable display label for the outer Pebble tab ("Browser 1", "Browser 2", …).
    *  Optional so sessions persisted before this field was added fall back
    *  gracefully to the URL-derived label in getBrowserTabLabel. */
   label?: string
@@ -927,7 +928,7 @@ export type BrowserWorkspace = {
   activePageId?: string | null
   pageIds?: string[]
   // Why: the active page owns real browser chrome state now, but the top-level
-  // Orca tab strip still renders one workspace entry. Mirror the active page's
+  // Pebble tab strip still renders one workspace entry. Mirror the active page's
   // title/url/loading metadata here so existing workspace-level UI can stay
   // stable while Phase 2 introduces nested browser pages.
   url: string
@@ -1499,7 +1500,7 @@ export type GitHubPRReviewCommentInput = {
 }
 
 export type GitHubWorkItemDetails = {
-  // Why: main-process doesn't know Orca's Repo.id, so this inner item omits
+  // Why: main-process doesn't know Pebble's Repo.id, so this inner item omits
   // repoId. The renderer stamps it when routing the details through the store.
   item: Omit<GitHubWorkItem, 'repoId'>
   body: string
@@ -1942,25 +1943,25 @@ export type LinearTeam = {
   url?: string
 }
 
-// ─── Hooks (orca.yaml) ──────────────────────────────────────────────
-export type OrcaHooks = {
+// ─── Hooks (pebble.yaml) ──────────────────────────────────────────────
+export type PebbleHooks = {
   scripts: {
     setup?: string // Runs after worktree is created
     archive?: string // Runs before worktree is archived
   }
   issueCommand?: string // Shared default command for linked GitHub issues
-  defaultTabs?: OrcaDefaultTabTemplate[] // Terminal tabs to create once for a new worktree
-  environmentRecipes?: OrcaVmRecipe[] // Project-scoped per-workspace environment recipes
-  environmentRecipeDiagnostics?: OrcaVmRecipeDiagnostic[] // Non-fatal validation issues from environmentRecipes
+  defaultTabs?: PebbleDefaultTabTemplate[] // Terminal tabs to create once for a new worktree
+  environmentRecipes?: PebbleVmRecipe[] // Project-scoped per-workspace environment recipes
+  environmentRecipeDiagnostics?: PebbleVmRecipeDiagnostic[] // Non-fatal validation issues from environmentRecipes
 }
 
-export type OrcaDefaultTabTemplate = {
+export type PebbleDefaultTabTemplate = {
   title?: string
   color?: string
   command?: string
 }
 
-export type OrcaVmRecipe = {
+export type PebbleVmRecipe = {
   id: string
   name: string
   create: string
@@ -1971,7 +1972,7 @@ export type OrcaVmRecipe = {
   destroyDisabled?: boolean
 }
 
-export type OrcaVmRecipeDiagnostic = {
+export type PebbleVmRecipeDiagnostic = {
   index: number
   field?: string
   message: string
@@ -2008,7 +2009,7 @@ export type WorktreeStartupLaunch = {
 }
 
 export type WorktreeDefaultTabsLaunch = {
-  tabs: OrcaDefaultTabTemplate[]
+  tabs: PebbleDefaultTabTemplate[]
   runCommands: boolean
 }
 
@@ -2319,11 +2320,11 @@ export type ClaudeManagedAccountRuntimeSelection = {
   wsl: Record<string, string | null>
 }
 
-/** All AI coding agents Orca knows how to launch. Used for the agent picker in the new-workspace
+/** All AI coding agents Pebble knows how to launch. Used for the agent picker in the new-workspace
  *  flow and for the default-agent setting. Extend this union as new agents are added. */
 export type TuiAgent =
   | 'claude' // Claude Code
-  | 'claude-agent-teams' // Claude Code Agent Teams via Orca native panes
+  | 'claude-agent-teams' // Claude Code Agent Teams via Pebble native panes
   | 'openclaude' // OpenClaude
   | 'codex' // OpenAI Codex
   | 'autohand' // Autohand Code CLI
@@ -2462,12 +2463,12 @@ export type GlobalSettings = {
    *  host-varying setting is `host override ?? client default`. */
   hostSettingOverrides?: Partial<Record<ExecutionHostId, HostSettingOverrides>>
   nestWorkspaces: boolean
-  workspaceDirHistory?: OrcaWorkspaceLayout[]
+  workspaceDirHistory?: PebbleWorkspaceLayout[]
   refreshLocalBaseRefOnWorktreeCreate: boolean
   /** Set once the user dismisses the "local main is behind" suggestion toast, so
    *  the nudge to enable refreshLocalBaseRefOnWorktreeCreate never shows again. */
   localBaseRefSuggestionDismissed: boolean
-  /** When enabled, Orca renames a workspace's auto-generated creature branch to
+  /** When enabled, Pebble renames a workspace's auto-generated creature branch to
    *  a short name derived from the first prompt once work begins. Users can
    *  still turn this off from global Git settings. */
   autoRenameBranchFromWork: boolean
@@ -2549,7 +2550,7 @@ export type GlobalSettings = {
   terminalQuickCommands?: TerminalQuickCommand[]
   windowBackgroundBlur?: boolean
   /** Why: Windows-only. When on, the close (X) button hides the window to the
-   *  system tray instead of quitting Orca; off keeps the default quit-on-close.
+   *  system tray instead of quitting Pebble; off keeps the default quit-on-close.
    *  The tray icon itself is always present on Windows regardless of this flag. */
   minimizeToTrayOnClose?: boolean
   /** Why: Windows terminals conventionally use right-click as a paste gesture.
@@ -2562,7 +2563,7 @@ export type GlobalSettings = {
    *  modern choice for an IDE context. Only consulted on Windows. */
   terminalWindowsShell: string
   /** Why: when WSL is the Windows default shell, users with multiple distros
-   *  need Orca to launch terminals and scan agents in the same chosen distro
+   *  need Pebble to launch terminals and scan agents in the same chosen distro
    *  instead of whatever WSL currently marks as its global default. */
   terminalWindowsWslDistro?: string | null
   /** Why: account/auth location is independent from the user's preferred
@@ -2595,7 +2596,7 @@ export type GlobalSettings = {
    *  conservative default while making the capability one toggle away. */
   terminalAllowOsc52Clipboard: boolean
   /** Experimental Claude Code Agent Teams integration. Native panes use a
-   *  tmux-compatible shim so teammate output stays on Orca's normal PTY path. */
+   *  tmux-compatible shim so teammate output stays on Pebble's normal PTY path. */
   claudeAgentTeamsMode?: ClaudeAgentTeamsMode
   /** Where the repo setup script runs on workspace create. Defaults to a
    *  background "Setup" tab so the user's main terminal stays immediately
@@ -2610,7 +2611,7 @@ export type GlobalSettings = {
   /** Why: corporate TLS-intercepting proxies can break Electron HTTP/2 downloads;
    *  this opt-in compatibility mode applies Chromium's process-wide HTTP/1.1 switch. */
   electronHttp1CompatibilityMode?: boolean
-  /** Why: opening arbitrary links inside Orca uses an isolated guest browser surface.
+  /** Why: opening arbitrary links inside Pebble uses an isolated guest browser surface.
    *  The setting stays opt-in so existing workflows continue to use the system browser
    *  until the user explicitly wants worktree-scoped in-app browsing. */
   openLinksInApp: boolean
@@ -2642,7 +2643,7 @@ export type GlobalSettings = {
    *  default branch. Only affects the compare/diff view, not the PR/rebase
    *  merge target. Per-user, not per-workspace. */
   sourceControlCompareAgainstUpstream: boolean
-  /** Whether to show the Orca app name in the titlebar. */
+  /** Whether to show the Pebble app name in the titlebar. */
   showTitlebarAppName: boolean
   /** Why: some users do not use the Tasks feature and prefer to keep the
    *  left sidebar free of its button entirely. Hiding the button here also
@@ -2651,13 +2652,13 @@ export type GlobalSettings = {
   /** Why: Automations can be restored from Settings or the View menu, so this
    *  only controls whether the top-level sidebar shortcut is shown. */
   showAutomationsButton?: boolean
-  /** Why: Orca Mobile remains reachable from Settings; this only controls
+  /** Why: Pebble Mobile remains reachable from Settings; this only controls
    *  whether the top-level sidebar shortcut is shown. */
   showMobileButton?: boolean
   /** Controls how Ctrl+Tab chooses the next visible tab. Optional for
    *  profiles saved before this setting existed; readers default to MRU. */
   ctrlTabOrderMode?: CtrlTabOrderMode
-  /** Why: Orca-first preserves fast workspace/app control from agent TUIs.
+  /** Why: Pebble-first preserves fast workspace/app control from agent TUIs.
    *  Terminal-first is opt-in for users who want shell/TUI bindings to win. */
   terminalShortcutPolicy?: TerminalShortcutPolicy
   /** Why: Floating Workspace is the default global surface so users can
@@ -2668,7 +2669,7 @@ export type GlobalSettings = {
    *  that inherited false. Once migrated, an explicit off choice sticks. */
   floatingTerminalDefaultedForAllUsers?: boolean
   /** Where new Floating Workspace terminal tabs start. Empty or '~' means
-   *  the user's home directory; markdown notes use Orca's app-owned
+   *  the user's home directory; markdown notes use Pebble's app-owned
    *  floating workspace under Electron userData. */
   floatingTerminalCwd: string
   /** Picker-approved Floating Workspace directories that may be reauthorized
@@ -2680,7 +2681,7 @@ export type GlobalSettings = {
    *  button for discoverability. */
   floatingTerminalTriggerLocation: FloatingTerminalTriggerLocation
   /** Legacy pre-file-backed keyboard shortcut overrides. New writes go to
-   *  ~/.orca/keybindings.json; main migrates this once when present. */
+   *  ~/.pebble/keybindings.json; main migrates this once when present. */
   keybindings?: KeybindingOverrides
   diffDefaultView: 'inline' | 'side-by-side'
   diffWordWrap: boolean
@@ -2695,13 +2696,13 @@ export type GlobalSettings = {
   promptCacheTtlMs: number
   /** Why: Codex rate-limit account routing is a durable app preference owned by
    *  the main process, not transient UI state. Persisting the selected managed
-   *  auth here lets Orca prepare shared ~/.codex before the renderer hydrates,
+   *  auth here lets Pebble prepare shared ~/.codex before the renderer hydrates,
    *  while keeping this scope explicitly separate from Codex usage analytics
    *  and external terminal sessions. */
   codexManagedAccounts: CodexManagedAccount[]
   activeCodexManagedAccountId: string | null
   activeCodexManagedAccountIdsByRuntime?: CodexManagedAccountRuntimeSelection
-  /** Why: Claude Code keeps conversations under one shared config root. Orca
+  /** Why: Claude Code keeps conversations under one shared config root. Pebble
    *  persists only per-account auth material here so switching accounts does
    *  not fork prior chat/session context the way CLAUDE_CONFIG_DIR swapping would. */
   claudeManagedAccounts: ClaudeManagedAccount[]
@@ -2723,7 +2724,7 @@ export type GlobalSettings = {
    *  hidden for existing profiles without overriding later user opt-ins. */
   claudeAgentTeamsDefaultDisabledMigrated?: boolean
   /** Why: worktree deletion is destructive (git worktree remove + rm -rf of the
-   *  working directory), so Orca shows a confirmation dialog by default. Users
+   *  working directory), so Pebble shows a confirmation dialog by default. Users
    *  who delete frequently can opt into skipping the dialog via a "Don't ask
    *  again" checkbox inside it or from the General settings pane. We keep this
    *  defaulted to false so first-time behavior stays safe. */
@@ -2793,7 +2794,7 @@ export type GlobalSettings = {
    *  path, so this gates that close behind a confirmation prompt to prevent
    *  accidental loss. Defaults on. */
   confirmClosePinnedTab: boolean
-  /** When true, Orca requests local awake assertions while hook-reported agents are working. */
+  /** When true, Pebble requests local awake assertions while hook-reported agents are working. */
   keepComputerAwakeWhileAgentsRun: boolean
   /** Why: macOS terminals must choose between letting Option compose layout
    *  characters (@ on German, € on French) or treating Option as Meta/Esc for
@@ -2843,11 +2844,10 @@ export type GlobalSettings = {
   /** Legacy persisted key from before the sidekick -> pet rename. Read only
    *  during migration; new writes use experimentalPet. */
   experimentalSidekick?: boolean
-  /** Experimental: left-sidebar Agents view with a threaded feed for agent
-   *  completions, blocking states, unread state, and worktree creation events. */
+  /** Legacy persisted key from before the Agents view graduated into the
+   *  primary sidebar. It is kept true during migration and no longer gates UI. */
   experimentalActivity: boolean
-  /** One-shot migration guard for defaulting the Agents view off for all
-   *  users. Once set, later explicit opt-ins persist normally. */
+  /** Legacy one-shot migration guard from the experimental rollout. */
   experimentalActivityDefaultedOffForAllUsers?: boolean
   /** Experimental: persistent terminal pane attention ring for terminal bell
    *  and agent-completion events. Opt-in while the signal/noise balance is
@@ -2927,7 +2927,7 @@ export type GlobalSettings = {
   voice?: VoiceSettings
 }
 
-export type OrcaWorkspaceLayout = {
+export type PebbleWorkspaceLayout = {
   path: string
   nestWorkspaces: boolean
 }
@@ -3240,7 +3240,7 @@ export type PersistedUIState = {
   lastUpdateCheckAt: number | null
   pendingUpdateNudgeId?: string | null
   dismissedUpdateNudgeId?: string | null
-  /** Whether Orca has already attempted to trigger the macOS notification
+  /** Whether Pebble has already attempted to trigger the macOS notification
    *  permission dialog via a startup notification. Prevents re-firing on
    *  every launch. */
   notificationPermissionRequested?: boolean
@@ -3269,7 +3269,7 @@ export type PersistedUIState = {
    *  available from Settings > Browser and the toolbar overflow menu. */
   browserImportHintHidden?: boolean
   /** Why: Windows-only. Set once after the window first hides to the system
-   *  tray, so the "Orca is still running" notification shows only on first use. */
+   *  tray, so the "Pebble is still running" notification shows only on first use. */
   trayMinimizeNoticeShown?: boolean
   /** User dismissed the first-run Mobile Emulator intro (Keep, Hide, or close).
    *  Reversible only by re-enabling the feature in Settings. */
@@ -3336,7 +3336,7 @@ export type PersistedUIState = {
    *  notification should fire. Starts at 35 and doubles each time the user
    *  dismisses the notification without starring. */
   starNagNextThreshold?: number
-  /** Once the user has starred Orca (from any entry point) we permanently
+  /** Once the user has starred Pebble (from any entry point) we permanently
    *  suppress the nag — no further thresholds, no notifications. */
   starNagCompleted?: boolean
   /** Timestamp until which nonterminal dismissals suppress threshold prompts.
@@ -3345,7 +3345,7 @@ export type PersistedUIState = {
   /** App version that already consumed the first successful-agent value-moment ask.
    *  Main-owned so remote/web clients cannot spoof the once-per-version cap. */
   starNagAgentValueMomentAppVersion?: string | null
-  trustedOrcaHooks?: PersistedTrustedOrcaHooks
+  trustedPebbleHooks?: PersistedTrustedPebbleHooks
   setupScriptPromptDismissedRepoIds?: string[]
   /** Whether the experimental pet overlay is currently visible. Separate
    *  from the experimentalPet settings flag so "Hide pet" from the
@@ -3438,22 +3438,22 @@ export type SpriteAnimation = {
   frames: number
 }
 
-export type PersistedTrustedOrcaHookEntry = {
+export type PersistedTrustedPebbleHookEntry = {
   contentHash: string
   approvedAt: number
 }
 
-export type PersistedTrustedOrcaHookRepo = {
+export type PersistedTrustedPebbleHookRepo = {
   all?: {
     approvedAt: number
   }
-  setup?: PersistedTrustedOrcaHookEntry
-  archive?: PersistedTrustedOrcaHookEntry
-  issueCommand?: PersistedTrustedOrcaHookEntry
-  vmRecipe?: PersistedTrustedOrcaHookEntry
+  setup?: PersistedTrustedPebbleHookEntry
+  archive?: PersistedTrustedPebbleHookEntry
+  issueCommand?: PersistedTrustedPebbleHookEntry
+  vmRecipe?: PersistedTrustedPebbleHookEntry
 }
 
-export type PersistedTrustedOrcaHooks = Record<string, PersistedTrustedOrcaHookRepo>
+export type PersistedTrustedPebbleHooks = Record<string, PersistedTrustedPebbleHookRepo>
 
 export type LegacyPaneKeyAliasEntry = {
   ptyId: string
@@ -3657,7 +3657,7 @@ export type AppMemory = UsageValues & {
   main: UsageValues
   renderer: UsageValues
   other: UsageValues
-  /** Oldest-first memory samples (bytes) for the whole Orca app, one per
+  /** Oldest-first memory samples (bytes) for the whole Pebble app, one per
    *  successful collection. Used to render the sparkline in the dashboard.
    *  Empty before the first snapshot is recorded. */
   history: number[]

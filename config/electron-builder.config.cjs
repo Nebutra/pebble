@@ -8,8 +8,11 @@ const {
   verifyPackagedMainRuntimeDeps
 } = require('./packaged-runtime-node-modules.cjs')
 
-const isMacRelease = process.env.ORCA_MAC_RELEASE === '1'
-const isLinuxArm64Release = process.env.ORCA_LINUX_ARM64_RELEASE === '1'
+const isMacRelease =
+  process.env.PEBBLE_MAC_RELEASE === '1' || process.env.PEBBLE_MAC_RELEASE === '1'
+const isLinuxArm64Release =
+  process.env.PEBBLE_LINUX_ARM64_RELEASE === '1' ||
+  process.env.PEBBLE_LINUX_ARM64_RELEASE === '1'
 const featureWallResources = {
   from: 'resources/onboarding/feature-wall',
   to: 'onboarding/feature-wall'
@@ -43,8 +46,8 @@ const winSpeechNativeResource = {
 
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
-  appId: 'com.stablyai.orca',
-  productName: 'Orca',
+  appId: 'nebutra.pebble',
+  productName: 'Pebble',
   directories: {
     buildResources: 'resources/build'
   },
@@ -141,11 +144,14 @@ module.exports = {
       chmodSync(join(resourcesDir, filename), 0o755)
     }
     if (context.electronPlatformName === 'darwin') {
-      await signMacComputerUseHelper(join(resourcesDir, 'Orca Computer Use.app'), context.packager)
+      await signMacComputerUseHelper(
+        join(resourcesDir, 'Pebble Computer Use.app'),
+        context.packager
+      )
     }
   },
   win: {
-    executableName: 'Orca',
+    executableName: 'Pebble',
     // Why: Windows installers are signed after electron-builder packaging by
     // SignPath, so the packager cannot infer the updater publisherName.
     signtoolOptions: {
@@ -155,8 +161,12 @@ module.exports = {
       ...commonExtraResources,
       winSpeechNativeResource,
       {
-        from: 'resources/win32/bin/orca.cmd',
-        to: 'bin/orca.cmd'
+        from: 'resources/win32/bin/pebble.cmd',
+        to: 'bin/pebble.cmd'
+      },
+      {
+        from: 'resources/win32/bin/pebble.cmd',
+        to: 'bin/pebble.cmd'
       },
       {
         from: 'node_modules/agent-browser/bin/agent-browser-win32-x64.exe',
@@ -170,7 +180,7 @@ module.exports = {
     ]
   },
   nsis: {
-    artifactName: 'orca-windows-setup.${ext}',
+    artifactName: 'pebble-windows-setup.${ext}',
     shortcutName: '${productName}',
     uninstallDisplayName: '${productName}',
     createDesktopShortcut: 'always'
@@ -181,19 +191,19 @@ module.exports = {
     entitlementsInherit: 'resources/build/entitlements.mac.plist',
     extendInfo: {
       NSAppleEventsUsageDescription:
-        'Orca allows terminal-launched developer tools to automate local apps when you request it.',
+        'Pebble allows terminal-launched developer tools to automate local apps when you request it.',
       NSBluetoothAlwaysUsageDescription:
-        'Orca allows terminal-launched developer tools to access Bluetooth devices when you request it.',
+        'Pebble allows terminal-launched developer tools to access Bluetooth devices when you request it.',
       NSBluetoothPeripheralUsageDescription:
-        'Orca allows terminal-launched developer tools to access Bluetooth devices when you request it.',
+        'Pebble allows terminal-launched developer tools to access Bluetooth devices when you request it.',
       NSCameraUsageDescription: "Application requests access to the device's camera.",
       NSLocationUsageDescription:
-        'Orca allows terminal-launched developer tools to access location when you request it.',
+        'Pebble allows terminal-launched developer tools to access location when you request it.',
       NSLocalNetworkUsageDescription:
-        'Orca allows terminal-launched developer tools to discover and connect to local development servers when you request it.',
+        'Pebble allows terminal-launched developer tools to discover and connect to local development servers when you request it.',
       NSMicrophoneUsageDescription: "Application requests access to the device's microphone.",
       NSAudioCaptureUsageDescription:
-        'Orca allows terminal-launched developer tools to capture desktop audio when you request it.',
+        'Pebble allows terminal-launched developer tools to capture desktop audio when you request it.',
       NSBonjourServices: ['_http._tcp', '_https._tcp'],
       NSDocumentsFolderUsageDescription:
         "Application requests access to the user's Documents folder.",
@@ -210,8 +220,12 @@ module.exports = {
       ...commonExtraResources,
       macSpeechNativeResource,
       {
-        from: 'resources/darwin/bin/orca',
-        to: 'bin/orca'
+        from: 'resources/darwin/bin/pebble',
+        to: 'bin/pebble'
+      },
+      {
+        from: 'resources/darwin/bin/pebble',
+        to: 'bin/pebble'
       },
       {
         from: 'node_modules/agent-browser/bin/agent-browser-darwin-${arch}',
@@ -224,8 +238,8 @@ module.exports = {
         to: 'serve-sim'
       },
       {
-        from: 'native/computer-use-macos/.build/release/Orca Computer Use.app',
-        to: 'Orca Computer Use.app'
+        from: 'native/computer-use-macos/.build/release/Pebble Computer Use.app',
+        to: 'Pebble Computer Use.app'
       },
       featureWallResources
     ],
@@ -244,28 +258,32 @@ module.exports = {
   // silently downgrading to ad-hoc artifacts that look shippable in CI logs.
   forceCodeSigning: isMacRelease,
   dmg: {
-    artifactName: 'orca-macos-${arch}.${ext}'
+    artifactName: 'pebble-macos-${arch}.${ext}'
   },
   linux: {
-    // Why: Ubuntu desktop ships GNOME Orca as the `orca` package and /usr/bin/orca.
-    // The Linux installer should not claim those system package/file names.
-    executableName: 'orca-ide',
+    // Why: keep the `-ide` suffix on Linux so Pebble avoids collisions with
+    // distro-provided or user-owned bare `pebble` commands.
+    executableName: 'pebble-ide',
     // Why: the icns source lets electron-builder emit standard hicolor PNG
     // sizes; a single 1024px PNG is ignored by some Linux docks/launchers.
     icon: 'resources/build/icon.icns',
     desktop: {
       entry: {
-        // Why: Electron reports WM_CLASS=orca for the visible Linux window;
-        // GNOME docks need an exact match to group it with orca-ide.desktop.
-        StartupWMClass: 'orca'
+        // Why: Electron reports WM_CLASS from the product name; GNOME docks
+        // need an exact match to group the window with pebble-ide.desktop.
+        StartupWMClass: 'pebble'
       }
     },
     extraResources: [
       ...commonExtraResources,
       linuxSpeechNativeResource,
       {
-        from: 'resources/linux/bin/orca-ide',
-        to: 'bin/orca-ide'
+        from: 'resources/linux/bin/pebble-ide',
+        to: 'bin/pebble-ide'
+      },
+      {
+        from: 'resources/linux/bin/pebble-ide',
+        to: 'bin/pebble-ide'
       },
       {
         from: 'node_modules/agent-browser/bin/agent-browser-linux-${arch}',
@@ -278,16 +296,16 @@ module.exports = {
       featureWallResources
     ],
     target: ['AppImage', 'deb'],
-    maintainer: 'stablyai',
+    maintainer: 'Nebutra',
     category: 'Utility'
   },
   appImage: {
-    artifactName: isLinuxArm64Release ? 'orca-linux-arm64.${ext}' : 'orca-linux.${ext}'
+    artifactName: isLinuxArm64Release ? 'pebble-linux-arm64.${ext}' : 'pebble-linux.${ext}'
   },
   deb: {
-    packageName: 'orca-ide',
-    artifactName: 'orca-ide_${version}_${arch}.${ext}',
-    // Why: xvfb lets the bundled `orca serve` CLI run browser panes on a headless
+    packageName: 'pebble-ide',
+    artifactName: 'pebble-ide_${version}_${arch}.${ext}',
+    // Why: xvfb lets the bundled `pebble serve` CLI run browser panes on a headless
     // Linux host — Chromium needs a display server even for offscreen rendering,
     // and serve starts Xvfb itself when present (see ensure-virtual-display.ts).
     depends: [
@@ -299,7 +317,7 @@ module.exports = {
       'xclip',
       'xvfb'
     ],
-    // Why: symlink the bundled CLI onto PATH at install time so `orca-ide serve`
+    // Why: symlink the bundled CLI onto PATH at install time so `pebble-ide serve`
     // works on a headless host. The in-app CLI registration (CliInstaller) is
     // GUI-triggered and can never run on a server, so without this the CLI is
     // unreachable from the shell on exactly the hosts that need it.
@@ -307,8 +325,8 @@ module.exports = {
     afterRemove: 'resources/linux/packaging/after-remove.sh'
   },
   rpm: {
-    packageName: 'orca-ide',
-    artifactName: 'orca-ide-${version}.${arch}.${ext}',
+    packageName: 'pebble-ide',
+    artifactName: 'pebble-ide-${version}.${arch}.${ext}',
     // Why: see deb depends. RPM distros ship Xvfb as xorg-x11-server-Xvfb (there
     // is no `xvfb` package), so the name differs from the deb here.
     depends: [
@@ -328,13 +346,13 @@ module.exports = {
   // (node-pty) for each target architecture when producing dual-arch macOS
   // builds (x64 + arm64). With npmRebuild disabled, CI on an arm64 runner
   // packages arm64 binaries into the x64 DMG, causing "posix_spawnp failed"
-  // on Intel Macs. The beforeBuild hook performs Orca's targeted rebuild and
+  // on Intel Macs. The beforeBuild hook performs Pebble's targeted rebuild and
   // returns false so electron-builder does not rebuild optional cpu-features.
   npmRebuild: true,
   publish: {
     provider: 'github',
-    owner: 'stablyai',
-    repo: 'orca',
+    owner: 'nebutra',
+    repo: 'pebble',
     releaseType: 'release'
   }
 }
@@ -343,7 +361,7 @@ function chmodUnixCliLaunchers(resourcesDir, electronPlatformName) {
   if (electronPlatformName === 'win32') {
     return
   }
-  for (const launcherName of ['orca', 'orca-ide']) {
+  for (const launcherName of ['pebble', 'pebble-ide', 'pebble', 'pebble-ide']) {
     const launcherPath = join(resourcesDir, 'bin', launcherName)
     if (!existsSync(launcherPath)) {
       continue
@@ -374,7 +392,7 @@ function chmodMacServeSimHelpers(resourcesDir, electronPlatformName) {
 async function signMacComputerUseHelper(helperAppPath, packager) {
   if (!existsSync(helperAppPath)) {
     if (isMacRelease) {
-      throw new Error(`Missing Orca Computer Use helper app at ${helperAppPath}`)
+      throw new Error(`Missing Pebble Computer Use helper app at ${helperAppPath}`)
     }
     return
   }
@@ -383,15 +401,16 @@ async function signMacComputerUseHelper(helperAppPath, packager) {
       ? await packager.codeSigningInfo.value
       : null
   const identity =
-    process.env.ORCA_COMPUTER_MACOS_SIGN_IDENTITY ??
+    process.env.PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY ??
+    process.env.PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY ??
     process.env.CSC_NAME ??
     findInstalledMacSigningIdentity(codeSigningInfo?.keychainFile) ??
     (isMacRelease ? null : '-')
   if (!identity) {
-    throw new Error('Missing signing identity for Orca Computer Use helper app')
+    throw new Error('Missing signing identity for Pebble Computer Use helper app')
   }
   // Why: TCC grants attach to this nested app's code identity. Sign it before
-  // the outer Orca.app is sealed so production builds preserve that identity.
+  // the outer Pebble.app is sealed so production builds preserve that identity.
   execFileSync('codesign', codesignArgs(identity, helperAppPath), { stdio: 'inherit' })
   execFileSync('codesign', ['--verify', '--deep', '--strict', helperAppPath], {
     stdio: 'inherit'

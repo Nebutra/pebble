@@ -528,7 +528,7 @@ describe('fetchCodexRateLimits', () => {
 
     try {
       const resultPromise = fetchCodexRateLimits({
-        codexHomePath: '\\\\wsl.localhost\\Ubuntu\\home\\alice\\.local\\share\\orca\\account\\home'
+        codexHomePath: '\\\\wsl.localhost\\Ubuntu\\home\\alice\\.local\\share\\pebble\\account\\home'
       })
       await vi.advanceTimersByTimeAsync(1)
       await vi.advanceTimersByTimeAsync(1)
@@ -537,10 +537,10 @@ describe('fetchCodexRateLimits', () => {
       const [spawnFile, spawnArgs, spawnOptions] = childSpawnMock.mock.calls[0]
       expect(spawnFile).toBe('wsl.exe')
       const bashCommand = spawnArgs.at(-1) as string
-      expect(bashCommand).toContain('mkdir -p "$orca_rate_limit_cwd"')
-      expect(bashCommand).toContain('cd "$orca_rate_limit_cwd"')
+      expect(bashCommand).toContain('mkdir -p "$pebble_rate_limit_cwd"')
+      expect(bashCommand).toContain('cd "$pebble_rate_limit_cwd"')
       expect(bashCommand).toContain(
-        "export CODEX_HOME='/home/alice/.local/share/orca/account/home'"
+        "export CODEX_HOME='/home/alice/.local/share/pebble/account/home'"
       )
       expect(bashCommand).toContain("exec codex '-s' 'read-only' '-a' 'untrusted' 'app-server'")
       expect(spawnOptions).toEqual(
@@ -581,7 +581,7 @@ describe('fetchCodexRateLimits', () => {
 
     try {
       const resultPromise = fetchCodexRateLimits({
-        codexHomePath: '\\\\wsl.localhost\\Ubuntu\\home\\alice\\.local\\share\\orca\\account\\home'
+        codexHomePath: '\\\\wsl.localhost\\Ubuntu\\home\\alice\\.local\\share\\pebble\\account\\home'
       })
       rpcChild.emit('close')
       await vi.advanceTimersByTimeAsync(0)
@@ -589,10 +589,10 @@ describe('fetchCodexRateLimits', () => {
       const [spawnFile, spawnArgs, spawnOptions] = ptySpawnMock.mock.calls[0]
       expect(spawnFile).toBe('wsl.exe')
       const bashCommand = spawnArgs.at(-1) as string
-      expect(bashCommand).toContain('mkdir -p "$orca_rate_limit_cwd"')
-      expect(bashCommand).toContain('cd "$orca_rate_limit_cwd"')
+      expect(bashCommand).toContain('mkdir -p "$pebble_rate_limit_cwd"')
+      expect(bashCommand).toContain('cd "$pebble_rate_limit_cwd"')
       expect(bashCommand).toContain(
-        "export CODEX_HOME='/home/alice/.local/share/orca/account/home'"
+        "export CODEX_HOME='/home/alice/.local/share/pebble/account/home'"
       )
       expect(bashCommand).toContain('exec codex ')
       expect(spawnOptions).toEqual(

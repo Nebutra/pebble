@@ -348,7 +348,7 @@ describe('resolveAgentForegroundProcess', () => {
             'ParentProcessId=99',
             'ProcessId=100',
             '',
-            'CommandLine=node C:\\Users\\dev\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\bin\\codex.js --cwd C:\\repo\\orca',
+            'CommandLine=node C:\\Users\\dev\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\bin\\codex.js --cwd C:\\repo\\pebble',
             'CreationDate=20260616110100.000000-000',
             'ExecutablePath=C:\\Program Files\\nodejs\\node.exe',
             'Name=node.exe',
@@ -370,7 +370,7 @@ describe('resolveAgentForegroundProcess', () => {
 
     await expect(
       resolveAgentForegroundProcess(100, 'powershell.exe', {
-        contextPaths: ['C:\\repo\\orca']
+        contextPaths: ['C:\\repo\\pebble']
       })
     ).resolves.toBe('codex')
   })
@@ -389,14 +389,14 @@ describe('resolveAgentForegroundProcess', () => {
             'ParentProcessId=99',
             'ProcessId=100',
             '',
-            'CommandLine=codex --cwd C:\\repo\\orca',
+            'CommandLine=codex --cwd C:\\repo\\pebble',
             'CreationDate=20260616110100.000000-000',
             'ExecutablePath=C:\\Users\\dev\\AppData\\Roaming\\npm\\codex.cmd',
             'Name=codex.exe',
             'ParentProcessId=100',
             'ProcessId=101',
             '',
-            'CommandLine=gemini --cwd C:\\repo\\orca',
+            'CommandLine=gemini --cwd C:\\repo\\pebble',
             'CreationDate=20260616110200.000000-000',
             'ExecutablePath=C:\\Users\\dev\\AppData\\Roaming\\npm\\gemini.cmd',
             'Name=gemini.exe',
@@ -411,7 +411,7 @@ describe('resolveAgentForegroundProcess', () => {
 
     await expect(
       resolveAgentForegroundProcess(100, 'powershell.exe', {
-        contextPaths: ['C:\\repo\\orca']
+        contextPaths: ['C:\\repo\\pebble']
       })
     ).resolves.toBe('gemini')
   })
@@ -430,14 +430,14 @@ describe('resolveAgentForegroundProcess', () => {
             'ParentProcessId=99',
             'ProcessId=100',
             '',
-            'CommandLine=codex --cwd C:\\repo\\orca',
+            'CommandLine=codex --cwd C:\\repo\\pebble',
             'CreationDate=20260616110100.000000-000',
             'ExecutablePath=C:\\Users\\dev\\AppData\\Roaming\\npm\\codex.cmd',
             'Name=codex.exe',
             'ParentProcessId=100',
             'ProcessId=101',
             '',
-            'CommandLine=gemini --cwd C:\\repo\\orca',
+            'CommandLine=gemini --cwd C:\\repo\\pebble',
             'CreationDate=20260616110200.000000-000',
             'ExecutablePath=C:\\Users\\dev\\AppData\\Roaming\\npm\\gemini.cmd',
             'Name=gemini.exe',
@@ -452,7 +452,7 @@ describe('resolveAgentForegroundProcess', () => {
 
     await expect(
       resolveAgentForegroundProcess(100, 'powershell.exe', {
-        contextPaths: ['C:\\repo\\orca']
+        contextPaths: ['C:\\repo\\pebble']
       })
     ).resolves.toBe('powershell.exe')
   })

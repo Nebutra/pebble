@@ -16,7 +16,7 @@
 }
 
 @font-face {
-  font-family: 'Orca Nerd Font Symbols';
+  font-family: 'Pebble Nerd Font Symbols';
   src: url('./fonts/SymbolsNerdFontMono-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
@@ -343,7 +343,7 @@
 
 [data-sonner-toaster] [data-sonner-toast][data-styled='true'] [data-close-button] {
   /* Why: Sonner's dark-theme defaults can resolve the close icon and button
-     background to the same color; keep the X readable on both Orca themes. */
+     background to the same color; keep the X readable on both Pebble themes. */
   color: var(--popover-foreground);
   background: var(--popover);
   border-color: rgb(0 0 0 / 0.14);
@@ -466,7 +466,7 @@
 /* Keep the sidebar gutter reserved; only the thumb fades in on hover. */
 .worktree-sidebar-scrollbar {
   /* Why: the scrollbar gutter is paint-only in Chromium; this keeps card
-     surfaces clear of Orca's resize handle and right-edge sidebar chrome. */
+     surfaces clear of Pebble's resize handle and right-edge sidebar chrome. */
   padding-right: 4px;
   scrollbar-gutter: stable;
   scrollbar-color: transparent transparent;
@@ -1916,41 +1916,41 @@
 
 /* ── Git conflict decorations ───────────────────────────────────── */
 
-.monaco-editor .orca-conflict-marker-line {
+.monaco-editor .pebble-conflict-marker-line {
   background: color-mix(in srgb, var(--destructive) 12%, transparent);
 }
 
-.monaco-editor .orca-conflict-section-line {
+.monaco-editor .pebble-conflict-section-line {
   border-left: 3px solid transparent;
 }
 
-.monaco-editor .orca-conflict-current-line {
+.monaco-editor .pebble-conflict-current-line {
   background: color-mix(in srgb, var(--git-decoration-modified) 12%, transparent);
   border-left-color: color-mix(in srgb, var(--git-decoration-modified) 72%, transparent);
 }
 
-.monaco-editor .orca-conflict-base-line {
+.monaco-editor .pebble-conflict-base-line {
   background: color-mix(in srgb, var(--muted-foreground) 7%, transparent);
   border-left-color: color-mix(in srgb, var(--muted-foreground) 36%, transparent);
 }
 
-.monaco-editor .orca-conflict-incoming-line {
+.monaco-editor .pebble-conflict-incoming-line {
   background: color-mix(in srgb, var(--git-decoration-renamed) 11%, transparent);
   border-left-color: color-mix(in srgb, var(--git-decoration-renamed) 68%, transparent);
 }
 
-.monaco-editor .orca-conflict-line-decoration {
+.monaco-editor .pebble-conflict-line-decoration {
   width: 4px !important;
   margin-left: 3px;
   background: var(--destructive);
   border-radius: 999px;
 }
 
-.monaco-editor .orca-conflict-margin {
+.monaco-editor .pebble-conflict-margin {
   background: color-mix(in srgb, var(--destructive) 8%, transparent);
 }
 
-.monaco-editor .orca-conflict-marker-label {
+.monaco-editor .pebble-conflict-marker-label {
   color: var(--destructive);
   font-family: var(--font-sans, system-ui, sans-serif);
   font-size: 11px;
@@ -2478,12 +2478,12 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
   }
 }
 
-.orca-contextual-tour-target-rings {
+.pebble-contextual-tour-target-rings {
   border-radius: 9999px;
   pointer-events: none;
 }
 
-.orca-contextual-tour-target-rings::before {
+.pebble-contextual-tour-target-rings::before {
   content: '';
   position: absolute;
   inset: -2px;
@@ -2508,7 +2508,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .orca-contextual-tour-target-rings::before {
+  .pebble-contextual-tour-target-rings::before {
     animation: none;
     opacity: 0.72;
     transform: scale(1.28);
@@ -3035,7 +3035,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
    useDiffCommentDecorator. Keep it visually subtle until hovered so it does
    not distract from the diff itself. Left position overlaps the glyph margin
    so the affordance reads as "add comment on this line". */
-.orca-diff-comment-add-btn {
+.pebble-diff-comment-add-btn {
   position: absolute;
   left: 4px;
   width: 18px;
@@ -3059,27 +3059,27 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
     box-shadow 100ms ease;
 }
 
-.orca-diff-comment-add-btn:hover {
+.pebble-diff-comment-add-btn:hover {
   color: var(--primary);
   border-color: color-mix(in srgb, var(--primary) 52%, var(--border));
   background: color-mix(in srgb, var(--primary) 12%, var(--background));
   box-shadow: 0 1px 4px color-mix(in srgb, var(--foreground) 16%, transparent);
 }
 
-.orca-diff-comment-add-btn:focus-visible {
+.pebble-diff-comment-add-btn:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 1px;
 }
 
-.orca-diff-comment-range-highlight {
+.pebble-diff-comment-range-highlight {
   background: rgba(59, 130, 246, 0.14);
 }
 
-.dark .orca-diff-comment-range-highlight {
+.dark .pebble-diff-comment-range-highlight {
   background: rgba(96, 165, 250, 0.18);
 }
 
-.orca-diff-comment-inline {
+.pebble-diff-comment-inline {
   width: 100%;
   /* Why: Monaco's view-zone node already starts after the diff gutter. Avoid
      adding a second left inset so saved notes sit flush with the code column. */
@@ -3087,7 +3087,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
   box-sizing: border-box;
 }
 
-.orca-diff-comment-inline > .orca-diff-comment-card {
+.pebble-diff-comment-inline > .pebble-diff-comment-card {
   max-width: 420px;
 }
 
@@ -3099,7 +3099,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
    to produce roughly the same absolute luminance delta above its editor
    surface — the foreground color is different (white vs black) so equal
    percentages would not give equal contrast. Override lives in `.dark`. */
-.orca-diff-comment-card {
+.pebble-diff-comment-card {
   position: relative;
   /* Why: Monaco's view-lines overlay (data-mprt=8) is positioned absolutely on
      top of view-zone DOM. Without an explicit z-index here, clicks on
@@ -3123,7 +3123,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
     background-color 150ms ease;
 }
 
-.dark .orca-diff-comment-card {
+.dark .pebble-diff-comment-card {
   border-color: color-mix(in srgb, var(--foreground) 12%, var(--border));
   background: color-mix(in srgb, var(--foreground) 2%, var(--editor-surface));
   box-shadow:
@@ -3132,7 +3132,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
 }
 
 /* Content Column */
-.orca-diff-comment-content-col {
+.pebble-diff-comment-content-col {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
@@ -3141,7 +3141,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
 }
 
 /* Header Row */
-.orca-diff-comment-header {
+.pebble-diff-comment-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3150,7 +3150,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
 }
 
 /* Meta Group (Name, line, timestamp) */
-.orca-diff-comment-meta-group {
+.pebble-diff-comment-meta-group {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -3163,7 +3163,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
 }
 
 /* Action button pill: segmented control like Notion's Resolve / ... */
-.orca-diff-comment-actions-pill {
+.pebble-diff-comment-actions-pill {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -3175,12 +3175,12 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
-.dark .orca-diff-comment-actions-pill {
+.dark .pebble-diff-comment-actions-pill {
   border-color: color-mix(in srgb, var(--foreground) 14%, var(--border));
   background: color-mix(in srgb, var(--foreground) 4%, var(--editor-surface));
 }
 
-.orca-diff-comment-pill-btn {
+.pebble-diff-comment-pill-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3198,24 +3198,24 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
     color 100ms ease;
 }
 
-.orca-diff-comment-edit {
+.pebble-diff-comment-edit {
   min-width: 28px;
   height: 24px;
   padding: 4px 7px;
   border-radius: 4px;
 }
 
-.orca-diff-comment-pill-btn:hover {
+.pebble-diff-comment-pill-btn:hover {
   background: color-mix(in srgb, var(--foreground) 6%, transparent);
   color: var(--foreground);
 }
 
-.orca-diff-comment-pill-btn-danger:hover {
+.pebble-diff-comment-pill-btn-danger:hover {
   background: color-mix(in srgb, var(--destructive) 10%, transparent);
   color: var(--destructive);
 }
 
-.orca-diff-comment-pill-divider {
+.pebble-diff-comment-pill-divider {
   width: 1px;
   height: 12px;
   background: color-mix(in srgb, var(--foreground) 12%, var(--border));
@@ -3223,7 +3223,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
 }
 
 /* Quote/Reference block: Warm, gorgeous Notion-like callout */
-.orca-diff-comment-quote {
+.pebble-diff-comment-quote {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -3235,7 +3235,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
   line-height: 1.35;
 }
 
-.orca-diff-comment-quote-text {
+.pebble-diff-comment-quote-text {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -3244,7 +3244,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
 }
 
 /* Comment Body */
-.orca-diff-comment-body {
+.pebble-diff-comment-body {
   font-size: 13.5px;
   line-height: 1.5;
   color: var(--foreground);
@@ -3254,7 +3254,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
 }
 
 /* Popover for adding new comment */
-.orca-diff-comment-popover {
+.pebble-diff-comment-popover {
   position: absolute;
   left: 56px;
   right: 24px;
@@ -3270,7 +3270,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
     0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.dark .orca-diff-comment-popover {
+.dark .pebble-diff-comment-popover {
   border-color: color-mix(in srgb, var(--foreground) 14%, var(--border));
   background: color-mix(in srgb, var(--foreground) 2%, var(--editor-surface));
   box-shadow:
@@ -3278,7 +3278,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
     0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
-.orca-diff-comment-popover-label {
+.pebble-diff-comment-popover-label {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -3287,7 +3287,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
   margin-bottom: 2px;
 }
 
-.orca-diff-comment-popover-textarea {
+.pebble-diff-comment-popover-textarea {
   width: 100%;
   min-height: 56px;
   max-height: 240px;
@@ -3307,36 +3307,36 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
     box-shadow 150ms ease;
 }
 
-.dark .orca-diff-comment-popover-textarea {
+.dark .pebble-diff-comment-popover-textarea {
   border-color: color-mix(in srgb, var(--foreground) 10%, var(--border));
   background: color-mix(in srgb, var(--foreground) 3%, var(--editor-surface));
 }
 
-.orca-diff-comment-popover-textarea:focus {
+.pebble-diff-comment-popover-textarea:focus {
   border-color: color-mix(in srgb, var(--ring) 70%, var(--border));
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 18%, transparent);
 }
 
-.dark .orca-diff-comment-popover-textarea:focus {
+.dark .pebble-diff-comment-popover-textarea:focus {
   border-color: color-mix(in srgb, var(--ring) 70%, var(--border));
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 12%, transparent);
 }
 
-.orca-diff-comment-popover-textarea::-webkit-scrollbar {
+.pebble-diff-comment-popover-textarea::-webkit-scrollbar {
   width: 12px;
 }
 
-.orca-diff-comment-popover-textarea::-webkit-scrollbar-track {
+.pebble-diff-comment-popover-textarea::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.orca-diff-comment-popover-textarea::-webkit-scrollbar-thumb {
+.pebble-diff-comment-popover-textarea::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--muted-foreground, #737373) 28%, transparent);
   border: 3px solid transparent;
   background-clip: padding-box;
 }
 
-.orca-diff-comment-popover-footer {
+.pebble-diff-comment-popover-footer {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -3345,7 +3345,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
 }
 
 /* Why: tours need a distinct item surface without highlighting the underlying target. */
-.orca-contextual-tour-panel {
+.pebble-contextual-tour-panel {
   --contextual-tour-panel-surface: color-mix(in srgb, var(--foreground) 7%, var(--popover));
   --contextual-tour-panel-border: color-mix(in srgb, var(--foreground) 14%, var(--border));
   background: var(--contextual-tour-panel-surface);
@@ -3355,7 +3355,7 @@ html.onboarding-tour-start-transition::view-transition-new(root) {
     0 10px 24px rgba(0, 0, 0, 0.18);
 }
 
-.dark .orca-contextual-tour-panel {
+.dark .pebble-contextual-tour-panel {
   --contextual-tour-panel-surface: color-mix(in srgb, var(--foreground) 10%, var(--popover));
   --contextual-tour-panel-border: color-mix(in srgb, var(--foreground) 16%, var(--border));
   box-shadow:

@@ -24,7 +24,7 @@ import { WORKTREE_CREATE_TIMEOUT_MS } from '../tasks/workspace-create-timeout'
 import {
   isSetupHookTrusted,
   normalizeSetupHookTrust,
-  trustedOrcaHooksWithSetupApproval,
+  trustedPebbleHooksWithSetupApproval,
   wasSetupHookPreviouslyApproved,
   type SetupHookTrust
 } from '../tasks/setup-hook-trust'
@@ -33,7 +33,7 @@ import {
   isMobileTuiAgentEnabled,
   MOBILE_TUI_AGENT_LAUNCH_COMMANDS
 } from '../tasks/mobile-tui-agents'
-import type { PersistedTrustedOrcaHooks, TuiAgent } from '../../../src/shared/types'
+import type { PersistedTrustedPebbleHooks, TuiAgent } from '../../../src/shared/types'
 import type { SshConnectionState } from '../../../src/shared/ssh-types'
 import {
   NEW_WORKTREE_AGENT_OPTIONS as AGENT_OPTIONS,
@@ -189,7 +189,7 @@ function NewWorktreeModalContent({
   const [note, setNote] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [setupHookDetails, setSetupHookDetails] = useState<SetupHookDetails | null>(null)
-  const [trustedOrcaHooks, setTrustedOrcaHooks] = useState<PersistedTrustedOrcaHooks>({})
+  const [trustedPebbleHooks, setTrustedPebbleHooks] = useState<PersistedTrustedPebbleHooks>({})
   const [setupTrustPrompt, setSetupTrustPrompt] = useState<SetupTrustPrompt | null>(null)
   const [setupDecisionChoice, setSetupDecisionChoice] = useState<Exclude<
     SetupDecision,
@@ -312,9 +312,9 @@ function NewWorktreeModalContent({
         }
         if (uiResponse.ok) {
           const result = (uiResponse as RpcSuccess).result as {
-            ui?: { trustedOrcaHooks?: PersistedTrustedOrcaHooks }
+            ui?: { trustedPebbleHooks?: PersistedTrustedPebbleHooks }
           }
-          setTrustedOrcaHooks(result.ui?.trustedOrcaHooks ?? {})
+          setTrustedPebbleHooks(result.ui?.trustedPebbleHooks ?? {})
         }
       } catch {
         // Non-critical; repo.list owns the visible loading state.
@@ -494,17 +494,17 @@ function NewWorktreeModalContent({
     if (!client) {
       return
     }
-    const next = trustedOrcaHooksWithSetupApproval({
-      trust: trustedOrcaHooks,
+    const next = trustedPebbleHooksWithSetupApproval({
+      trust: trustedPebbleHooks,
       repoId,
       contentHash,
       alwaysTrust
     })
-    const response = await client.sendRequest('ui.set', { trustedOrcaHooks: next })
+    const response = await client.sendRequest('ui.set', { trustedPebbleHooks: next })
     if (!response.ok) {
       throw new Error(response.error.message)
     }
-    setTrustedOrcaHooks(next)
+    setTrustedPebbleHooks(next)
   }
 
   async function handleCreate(options: CreateOptions = {}) {
@@ -591,16 +591,16 @@ function NewWorktreeModalContent({
         setupDecision === 'run' &&
         setupTrust &&
         setupTrust.contentHash !== options.approvedSetupContentHash &&
-        !isSetupHookTrusted(trustedOrcaHooks, selectedRepo.id, setupTrust.contentHash)
+        !isSetupHookTrusted(trustedPebbleHooks, selectedRepo.id, setupTrust.contentHash)
       ) {
-        // Why: desktop prompts before running repo-owned orca.yaml setup hooks.
+        // Why: desktop prompts before running repo-owned pebble.yaml setup hooks.
         // Mobile stores the same trust hash so approvals carry across surfaces.
         setSetupTrustPrompt({
           repoId: selectedRepo.id,
           repoName: selectedRepo.displayName,
           scriptContent: setupTrust.scriptContent,
           contentHash: setupTrust.contentHash,
-          previouslyApproved: wasSetupHookPreviouslyApproved(trustedOrcaHooks, selectedRepo.id)
+          previouslyApproved: wasSetupHookPreviouslyApproved(trustedPebbleHooks, selectedRepo.id)
         })
         return
       }
@@ -834,7 +834,7 @@ function NewWorktreeModalContent({
                       {setupSource && (
                         <View style={styles.sourceBadge}>
                           <Text style={styles.sourceBadgeText}>
-                            {setupSource === 'orca.yaml' ? 'ORCA.YAML' : 'HOOKS'}
+                            {setupSource === 'pebble.yaml' ? 'PEBBLE.YAML' : 'HOOKS'}
                           </Text>
                         </View>
                       )}
@@ -943,7 +943,7 @@ function NewWorktreeModalContent({
                   : `Run setup from ${setupTrustPrompt.repoName}?`}
               </Text>
               <Text style={styles.subtitle}>
-                This repository's orca.yaml runs before the workspace starts. Only run it if you
+                This repository's pebble.yaml runs before the workspace starts. Only run it if you
                 trust this repository.
               </Text>
             </View>

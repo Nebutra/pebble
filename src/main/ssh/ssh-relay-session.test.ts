@@ -142,7 +142,7 @@ function mockDeploySuccess() {
 describe('SshRelaySession', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    delete process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS
+    delete process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS
     muxRequestMock.mockReset()
     muxRequestMock.mockResolvedValue([])
     installRemoteManagedAgentHooksMock.mockReset()
@@ -172,10 +172,10 @@ describe('SshRelaySession', () => {
   })
 
   it('installs remote managed hooks and relay-owned plugin assets before registering the SSH PTY provider', async () => {
-    process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS = '1'
+    process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS = '1'
     muxRequestMock.mockImplementation(async (method: string) => {
       if (method === 'session.resolveHome') {
-        return { resolvedPath: '/home/orca' }
+        return { resolvedPath: '/home/pebble' }
       }
       return { ok: true }
     })
@@ -198,7 +198,7 @@ describe('SshRelaySession', () => {
       ompExtensionSource: expect.stringContaining('/hook/omp')
     })
     expect(mockConn.sftp).toHaveBeenCalledTimes(1)
-    expect(installRemoteManagedAgentHooksMock).toHaveBeenCalledWith(sftp, '/home/orca')
+    expect(installRemoteManagedAgentHooksMock).toHaveBeenCalledWith(sftp, '/home/pebble')
     expect(sftp.end).toHaveBeenCalledTimes(1)
     expect(installRemoteManagedAgentHooksMock.mock.invocationCallOrder[0]).toBeLessThan(
       muxRequestMock.mock.invocationCallOrder[installPluginsCallIndex]
@@ -209,7 +209,7 @@ describe('SshRelaySession', () => {
   })
 
   it('does not run POSIX managed hook installers on Windows remotes', async () => {
-    process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS = '1'
+    process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS = '1'
     const { mockStore, mockPortForward, getMainWindow } = createMockDeps()
     const mockConn = {
       writeFile: vi.fn().mockResolvedValue(undefined)
@@ -223,9 +223,9 @@ describe('SshRelaySession', () => {
       platform: 'win32-x64',
       hostPlatform: getRemoteHostPlatform('win32-x64'),
       remoteHome: 'C:/Users/me',
-      remoteRelayDir: 'C:/Users/me/.orca-remote/relay-v1',
+      remoteRelayDir: 'C:/Users/me/.pebble-remote/relay-v1',
       nodePath: 'C:/Program Files/nodejs/node.exe',
-      sockPath: '\\\\.\\pipe\\orca-relay-123'
+      sockPath: '\\\\.\\pipe\\pebble-relay-123'
     })
     const session = new SshRelaySession('target-1', getMainWindow, mockStore, mockPortForward)
 
@@ -238,7 +238,7 @@ describe('SshRelaySession', () => {
   })
 
   it('does not register providers if dispose wins during initial plugin sync', async () => {
-    process.env.ORCA_FEATURE_REMOTE_AGENT_HOOKS = '1'
+    process.env.PEBBLE_FEATURE_REMOTE_AGENT_HOOKS = '1'
     let resolvePluginInstall!: () => void
     muxRequestMock.mockImplementation(async (method: string) => {
       if (method === AGENT_HOOK_INSTALL_PLUGINS_METHOD) {
@@ -306,7 +306,7 @@ describe('SshRelaySession', () => {
     expect(registerSshPtyProvider).toHaveBeenCalledWith('target-1', expect.anything())
   })
 
-  it('installs a native Windows Orca CLI bridge without POSIX shell commands', async () => {
+  it('installs a native Windows Pebble CLI bridge without POSIX shell commands', async () => {
     const { mockStore, mockPortForward, getMainWindow } = createMockDeps()
     const mockConn = {
       writeFile: vi.fn().mockResolvedValue(undefined)
@@ -320,9 +320,9 @@ describe('SshRelaySession', () => {
       platform: 'win32-x64',
       hostPlatform: getRemoteHostPlatform('win32-x64'),
       remoteHome: 'C:/Users/me',
-      remoteRelayDir: 'C:/Users/me/.orca-remote/relay-v1',
+      remoteRelayDir: 'C:/Users/me/.pebble-remote/relay-v1',
       nodePath: 'C:/Program Files/nodejs/node.exe',
-      sockPath: '\\\\.\\pipe\\orca-relay-123'
+      sockPath: '\\\\.\\pipe\\pebble-relay-123'
     })
 
     const session = new SshRelaySession('target-1', getMainWindow, mockStore, mockPortForward)
@@ -333,15 +333,15 @@ describe('SshRelaySession', () => {
     expect(vi.mocked(execCommand).mock.calls[0]?.[1]).toContain('powershell.exe')
     expect(vi.mocked(execCommand).mock.calls[0]?.[2]).toEqual({ wrapCommand: false })
     expect(mockConn.writeFile).toHaveBeenCalledWith(
-      'C:/Users/me/.orca-relay/bin/orca.cmd',
+      'C:/Users/me/.pebble-relay/bin/pebble.cmd',
       expect.stringContaining('@echo off'),
       { hostPlatform: getRemoteHostPlatform('win32-x64') }
     )
     const shim = vi.mocked(mockConn.writeFile).mock.calls[0]?.[1] as string
-    expect(shim).toContain('C:/Users/me/.orca-remote/relay-v1')
-    expect(shim).toContain('\\\\.\\pipe\\orca-relay-123')
-    expect(shim).not.toContain('if not exist "%ORCA_RELAY_SOCKET_PATH%"')
-    expect(shim).not.toContain('Orca SSH CLI bridge cannot find the relay socket')
+    expect(shim).toContain('C:/Users/me/.pebble-remote/relay-v1')
+    expect(shim).toContain('\\\\.\\pipe\\pebble-relay-123')
+    expect(shim).not.toContain('if not exist "%PEBBLE_RELAY_SOCKET_PATH%"')
+    expect(shim).not.toContain('Pebble SSH CLI bridge cannot find the relay socket')
     expect(shim).not.toContain('#!/usr/bin/env sh')
     expect(vi.mocked(execCommand).mock.calls.some(([, command]) => command.includes('chmod'))).toBe(
       false

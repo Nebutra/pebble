@@ -11,7 +11,7 @@ import {
   requestMicrophonePermissionsAsync,
   tearDown,
   toggleRecording
-} from '@orca/expo-two-way-audio'
+} from '@pebble/expo-two-way-audio'
 import type { RpcClient } from '../transport/rpc-client'
 import {
   MOBILE_DICTATION_CONNECTION_SLOW_ERROR_MESSAGE,

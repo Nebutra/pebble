@@ -61,7 +61,7 @@ const STRONG_WORKING_KEYWORDS = ['working', 'thinking', 'running'] as const
 //   - LEFT: reject `[\w./\\-]` so path fragments like `~/codex/ready`,
 //     Windows `C:\codex\ready`, and `codex.ready` cannot mint a strong idle
 //     signal by having the agent name sit earlier in the same path and the
-//     keyword land right after a path separator. Orca is a cross-platform
+//     keyword land right after a path separator. Pebble is a cross-platform
 //     Electron app, so Windows path separators must be handled too.
 //   - RIGHT: reject only `[\w\-]` so legitimate sentence-style titles like
 //     "Codex done." / "Aider idle." / "OpenCode ready!" still match — path
@@ -251,7 +251,7 @@ export function normalizeTerminalTitle(title: string): string {
 
   // Why: Pi's titlebar extension animates every 80ms with different braille
   // frames. Collapsing those frames into one stable label avoids renderer
-  // churn while preserving the working/idle transition Orca keys off.
+  // churn while preserving the working/idle transition Pebble keys off.
   if (isPiAgentTitle(title)) {
     const status = detectAgentStatusFromTitle(title)
     if (status === 'working') {
@@ -372,7 +372,7 @@ export function getAgentLabel(title: string): string | null {
     return 'Aider'
   }
   // Why: the cursor-agent native title is the literal string "Cursor Agent"
-  // (verified against the 2026.04.17 release) — Orca synthesizes the same
+  // (verified against the 2026.04.17 release) — Pebble synthesizes the same
   // label from hook events so the braille-spinner + agent-name path lights
   // up working/permission/idle transitions in the renderer. Match before
   // `isClaudeAgent` because Claude's generic braille heuristic would
@@ -399,7 +399,7 @@ export function getAgentLabel(title: string): string | null {
 }
 
 // Why: cursor-agent's native OSC title is the literal string "Cursor Agent"
-// across the entire turn — it carries zero working/idle information. Orca
+// across the entire turn — it carries zero working/idle information. Pebble
 // synthesizes its own titles ("⠋ Cursor Agent" for working, "Cursor -
 // action required" for permission) from cursor's hook events; the bare
 // native title must be a no-op so cursor's per-turn re-emissions cannot
@@ -415,7 +415,7 @@ export function detectAgentStatusFromTitle(title: string): AgentStatus | null {
   }
   // Why: "Cursor Agent" exactly (case-insensitive, no prefix/suffix) is cursor's
   // native title. Anything with additional tokens ("⠋ Cursor Agent", "Cursor -
-  // action required") is either an Orca-synthesized working/permission title
+  // action required") is either an Pebble-synthesized working/permission title
   // or a tighter match worth classifying.
   if (title.trim().toLowerCase() === CURSOR_NATIVE_TITLE_LOWER) {
     return null

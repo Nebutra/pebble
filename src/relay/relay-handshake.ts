@@ -1,4 +1,4 @@
-// Wire-level handshake helpers for the Orca relay.
+// Wire-level handshake helpers for the Pebble relay.
 //
 // Why this lives in its own module: oxlint enforces a 300-line limit (with
 // blanks/comments stripped) on .ts files, and relay.ts already runs near that
@@ -104,15 +104,15 @@ export function setupDaemonHandshake(sock: Socket, cb: DaemonHandshakeCallbacks)
     decoder.feed(chunk)
   }
   sock.on('data', onHandshakeData)
-  ;(sock as Socket & { __orcaOnHandshake?: typeof onHandshakeData }).__orcaOnHandshake =
+  ;(sock as Socket & { __pebbleOnHandshake?: typeof onHandshakeData }).__pebbleOnHandshake =
     onHandshakeData
 }
 
 export function detachHandshakeListener(sock: Socket): void {
-  const tagged = sock as Socket & { __orcaOnHandshake?: (chunk: Buffer) => void }
-  if (tagged.__orcaOnHandshake) {
-    sock.removeListener('data', tagged.__orcaOnHandshake)
-    delete tagged.__orcaOnHandshake
+  const tagged = sock as Socket & { __pebbleOnHandshake?: (chunk: Buffer) => void }
+  if (tagged.__pebbleOnHandshake) {
+    sock.removeListener('data', tagged.__pebbleOnHandshake)
+    delete tagged.__pebbleOnHandshake
   }
 }
 
@@ -138,7 +138,7 @@ function handleDaemonHandshakeFrame(
     sock.destroy()
     return false
   }
-  if (msg.type !== 'orca-relay-handshake') {
+  if (msg.type !== 'pebble-relay-handshake') {
     process.stderr.write(
       `[relay] Unexpected handshake type from client: ${msg.type}; closing socket\n`
     )
@@ -152,7 +152,7 @@ function handleDaemonHandshakeFrame(
     try {
       sock.write(
         encodeHandshakeFrame({
-          type: 'orca-relay-handshake-mismatch',
+          type: 'pebble-relay-handshake-mismatch',
           expected: launchVersion,
           got: msg.version
         })
@@ -164,7 +164,7 @@ function handleDaemonHandshakeFrame(
     return false
   }
   process.stderr.write(`[relay] Handshake OK from version=${msg.version}\n`)
-  sock.write(encodeHandshakeFrame({ type: 'orca-relay-handshake-ok', version: launchVersion }))
+  sock.write(encodeHandshakeFrame({ type: 'pebble-relay-handshake-ok', version: launchVersion }))
   return true
 }
 
@@ -216,7 +216,7 @@ export function runConnectHandshake(
         sock.destroy()
         process.exit(1)
       }
-      if (msg.type === 'orca-relay-handshake-ok') {
+      if (msg.type === 'pebble-relay-handshake-ok') {
         process.stderr.write(`[relay-connect] Handshake OK at version=${msg.version}\n`)
         handshakeDone = true
         const leftover = decoder.drain()
@@ -224,7 +224,7 @@ export function runConnectHandshake(
         cb.onAccepted(leftover)
         return
       }
-      if (msg.type === 'orca-relay-handshake-mismatch') {
+      if (msg.type === 'pebble-relay-handshake-mismatch') {
         // Why: explicit stderr flush + exit so the diagnostic line is
         // delivered to the client BEFORE the process exits. Without this,
         // process.stderr writes can be buffered/async on pipe transports
@@ -255,5 +255,5 @@ export function runConnectHandshake(
     }
   })
 
-  sock.write(encodeHandshakeFrame({ type: 'orca-relay-handshake', version: myVersion }))
+  sock.write(encodeHandshakeFrame({ type: 'pebble-relay-handshake', version: myVersion }))
 }

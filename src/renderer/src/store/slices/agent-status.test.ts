@@ -774,7 +774,7 @@ describe('agent status PR refresh handoff', () => {
       state: 'done',
       prompt: 'create a PR',
       agentType: 'codex',
-      lastAssistantMessage: 'Opened https://github.com/acme/orca/pull/42'
+      lastAssistantMessage: 'Opened https://github.com/acme/pebble/pull/42'
     })
 
     await flushMicrotasks()

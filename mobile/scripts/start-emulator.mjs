@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Start Orca Mobile server and load it in the iOS emulator.
+ * Start Pebble Mobile server and load it in the iOS emulator.
  * Looks for emulators in the given worktree.
  *
  * Usage:
@@ -78,7 +78,7 @@ Options:
   }
 }
 
-const ORCA_CLI = process.env.ORCA_CLI || 'orca'
+const PEBBLE_CLI = process.env.PEBBLE_CLI || 'pebble'
 
 // Colors for output
 const colors = {
@@ -119,9 +119,9 @@ function assertIosSimulatorPlatform() {
   }
 }
 
-// Execute orca CLI command
-async function orca(args, options = {}) {
-  const { stdout, stderr } = await execFileAsync(ORCA_CLI, args, {
+// Execute pebble CLI command
+async function pebble(args, options = {}) {
+  const { stdout, stderr } = await execFileAsync(PEBBLE_CLI, args, {
     cwd: options.cwd || process.cwd(),
     env: options.env || process.env,
     encoding: 'utf8',
@@ -137,7 +137,7 @@ async function getWorktree() {
   }
 
   try {
-    const { stdout } = await orca(['worktree', 'current', '--json'])
+    const { stdout } = await pebble(['worktree', 'current', '--json'])
     const result = JSON.parse(stdout)
     // Handle both response formats
     const worktreePath = result.worktree?.path || result.result?.worktree?.path
@@ -170,7 +170,7 @@ async function attachEmulator(worktree, device, runtime) {
   logStep('1', `Attaching to emulator: ${device.name}`)
 
   try {
-    await orca(['emulator', 'attach', device.udid, '--worktree', worktree, '--focus', '--json'], {
+    await pebble(['emulator', 'attach', device.udid, '--worktree', worktree, '--focus', '--json'], {
       cwd: worktree,
       env: runtime?.env || process.env,
       timeout: 60000
@@ -305,7 +305,7 @@ function metroUrlCandidates(initialUrl) {
 }
 
 function devClientUrlForMetroUrl(url) {
-  return `exp+orca-mobile://expo-development-client/?url=${encodeURIComponent(url)}`
+  return `exp+pebble-mobile://expo-development-client/?url=${encodeURIComponent(url)}`
 }
 
 function canListenOnPort(port) {
@@ -421,7 +421,7 @@ async function startMetro(worktree) {
       }
 
       // Also check for the dev-client URL format directly
-      const urlMatch = line.match(/exp\+orca-mobile:\/\/expo-development-client\/\?url=([^\s]+)/)
+      const urlMatch = line.match(/exp\+pebble-mobile:\/\/expo-development-client\/\?url=([^\s]+)/)
       if (urlMatch && !resolved) {
         url = normalizeMetroUrl(decodeURIComponent(urlMatch[1]))
         logInfo(`Found Metro URL: ${url}`)
@@ -508,7 +508,7 @@ async function openPairingUrlInSimulator(pairingUrl, deviceUdid, runtime, worktr
 
   // Why: the mobile app intentionally asks for a trust confirmation before
   // saving a host. This lands on the Pair button on current iPhone simulators.
-  await orca(['emulator', 'tap', '0.5', '0.56', '--worktree', worktree, '--json'], {
+  await pebble(['emulator', 'tap', '0.5', '0.56', '--worktree', worktree, '--json'], {
     cwd: worktree,
     env: runtime?.env || process.env,
     timeout: 30000
@@ -519,7 +519,7 @@ async function openPairingUrlInSimulator(pairingUrl, deviceUdid, runtime, worktr
 // Take a screenshot
 async function takeScreenshot(
   deviceUdid,
-  outputPath = path.join(os.tmpdir(), 'orca-mobile-ios.png')
+  outputPath = path.join(os.tmpdir(), 'pebble-mobile-ios.png')
 ) {
   logStep('4', 'Taking screenshot...')
 
@@ -561,7 +561,7 @@ async function findReachableMetroUrl(initialUrl) {
 
 // Main function
 async function main() {
-  log(colors.bright + 'Starting Orca Mobile in Emulator\n' + colors.reset)
+  log(colors.bright + 'Starting Pebble Mobile in Emulator\n' + colors.reset)
   let pairingRuntime = null
 
   try {
@@ -574,14 +574,14 @@ async function main() {
 
     pairingRuntime = await startHeadlessPairingRuntime({
       enabled: options.pair,
-      orcaCli: ORCA_CLI,
+      pebbleCli: PEBBLE_CLI,
       cwd: process.cwd(),
       lanIpCandidates,
       logStep,
       logSuccess
     })
     await registerWorktreeForPairingRuntime(pairingRuntime, worktree, {
-      orca,
+      pebble,
       logStep,
       logSuccess
     })
@@ -590,7 +590,7 @@ async function main() {
     const device = await findBestDevice(options.device)
     logInfo(`Using device: ${device.name} (${device.runtime})`)
 
-    // Why: emulator helpers are worktree-scoped in Orca; attach is idempotent
+    // Why: emulator helpers are worktree-scoped in Pebble; attach is idempotent
     // for the active worktree, while a global helper list cannot prove that.
     await attachEmulator(worktree, device, pairingRuntime)
 

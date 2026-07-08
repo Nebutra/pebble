@@ -37,7 +37,7 @@ describe('GitHub PR reviewer display', () => {
           reviewRequests: [
             { login: 'ExampleReviewer', name: null, avatarUrl: '' },
             { login: 'agent-slack', name: null, avatarUrl: '' },
-            { login: 'stably', name: null, avatarUrl: '' }
+            { login: 'nebutra', name: null, avatarUrl: '' }
           ]
         })
       )

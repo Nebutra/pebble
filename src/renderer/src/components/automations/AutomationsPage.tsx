@@ -64,7 +64,7 @@ import { TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY } from '../../../../shared/proto
 import type { PreflightStatus } from '../../../../preload/api-types'
 import type { RuntimeStatus } from '../../../../shared/runtime-types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
-import type { OrcaHooks, Repo, Worktree } from '../../../../shared/types'
+import type { PebbleHooks, Repo, Worktree } from '../../../../shared/types'
 import { getWorktreePathBasenameFromId } from '../../../../shared/worktree-id'
 import {
   buildAutomationCronSchedule,
@@ -145,10 +145,10 @@ import { ExternalAutomationManagers } from './ExternalAutomationManagers'
 import type { FetchExternalAutomationRuns } from './ExternalAutomationRunTable'
 import { useContextualTour } from '@/components/contextual-tours/use-contextual-tour'
 import { translate } from '@/i18n/i18n'
+import { PEBBLE_AUTOMATIONS_CHANGED_EVENT } from '@/lib/automation-change-event'
 
 const AGENTS = getAgentCatalog().map((agent) => agent.id)
 const DEFAULT_TIME = '09:00'
-const AUTOMATIONS_CHANGED_EVENT = 'orca:automations-changed'
 type AutomationPaneTab = 'overview' | 'runs'
 type RepoBackedAutomationSourceContext = TaskSourceContext & { provider: 'github' | 'gitlab' }
 
@@ -414,7 +414,7 @@ export default function AutomationsPage(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
-  const [createTarget, setCreateTarget] = useState<AutomationCreateTarget>('orca')
+  const [createTarget, setCreateTarget] = useState<AutomationCreateTarget>('pebble')
   const [editingAutomationId, setEditingAutomationId] = useState<string | null>(null)
   const [relativeNow, setRelativeNow] = useState(Date.now())
   const [activePaneTab, setActivePaneTab] = useState<AutomationPaneTab>('overview')
@@ -468,10 +468,10 @@ export default function AutomationsPage(): React.JSX.Element {
   const setupDecisionDefaultSignatureRef = useRef<string | null>(null)
   const setupDecisionTouchedRef = useRef(false)
   const automationHookCheckPromisesRef = useRef<
-    Map<string, Promise<{ hooks: OrcaHooks | null; ok: boolean }>>
+    Map<string, Promise<{ hooks: PebbleHooks | null; ok: boolean }>>
   >(new Map())
   const [automationYamlHooksByRepoKey, setAutomationYamlHooksByRepoKey] = useState<
-    Record<string, OrcaHooks | null>
+    Record<string, PebbleHooks | null>
   >({})
   const [draft, setDraft] = useState<AutomationDraft>({
     name: '',
@@ -587,7 +587,7 @@ export default function AutomationsPage(): React.JSX.Element {
     [repos, settings]
   )
   const loadAutomationYamlHooksForRepo = useCallback(
-    async (repoId: string): Promise<OrcaHooks | null> => {
+    async (repoId: string): Promise<PebbleHooks | null> => {
       const key = getAutomationHooksCacheKey(repoId)
       if (Object.prototype.hasOwnProperty.call(automationYamlHooksByRepoKey, key)) {
         return automationYamlHooksByRepoKey[key] ?? null
@@ -599,7 +599,7 @@ export default function AutomationsPage(): React.JSX.Element {
       const settingsForRepo = getSettingsForRepoRuntimeOwner({ repos, settings }, repoId)
       const promise = checkRuntimeHooks(settingsForRepo, repoId)
         .then((result) => ({
-          hooks: result.status === 'error' ? null : ((result.hooks as OrcaHooks | null) ?? null),
+          hooks: result.status === 'error' ? null : ((result.hooks as PebbleHooks | null) ?? null),
           ok: result.status !== 'error'
         }))
         .catch(() => ({ hooks: null, ok: false }))
@@ -1088,8 +1088,10 @@ export default function AutomationsPage(): React.JSX.Element {
     const onAutomationsChanged = (): void => {
       void refresh()
     }
-    window.addEventListener(AUTOMATIONS_CHANGED_EVENT, onAutomationsChanged)
-    return () => window.removeEventListener(AUTOMATIONS_CHANGED_EVENT, onAutomationsChanged)
+    window.addEventListener(PEBBLE_AUTOMATIONS_CHANGED_EVENT, onAutomationsChanged)
+    return () => {
+      window.removeEventListener(PEBBLE_AUTOMATIONS_CHANGED_EVENT, onAutomationsChanged)
+    }
   }, [refresh])
 
   useEffect(() => {
@@ -1193,7 +1195,7 @@ export default function AutomationsPage(): React.JSX.Element {
   useEffect(() => {
     if (
       !createOpen ||
-      createTarget !== 'orca' ||
+      createTarget !== 'pebble' ||
       draft.workspaceMode !== 'new_per_run' ||
       !draft.projectId
     ) {
@@ -1267,7 +1269,7 @@ export default function AutomationsPage(): React.JSX.Element {
     const target = getDefaultTarget()
     setEditingAutomationId(null)
     setEditingExternalTarget(null)
-    setCreateTarget('orca')
+    setCreateTarget('pebble')
     const baseDraft: AutomationDraft = {
       name: '',
       prompt: '',
@@ -1308,7 +1310,7 @@ export default function AutomationsPage(): React.JSX.Element {
   const openEditDialog = async (automation: Automation): Promise<void> => {
     const requestId = (editRequestRef.current += 1)
     setEditingExternalTarget(null)
-    setCreateTarget('orca')
+    setCreateTarget('pebble')
     let latest = automation
     try {
       latest =
@@ -1596,7 +1598,7 @@ export default function AutomationsPage(): React.JSX.Element {
         repos,
         projectHostSetups,
         yamlHooks:
-          createTarget === 'orca' && draft.workspaceMode === 'new_per_run'
+          createTarget === 'pebble' && draft.workspaceMode === 'new_per_run'
             ? await loadAutomationYamlHooksForRepo(draft.projectId)
             : null,
         draftSetupDecision: draft.setupDecision
@@ -2909,7 +2911,7 @@ export default function AutomationsPage(): React.JSX.Element {
                         selectedAutomationRunPage.scheduledFor,
                         relativeNow
                       ),
-                      'Orca',
+                      'Pebble',
                       selectedAutomationRunPageWorkspaceDisplay?.detailLabel ?? 'No workspace'
                     ]}
                     detail={

@@ -12,10 +12,10 @@ import {
 
 function makeWorktree(overrides: Partial<Worktree> = {}): Worktree {
   return {
-    id: 'repo-1::/repo/orca',
+    id: 'repo-1::/repo/pebble',
     repoId: 'repo-1',
-    displayName: 'orca',
-    path: '/repo/orca',
+    displayName: 'pebble',
+    path: '/repo/pebble',
     head: 'abc123',
     branch: 'main',
     isBare: false,
@@ -36,8 +36,8 @@ function makeWorktree(overrides: Partial<Worktree> = {}): Worktree {
 function makeRepo(overrides: Partial<Repo> = {}): Repo {
   return {
     id: 'repo-1',
-    path: '/repo/orca',
-    displayName: 'orca',
+    path: '/repo/pebble',
+    displayName: 'pebble',
     badgeColor: '#000000',
     addedAt: 1,
     ...overrides
@@ -100,15 +100,15 @@ function makeWorktreeInfo(
 ): AiVaultSessionWorktreeInfo {
   return {
     status,
-    label: 'orca',
-    path: '/repo/orca',
-    ...(status === 'unavailable' ? {} : { worktreeId: 'repo-1::/repo/orca' })
+    label: 'pebble',
+    path: '/repo/pebble',
+    ...(status === 'unavailable' ? {} : { worktreeId: 'repo-1::/repo/pebble' })
   }
 }
 
-const HOST_SESSION_FILE = '/Users/ada/.claude/projects/-repo-orca/session-1.jsonl'
+const HOST_SESSION_FILE = '/Users/ada/.claude/projects/-repo-pebble/session-1.jsonl'
 const WSL_SESSION_FILE =
-  '\\\\wsl$\\Ubuntu\\home\\ada\\.claude\\projects\\-repo-orca\\session-1.jsonl'
+  '\\\\wsl$\\Ubuntu\\home\\ada\\.claude\\projects\\-repo-pebble\\session-1.jsonl'
 
 describe('resolveAiVaultSessionResumeState', () => {
   it('prefers the session worktree over the active workspace', () => {
@@ -125,7 +125,7 @@ describe('resolveAiVaultSessionResumeState', () => {
       })
     ).toEqual({
       blocked: false,
-      worktreeId: 'repo-1::/repo/orca',
+      worktreeId: 'repo-1::/repo/pebble',
       usesSessionWorktree: true
     })
   })
@@ -135,13 +135,13 @@ describe('resolveAiVaultSessionResumeState', () => {
       resolveAiVaultSessionResumeState({
         sessionFilePath: HOST_SESSION_FILE,
         worktreeInfo: makeWorktreeInfo('archived'),
-        activeWorktreeId: 'repo-1::/repo/orca',
+        activeWorktreeId: 'repo-1::/repo/pebble',
         worktrees: [makeWorktree()],
         repos: [{ id: 'repo-1' } as Repo]
       })
     ).toEqual({
       blocked: false,
-      worktreeId: 'repo-1::/repo/orca',
+      worktreeId: 'repo-1::/repo/pebble',
       usesSessionWorktree: false
     })
   })
@@ -173,7 +173,7 @@ describe('resolveAiVaultSessionResumeState', () => {
       })
     ).toEqual({
       blocked: false,
-      worktreeId: 'repo-1::/repo/orca',
+      worktreeId: 'repo-1::/repo/pebble',
       usesSessionWorktree: true
     })
   })
@@ -189,7 +189,7 @@ describe('resolveAiVaultSessionResumeState', () => {
       })
     ).toEqual({
       blocked: false,
-      worktreeId: 'repo-1::/repo/orca',
+      worktreeId: 'repo-1::/repo/pebble',
       usesSessionWorktree: true
     })
   })
@@ -236,20 +236,20 @@ describe('resolveAiVaultSessionResumeState', () => {
       resolveAiVaultSessionResumeState({
         sessionFilePath: HOST_SESSION_FILE,
         worktreeInfo: makeWorktreeInfo('active'),
-        activeWorktreeId: 'repo-2::/remote/orca',
+        activeWorktreeId: 'repo-2::/remote/pebble',
         worktrees: [
           makeWorktree(),
           makeWorktree({
-            id: 'repo-2::/remote/orca',
+            id: 'repo-2::/remote/pebble',
             repoId: 'repo-2',
-            path: '/remote/orca'
+            path: '/remote/pebble'
           })
         ],
         repos: [{ id: 'repo-1' } as Repo, { id: 'repo-2', connectionId: 'ssh-1' } as Repo]
       })
     ).toEqual({
       blocked: false,
-      worktreeId: 'repo-1::/repo/orca',
+      worktreeId: 'repo-1::/repo/pebble',
       usesSessionWorktree: true
     })
   })
@@ -351,7 +351,7 @@ describe('resolveAiVaultSessionResumeActions', () => {
         repos: [{ id: 'repo-1' } as Repo]
       })
     ).toEqual({
-      worktree: { worktreeId: 'repo-1::/repo/orca', disabled: false },
+      worktree: { worktreeId: 'repo-1::/repo/pebble', disabled: false },
       newTab: { worktreeId: 'repo-1::/repo/other', disabled: false }
     })
   })
@@ -361,20 +361,20 @@ describe('resolveAiVaultSessionResumeActions', () => {
       resolveAiVaultSessionResumeActions({
         sessionFilePath: WSL_SESSION_FILE,
         worktreeInfo: makeWorktreeInfo('active'),
-        activeWorktreeId: 'repo-2::/remote/orca',
+        activeWorktreeId: 'repo-2::/remote/pebble',
         worktrees: [
           makeWorktree(),
           makeWorktree({
-            id: 'repo-2::/remote/orca',
+            id: 'repo-2::/remote/pebble',
             repoId: 'repo-2',
-            path: '/remote/orca'
+            path: '/remote/pebble'
           })
         ],
         repos: [{ id: 'repo-1' } as Repo, { id: 'repo-2', connectionId: 'ssh-1' } as Repo]
       })
     ).toEqual({
-      worktree: { worktreeId: 'repo-1::/repo/orca', disabled: false },
-      newTab: { worktreeId: 'repo-2::/remote/orca', disabled: false }
+      worktree: { worktreeId: 'repo-1::/repo/pebble', disabled: false },
+      newTab: { worktreeId: 'repo-2::/remote/pebble', disabled: false }
     })
   })
 
@@ -383,20 +383,20 @@ describe('resolveAiVaultSessionResumeActions', () => {
       resolveAiVaultSessionResumeActions({
         sessionFilePath: HOST_SESSION_FILE,
         worktreeInfo: makeWorktreeInfo('active'),
-        activeWorktreeId: 'repo-2::/remote/orca',
+        activeWorktreeId: 'repo-2::/remote/pebble',
         worktrees: [
           makeWorktree(),
           makeWorktree({
-            id: 'repo-2::/remote/orca',
+            id: 'repo-2::/remote/pebble',
             repoId: 'repo-2',
-            path: '/remote/orca'
+            path: '/remote/pebble'
           })
         ],
         repos: [{ id: 'repo-1' } as Repo, { id: 'repo-2', connectionId: 'ssh-1' } as Repo]
       })
     ).toEqual({
-      worktree: { worktreeId: 'repo-1::/repo/orca', disabled: false },
-      newTab: { worktreeId: 'repo-2::/remote/orca', disabled: true }
+      worktree: { worktreeId: 'repo-1::/repo/pebble', disabled: false },
+      newTab: { worktreeId: 'repo-2::/remote/pebble', disabled: true }
     })
   })
 
@@ -425,7 +425,7 @@ describe('resolveAiVaultSessionResumeActions', () => {
         ]
       })
     ).toEqual({
-      worktree: { worktreeId: 'repo-1::/repo/orca', disabled: true },
+      worktree: { worktreeId: 'repo-1::/repo/pebble', disabled: true },
       newTab: { worktreeId: 'repo-2::/repo/other', disabled: false }
     })
   })
@@ -435,12 +435,12 @@ describe('resolveAiVaultSessionResumeActions', () => {
       resolveAiVaultSessionResumeActions({
         sessionFilePath: HOST_SESSION_FILE,
         worktreeInfo: makeWorktreeInfo('current'),
-        activeWorktreeId: 'repo-1::/repo/orca',
+        activeWorktreeId: 'repo-1::/repo/pebble',
         worktrees: [makeWorktree()],
         repos: [{ id: 'repo-1' } as Repo]
       })
     ).toEqual({
-      worktree: { worktreeId: 'repo-1::/repo/orca', disabled: false },
+      worktree: { worktreeId: 'repo-1::/repo/pebble', disabled: false },
       newTab: { worktreeId: null, disabled: true }
     })
   })

@@ -27,7 +27,7 @@ function getDiagLogPath(): string {
     try {
       _diagLog = join(app.getPath('userData'), 'cookie-import-diag.log')
     } catch {
-      _diagLog = join(tmpdir(), 'orca-cookie-import-diag.log')
+      _diagLog = join(tmpdir(), 'pebble-cookie-import-diag.log')
     }
   }
   return _diagLog
@@ -1301,7 +1301,7 @@ async function importCookiesFromFirefox(
 ): Promise<BrowserCookieImportResult> {
   diag(`importCookiesFromFirefox: partition="${targetPartition}"`)
 
-  const tmpDir = mkdtempSync(join(tmpdir(), 'orca-cookie-import-'))
+  const tmpDir = mkdtempSync(join(tmpdir(), 'pebble-cookie-import-'))
   const tmpCookiesPath = join(tmpDir, 'cookies.sqlite')
 
   try {
@@ -1419,7 +1419,7 @@ async function importCookiesFromSafari(
       return {
         ok: false,
         reason:
-          'macOS denied access to Safari cookies. Grant Full Disk Access to Orca in System Settings → Privacy & Security → Full Disk Access.'
+          'macOS denied access to Safari cookies. Grant Full Disk Access to Pebble in System Settings → Privacy & Security → Full Disk Access.'
       }
     }
     return { ok: false, reason: 'Could not read Safari cookies.' }
@@ -1470,7 +1470,7 @@ export async function importCookiesFromBrowser(
 
   // Why: the browser may hold a lock on the Cookies file. Copying to a temp
   // location avoids lock contention and ensures we read a consistent snapshot.
-  const tmpDir = mkdtempSync(join(tmpdir(), 'orca-cookie-import-'))
+  const tmpDir = mkdtempSync(join(tmpdir(), 'pebble-cookie-import-'))
   const tmpCookiesPath = join(tmpDir, 'Cookies')
 
   try {
@@ -1713,7 +1713,7 @@ export async function importCookiesFromBrowser(
     diag(`  SQLite staging complete: ${imported} cookies, ${domainSet.size} domains`)
 
     // Why: clearing the session's in-memory cookie store before loading imported
-    // cookies prevents stale cookies from a previous Orca browsing session from
+    // cookies prevents stale cookies from a previous Pebble browsing session from
     // mixing with the imported set. Mixed state (some old, some imported) causes
     // sites like Google to detect inconsistent session cookies and reject them.
     await targetSession.clearStorageData({ storages: ['cookies'] })

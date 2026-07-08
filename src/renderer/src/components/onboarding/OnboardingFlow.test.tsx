@@ -40,11 +40,11 @@ describe('OnboardingFlow', () => {
     })
 
     expect(html).toContain('Set up notifications')
-    expect(html).not.toContain('Set up Orca for agents')
-    expect(html).not.toContain('Explore Orca')
+    expect(html).not.toContain('Set up Pebble for agents')
+    expect(html).not.toContain('Explore Pebble')
     expect(html).not.toContain('Take the tour')
     expect(html).toContain('Add your first project')
-    expect(html).not.toContain('Point Orca at some code')
+    expect(html).not.toContain('Point Pebble at some code')
   })
 
   it.each([
@@ -65,8 +65,8 @@ describe('OnboardingFlow', () => {
       })
 
       expect(html).toContain(title)
-      expect(html).not.toContain('Set up Orca for agents')
-      expect(html).not.toContain('Explore Orca')
+      expect(html).not.toContain('Set up Pebble for agents')
+      expect(html).not.toContain('Explore Pebble')
     }
   )
 
@@ -88,8 +88,8 @@ describe('OnboardingFlow', () => {
       })
 
       expect(html).toContain(title)
-      expect(html).not.toContain('Set up Orca for agents')
-      expect(html).not.toContain('Explore Orca')
+      expect(html).not.toContain('Set up Pebble for agents')
+      expect(html).not.toContain('Explore Pebble')
     }
   )
 
@@ -173,7 +173,7 @@ describe('OnboardingFlow', () => {
     expect(html).toContain('Add your first project')
     expect(html).not.toContain('Set up GitHub tasks')
     expect(html).not.toContain('Connect your task sources')
-    expect(html).not.toContain('Point Orca at some code')
+    expect(html).not.toContain('Point Pebble at some code')
   })
 
   it('shows only GitHub on the task setup page when the GitHub CLI is missing', () => {

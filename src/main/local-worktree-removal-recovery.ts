@@ -67,7 +67,7 @@ export async function recoverLocalWindowsLongPathWorktreeRemoval(
   }
 
   // Why: watcher shutdown is best-effort, but Git registration must be pruned
-  // before callers clear Orca metadata or the branch remains locked.
+  // before callers clear Pebble metadata or the branch remains locked.
   await args.closeWatcher(args.canonicalWorktreePath).catch(() => {})
   try {
     await removeLocalWorktreePath(args.canonicalWorktreePath, args.localWorktreeGitOptions)

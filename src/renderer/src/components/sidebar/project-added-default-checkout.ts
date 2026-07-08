@@ -7,6 +7,7 @@ import type {
 } from '../../../../shared/telemetry-events'
 import type { DetectedWorktreeListResult, Worktree } from '../../../../shared/types'
 import { relativePathInsideRoot } from '../../../../shared/cross-platform-path'
+import { isManagedWorktreeOwnership } from '../../../../shared/worktree-ownership'
 import { markOnboardingProjectAdded } from '@/lib/onboarding-project-checklist'
 import { finalizeImportedRepoAfterSkip } from './add-repo-skip-finalization'
 
@@ -36,7 +37,7 @@ function hasDetectedHiddenLinkedExternalWorktrees(
       !worktree.isMainWorktree &&
       !worktree.selectedCheckout &&
       !worktree.visible &&
-      worktree.ownership !== 'orca-managed'
+      !isManagedWorktreeOwnership(worktree.ownership)
   )
 }
 

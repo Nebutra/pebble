@@ -1,13 +1,13 @@
 /**
- * Zustand store inspection helpers for Orca E2E tests.
+ * Zustand store inspection helpers for Pebble E2E tests.
  *
- * Why: In dev mode, Orca exposes `window.__store` (the Zustand useAppStore).
+ * Why: In dev mode, Pebble exposes `window.__store` (the Zustand useAppStore).
  * Reading store state gives tests reliable access to app state without
  * fragile DOM scraping.
  */
 
-import type { Page } from '@stablyai/playwright-test'
-import { expect } from '@stablyai/playwright-test'
+import type { Page } from '@nebutra/playwright-test'
+import { expect } from '@nebutra/playwright-test'
 import type { BrowserTabSummary, ExplorerFileSummary, TerminalTabSummary } from './runtime-types'
 
 /** Read a value from the Zustand store. Returns the raw JS value. */

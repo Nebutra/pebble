@@ -2,6 +2,7 @@ import { normalizeRuntimePathForComparison } from './cross-platform-path'
 import type { DetectedWorktree, DetectedWorktreeListResult, Repo } from './types'
 import {
   effectiveExternalWorktreeVisibility,
+  isManagedWorktreeOwnership,
   isLegacyRepoForExternalWorktreeVisibility
 } from './worktree-ownership'
 
@@ -40,7 +41,9 @@ export function getHiddenExternalWorktrees(
   }
   return detected.worktrees.filter(
     (worktree) =>
-      !worktree.visible && !worktree.selectedCheckout && worktree.ownership !== 'orca-managed'
+      !worktree.visible &&
+      !worktree.selectedCheckout &&
+      !isManagedWorktreeOwnership(worktree.ownership)
   )
 }
 

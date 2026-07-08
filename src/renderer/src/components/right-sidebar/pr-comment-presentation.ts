@@ -6,7 +6,7 @@ export type PRCommentPresentationVariant = 'flat' | 'cards' | 'focus'
 
 export const DEFAULT_PR_COMMENT_PRESENTATION_VARIANT: PRCommentPresentationVariant = 'cards'
 
-const STORAGE_KEY = 'orca:pr-comment-presentation'
+const STORAGE_KEY = 'pebble:pr-comment-presentation'
 
 export type PRCommentPresentationClasses = {
   variant: PRCommentPresentationVariant
@@ -108,12 +108,18 @@ function isVariant(value: string | null): value is PRCommentPresentationVariant 
 }
 
 /** Resolve the active variant. In dev, override with
- *  localStorage.setItem('orca:pr-comment-presentation', 'cards' | 'flat' | 'focus'). */
+ *  localStorage.setItem('pebble:pr-comment-presentation', 'cards' | 'flat' | 'focus'). */
 export function resolvePRCommentPresentationVariant(): PRCommentPresentationVariant {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !window.localStorage) {
     return DEFAULT_PR_COMMENT_PRESENTATION_VARIANT
   }
-  const stored = window.localStorage.getItem(STORAGE_KEY)
+  let stored: string | null
+  try {
+    stored = window.localStorage.getItem(STORAGE_KEY)
+  } catch {
+    // Why: storage can be unavailable in restricted browser/test contexts.
+    return DEFAULT_PR_COMMENT_PRESENTATION_VARIANT
+  }
   if (isVariant(stored)) {
     return stored
   }

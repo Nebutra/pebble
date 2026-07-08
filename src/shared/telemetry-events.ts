@@ -108,10 +108,10 @@ export const AGENT_KIND_VALUES = [
 export const agentKindSchema = z.enum(AGENT_KIND_VALUES)
 export type AgentKind = z.infer<typeof agentKindSchema>
 
-// Trimmed to a small set of values Orca's PTY-typed-command launch architecture
+// Trimmed to a small set of values Pebble's PTY-typed-command launch architecture
 // can emit:
 //   - `binary_not_found` — `provider.spawn` ENOENT (the *shell* binary is
-//     missing). The agent CLI being missing is invisible: Orca spawns a
+//     missing). The agent CLI being missing is invisible: Pebble spawns a
 //     healthy shell and types the command, and bash/zsh's "command not found"
 //     surfaces only as terminal output.
 //   - `paste_readiness_timeout` — bracketed-paste readiness wait timed out.
@@ -121,7 +121,7 @@ export type AgentKind = z.infer<typeof agentKindSchema>
 //     unclassifiable shell-spawn errors).
 // Provider-side errors (`auth_expired`, `rate_limited`, `network_timeout`,
 // `provider_*`) happen inside the agent CLI subprocess and are not observable
-// to Orca — see telemetry-plan.md §Decision: Defer per-incident error fields.
+// to Pebble — see telemetry-plan.md §Decision: Defer per-incident error fields.
 // Adding a new value is additive-safe; do it when the call site lands, not in
 // anticipation.
 export const errorClassSchema = z.enum(['binary_not_found', 'paste_readiness_timeout', 'unknown'])
@@ -273,8 +273,8 @@ export type OptInVia = z.infer<typeof optInViaSchema>
 // `settings_changed`. If a setting isn't in this list, we do not emit.
 //
 // Keys are camelCase to match the actual field names in `GlobalSettings`.
-// `orca_channel` is intentionally absent — it is a build-time common
-// property baked in from `ORCA_BUILD_IDENTITY`, not a user-togglable setting.
+// `pebble_channel` is intentionally absent — it is a build-time common
+// property baked in from `PEBBLE_BUILD_IDENTITY`, not a user-togglable setting.
 //
 // Intentionally does NOT include the telemetry opt-in toggle — that is
 // covered by the dedicated `telemetry_opted_in` / `telemetry_opted_out`
@@ -357,7 +357,7 @@ const repoAddedSchema = z
   })
   .strict()
 
-const appStarredOrcaSchema = z
+const appStarredPebbleSchema = z
   .object({
     source: appStarSourceSchema,
     nth_repo_added: nthRepoAddedSchema
@@ -468,22 +468,22 @@ const nativeChatMessageSentSchema = z
 const telemetryOptedInSchema = z.object({ via: optInViaSchema }).strict()
 const telemetryOptedOutSchema = z.object({ via: optInViaSchema }).strict()
 
-const orcaCliFeatureTipSourceSchema = z.enum(['app_open', 'manual'])
-const orcaCliFeatureTipShownSchema = z
+const pebbleCliFeatureTipSourceSchema = z.enum(['app_open', 'manual'])
+const pebbleCliFeatureTipShownSchema = z
   .object({
-    source: orcaCliFeatureTipSourceSchema,
+    source: pebbleCliFeatureTipSourceSchema,
     nth_repo_added: nthRepoAddedSchema
   })
   .strict()
-const orcaCliFeatureTipSetupClickedSchema = z
+const pebbleCliFeatureTipSetupClickedSchema = z
   .object({
-    source: orcaCliFeatureTipSourceSchema,
+    source: pebbleCliFeatureTipSourceSchema,
     nth_repo_added: nthRepoAddedSchema
   })
   .strict()
-const orcaCliFeatureTipSetupResultSchema = z
+const pebbleCliFeatureTipSetupResultSchema = z
   .object({
-    source: orcaCliFeatureTipSourceSchema,
+    source: pebbleCliFeatureTipSourceSchema,
     result: z.enum(['installed', 'needs_attention', 'dev_preview', 'failed']),
     nth_repo_added: nthRepoAddedSchema
   })
@@ -491,13 +491,13 @@ const orcaCliFeatureTipSetupResultSchema = z
 
 const cmdJPaletteFeatureTipShownSchema = z
   .object({
-    source: orcaCliFeatureTipSourceSchema,
+    source: pebbleCliFeatureTipSourceSchema,
     nth_repo_added: nthRepoAddedSchema
   })
   .strict()
 const cmdJPaletteFeatureTipAcknowledgedSchema = z
   .object({
-    source: orcaCliFeatureTipSourceSchema,
+    source: pebbleCliFeatureTipSourceSchema,
     nth_repo_added: nthRepoAddedSchema
   })
   .strict()
@@ -1101,7 +1101,7 @@ const activationChecklistItemCompletedSchema = z
 
 // Why: see docs/agent-on-path-detection.md. Disambiguates `on_path: false`
 // rows on dashboard 1562016 — distinguishes shell-hydration failure (where
-// `on_path` is misleading because Orca's view of PATH is incomplete) from
+// `on_path` is misleading because Pebble's view of PATH is incomplete) from
 // genuinely-not-on-PATH (where the field is reporting accurately). Closed
 // enum kept in lockstep with `ShellHydrationFailureReason` via a compile-time
 // guard below.
@@ -1379,7 +1379,7 @@ const terminalPaneSplitSchema = z
 // which cannot be unmixed after the fact.
 export const eventSchemas = {
   app_opened: appOpenedSchema,
-  app_starred_orca: appStarredOrcaSchema,
+  app_starred_pebble: appStarredPebbleSchema,
   star_nag_outcome: starNagOutcomeEventSchema,
   feature_interaction_usage_bucket_reached: featureInteractionUsageBucketReachedSchema,
 
@@ -1409,9 +1409,9 @@ export const eventSchemas = {
   telemetry_opted_in: telemetryOptedInSchema,
   telemetry_opted_out: telemetryOptedOutSchema,
 
-  orca_cli_feature_tip_shown: orcaCliFeatureTipShownSchema,
-  orca_cli_feature_tip_setup_clicked: orcaCliFeatureTipSetupClickedSchema,
-  orca_cli_feature_tip_setup_result: orcaCliFeatureTipSetupResultSchema,
+  pebble_cli_feature_tip_shown: pebbleCliFeatureTipShownSchema,
+  pebble_cli_feature_tip_setup_clicked: pebbleCliFeatureTipSetupClickedSchema,
+  pebble_cli_feature_tip_setup_result: pebbleCliFeatureTipSetupResultSchema,
   cmd_j_palette_feature_tip_shown: cmdJPaletteFeatureTipShownSchema,
   cmd_j_palette_feature_tip_acknowledged: cmdJPaletteFeatureTipAcknowledgedSchema,
 
@@ -1510,7 +1510,7 @@ export const COHORT_EXTENDED: readonly EventName[] = Array.from(COHORT_EXTENDED_
 // injection set against silent schema drift.
 type _CohortExtendedRoster =
   | 'app_opened'
-  | 'app_starred_orca'
+  | 'app_starred_pebble'
   | 'star_nag_outcome'
   | 'feature_interaction_usage_bucket_reached'
   | 'repo_added'
@@ -1527,9 +1527,9 @@ type _CohortExtendedRoster =
   | 'agent_started'
   | 'agent_prompt_sent'
   | 'agent_error'
-  | 'orca_cli_feature_tip_shown'
-  | 'orca_cli_feature_tip_setup_clicked'
-  | 'orca_cli_feature_tip_setup_result'
+  | 'pebble_cli_feature_tip_shown'
+  | 'pebble_cli_feature_tip_setup_clicked'
+  | 'pebble_cli_feature_tip_setup_result'
   | 'cmd_j_palette_feature_tip_shown'
   | 'cmd_j_palette_feature_tip_acknowledged'
 // Why: `z.object({}).strict()` infers a string index signature, which would
@@ -1632,7 +1632,7 @@ export const commonPropsSchema = z
     // scheme is cheap to preserve).
     install_id: z.string().min(1).max(64),
     session_id: z.string().min(1).max(64),
-    orca_channel: z.enum(['stable', 'rc'])
+    pebble_channel: z.enum(['stable', 'rc'])
   })
   .strict()
 export type CommonProps = z.infer<typeof commonPropsSchema>

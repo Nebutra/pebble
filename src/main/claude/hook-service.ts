@@ -48,21 +48,21 @@ function getManagedScript(
       'setlocal',
       ...(options.skipWhenDevinImportsClaude
         ? [
-            // Why: Devin imports .claude hooks by default. Skip Orca's managed
+            // Why: Devin imports .claude hooks by default. Skip Pebble's managed
             // Claude hook there so status posts stay attributed to Devin.
             'if not "%DEVIN_PROJECT_DIR%"=="" exit /b 0'
           ]
         : []),
-      // Why: the endpoint file holds the *live* port/token for this Orca
-      // install. A PTY that survived an Orca restart has stale PORT/TOKEN
+      // Why: the endpoint file holds the *live* port/token for this Pebble
+      // install. A PTY that survived a Pebble restart has stale PORT/TOKEN
       // baked into its env from the old instance — loading `endpoint.cmd`
       // (`set KEY=VALUE` lines) via `call` refreshes them so the hook
       // reaches the current server. Falls through to PTY env if the file
-      // is missing (first run / pre-endpoint-file / running outside Orca).
-      'if defined ORCA_AGENT_HOOK_ENDPOINT if exist "%ORCA_AGENT_HOOK_ENDPOINT%" call "%ORCA_AGENT_HOOK_ENDPOINT%" 2>nul',
-      'if "%ORCA_AGENT_HOOK_PORT%"=="" exit /b 0',
-      'if "%ORCA_AGENT_HOOK_TOKEN%"=="" exit /b 0',
-      'if "%ORCA_PANE_KEY%"=="" exit /b 0',
+      // is missing (first run / pre-endpoint-file / running outside Pebble).
+      'if defined PEBBLE_AGENT_HOOK_ENDPOINT if exist "%PEBBLE_AGENT_HOOK_ENDPOINT%" call "%PEBBLE_AGENT_HOOK_ENDPOINT%" 2>nul',
+      'if "%PEBBLE_AGENT_HOOK_PORT%"=="" exit /b 0',
+      'if "%PEBBLE_AGENT_HOOK_TOKEN%"=="" exit /b 0',
+      'if "%PEBBLE_PANE_KEY%"=="" exit /b 0',
       // Why: post via curl.exe, not a second PowerShell. Claude's launcher is
       // already an encoded PowerShell command (Git Bash needs it to survive
       // spaces); a PowerShell post on top of that meant two interpreter
@@ -78,18 +78,18 @@ function getManagedScript(
     '#!/bin/sh',
     ...(options.skipWhenDevinImportsClaude
       ? [
-          // Why: Devin imports .claude hooks by default. Skip Orca's managed
+          // Why: Devin imports .claude hooks by default. Skip Pebble's managed
           // Claude hook there so status posts stay attributed to Devin.
           'if [ -n "$DEVIN_PROJECT_DIR" ]; then',
           '  exit 0',
           'fi'
         ]
       : []),
-    // Why: the endpoint file holds the *live* port/token for this Orca
-    // install. PTYs that survive an Orca restart have stale PORT/TOKEN
+    // Why: the endpoint file holds the *live* port/token for this Pebble
+    // install. PTYs that survive a Pebble restart have stale PORT/TOKEN
     // baked into their env from the old instance — sourcing the file here
     // lets us reach the new server. Falls back to PTY env if the file is
-    // missing (first-run / pre-endpoint-file scripts / running outside Orca).
+    // missing (first-run / pre-endpoint-file scripts / running outside Pebble).
     // Why: suppress stderr on the `.` builtin. A TOCTOU race (endpoint unlinked
     // between the `[ -r ]` test and the source) or a malformed line (e.g. CRLF
     // bled in from a cross-platform userData copy) would otherwise print a
@@ -99,10 +99,10 @@ function getManagedScript(
     // here is strictly better than leaking shell errors into the hook output.
     // `|| :` defends against an eventual `set -e` in an outer script context
     // (not present today) aborting the hook on a parse error.
-    'if [ -n "$ORCA_AGENT_HOOK_ENDPOINT" ] && [ -r "$ORCA_AGENT_HOOK_ENDPOINT" ]; then',
-    '  . "$ORCA_AGENT_HOOK_ENDPOINT" 2>/dev/null || :',
+    'if [ -n "$PEBBLE_AGENT_HOOK_ENDPOINT" ] && [ -r "$PEBBLE_AGENT_HOOK_ENDPOINT" ]; then',
+    '  . "$PEBBLE_AGENT_HOOK_ENDPOINT" 2>/dev/null || :',
     'fi',
-    'if [ -z "$ORCA_AGENT_HOOK_PORT" ] || [ -z "$ORCA_AGENT_HOOK_TOKEN" ] || [ -z "$ORCA_PANE_KEY" ]; then',
+    'if [ -z "$PEBBLE_AGENT_HOOK_PORT" ] || [ -z "$PEBBLE_AGENT_HOOK_TOKEN" ] || [ -z "$PEBBLE_PANE_KEY" ]; then',
     '  exit 0',
     'fi',
     'payload=$(cat)',
@@ -116,16 +116,16 @@ function getManagedScript(
     // Why: pipe payload to curl's stdin (`payload@-`) instead of an inline
     // `payload=$VALUE` arg, so tens-of-KB tool output stays off the curl
     // command line (EDR command-line false positives). Wire body is identical.
-    'printf \'%s\' "$payload" | curl -sS -X POST "http://127.0.0.1:${ORCA_AGENT_HOOK_PORT}/hook/claude" \\',
+    'printf \'%s\' "$payload" | curl -sS -X POST "http://127.0.0.1:${PEBBLE_AGENT_HOOK_PORT}/hook/claude" \\',
     '  --connect-timeout 0.5 --max-time 1.5 \\',
     '  -H "Content-Type: application/x-www-form-urlencoded" \\',
-    '  -H "X-Orca-Agent-Hook-Token: ${ORCA_AGENT_HOOK_TOKEN}" \\',
-    '  --data-urlencode "paneKey=${ORCA_PANE_KEY}" \\',
-    '  --data-urlencode "tabId=${ORCA_TAB_ID}" \\',
-    '  --data-urlencode "launchToken=${ORCA_AGENT_LAUNCH_TOKEN}" \\',
-    '  --data-urlencode "worktreeId=${ORCA_WORKTREE_ID}" \\',
-    '  --data-urlencode "env=${ORCA_AGENT_HOOK_ENV}" \\',
-    '  --data-urlencode "version=${ORCA_AGENT_HOOK_VERSION}" \\',
+    '  -H "X-Pebble-Agent-Hook-Token: ${PEBBLE_AGENT_HOOK_TOKEN}" \\',
+    '  --data-urlencode "paneKey=${PEBBLE_PANE_KEY}" \\',
+    '  --data-urlencode "tabId=${PEBBLE_TAB_ID}" \\',
+    '  --data-urlencode "launchToken=${PEBBLE_AGENT_LAUNCH_TOKEN}" \\',
+    '  --data-urlencode "worktreeId=${PEBBLE_WORKTREE_ID}" \\',
+    '  --data-urlencode "env=${PEBBLE_AGENT_HOOK_ENV}" \\',
+    '  --data-urlencode "version=${PEBBLE_AGENT_HOOK_VERSION}" \\',
     '  --data-urlencode "payload@-" >/dev/null 2>&1 || true',
     'exit 0',
     ''
@@ -217,7 +217,7 @@ export class ClaudeHookService {
     return this.getStatus()
   }
 
-  // Why: install Orca's Claude hook settings on the remote box rather than the
+  // Why: install Pebble's Claude hook settings on the remote box rather than the
   // local machine. Caller passes the user's SFTP handle plus the resolved
   // remote `$HOME`; POSIX-only by design (Windows-remote deferred).
   async installRemote(sftp: SFTPWrapper, remoteHome: string): Promise<AgentHookInstallStatus> {
@@ -227,7 +227,7 @@ export class ClaudeHookService {
     // `process.platform` here (that's the local box).
     const remoteConfigPath = getRemoteConfigPath(remoteHome, this.options.settings)
     const remoteScriptFileName = getPosixManagedScriptFileName(this.options.settings)
-    const remoteScriptPath = `${remoteHome.replace(/\/$/, '')}/.orca/agent-hooks/${remoteScriptFileName}`
+    const remoteScriptPath = `${remoteHome.replace(/\/$/, '')}/.pebble/agent-hooks/${remoteScriptFileName}`
     // Why: SFTP reads/writes fail far more often than local fs (network drops,
     // EACCES on remote dirs, disk full, channel closed). Wrap the entire
     // install flow in try/catch so a transient I/O failure surfaces as a
@@ -258,7 +258,7 @@ export class ClaudeHookService {
       // order means a partial-failure mid-install at worst leaves the user
       // with a working script no settings.json points at (a no-op), instead
       // of broken settings.json.
-      // Why: SSH remotes use POSIX `.sh` hook paths even when Orca itself is
+      // Why: SSH remotes use POSIX `.sh` hook paths even when Pebble itself is
       // running on Windows; never derive remote script syntax from local OS.
       await writeManagedScriptRemote(
         sftp,

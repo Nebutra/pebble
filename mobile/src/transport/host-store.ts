@@ -9,12 +9,12 @@ import {
 } from './types'
 import { getNextHostNameFromHosts } from './host-names'
 
-const STORAGE_KEY = 'orca:hosts'
+const STORAGE_KEY = 'pebble:hosts'
 // Why: SecureStore keys must match [A-Za-z0-9._-]; colons are rejected.
 // Use dots as the separator so the key shape stays readable while
 // satisfying the validator.
-const TOKEN_KEY_PREFIX = 'orca.host-token.'
-const WEB_TOKEN_KEY_PREFIX = 'orca:web-host-token:'
+const TOKEN_KEY_PREFIX = 'pebble.host-token.'
+const WEB_TOKEN_KEY_PREFIX = 'pebble:web-host-token:'
 
 // Why: WHEN_UNLOCKED_THIS_DEVICE_ONLY keeps the pairing token off
 // iCloud Keychain and out of iCloud/iTunes backup restores onto a

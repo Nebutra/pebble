@@ -20,17 +20,17 @@ export function escapeWslShCommandForWindows(command: string): string {
 export function buildWslLoginShellCommand(command: string): string {
   const quotedCommand = quotePosixShell(command)
   return [
-    '_orca_wsl_shell=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)',
-    'if [ -z "$_orca_wsl_shell" ] || [ ! -x "$_orca_wsl_shell" ]; then',
-    '  _orca_wsl_shell="${SHELL:-/bin/bash}"',
+    '_pebble_wsl_shell=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)',
+    'if [ -z "$_pebble_wsl_shell" ] || [ ! -x "$_pebble_wsl_shell" ]; then',
+    '  _pebble_wsl_shell="${SHELL:-/bin/bash}"',
     'fi',
-    'if [ -z "$_orca_wsl_shell" ] || [ ! -x "$_orca_wsl_shell" ]; then',
-    '  _orca_wsl_shell=/bin/sh',
+    'if [ -z "$_pebble_wsl_shell" ] || [ ! -x "$_pebble_wsl_shell" ]; then',
+    '  _pebble_wsl_shell=/bin/sh',
     'fi',
-    '_orca_wsl_shell_name=$(basename "$_orca_wsl_shell" | tr "[:upper:]" "[:lower:]")',
-    'case "$_orca_wsl_shell_name" in',
-    `  sh|dash) exec "$_orca_wsl_shell" -lc ${quotedCommand} ;;`,
-    `  bash|zsh|ksh|mksh|ash) exec "$_orca_wsl_shell" -ilc ${quotedCommand} ;;`,
+    '_pebble_wsl_shell_name=$(basename "$_pebble_wsl_shell" | tr "[:upper:]" "[:lower:]")',
+    'case "$_pebble_wsl_shell_name" in',
+    `  sh|dash) exec "$_pebble_wsl_shell" -lc ${quotedCommand} ;;`,
+    `  bash|zsh|ksh|mksh|ash) exec "$_pebble_wsl_shell" -ilc ${quotedCommand} ;;`,
     `  *) exec /bin/sh -lc ${quotedCommand} ;;`,
     'esac'
   ].join('\n')
@@ -38,13 +38,13 @@ export function buildWslLoginShellCommand(command: string): string {
 
 export function buildWslInteractiveLoginShellCommand(): string {
   return [
-    '_orca_wsl_shell=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)',
-    'if [ -z "$_orca_wsl_shell" ] || [ ! -x "$_orca_wsl_shell" ]; then',
-    '  _orca_wsl_shell="${SHELL:-/bin/bash}"',
+    '_pebble_wsl_shell=$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)',
+    'if [ -z "$_pebble_wsl_shell" ] || [ ! -x "$_pebble_wsl_shell" ]; then',
+    '  _pebble_wsl_shell="${SHELL:-/bin/bash}"',
     'fi',
-    'if [ -z "$_orca_wsl_shell" ] || [ ! -x "$_orca_wsl_shell" ]; then',
-    '  _orca_wsl_shell=/bin/sh',
+    'if [ -z "$_pebble_wsl_shell" ] || [ ! -x "$_pebble_wsl_shell" ]; then',
+    '  _pebble_wsl_shell=/bin/sh',
     'fi',
-    'exec "$_orca_wsl_shell" -l'
+    'exec "$_pebble_wsl_shell" -l'
   ].join('\n')
 }
