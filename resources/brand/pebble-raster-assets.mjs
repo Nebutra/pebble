@@ -1,7 +1,5 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PNG } from 'pngjs'
@@ -22,9 +20,11 @@ const MOBILE = join(ROOT, 'mobile', 'assets')
 const CLASSIC_SOURCE = join(GENERATED, 'pebble-icon', 'selected-icon.png')
 const SOFT_SOURCE = join(GENERATED, 'pebble-icon', '02-icon-soft.png')
 const MINERAL_SOURCE = join(GENERATED, 'pebble-icon', '03-icon-mineral.png')
+const GLYPH_SOURCE = join(GENERATED, 'pebble-icon', 'selected-glyph-chromakey.png')
 
 const PEBBLE_MIST = { r: 244, g: 240, b: 234, a: 255 }
 const MOBILE_SPLASH_BG = { r: 244, g: 240, b: 234, a: 255 }
+const TRANSPARENT_BACKGROUND = { r: 0, g: 0, b: 0, a: 0 }
 
 function readPng(path) {
   const png = PNG.sync.read(readFileSync(path))
@@ -55,14 +55,19 @@ function assertInput(path) {
   }
 }
 
-function pixelMax(data, index) {
-  return Math.max(data[index], data[index + 1], data[index + 2])
+function isChromaGreen(data, index) {
+  return data[index + 1] > 150 && data[index] < 120 && data[index + 2] < 120
 }
 
-function removeDarkCornerBackground(image, threshold = 56) {
-  const { width, height, data } = image
+function buildGlyphMasks(glyph) {
+  const { width, height, data } = glyph
+  const green = new Uint8Array(width * height)
   const visited = new Uint8Array(width * height)
   const queue = []
+
+  for (let offset = 0; offset < green.length; offset++) {
+    green[offset] = isChromaGreen(data, offset * 4) ? 1 : 0
+  }
 
   function enqueue(x, y) {
     if (x < 0 || y < 0 || x >= width || y >= height) {
@@ -72,8 +77,7 @@ function removeDarkCornerBackground(image, threshold = 56) {
     if (visited[offset]) {
       return
     }
-    const index = offset * 4
-    if (pixelMax(data, index) > threshold) {
+    if (!green[offset]) {
       return
     }
     visited[offset] = 1
@@ -97,18 +101,19 @@ function removeDarkCornerBackground(image, threshold = 56) {
     enqueue(x, y - 1)
   }
 
-  const out = Buffer.from(data)
-  for (let offset = 0; offset < visited.length; offset++) {
-    if (!visited[offset]) {
+  const stone = new Uint8Array(width * height)
+  const prompt = new Uint8Array(width * height)
+  for (let offset = 0; offset < green.length; offset++) {
+    if (visited[offset]) {
       continue
     }
-    const index = offset * 4
-    out[index] = 0
-    out[index + 1] = 0
-    out[index + 2] = 0
-    out[index + 3] = 0
+    if (green[offset]) {
+      prompt[offset] = 1
+    } else {
+      stone[offset] = 1
+    }
   }
-  return { width, height, data: out }
+  return { width, height, stone, prompt }
 }
 
 function createCanvas(width, height, fill) {
@@ -145,49 +150,138 @@ function alphaComposite(dst, src, left, top) {
   }
 }
 
-function fitSourceOnCanvas(source, canvasSize, fitRatio, background = PEBBLE_MIST) {
-  const sourceWithAlpha = removeDarkCornerBackground(source)
+function cropTransparentSquare(image, paddingRatio = 0.04) {
+  let minX = image.width
+  let minY = image.height
+  let maxX = -1
+  let maxY = -1
+
+  for (let y = 0; y < image.height; y++) {
+    for (let x = 0; x < image.width; x++) {
+      const index = (y * image.width + x) * 4
+      if (image.data[index + 3] === 0) {
+        continue
+      }
+      minX = Math.min(minX, x)
+      minY = Math.min(minY, y)
+      maxX = Math.max(maxX, x)
+      maxY = Math.max(maxY, y)
+    }
+  }
+
+  if (maxX < minX || maxY < minY) {
+    return image
+  }
+
+  const contentWidth = maxX - minX + 1
+  const contentHeight = maxY - minY + 1
+  const paddedSide = Math.ceil(Math.max(contentWidth, contentHeight) * (1 + paddingRatio * 2))
+  const centerX = Math.round((minX + maxX) / 2)
+  const centerY = Math.round((minY + maxY) / 2)
+  const sourceLeft = Math.max(0, Math.round(centerX - paddedSide / 2))
+  const sourceTop = Math.max(0, Math.round(centerY - paddedSide / 2))
+  const sourceRight = Math.min(image.width, sourceLeft + paddedSide)
+  const sourceBottom = Math.min(image.height, sourceTop + paddedSide)
+  const cropWidth = sourceRight - sourceLeft
+  const cropHeight = sourceBottom - sourceTop
+  const data = Buffer.alloc(cropWidth * cropHeight * 4)
+
+  for (let y = 0; y < cropHeight; y++) {
+    for (let x = 0; x < cropWidth; x++) {
+      const srcIndex = ((sourceTop + y) * image.width + sourceLeft + x) * 4
+      const dstIndex = (y * cropWidth + x) * 4
+      data[dstIndex] = image.data[srcIndex]
+      data[dstIndex + 1] = image.data[srcIndex + 1]
+      data[dstIndex + 2] = image.data[srcIndex + 2]
+      data[dstIndex + 3] = image.data[srcIndex + 3]
+    }
+  }
+
+  return { width: cropWidth, height: cropHeight, data }
+}
+
+function createMaskedPebbleObject(texture, glyph) {
+  const masks = buildGlyphMasks(glyph)
+  const textureSource =
+    texture.width === masks.width && texture.height === masks.height
+      ? texture
+      : resizeImage(texture, masks.width, masks.height)
+  const data = Buffer.alloc(masks.width * masks.height * 4)
+
+  // The generated icon contains an inner app tile; the glyph mask keeps only the
+  // approved pebble silhouette and terminal mark for platform icon exports.
+  for (let offset = 0; offset < masks.stone.length; offset++) {
+    const index = offset * 4
+    if (masks.stone[offset]) {
+      data[index] = textureSource.data[index]
+      data[index + 1] = textureSource.data[index + 1]
+      data[index + 2] = textureSource.data[index + 2]
+      data[index + 3] = 255
+      continue
+    }
+    if (masks.prompt[offset]) {
+      data[index] = 255
+      data[index + 1] = 253
+      data[index + 2] = 248
+      data[index + 3] = 255
+    }
+  }
+
+  return { width: masks.width, height: masks.height, data }
+}
+
+function fitPebbleObjectOnCanvas(texture, glyph, canvasSize, fitRatio, background = PEBBLE_MIST) {
+  const maskedPebble = cropTransparentSquare(createMaskedPebbleObject(texture, glyph))
   const targetSide = Math.round(canvasSize * fitRatio)
-  const resized = resizeImage(sourceWithAlpha, targetSide, targetSide)
+  const resized = resizeImage(maskedPebble, targetSide, targetSide)
   const canvas = createCanvas(canvasSize, canvasSize, background)
   const offset = Math.round((canvasSize - targetSide) / 2)
   alphaComposite(canvas, resized, offset, offset)
   return canvas
 }
 
-function makeSplash(source) {
+function makeSplash(texture, glyph) {
   const canvas = createCanvas(400, 255, MOBILE_SPLASH_BG)
-  const sourceWithAlpha = removeDarkCornerBackground(source)
-  const resized = resizeImage(sourceWithAlpha, 154, 154)
+  const resized = resizeImage(cropTransparentSquare(createMaskedPebbleObject(texture, glyph)), 154, 154)
   alphaComposite(canvas, resized, Math.round((400 - 154) / 2), Math.round((255 - 154) / 2))
   return canvas
 }
 
-function writeIconSet(source1024) {
-  const iconsetDir = join(tmpdir(), `pebble-icon-${process.pid}.iconset`)
-  rmSync(iconsetDir, { recursive: true, force: true })
-  mkdirSync(iconsetDir, { recursive: true })
-  const entries = [
-    ['icon_16x16.png', 16],
-    ['icon_16x16@2x.png', 32],
-    ['icon_32x32.png', 32],
-    ['icon_32x32@2x.png', 64],
-    ['icon_128x128.png', 128],
-    ['icon_128x128@2x.png', 256],
-    ['icon_256x256.png', 256],
-    ['icon_256x256@2x.png', 512],
-    ['icon_512x512.png', 512],
-    ['icon_512x512@2x.png', 1024]
+function icnsChunk(type, png) {
+  const header = Buffer.alloc(8)
+  header.write(type, 0, 4, 'ascii')
+  header.writeUInt32BE(png.length + 8, 4)
+  return Buffer.concat([header, png])
+}
+
+function writeIcns(source1024) {
+  const pngBySize = new Map(
+    [16, 32, 64, 128, 256, 512, 1024].map((size) => [
+      size,
+      encodePng(resizeImage(source1024, size, size))
+    ])
+  )
+  const chunks = [
+    icnsChunk('ic04', pngBySize.get(16)),
+    icnsChunk('ic05', pngBySize.get(32)),
+    icnsChunk('ic11', pngBySize.get(32)),
+    icnsChunk('ic12', pngBySize.get(64)),
+    icnsChunk('ic07', pngBySize.get(128)),
+    icnsChunk('ic08', pngBySize.get(256)),
+    icnsChunk('ic13', pngBySize.get(256)),
+    icnsChunk('ic09', pngBySize.get(512)),
+    icnsChunk('ic14', pngBySize.get(512)),
+    icnsChunk('ic10', pngBySize.get(1024))
   ]
-  for (const [name, size] of entries) {
-    writePng(join(iconsetDir, name), resizeImage(source1024, size, size), { rgb: true })
-  }
-  execFileSync('iconutil', ['-c', 'icns', iconsetDir, '-o', join(BUILD, 'icon.icns')])
-  rmSync(iconsetDir, { recursive: true, force: true })
+  const body = Buffer.concat(chunks)
+  const header = Buffer.alloc(8)
+  header.write('icns', 0, 4, 'ascii')
+  header.writeUInt32BE(body.length + 8, 4)
+  writeFileSync(join(BUILD, 'icon.icns'), Buffer.concat([header, body]))
 }
 
 function main() {
-  for (const path of [CLASSIC_SOURCE, SOFT_SOURCE, MINERAL_SOURCE]) {
+  for (const path of [CLASSIC_SOURCE, SOFT_SOURCE, MINERAL_SOURCE, GLYPH_SOURCE]) {
     assertInput(path)
   }
   mkdirSync(PROCESSED, { recursive: true })
@@ -195,27 +289,42 @@ function main() {
   mkdirSync(APP_ICONS, { recursive: true })
   mkdirSync(MOBILE, { recursive: true })
 
-  const classic1024 = fitSourceOnCanvas(readPng(CLASSIC_SOURCE), 1024, 0.88)
-  const soft1024 = fitSourceOnCanvas(readPng(SOFT_SOURCE), 1024, 0.88)
-  const mineral1024 = fitSourceOnCanvas(readPng(MINERAL_SOURCE), 1024, 0.88)
+  const glyph = readPng(GLYPH_SOURCE)
+  const classic = readPng(CLASSIC_SOURCE)
+  const classic1024 = fitPebbleObjectOnCanvas(classic, glyph, 1024, 0.82, TRANSPARENT_BACKGROUND)
+  const soft1024 = fitPebbleObjectOnCanvas(
+    readPng(SOFT_SOURCE),
+    glyph,
+    1024,
+    0.82,
+    TRANSPARENT_BACKGROUND
+  )
+  const mineral1024 = fitPebbleObjectOnCanvas(
+    readPng(MINERAL_SOURCE),
+    glyph,
+    1024,
+    0.82,
+    TRANSPARENT_BACKGROUND
+  )
+  const mobileOpaque1024 = fitPebbleObjectOnCanvas(classic, glyph, 1024, 0.82, PEBBLE_MIST)
 
-  writePng(join(PROCESSED, 'pebble-icon-classic-1024.png'), classic1024, { rgb: true })
-  writePng(join(PROCESSED, 'pebble-icon-soft-1024.png'), soft1024, { rgb: true })
-  writePng(join(PROCESSED, 'pebble-icon-mineral-1024.png'), mineral1024, { rgb: true })
+  writePng(join(PROCESSED, 'pebble-icon-classic-1024.png'), classic1024)
+  writePng(join(PROCESSED, 'pebble-icon-soft-1024.png'), soft1024)
+  writePng(join(PROCESSED, 'pebble-icon-mineral-1024.png'), mineral1024)
 
-  writePng(join(BUILD, 'icon.png'), classic1024, { rgb: true })
-  writePng(join(ROOT, 'resources', 'icon.png'), resizeImage(classic1024, 256, 256), { rgb: true })
-  writePng(join(ROOT, 'resources', 'icon-dev.png'), resizeImage(classic1024, 256, 256), { rgb: true })
-  writePng(join(APP_ICONS, 'pebble-watercolor.png'), soft1024, { rgb: true })
-  writePng(join(APP_ICONS, 'pebble-blue.png'), mineral1024, { rgb: true })
+  writePng(join(BUILD, 'icon.png'), classic1024)
+  writePng(join(ROOT, 'resources', 'icon.png'), resizeImage(classic1024, 256, 256))
+  writePng(join(ROOT, 'resources', 'icon-dev.png'), resizeImage(classic1024, 256, 256))
+  writePng(join(APP_ICONS, 'pebble-watercolor.png'), soft1024)
+  writePng(join(APP_ICONS, 'pebble-blue.png'), mineral1024)
 
-  writePng(join(MOBILE, 'icon.png'), classic1024, { rgb: true })
-  writePng(join(MOBILE, 'adaptive-icon.png'), classic1024, { rgb: true })
-  writePng(join(MOBILE, 'favicon.png'), resizeImage(classic1024, 48, 48), { rgb: true })
-  writePng(join(MOBILE, 'splash-icon.png'), makeSplash(readPng(CLASSIC_SOURCE)), { rgb: true })
+  writePng(join(MOBILE, 'icon.png'), mobileOpaque1024, { rgb: true })
+  writePng(join(MOBILE, 'adaptive-icon.png'), classic1024)
+  writePng(join(MOBILE, 'favicon.png'), resizeImage(classic1024, 48, 48))
+  writePng(join(MOBILE, 'splash-icon.png'), makeSplash(classic, glyph), { rgb: true })
 
-  writeIconSet(classic1024)
-  writeFileSync(join(BUILD, 'icon.ico'), buildWindowsIcoFromPng(encodeRgbPng(classic1024)))
+  writeIcns(classic1024)
+  writeFileSync(join(BUILD, 'icon.ico'), buildWindowsIcoFromPng(encodePng(classic1024)))
 
   console.log('Pebble raster brand assets generated.')
 }

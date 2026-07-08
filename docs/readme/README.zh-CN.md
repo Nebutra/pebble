@@ -62,7 +62,7 @@
 
 ### 终端分屏
 
-Ghostty 级终端，支持 WebGL 渲染、无限分屏，以及重启后依然保留的滚动历史。
+Pebble 自带终端，支持 WebGL 渲染、无限分屏，以及重启后依然保留的滚动历史。
 
 [文档 →](https://www.nebutra.com/pebble/docs/terminal)
 

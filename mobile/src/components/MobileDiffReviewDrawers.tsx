@@ -6,6 +6,7 @@ import { colors } from '../theme/mobile-theme'
 import type { ActionSheetAction } from './ActionSheetModal'
 import { ActionSheetModal } from './ActionSheetModal'
 import { BottomDrawer } from './BottomDrawer'
+import { getLoadingMicrocopy } from '../../../src/shared/loading-microcopy'
 import { ConfirmModal } from './ConfirmModal'
 import { mobileReviewCountLabel } from '../session/mobile-diff-review-screen-model'
 import type { useMobileDiffReviewController } from '../session/use-mobile-diff-review-controller'
@@ -154,7 +155,7 @@ function sendSheetMessage(
   controller: ReturnType<typeof useMobileDiffReviewController>
 ): string | undefined {
   return controller.sendSheet?.kind === 'loading'
-    ? 'Loading agent sessions...'
+    ? getLoadingMicrocopy('mobile-send-agent-sessions')
     : controller.sendSheet?.kind === 'error'
       ? controller.sendSheet.message
       : `${controller.unsentComments.length} unsent notes`

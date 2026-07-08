@@ -76,7 +76,7 @@ export const FEATURE_WALL_TILES: readonly FeatureWallTile[] = [
   {
     id: 'tile-02',
     kind: 'media',
-    title: 'Ghostty-class terminal',
+    title: 'Pebble terminal',
     caption:
       'WebGL rendering, infinite splits, scrollback restored on restart, full scrollback search.',
     gifPath: 'tile-02.gif',

@@ -6,6 +6,7 @@ import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
 import { parseSparsePresetDirectories } from '@/lib/sparse-preset-draft'
 import { useMountedRef } from '@/hooks/useMountedRef'
+import { getLoadingMicrocopy } from '../../../../shared/loading-microcopy'
 import type { SparsePreset } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
 import {
@@ -193,7 +194,7 @@ export default function SparseCheckoutPresetSelect({
   )
 
   const triggerLabel = isLoadingPresets
-    ? 'Loading presets...'
+    ? getLoadingMicrocopy('sparse-presets')
     : hasPresetLoadError
       ? 'Retry loading presets'
       : !presetsLoaded

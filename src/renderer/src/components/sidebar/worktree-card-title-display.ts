@@ -1,3 +1,5 @@
+import { isLoadingMicrocopy } from '../../../../shared/loading-microcopy'
+
 type WorktreeCardTitleDisplayInput = {
   storedDisplayName: string | null | undefined
   branchName: string | null | undefined
@@ -16,7 +18,7 @@ function normalizeTitle(value: string | null | undefined): string | null {
   if (!trimmed) {
     return null
   }
-  if (/^(Loading .+|.+ details unavailable)$/i.test(trimmed)) {
+  if (/^(Loading .+|.+ details unavailable)$/i.test(trimmed) || isLoadingMicrocopy(trimmed)) {
     return null
   }
   return trimmed

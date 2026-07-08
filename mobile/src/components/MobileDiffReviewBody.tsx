@@ -2,6 +2,7 @@ import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native
 import { RefreshCw } from 'lucide-react-native'
 import type { RefObject } from 'react'
 import type { DiffComment } from '../../../src/shared/types'
+import { getLoadingMicrocopy } from '../../../src/shared/loading-microcopy'
 import { colors } from '../theme/mobile-theme'
 import { MobileDiffReviewLine } from './MobileDiffReviewLine'
 import type {
@@ -40,7 +41,7 @@ export function MobileDiffReviewBody({
   onRetry
 }: Props) {
   if (screenState.kind === 'loading') {
-    return <CenteredState text="Loading review..." busy />
+    return <CenteredState text={getLoadingMicrocopy('mobile-diff-review')} busy />
   }
   if (screenState.kind === 'error' || screenState.kind === 'unavailable') {
     return (
@@ -55,7 +56,7 @@ export function MobileDiffReviewBody({
     return <CenteredState title="No Reviewable Changes" text="Try a different review filter." />
   }
   if (diffState.kind === 'loading') {
-    return <CenteredState text="Loading diff..." busy muted />
+    return <CenteredState text={getLoadingMicrocopy('mobile-diff')} busy muted />
   }
   if (diffState.kind !== 'ready') {
     return <DiffUnavailableState diffState={diffState} onRetry={onRetry} />

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ExternalLink, FolderPlus, GitBranchPlus, Star, X } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useAppStore } from '../store'
@@ -12,8 +12,9 @@ import {
 import { ShortcutKeyCombo } from './ShortcutKeyCombo'
 import { useShortcutKeyDetails, type ShortcutKeyComboDetails } from '@/hooks/useShortcutLabel'
 import { useMountedRef } from '@/hooks/useMountedRef'
-import logo from '../../../../resources/logo.svg'
+import iconUrl from '../../../../resources/icon.png?url'
 import { translate } from '@/i18n/i18n'
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import {
   getLandingPreflightIssues,
   hasGitHubBackedProject,
@@ -27,13 +28,13 @@ type ShortcutItem = {
 }
 
 const PEBBLE_STARGAZERS_URL = 'https://github.com/nebutra/pebble/stargazers'
+const LANDING_STAR_MENU_COLLISION_PADDING = { top: 8, right: 8, bottom: 40, left: 8 } as const
 
 type StarState = 'loading' | 'starred' | 'not-starred' | 'web-fallback' | 'hidden'
 
 function GitHubStarButton({ hasRepos }: { hasRepos: boolean }): React.JSX.Element | null {
   const [state, setState] = useState<StarState>('loading')
   const [menuOpen, setMenuOpen] = useState(false)
-  const wrapperRef = useRef<HTMLDivElement | null>(null)
   const mountedRef = useMountedRef()
 
   useEffect(() => {
@@ -52,19 +53,6 @@ function GitHubStarButton({ hasRepos }: { hasRepos: boolean }): React.JSX.Elemen
       cancelled = true
     }
   }, [])
-
-  useEffect(() => {
-    if (!menuOpen) {
-      return
-    }
-    const onDocClick = (e: MouseEvent): void => {
-      if (!wrapperRef.current?.contains(e.target as Node)) {
-        setMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [menuOpen])
 
   const handleClick = async (): Promise<void> => {
     if (state === 'starred') {
@@ -98,41 +86,49 @@ function GitHubStarButton({ hasRepos }: { hasRepos: boolean }): React.JSX.Elemen
   }
 
   return (
-    <div ref={wrapperRef} className="relative inline-block">
-      <button
-        className={cn(
-          'inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-[13px] font-medium transition-all duration-300',
-          state === 'loading' && 'pointer-events-none opacity-0',
-          state !== 'starred' &&
-            'cursor-pointer border-amber-500/60 text-amber-700 hover:border-amber-500/80 hover:bg-amber-400/10 dark:border-amber-400/30 dark:text-amber-300/90 dark:hover:border-amber-400/50 dark:hover:bg-amber-400/[0.08]',
-          state === 'starred' &&
-            'cursor-pointer border-amber-500/50 bg-amber-400/10 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/[0.06] dark:text-amber-400/60'
-        )}
-        onClick={handleClick}
-        disabled={state === 'loading'}
-      >
-        {state === 'web-fallback' ? (
-          <ExternalLink className="size-3.5 text-amber-600 transition-all duration-300 dark:text-amber-400/80" />
-        ) : (
-          <Star
-            className={cn(
-              'size-3.5 transition-all duration-300',
-              state === 'starred'
-                ? 'fill-amber-500/70 text-amber-500/70 dark:fill-amber-400/60 dark:text-amber-400/60'
-                : 'text-amber-600 dark:text-amber-400/80'
-            )}
-          />
-        )}
-        {state === 'starred'
-          ? translate('auto.components.Landing.ec43b38ba7', 'Starred on GitHub')
-          : state === 'web-fallback'
-            ? translate('auto.components.Landing.157bb5ecbb', 'Open GitHub')
-            : translate('auto.components.Landing.0d0ace8861', 'Star on GitHub')}
-      </button>
-      {state === 'starred' && menuOpen && (
-        <div className="absolute right-0 top-[calc(100%+4px)] z-10 min-w-[100px] rounded-md border border-border bg-popover py-1 shadow-md">
+    <div className="relative inline-block">
+      <Popover open={state === 'starred' && menuOpen} onOpenChange={setMenuOpen}>
+        <PopoverAnchor asChild>
           <button
-            className="w-full px-3 py-1.5 text-left text-[13px] text-foreground hover:bg-muted"
+            className={cn(
+              'inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-[13px] font-medium transition-all duration-300',
+              state === 'loading' && 'pointer-events-none opacity-0',
+              state !== 'starred' &&
+                'cursor-pointer border-amber-500/60 text-amber-700 hover:border-amber-500/80 hover:bg-amber-400/10 dark:border-amber-400/30 dark:text-amber-300/90 dark:hover:border-amber-400/50 dark:hover:bg-amber-400/[0.08]',
+              state === 'starred' &&
+                'cursor-pointer border-amber-500/50 bg-amber-400/10 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/[0.06] dark:text-amber-400/60'
+            )}
+            onClick={handleClick}
+            disabled={state === 'loading'}
+          >
+            {state === 'web-fallback' ? (
+              <ExternalLink className="size-3.5 text-amber-600 transition-all duration-300 dark:text-amber-400/80" />
+            ) : (
+              <Star
+                className={cn(
+                  'size-3.5 transition-all duration-300',
+                  state === 'starred'
+                    ? 'fill-amber-500/70 text-amber-500/70 dark:fill-amber-400/60 dark:text-amber-400/60'
+                    : 'text-amber-600 dark:text-amber-400/80'
+                )}
+              />
+            )}
+            {state === 'starred'
+              ? translate('auto.components.Landing.ec43b38ba7', 'Starred on GitHub')
+              : state === 'web-fallback'
+                ? translate('auto.components.Landing.157bb5ecbb', 'Open GitHub')
+                : translate('auto.components.Landing.0d0ace8861', 'Star on GitHub')}
+          </button>
+        </PopoverAnchor>
+        <PopoverContent
+          align="end"
+          side="bottom"
+          sideOffset={4}
+          collisionPadding={LANDING_STAR_MENU_COLLISION_PADDING}
+          className="z-[80] min-w-[100px] p-1"
+        >
+          <button
+            className="w-full rounded-[7px] px-2 py-1 text-left text-[12px] font-medium leading-5 text-foreground hover:bg-black/8 dark:hover:bg-white/14"
             onClick={() => {
               setMenuOpen(false)
               setState('hidden')
@@ -140,8 +136,8 @@ function GitHubStarButton({ hasRepos }: { hasRepos: boolean }): React.JSX.Elemen
           >
             {translate('auto.components.Landing.c1cf168479', 'Hide')}
           </button>
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }
@@ -317,18 +313,13 @@ export default function Landing(): React.JSX.Element {
     <div className="absolute inset-0 flex items-center justify-center bg-background">
       <div className="w-full max-w-lg px-6">
         <div className="flex flex-col items-center gap-4 py-8">
-          <div
-            className="flex items-center justify-center size-20 rounded-2xl border border-border/80 shadow-lg shadow-black/40"
-            style={{ backgroundColor: '#12181e' }}
-          >
-            <img
-              src={logo}
-              alt={translate('auto.components.Landing.520304a067', 'Pebble logo')}
-              className="size-12"
-            />
-          </div>
+          <img
+            src={iconUrl}
+            alt={translate('auto.components.Landing.520304a067', 'Pebble logo')}
+            className="size-24 drop-shadow-lg"
+          />
           <h1 className="text-4xl font-bold text-foreground tracking-tight">
-            {translate('auto.components.Landing.6ca6ff404e', 'PEBBLE')}
+            {translate('auto.components.Landing.6ca6ff404e', 'Pebble')}
           </h1>
 
           {preflightIssues.length > 0 && <PreflightBanner issues={preflightIssues} repos={repos} />}

@@ -16,6 +16,12 @@ export const DEFAULT_TERMINAL_THEME_LIGHT = 'Builtin Tango Light'
 export const DEFAULT_TERMINAL_DIVIDER_DARK = '#3f3f46'
 const DEFAULT_TERMINAL_DIVIDER_LIGHT = '#d4d4d8'
 
+const BUILTIN_TERMINAL_THEME_LABELS: Record<string, string> = {
+  // Why: the stored theme key remains Ghostty-compatible; only the user-facing
+  // brand label changes during the Pebble migration.
+  'Ghostty Default Style Dark': 'Pebble Default Dark'
+}
+
 export type EffectiveTerminalAppearance = {
   mode: 'dark' | 'light'
   sourceTheme: 'system' | 'dark' | 'light'
@@ -90,7 +96,7 @@ export function getAvailableTerminalThemeOptions(
 ): TerminalThemeOption[] {
   const builtinOptions = BUILTIN_TERMINAL_THEME_NAMES.map((name) => ({
     value: name,
-    label: name,
+    label: BUILTIN_TERMINAL_THEME_LABELS[name] ?? name,
     group: 'built-in' as const,
     previewTheme: getTheme(name)
   }))

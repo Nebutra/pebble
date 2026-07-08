@@ -36,7 +36,7 @@ import type { UseGhosttyImportReturn } from './useGhosttyImport'
 import { WarpThemeImportModal } from './WarpThemeImportModal'
 import type { UseWarpThemeImportReturn } from './useWarpThemeImport'
 import { isWebClientLocation } from '@/hooks/useSettingsNavigationMetadata'
-import ghosttyIcon from '../../../../../resources/ghostty.svg'
+import { Terminal } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 
 type TerminalAppearanceSectionProps = {
@@ -188,7 +188,7 @@ export function TerminalAppearanceSection({
                   className="gap-1.5"
                   onClick={() => void ghostty.handleClick()}
                 >
-                  <img src={ghosttyIcon} alt="" aria-hidden="true" className="size-4" />
+                  <Terminal className="size-4" />
                   {translate(
                     'auto.components.settings.TerminalAppearanceSection.855a76343a',
                     'Import from Ghostty'

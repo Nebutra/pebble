@@ -4,22 +4,34 @@ import { colors } from '../theme/mobile-theme'
 type Props = {
   size?: number
   color?: string
+  cutoutColor?: string
 }
 
-export function PebbleLogo({ size = 24, color = colors.textPrimary }: Props) {
+export function PebbleLogo({
+  size = 24,
+  color = colors.textPrimary,
+  cutoutColor = colors.bgBase
+}: Props) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 256 256">
+    <Svg width={size} height={size} viewBox="0 0 1024 1024">
       <Path
         fill={color}
-        d="M101 50h54c18 0 32 12 32 28s-14 28-32 28h-54c-18 0-32-12-32-28s14-28 32-28Z"
+        d="M504 181c116-3 229 45 297 132 83 108 88 255 17 382-67 121-198 180-355 155-137-22-238-94-279-208-45-126-6-263 102-359 58-51 134-99 218-102z"
       />
       <Path
-        fill={color}
-        d="M72 107h112c21 0 38 14 38 33s-17 33-38 33H72c-21 0-38-14-38-33s17-33 38-33Z"
+        fill="none"
+        stroke={cutoutColor}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={70}
+        d="M395 370 543 518 395 666"
       />
       <Path
-        fill={color}
-        d="M55 173h146c24 0 43 15 43 34s-19 34-43 34H55c-24 0-43-15-43-34s19-34 43-34Z"
+        fill="none"
+        stroke={cutoutColor}
+        strokeLinecap="round"
+        strokeWidth={70}
+        d="M612 620h131"
       />
     </Svg>
   )

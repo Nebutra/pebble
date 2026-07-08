@@ -40,6 +40,7 @@ import {
 } from '../../../../shared/execution-host'
 import { agentLabel, type AiVaultSessionGroup } from './ai-vault-session-filters'
 import { translate } from '@/i18n/i18n'
+import { getLoadingMicrocopy } from '../../../../shared/loading-microcopy'
 
 const VAULT_HEADER_CONTROL_CLASS = 'size-6 shrink-0'
 
@@ -87,7 +88,7 @@ export function SessionLoadingState(): React.JSX.Element {
         <span>
           {translate(
             'auto.components.right.sidebar.AiVaultPanelControls.scanningSessions',
-            'Scanning sessions'
+            getLoadingMicrocopy('ai-vault-sessions')
           )}
         </span>
       </div>

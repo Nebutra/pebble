@@ -1,5 +1,6 @@
 import type { AppState } from '@/store/types'
 import { findWorktreeById } from '@/store/slices/worktree-helpers'
+import { getLoadingMicrocopy } from '../../../../shared/loading-microcopy'
 import type { Worktree } from '../../../../shared/types'
 import type { SshConnectionStatus } from '../../../../shared/ssh-types'
 
@@ -175,7 +176,7 @@ export function getUnavailableQuickActionMessage(
 ): string {
   switch (reason) {
     case 'loading':
-      return `Can't ${actionTitle.toLowerCase()} — workspace is still loading.`
+      return `Can't ${actionTitle.toLowerCase()} — ${getLoadingMicrocopy('cmd-j-workspace')}`
     case 'no-active-workspace':
       return `Can't ${actionTitle.toLowerCase()} — no workspace is active.`
     case 'ssh-disconnected':

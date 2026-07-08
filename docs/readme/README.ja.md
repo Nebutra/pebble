@@ -62,7 +62,7 @@
 
 ### ターミナル分割
 
-WebGL レンダリング、無制限の分割、再起動後も残るスクロールバックを備えた Ghostty クラスのターミナル。
+WebGL レンダリング、無制限の分割、再起動後も残るスクロールバックを備えた Pebble 内蔵ターミナル。
 
 [ドキュメント →](https://www.nebutra.com/pebble/docs/terminal)
 

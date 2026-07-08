@@ -743,7 +743,7 @@
         "0f478f5efa": "Completado",
         "4812814bc8": "Iniciado",
         "9c3ba11a05": "Estado:",
-        "934d87ab96": "Cargando detalles del check...",
+        "934d87ab96": "Desenredando PRs...",
         "71c11aff84": "Volver a ejecutar todos los checks",
         "e31651a224": "Volver a ejecutar checks fallidos",
         "1b56e28faa": "Volver a ejecutar",
@@ -795,7 +795,7 @@
         "b1574e8ac2": "Restablecer contexto de código",
         "d43736d09c": "Controles de contexto de código",
         "bd7be7b1fd": "comentario L",
-        "db61d76cd5": "Cargando contexto de código...",
+        "db61d76cd5": "Cocinando...",
         "f2d02cdf8c": "archivos vistos",
         "1257d1435d": "Mostrar árbol de archivos",
         "a341343303": "Se agregó el comentario de revisión.",
@@ -806,13 +806,13 @@
         "70e84e3d0b": "No hay revisores que coincidan.",
         "1ffce94a8b": "Todos los demás",
         "c2b21818e1": "Sugerencias",
-        "a98433e73d": "Cargando...",
+        "a98433e73d": "Iterando...",
         "b0b7344684": "Solicita hasta 15 revisores",
         "934add88b6": "Revisor",
         "bb42774171": "Escribe o elige un usuario",
         "36f9ac4a47": "No se solicitaron revisores.",
         "8b15a5e91c": "Eliminar revisor {{value0}}",
-        "6a45771d47": "Cargando revisores",
+        "6a45771d47": "Invocando reviewers...",
         "dc8a092c57": "Revisores",
         "e3243d9376": "Editó estos archivos recientemente",
         "8c45901789": "Solicitar revisor {{value0}}",
@@ -902,7 +902,7 @@
         "da4174b00f": "Editar",
         "93f79a3fc1": "Guardar",
         "f72fad3b16": "Cancelar",
-        "717b706849": "Cargando etiquetas",
+        "717b706849": "Ordenando el tablero...",
         "3c0b6ccca7": "bug, backend",
         "dde24ade55": "Etiquetas",
         "908d8d2a73": "Descripción",
@@ -928,7 +928,7 @@
         "ceaf7c30c7": "El ID del revisor no está disponible para este usuario de GitLab.",
         "f7cb495a12": "Se reintentó {{value0}}",
         "98718490e4": "El título del MR es obligatorio.",
-        "d600c2619a": "Cargando log",
+        "d600c2619a": "Construyendo...",
         "028bde664e": "Ocultar",
         "2f9b27f838": "Log del job",
         "032ae1312b": "Abrir job en GitLab",
@@ -1049,7 +1049,7 @@
         "f63ef94ea8": "Issues",
         "f6c6381593": "Copiar prompt",
         "5d670ec8dc": "Copiar nombre de rama sugerido",
-        "937ba6ad9a": "Cargando proyectos",
+        "937ba6ad9a": "Pastoreando tickets...",
         "db3f269d98": "Buscar proyectos",
         "b51276c8d6": "Proyecto",
         "8b5b593053": "No se pudo actualizar el proyecto",
@@ -1085,16 +1085,16 @@
         "2820f0f0f0": "Deja un comentario...",
         "6ab35eafd5": "No se pudo agregar el comentario",
         "367f828482": "No se encontraron etiquetas",
-        "cddd9b04a7": "Cargando etiquetas",
+        "cddd9b04a7": "Pastoreando tickets...",
         "23886c7eec": "Agregar etiqueta",
         "7f7b89b631": "Etiquetas: {{value0}}",
-        "b2376d0179": "Cargando miembros",
+        "b2376d0179": "Kanbaneando...",
         "866316f22c": "Sin asignar",
         "b5675b0694": "Guardar",
         "ceeb8c6153": "Limpiar",
         "fbb90300e2": "Estimación personalizada",
         "780ea6ed89": "No se encontraron estados",
-        "59b6cd3706": "Cargando estados",
+        "59b6cd3706": "Ordenando el tablero...",
         "64bfffc4dd": "Etiquetas",
         "dd304de85a": "Propiedades",
         "0be31fef8e": "La estimación debe ser un número entero no negativo",
@@ -1230,7 +1230,7 @@
         "000f90afcf": "Completado",
         "76551b1161": "Iniciado",
         "662bc2998d": "Estado:",
-        "d8e82b7f15": "Cargando detalles del check...",
+        "d8e82b7f15": "Leyendo el té del diff...",
         "54cddd1858": "Volver a ejecutar todos los checks",
         "68605516dd": "Volver a ejecutar checks fallidos",
         "522d9353e1": "Volver a ejecutar",
@@ -1282,7 +1282,7 @@
         "5f3e293517": "Restablecer contexto de código",
         "85d119be40": "Controles de contexto de código",
         "791ddede19": "comentario L",
-        "4b960e5978": "Cargando contexto de código...",
+        "4b960e5978": "Desenredando PRs...",
         "89e80af1c7": "archivos vistos",
         "319cf2d54b": "Mostrar árbol de archivos",
         "eff839f438": "Se agregó el comentario de revisión.",
@@ -1293,13 +1293,13 @@
         "5ad00c7a0e": "No hay revisores que coincidan.",
         "2760fa29a4": "Todos los demás",
         "828f045847": "Sugerencias",
-        "57750f4a8c": "Cargando...",
+        "57750f4a8c": "Leyendo el té del diff...",
         "805cb72cd4": "Solicita hasta 15 revisores",
         "a04c137bb7": "Revisor",
         "3bde131f49": "Escribe o elige un usuario",
         "d10b6d5209": "No se solicitaron revisores.",
         "ae9a38fd4a": "Eliminar revisor {{value0}}",
-        "acbd110867": "Cargando revisores",
+        "acbd110867": "Leyendo el té del diff...",
         "00d3be6bcd": "Revisores",
         "f4a4b3fd9f": "Editó estos archivos recientemente",
         "41d275d3ec": "Solicitar revisor {{value0}}",
@@ -1361,7 +1361,7 @@
         "61b1c871a6": "Abrir",
         "250e5b2dfb": "Enter",
         "74e2e1b3e4": "No hay archivos coincidentes.",
-        "722a21e1a8": "Cargando archivos...",
+        "722a21e1a8": "Leyendo migas...",
         "1cb6ef47b7": "Ir al archivo...",
         "9e97f08d0f": "Buscar un archivo para abrir",
         "ec31e058f7": "Ir al archivo",
@@ -1409,13 +1409,13 @@
         "919a20dd5b": "Ingresa {{value0}}",
         "56cdb413a2": "Valores separados por comas",
         "1f0fce91e3": "Selecciona {{value0}}",
-        "cbcdcbe244": "Cargando campos obligatorios de Jira...",
+        "cbcdcbe244": "Pastoreando tickets...",
         "34d97ca682": "¿Qué está sucediendo?",
         "f161bf9ede": "Descripción (opcional)",
         "578f730c16": "Breve resumen",
         "16cba35bee": "Título",
         "ae592fee62": "Tipo de issue",
-        "7d63e2626e": "Cargando...",
+        "7d63e2626e": "Kanbaneando...",
         "93c57f15e5": "No se encontraron proyectos.",
         "cfb56a7868": "Buscar proyectos...",
         "00022ec0ba": "Proyecto",
@@ -1575,7 +1575,7 @@
         "8a22eb3f7b": "No hay revisores que coincidan.",
         "67755a83a1": "Todos los demás",
         "3ace2e6bcf": "Sugerencias",
-        "0eacf48491": "Cargando…",
+        "0eacf48491": "Kanbaneando...",
         "0b9b04f4b5": "Escribe o elige un usuario",
         "62c7bd789f": "Solicita hasta 15 revisores",
         "5d4fd69a6a": "Activo recientemente en este pull request",
@@ -1596,7 +1596,7 @@
         "d09bf34db7": "Cerrado",
         "1c893195ac": "No se pudo actualizar el estado",
         "afc68824ff": "No se encontraron estados",
-        "cc13109b5d": "Cargando estados",
+        "cc13109b5d": "Pastoreando tickets...",
         "d45a910c4a": "Cambiar estado Linear de {{value0}}",
         "d8a517ad89": "Identificador",
         "50387522d7": "Sin agrupación",
@@ -1710,7 +1710,7 @@
         "cd51e28d8b": "Guardar",
         "0037b21794": "No guardar",
         "21295c6b8c": "Cambios no guardados",
-        "5c1d2a32bb": "Cargando editor...",
+        "5c1d2a32bb": "Ordenando el buffer...",
         "f0600556b3": "No se pudo crear el archivo Markdown sin título.",
         "37da0d736f": "Nueva pestaña del navegador",
         "a2a279b32a": "El guardado agotó el tiempo de espera o falló. Corrige los errores antes de cerrar.",
@@ -1775,7 +1775,7 @@
         "739bda980c": "primario",
         "556e7232ca": "Actual",
         "684e8d7bc2": "Recopilando tus worktrees recientes y pestañas abiertas.",
-        "ff908adfe9": "Cargando objetivos de salto",
+        "ff908adfe9": "Ordenando la estantería...",
         "1ebe225fee": "Busca worktrees, ajustes, pestañas y acciones...",
         "4e4ff044d5": "Buscar worktrees, ajustes, pestañas y acciones",
         "4ee378034d": "Saltar a...",
@@ -1865,7 +1865,7 @@
           },
           "ProjectCell": {
             "4b5b871da8": "No hay etiquetas en este repositorio.",
-            "2219e945ef": "Cargando…",
+            "2219e945ef": "Pastoreando tickets...",
             "54cac64427": "La fila no tiene slug de repositorio.",
             "8ae56a88a6": "Etiquetas",
             "f7cdb78efb": "Asignados",
@@ -1897,16 +1897,16 @@
           "ProjectPicker": {
             "96739284c3": "Pega una URL de proyecto abajo para acceder a los que faltan.",
             "9b36829267": "No se encontraron vistas.",
-            "72a05c04a6": "Cargando vistas…",
+            "72a05c04a6": "Ordenando el tablero...",
             "9bf55fa1e8": "Elige una vista",
             "a51b3337ab": "← Volver",
             "8ab5447c64": "Fijar",
             "5009ffc2f3": "Quitar fijado",
             "fce99a24a7": "Agregar",
             "5113ecc298": "Agregar por URL u owner/number",
-            "7b6d39627e": "Cargando…",
+            "7b6d39627e": "Ordenando el tablero...",
             "b787682111": "Explorar todo",
-            "ba0ab9a117": "Explorar todo (cargando…)",
+            "ba0ab9a117": "Explorar todo (Kanbaneando...)",
             "b3044b7a25": "Recientes",
             "707843206c": "Fijado",
             "f492e1b539": "Buscar proyectos",
@@ -1929,7 +1929,7 @@
             "4f57d2e0b1": "Ningún elemento coincide con el filtro de esta vista."
           },
           "ProjectViewWrapper": {
-            "463f1205c0": "Cargando vista del proyecto",
+            "463f1205c0": "Kanbaneando...",
             "23b87ba9f7": "Abrir en GitHub",
             "4d2a77a119": "Enviar feature request",
             "1bf8c01c8b": "Cambia a una vista de tabla para trabajar con este proyecto en Pebble.",
@@ -1955,7 +1955,7 @@
           "slug": {
             "dialog": {
               "AssigneesEditor": {
-                "529fec247b": "Cargando…",
+                "529fec247b": "Puliendo píxeles...",
                 "98914e6b36": "Asignados:",
                 "94a4e6e4fa": "ninguno"
               },
@@ -1970,7 +1970,7 @@
                 "commentTooLarge": "El comentario es demasiado grande para enviarlo de forma segura."
               },
               "LabelsEditor": {
-                "34dd57d6c8": "Cargando…",
+                "34dd57d6c8": "Puliendo píxeles...",
                 "a7b182fcda": "Etiquetas:",
                 "1a5366b5be": "ninguno"
               },
@@ -1979,7 +1979,7 @@
                 "41169e41fb": "Añade una descripción…",
                 "a91735d19f": "Cancelar",
                 "e64f6c3eff": "Guardar",
-                "e4ef8281e9": "Cargando…",
+                "e4ef8281e9": "Ordenando el tablero...",
                 "ae98897edf": "Cerrar",
                 "69caf40ae8": "Abrir en GitHub",
                 "7c302f8174": "Sin título"
@@ -2054,7 +2054,7 @@
           "rate": {
             "limit": {
               "display": {
-                "5509443543": "Cargando presupuesto de API de GitHub...",
+                "5509443543": "Presupuestando API...",
                 "34973d4695": "El presupuesto de la API de GitHub no está disponible.",
                 "d12d3d6f33": "Actualizar el presupuesto de la API de GitHub",
                 "d5e5de9070": "Pebble usa REST, Search y GraphQL a través de la CLI de GitHub.",
@@ -2090,13 +2090,13 @@
           "commentTooLarge": "El comentario es demasiado grande para enviarlo de forma segura."
         },
         "GitHubWorkItemAssigneePopoverContent": {
-          "cddd9b04a7": "Cargando asignados",
+          "cddd9b04a7": "Afilando el cursor...",
           "a00830d3f7": "No hay usuarios",
           "4f8b6f2c1d": "Filtrar asignados..."
         },
         "GitHubWorkItemLabelPopoverContent": {
           "2aa9acdf34": "Editar etiquetas en GitHub",
-          "cddd9b04a7": "Cargando etiquetas",
+          "cddd9b04a7": "Ordenando el buffer...",
           "de26e2eb06": "No hay etiquetas",
           "8b0d52ee3a": "Filtrar etiquetas..."
         },
@@ -2166,7 +2166,7 @@
               "5f79bc76b0": "Volver a proyectos",
               "aac9a4afc6": "Abrir en Linear",
               "7616c986c6": "Abrir issues de {{value0}}",
-              "93e1f6bfca": "Cargando",
+              "93e1f6bfca": "Kanbaneando...",
               "98730088a6": ". Busca o abre Linear para ver el conjunto completo.",
               "06b887d622": "Mostrando primero",
               "2c4b1c2c08": "número",
@@ -2569,7 +2569,7 @@
       "tab": {
         "group": {
           "TabGroupPanel": {
-            "814fb04c43": "Cargando editor...",
+            "814fb04c43": "Ordenando el buffer...",
             "f7d6ce445e": "Cerrar grupo",
             "0db2081805": "Dividir hacia arriba",
             "30137df7d0": "Dividir a la izquierda",
@@ -2726,7 +2726,7 @@
               "entry": {
                 "classifier": {
                   "42e6262ae9": "No hay acción disponible.",
-                  "097a982ee0": "Cargando archivos...",
+                  "097a982ee0": "Abriendo el cajón...",
                   "5a9c83c04b": "Abrir cualquier archivo, URL, agente, ...",
                   "90eb94dc48": "Introduce una URL http:// o https://.",
                   "5553b283ce": "Introduce una URL o ruta de archivo.",
@@ -2845,7 +2845,7 @@
             "e419d27083": "Expandir Pebble",
             "41ae4fa725": "Terminando…",
             "138b99bd80": "esta sesión",
-            "888dad8c55": "Cargando…",
+            "888dad8c55": "Cocinando...",
             "6d9793d4bc": "Administrador de recursos - Terminales",
             "ca95d077db": "servicio inaccesible",
             "a82253b458": "Eliminar espacio de trabajo.",
@@ -4623,7 +4623,7 @@
           "5bf8764953": "Error al actualizar la cuenta del Codex.",
           "9baf45d071": "Este dispositivo",
           "2358ac71d2": "WSL predeterminado",
-          "ad47a33f72": "Cargando WSL",
+          "ad47a33f72": "Afinando perillas...",
           "8619f9afa9": "WSL",
           "46cf7e7495": "Ubicación de la cuenta",
           "0b4591ff93": "Elige qué entorno local inspeccionar y dónde se agregan nuevas cuentas gestionadas de Claude y Codex.",
@@ -4694,7 +4694,7 @@
         },
         "AgentLocationSetting": {
           "92f4238f1a": "WSL predeterminado",
-          "fc806485ae": "Cargando WSL",
+          "fc806485ae": "Buscando el switch bueno...",
           "43663b5e69": "WSL",
           "9bccf48906": "Ubicación de Agents",
           "d00949e59b": "Muestra Agents instalados desde {{value0}}. Actualizar vuelve a revisar PATH en ese entorno.",
@@ -5249,7 +5249,7 @@
           "1e29570462": "dando estrella",
           "9d181300e3": "con estrella",
           "5c49f02662": "oculto",
-          "b3f0584f5d": "cargando",
+          "b3f0584f5d": "Afinando perillas...",
           "cb65c75b11": "Abriendo...",
           "f2d4f877b2": "Abrir GitHub"
         },
@@ -5305,7 +5305,7 @@
           "674b5ccd6b": "No hay nuevos ajustes que importar; tus ajustes actuales ya coinciden.",
           "a4c5dec640": "Ajustes por actualizar",
           "4466f4cdaa": "Importación completa",
-          "023a52c1f7": "Cargando vista previa…",
+          "023a52c1f7": "Buscando el switch bueno...",
           "2763b0c045": "Revisa los ajustes que se importarán desde tu configuración de Ghostty.",
           "d2f33670a9": "Importar desde Ghostty",
           "273e7e81fe": "Configuraciones",
@@ -5481,7 +5481,7 @@
           "33c2a1e1b4": "Finalizar sesión {{value0}}",
           "2896a50f50": "Ir a la terminal {{value0}}",
           "e26a60d9eb": "Sin sesiones.",
-          "39c53d6d74": "Cargando…",
+          "39c53d6d74": "Buscando el switch bueno...",
           "5ed15e778c": "Reiniciar servicio",
           "3282db098c": "Finalizar todas las sesiones",
           "b3b1cc5708": "Actualizar",
@@ -6183,7 +6183,7 @@
           "8afa676615": "Agentes",
           "add3b97ee6": "\"",
           "3c88ec55d6": "No se encontraron configuraciones para \"",
-          "c7ad095d96": "Cargando ajustes...",
+          "c7ad095d96": "Afinando perillas...",
           "acc7bbdefd": "Presiona ESC de nuevo para salir de ajustes",
           "43b68e10f0": "Tienes cambios no guardados de Git AI Author. Al salir se descartarán.",
           "17bdee4ff1": "¿Descartar cambios no guardados de Git AI Author?",
@@ -6311,7 +6311,7 @@
           "568d7e1e49": "Actualizado {{value0}}",
           "d7b3f0bdc3": "{{value0}} directorios",
           "9d3c087fc0": "1 directorio",
-          "8deb7024ab": "Cargando presets sparse...",
+          "8deb7024ab": "Afinando perillas...",
           "92c08ccae3": "No se pudieron cargar los presets sparse.",
           "3dfa765ca7": "Se guardarán {{value0}} directorios.",
           "b532b9c17d": "Se guardará 1 directorio.",
@@ -6547,7 +6547,7 @@
           "72bc9334a0": "Comportamiento del renderizador del terminal para paneles activos y paneles nuevos.",
           "2fba319f21": "Renderizado",
           "cc8c5ca224": "Predeterminado de Windows",
-          "d78fc4fdef": "Cargando distribuciones",
+          "d78fc4fdef": "Afinando perillas...",
           "219aaa59f4": "Distribución WSL",
           "2503f1e86b": "Se utiliza para nuevos paneles de terminal WSL y detección de agentes locales cuando el espacio de trabajo activo aún no está dentro de WSL.",
           "5fe79a5e56": "Elija qué distribución WSL utilizarán los nuevos terminales WSL y los análisis de agentes locales.",
@@ -8376,7 +8376,7 @@
           "yaml_no_themes_found": "No se encontraron temas en los archivos seleccionados.",
           "choose_file": "Elegir archivo",
           "choose_folder": "Elegir carpeta",
-          "loading": "Cargando temas de Warp...",
+          "loading": "Buscando el switch bueno...",
           "found_theme_one": "Se encontró 1 tema",
           "found_theme_other": "Se encontraron {{value0}} temas",
           "found_in_source": " en {{value0}}",
@@ -8655,7 +8655,7 @@
         "AgentRuntimeSetting": {
           "label": "Runtime de agentes",
           "wsl": "WSL",
-          "loadingWsl": "Cargando WSL",
+          "loadingWsl": "Afinando perillas...",
           "selectDistro": "Seleccionar distro",
           "windowsDescription": "Detecta y lanza agentes en Windows para proyectos que no anulan su runtime.",
           "wslUnavailable": "WSL no está disponible en esta máquina.",
@@ -8910,13 +8910,13 @@
           },
           "GitHistoryPanel": {
             "cf7cad58d2": "Aún no hay commits",
-            "781a8bcf7b": "Cargando gráfico…",
+            "781a8bcf7b": "Susurrando ramas...",
             "d0fb0f4bf2": "Actualizar commits",
             "9f7535d22b": "Las refs son nombres de ramas o tags que apuntan a ese commit exacto. Solo aparecen cuando Git tiene una ref con nombre para el commit.",
             "9289ba0cb9": "¿Qué son las refs?",
             "d836037d02": "Commits",
             "8232c8b2f2": "Abrir commit {{value0}}: {{value1}}",
-            "9a8b85882d": "cargando",
+            "9a8b85882d": "Buceando diffs...",
             "62e685d5ec": "idle",
             "111e1d0db4": "error",
             "e5e81e59a6": "Cambiar tamaño del panel de commits",
@@ -9169,7 +9169,7 @@
             "522f44dce5": "Archivos sin seguimiento",
             "3636d0f686": "listo",
             "d2e9189866": "todo",
-            "a0cc0e6b4e": "cargando",
+            "a0cc0e6b4e": "Construyendo...",
             "9339382454": "Quitar todo del stage",
             "24d2598eff": "Agregar todo al stage",
             "ce41708855": "Descartar todo",
@@ -9344,7 +9344,7 @@
                 "2524d1fb83": "Cola del log disponible en los detalles completos.",
                 "a2fb3f4408": "Mostrando los primeros 100 jobs",
                 "df137989b3": "Mostrando las primeras 20 anotaciones",
-                "1f2b980522": "Cargando detalles del check…",
+                "1f2b980522": "Invocando reviewers...",
                 "0c96cd25e5": "Resolver",
                 "3a71a6ed0b": "Resuelve los conflictos antes de que los checks y el merge puedan completarse.",
                 "60186d8498": "Los conflictos bloquean esto",
@@ -9648,7 +9648,7 @@
             "sessionHostMismatchUnsupported": "Esta sesión pertenece a un host diferente. Abre un espacio de trabajo en el mismo host para reanudarla."
           },
           "AiVaultPanelControls": {
-            "scanningSessions": "Buscando sesiones",
+            "scanningSessions": "Despertando mini cerebros...",
             "scopeAriaLabel": "Ámbito del historial de sesiones: {{value0}}",
             "currentWorkspaceLower": "workspace actual",
             "currentWorktreeLower": "worktree actual",
@@ -9767,7 +9767,7 @@
             "f8a2c4d1e0": "Modo de búsqueda del explorador"
           },
           "GitHistoryCommitFiles": {
-            "a1b2c3d4e5": "Cargando archivos…",
+            "a1b2c3d4e5": "Abriendo el cajón...",
             "b2c3d4e5f6": "No hay cambios de archivos en este commit",
             "c3d4e5f6a7": "Abrir todos los cambios juntos"
           },
@@ -9929,8 +9929,8 @@
           "8124d085a6": "Abra la configuración de Mac",
           "aa36281b00": "Abra Configuración del sistema y asegúrese de que Pebble pueda enviar notificaciones.",
           "d2dba86837": "Permitir Pebble en macOS",
-          "e52aacf380": "Cargando configuración de notificaciones…",
-          "3cd5374e22": "La configuración de notificaciones aún se está cargando",
+          "e52aacf380": "Calibrando vibes...",
+          "3cd5374e22": "Afinando perillas...",
           "b6a994e36e": "No se pudo reproducir el sonido de notificación",
           "c0692baa52": "Elija un archivo personalizado",
           "ac80d97e02": "Cambiar archivo personalizado"
@@ -10050,12 +10050,12 @@
           "rightClickPasteDescription": "El clic derecho pega el contenido del portapapeles. Ctrl+clic derecho abre el menú contextual.",
           "rightClickMenu": "Abrir menú contextual",
           "rightClickMenuDescription": "El clic derecho abre el menú de la terminal. Pega desde el menú o con el teclado.",
-          "loading": "Cargando ajustes de la terminal...",
+          "loading": "Calibrando vibes...",
           "defaultShell": "Shell predeterminada",
           "defaultShellDescription": "Elige la shell que Pebble abre para nuevos paneles de la terminal de Windows.",
           "wslDistribution": "Distribución de WSL",
           "wslDistributionDescription": "Usa la distribución predeterminada de Windows o elige una distro instalada específica.",
-          "loadingDistros": "Cargando distribuciones",
+          "loadingDistros": "Buscando el switch bueno...",
           "windowsDefault": "Predeterminada de Windows",
           "rightClickBehavior": "Comportamiento del clic derecho",
           "rightClickBehaviorDescription": "Elige el comportamiento del ratón en la terminal que coincida con tu memoria muscular de Windows."
@@ -10301,7 +10301,7 @@
           "rate": {
             "limit": {
               "display": {
-                "ebc0e8ecf1": "Cargando cuota de la API de GitLab...",
+                "ebc0e8ecf1": "Presupuestando API...",
                 "a2d3d1fdde": "La cuota de la API de GitLab no está disponible.",
                 "a2f68645ac": "Actualizar la cuota de la API de GitLab",
                 "2f9c16d6c3": "Pebble usa REST a través de la CLI de GitLab.",
@@ -10346,7 +10346,7 @@
             "adc281394d": "Descartar",
             "8cf80db43b": "Configura la CLI de Pebble y el skill de agente para que los agentes puedan coordinarse a través de Pebble.",
             "2a3c5ddf5e": "Habilitar orquestación",
-            "d6b563ae24": "Cargando editor...",
+            "d6b563ae24": "Puliendo píxeles...",
             "8b14ba6c17": "Nueva pestaña del navegador",
             "b085fb58b5": "Este archivo tiene cambios no guardados.",
             "5ddc688c52": "\"{{value0}}\" tiene cambios no guardados. ¿Quieres guardar antes de cerrar?",
@@ -10958,7 +10958,7 @@
           "ef25ae2d09": "No hay cambios no confirmados.",
           "052c184f24": "El diff de texto no está disponible para este archivo.",
           "7dffb0f563": "Archivo binario",
-          "54e0035b15": "Cargando diff…"
+          "54e0035b15": "Afilando el cursor..."
         },
         "CodeBlockCopyButton": {
           "28921f5bf9": "Copiado",
@@ -11011,7 +11011,7 @@
           "dde325ddfe": "Ajuste desactivado"
         },
         "ConflictComponents": {
-          "f338288514": "Cargando contenido del conflicto…",
+          "f338288514": "Desenredando PRs...",
           "90d576adb2": "Actualizar",
           "a1ce36f77d": "Instantánea capturada a las ",
           "4be41eaafc": "conflicto no resuelto",
@@ -11047,7 +11047,7 @@
         "DiffSectionBody": {
           "35d6afb5be": "Archivo binario cambiado",
           "cef4cf0ff5": "Reintentar",
-          "f5cf81cec2": "Cargando diff…",
+          "f5cf81cec2": "Puliendo píxeles...",
           "72f71f52eb": "El diff de texto no está disponible para este archivo.",
           "7ce8436458": "El diff de texto no está disponible para este archivo en la comparación de ramas.",
           "bdbf02d5df": "binario",
@@ -11062,11 +11062,11 @@
           "e4b074749d": "Front matter",
           "9640d1d3db": "Vista previa de la versión modificada de este diff. Cambia al modo de código fuente para inspeccionar los cambios.",
           "78541e254e": "Archivo binario cambiado",
-          "c88c73a0d3": "Cargando diff…",
+          "c88c73a0d3": "Puliendo píxeles...",
           "b9de81ba52": "Archivo binario — no se puede mostrar",
-          "b2735221f5": "Cargando…",
+          "b2735221f5": "Ordenando el buffer...",
           "8608ce4cb1": "La vista previa de Markdown no está disponible para archivos binarios.",
-          "37a0e81fa6": "Cargando vista previa…",
+          "37a0e81fa6": "Desenredando PRs...",
           "8b1a605bae": "Este archivo está en estado de conflicto, pero no hay ningún archivo del worktree disponible para editar.",
           "2a512bb46a": "Reintentar",
           "39f018b052": "No se puede cargar el archivo",
@@ -11100,7 +11100,7 @@
           "1eef809708": "Ajuste de línea"
         },
         "EditorPanelShell": {
-          "e2c4dec350": "Cargando editor…"
+          "e2c4dec350": "Afilando el cursor..."
         },
         "EditorViewToggle": {
           "b3410cd5e0": "Notebook",
@@ -11122,7 +11122,7 @@
           "6c89c73d9f": "Restablecer zoom",
           "be27304574": "Alejar",
           "77bfc9b35a": "Abrir imagen en ventana emergente",
-          "3ef9551ba2": "Cargando vista previa...",
+          "3ef9551ba2": "Invocando reviewers...",
           "d9d2944855": "No se pudo cargar la vista previa del archivo"
         },
         "ImageViewerPopup": {
@@ -11471,7 +11471,7 @@
           "00e1c1658a": "Completado",
           "aa8494ae3c": "check #",
           "2dd5ddabc4": "workflow #",
-          "1f2b980522": "Cargando detalles de la comprobación…",
+          "1f2b980522": "Invocando reviewers...",
           "d098e5529a": "Salida",
           "f2fe8a4e8f": "Anotaciones",
           "cdbfda4dec": "Anotación",
@@ -12071,7 +12071,7 @@
           "d4b34feb66": "tiempo de ejecución",
           "2d4388a908": "Corre",
           "9c080765ff": "Aún no se han encontrado ejecuciones de Hermes.",
-          "8ea934cacf": "Cargando ejecuciones...",
+          "8ea934cacf": "Shippeando...",
           "d5527d8fe7": "corre",
           "872d032d05": "correr"
         },
@@ -12413,7 +12413,7 @@
       },
       "state": {
         "loading": {
-          "title": "Cargando conversación…",
+          "title": "Kanbaneando...",
           "subtitle": "Leyendo la transcripción del agente."
         },
         "error": {
@@ -12435,7 +12435,7 @@
         "copy": "Copiar mensaje"
       },
       "scrollMessageToTop": "Desplazar este mensaje hacia arriba",
-      "loadingEarlier": "Cargando…",
+      "loadingEarlier": "Pebbling...",
       "loadEarlier": "Cargar mensajes anteriores",
       "question": {
         "step": "Paso {{value0}}",

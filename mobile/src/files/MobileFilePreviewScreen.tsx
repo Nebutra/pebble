@@ -3,6 +3,7 @@ import { Alert, BackHandler, Pressable, Text, View, useWindowDimensions } from '
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { ChevronLeft, Save } from 'lucide-react-native'
+import { getLoadingMicrocopy } from '../../../src/shared/loading-microcopy'
 import { getWorktreeLabel } from '../session/worktree-label'
 import { colors, spacing } from '../theme/mobile-theme'
 import { useForceReconnect, useHostClient } from '../transport/client-context'
@@ -37,7 +38,9 @@ export function MobileFilePreviewScreen({ route }: Props) {
   const { client, state: connState } = useHostClient(previewParams?.hostId)
   const forceReconnect = useForceReconnect()
   const [preview, setPreview] = useState<MobileFilePreviewResult>(() =>
-    route.ok ? { status: 'loading', message: 'Loading preview...' } : previewError(route.message)
+    route.ok
+      ? { status: 'loading', message: getLoadingMicrocopy('mobile-file-preview') }
+      : previewError(route.message)
   )
   const [draftContent, setDraftContent] = useState('')
   const [savedContent, setSavedContent] = useState('')
@@ -103,7 +106,7 @@ export function MobileFilePreviewScreen({ route }: Props) {
       return
     }
     if (!preserveDirtyDraft) {
-      setPreview({ status: 'loading', message: 'Loading preview...' })
+      setPreview({ status: 'loading', message: getLoadingMicrocopy('mobile-file-preview') })
     }
     setSaveError('')
     try {

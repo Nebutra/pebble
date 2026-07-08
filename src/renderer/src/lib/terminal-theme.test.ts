@@ -230,6 +230,12 @@ describe('resolveEffectiveTerminalAppearance', () => {
     expect(options.some((option) => option.group === 'built-in')).toBe(true)
     expect(options).toContainEqual(
       expect.objectContaining({
+        value: DEFAULT_TERMINAL_THEME_DARK,
+        label: 'Pebble Default Dark'
+      })
+    )
+    expect(options).toContainEqual(
+      expect.objectContaining({
         value: 'custom:warp:tokyo-night',
         label: 'Tokyo Night',
         group: 'imported',

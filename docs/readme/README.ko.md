@@ -62,7 +62,7 @@
 
 ### 터미널 분할
 
-WebGL 렌더링, 무한 분할, 재시작 후에도 유지되는 스크롤백을 갖춘 Ghostty급 터미널.
+WebGL 렌더링, 무한 분할, 재시작 후에도 유지되는 스크롤백을 갖춘 Pebble 내장 터미널.
 
 [문서 →](https://www.nebutra.com/pebble/docs/terminal)
 

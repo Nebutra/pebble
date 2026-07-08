@@ -11,6 +11,7 @@ import { isPseudoLocalizationLocale, pseudoLocalizeString } from './pseudo-local
 import { DEFAULT_LOCALE, resolveUiLocale } from './supported-languages'
 import type { SupportedUiLocale } from '../../../shared/ui-locale'
 import type { UiLanguage } from '../../../shared/ui-language'
+import { getLoadingMicrocopy } from '../../../shared/loading-microcopy'
 
 export const i18n: I18nInstance = i18next.createInstance()
 
@@ -72,8 +73,27 @@ void i18n
     }
   })
 
+function getTranslateFallback(key: string, fallback: string): string {
+  const microcopySeed = `${key}:${fallback}`
+  if (/\(loading(?:\.{3}|…)\)/i.test(fallback)) {
+    return fallback.replace(
+      /\(loading(?:\.{3}|…)\)/i,
+      `(${getLoadingMicrocopy(microcopySeed, i18n.language)})`
+    )
+  }
+  if (
+    /^Loading(?:\b|\s|[.…])/.test(fallback) ||
+    /^loading$/i.test(fallback) ||
+    /still loading/i.test(fallback) ||
+    /^Scanning sessions$/i.test(fallback)
+  ) {
+    return getLoadingMicrocopy(microcopySeed, i18n.language)
+  }
+  return fallback
+}
+
 export function translate(key: string, fallback: string, options?: TOptions): string {
-  const value = i18n.t(key, { defaultValue: fallback, ...options })
+  const value = i18n.t(key, { defaultValue: getTranslateFallback(key, fallback), ...options })
   return isPseudoLocalizationLocale(i18n.language) ? pseudoLocalizeString(value) : value
 }
 

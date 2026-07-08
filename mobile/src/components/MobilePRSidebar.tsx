@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { RotateCw } from 'lucide-react-native'
+import { getLoadingMicrocopy } from '../../../src/shared/loading-microcopy'
 import { colors } from '../theme/mobile-theme'
 import type { PrSidebarState } from '../session/mobile-pr-sidebar-state'
 import type { ConnectionState } from '../transport/types'
@@ -149,7 +150,7 @@ function PrSidebarContent({
     return (
       <View style={styles.stateArea}>
         <ActivityIndicator color={colors.textSecondary} />
-        <Text style={styles.stateText}>Loading pull request…</Text>
+        <Text style={styles.stateText}>{getLoadingMicrocopy('mobile-pr-sidebar')}</Text>
       </View>
     )
   }

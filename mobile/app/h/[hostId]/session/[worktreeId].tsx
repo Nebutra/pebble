@@ -208,6 +208,7 @@ import {
 import { colors, spacing } from '../../../../src/theme/mobile-theme'
 import { styles } from './mobile-session-styles'
 import type { DiffComment } from '../../../../../src/shared/types'
+import { getLoadingMicrocopy } from '../../../../../src/shared/loading-microcopy'
 import type {
   DiffCommentActions,
   DiffNotesDelivery,
@@ -4267,7 +4268,7 @@ export default function SessionScreen() {
   const terminalSummary =
     connState === 'connected'
       ? showLoadingState
-        ? 'Loading tabs'
+        ? getLoadingMicrocopy('mobile-session-tabs')
         : visibleTabs.length === 1
           ? '1 tab'
           : `${visibleTabs.length} tabs`
@@ -4719,7 +4720,7 @@ export default function SessionScreen() {
               <View style={styles.emptyState}>
                 <ActivityIndicator size="small" color={colors.textSecondary} />
                 <Text style={styles.emptyText}>
-                  {activePendingTerminalTab.title || 'Loading terminal'}
+                  {activePendingTerminalTab.title || getLoadingMicrocopy('mobile-terminal')}
                 </Text>
               </View>
             ) : (

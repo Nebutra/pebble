@@ -18,6 +18,7 @@ import {
 } from './GitHistoryCommitContextMenu'
 import type { SourceControlRowOpenEvent } from './source-control-split-open'
 import { translate } from '@/i18n/i18n'
+import { getLoadingMicrocopy } from '../../../../shared/loading-microcopy'
 
 export type GitHistoryPanelState =
   | { status: 'idle' | 'loading'; result?: GitHistoryResult; error?: string }
@@ -326,7 +327,7 @@ export function GitHistoryPanel({
           <span>
             {translate(
               'auto.components.right.sidebar.GitHistoryPanel.781a8bcf7b',
-              'Loading graph...'
+              getLoadingMicrocopy('git-history-graph')
             )}
           </span>
         </div>

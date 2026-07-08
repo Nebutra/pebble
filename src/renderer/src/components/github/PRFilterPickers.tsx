@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { isClipboardTextByteLengthOverLimit } from '../../../../shared/clipboard-text'
+import { getLoadingMicrocopy } from '../../../../shared/loading-microcopy'
 
 export type PickerOption = { key: string; primary: string; secondary?: string }
 
@@ -86,7 +87,7 @@ export function SingleSelectList({
     !queryTooLarge &&
     !filtered.some((o) => o.key.toLowerCase() === trimmedQuery.toLowerCase())
   const fallback = loading
-    ? 'Loading…'
+    ? getLoadingMicrocopy('pr-picker-single')
     : queryTooLarge
       ? 'Search text is too large.'
       : showCustom
@@ -170,7 +171,7 @@ export function MultiSelectList({
   const selectedSet = useMemo(() => new Set(selected), [selected])
   const { queryTooLarge } = getPullRequestPickerQueryState(query)
   const fallback = loading
-    ? 'Loading…'
+    ? getLoadingMicrocopy('pr-picker-multi')
     : queryTooLarge
       ? 'Search text is too large.'
       : (error ?? emptyText ?? 'No matches')

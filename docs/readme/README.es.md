@@ -62,7 +62,7 @@ Lanza un mismo prompt a cinco agentes, cada uno en su propio worktree de git ais
 
 ### Terminales divididas
 
-Terminales de nivel Ghostty con renderizado WebGL, divisiones infinitas y un scrollback que sobrevive a los reinicios.
+Terminales propios de Pebble con renderizado WebGL, divisiones infinitas y un scrollback que sobrevive a los reinicios.
 
 [Docs →](https://www.nebutra.com/pebble/docs/terminal)
 

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { BellRing, FileAudio, Settings, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import type { GlobalSettings, NotificationPermissionStatusResult } from '../../../../shared/types'
+import { getLoadingMicrocopy } from '../../../../shared/loading-microcopy'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -151,7 +152,7 @@ export function NotificationStep({
       toast.error(
         translate(
           'auto.components.onboarding.NotificationStep.3cd5374e22',
-          'Notification settings are still loading'
+          getLoadingMicrocopy('notification-settings-blocked')
         )
       )
       return

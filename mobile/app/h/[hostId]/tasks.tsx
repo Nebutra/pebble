@@ -133,6 +133,7 @@ import type {
   SparsePreset,
   TuiAgent
 } from '../../../../src/shared/types'
+import { getLoadingMicrocopy } from '../../../../src/shared/loading-microcopy'
 import type { SshConnectionState } from '../../../../src/shared/ssh-types'
 
 type RepoSummary = {
@@ -10235,7 +10236,9 @@ export default function MobileTasksScreen() {
               ) : null}
 
               <Text style={styles.linearStatesTitle}>
-                {githubProjectLoading ? 'Browse all (loading...)' : 'Browse all'}
+                {githubProjectLoading
+                  ? `Browse all (${getLoadingMicrocopy('mobile-github-projects-browse')})`
+                  : 'Browse all'}
               </Text>
               {browseGitHubProjects.length === 0 ? (
                 <Text style={styles.emptyInlineText}>
@@ -10506,7 +10509,7 @@ export default function MobileTasksScreen() {
           {linearStatesLoading ? (
             <View style={styles.detailLoadingInline}>
               <ActivityIndicator size="small" color={colors.textSecondary} />
-              <Text style={styles.detailMuted}>Loading states...</Text>
+              <Text style={styles.detailMuted}>{getLoadingMicrocopy('mobile-linear-states')}</Text>
             </View>
           ) : linearStates.length === 0 ? (
             <Text style={styles.emptyInlineText}>No states available</Text>
@@ -11692,7 +11695,9 @@ export default function MobileTasksScreen() {
                   {projectIssueTypesLoading ? (
                     <View style={styles.detailLoadingInline}>
                       <ActivityIndicator size="small" color={colors.textSecondary} />
-                      <Text style={styles.detailMuted}>Loading issue types...</Text>
+                      <Text style={styles.detailMuted}>
+                        {getLoadingMicrocopy('mobile-project-issue-types')}
+                      </Text>
                     </View>
                   ) : projectIssueTypesError ? (
                     <Text style={styles.detailError}>{projectIssueTypesError}</Text>
@@ -11911,7 +11916,9 @@ export default function MobileTasksScreen() {
                   {projectLabelsLoading ? (
                     <View style={styles.detailLoadingInline}>
                       <ActivityIndicator size="small" color={colors.textSecondary} />
-                      <Text style={styles.detailMuted}>Loading labels...</Text>
+                      <Text style={styles.detailMuted}>
+                        {getLoadingMicrocopy('mobile-project-labels')}
+                      </Text>
                     </View>
                   ) : projectLabelsError ? (
                     <Text style={styles.detailError}>{projectLabelsError}</Text>
@@ -11972,7 +11979,9 @@ export default function MobileTasksScreen() {
                   {projectAssignableUsersLoading ? (
                     <View style={styles.detailLoadingInline}>
                       <ActivityIndicator size="small" color={colors.textSecondary} />
-                      <Text style={styles.detailMuted}>Loading assignees...</Text>
+                      <Text style={styles.detailMuted}>
+                        {getLoadingMicrocopy('mobile-project-assignees')}
+                      </Text>
                     </View>
                   ) : projectAssignableUsersError ? (
                     <Text style={styles.detailError}>{projectAssignableUsersError}</Text>
@@ -12146,7 +12155,9 @@ export default function MobileTasksScreen() {
                         {projectAssignableUsersLoading ? (
                           <View style={styles.detailLoadingInline}>
                             <ActivityIndicator size="small" color={colors.textSecondary} />
-                            <Text style={styles.detailMuted}>Loading reviewers...</Text>
+                            <Text style={styles.detailMuted}>
+                              {getLoadingMicrocopy('mobile-project-reviewers')}
+                            </Text>
                           </View>
                         ) : projectAssignableUsersError ? (
                           <Text style={styles.detailError}>{projectAssignableUsersError}</Text>
@@ -12871,7 +12882,9 @@ export default function MobileTasksScreen() {
                           itemLabelsLoading ? (
                             <View style={styles.detailLoadingInline}>
                               <ActivityIndicator size="small" color={colors.textSecondary} />
-                              <Text style={styles.detailMuted}>Loading labels...</Text>
+                              <Text style={styles.detailMuted}>
+                                {getLoadingMicrocopy('mobile-item-labels')}
+                              </Text>
                             </View>
                           ) : itemLabelsError ? (
                             <Text style={styles.detailError}>{itemLabelsError}</Text>
@@ -12960,7 +12973,9 @@ export default function MobileTasksScreen() {
                           itemAssignableUsersLoading ? (
                             <View style={styles.detailLoadingInline}>
                               <ActivityIndicator size="small" color={colors.textSecondary} />
-                              <Text style={styles.detailMuted}>Loading assignees...</Text>
+                              <Text style={styles.detailMuted}>
+                                {getLoadingMicrocopy('mobile-item-assignees')}
+                              </Text>
                             </View>
                           ) : itemAssignableUsersError ? (
                             <Text style={styles.detailError}>{itemAssignableUsersError}</Text>
@@ -13092,7 +13107,9 @@ export default function MobileTasksScreen() {
                       {itemAssignableUsersLoading ? (
                         <View style={styles.detailLoadingInline}>
                           <ActivityIndicator size="small" color={colors.textSecondary} />
-                          <Text style={styles.detailMuted}>Loading reviewers...</Text>
+                          <Text style={styles.detailMuted}>
+                            {getLoadingMicrocopy('mobile-item-reviewers')}
+                          </Text>
                         </View>
                       ) : itemAssignableUsersError ? (
                         <Text style={styles.detailError}>{itemAssignableUsersError}</Text>

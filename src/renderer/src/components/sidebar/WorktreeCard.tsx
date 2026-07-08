@@ -38,6 +38,7 @@ import type {
   IssueInfo,
   LinearIssue
 } from '../../../../shared/types'
+import { getLoadingMicrocopy } from '../../../../shared/loading-microcopy'
 import { CONFLICT_OPERATION_LABELS } from './WorktreeCardHelpers'
 import {
   WorktreeCardDetailsHover,
@@ -530,7 +531,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
           // Why: linked metadata is persisted immediately, but GitHub details
           // arrive asynchronously. Show the durable link number instead of
           // making the worktree look unlinked while the cache warms.
-          title: issue === null ? 'Issue details unavailable' : 'Loading issue...'
+          title: issue === null ? 'Issue details unavailable' : getLoadingMicrocopy('linked-issue')
         }
       : null)
   const linearStatus = useAppStore((s) => s.linearStatus)
@@ -592,7 +593,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
           title:
             linearIssueEntry || linearIssueFallbackEntry
               ? 'Linear issue details unavailable'
-              : 'Loading Linear issue...',
+              : getLoadingMicrocopy('linked-linear-issue'),
           url: linearIssueUrlFallback
         }
     : null

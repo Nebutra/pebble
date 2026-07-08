@@ -1,4 +1,5 @@
 import type { HostedReviewInfo } from '../../../../shared/hosted-review'
+import { getLoadingMicrocopy } from '../../../../shared/loading-microcopy'
 import type { PRInfo, Worktree } from '../../../../shared/types'
 
 type LinkedReviewMetadataProvider = Exclude<HostedReviewInfo['provider'], 'unsupported'>
@@ -71,7 +72,7 @@ function makeLinkedReviewFallback(
     number,
     // Why: linked review metadata is persisted before provider details are cached.
     // Keep the row visible on cold first render while the lookup catches up.
-    title: review === null ? `${label} details unavailable` : `Loading ${label}...`
+    title: review === null ? `${label} details unavailable` : getLoadingMicrocopy(`review-${label}`)
   }
 }
 

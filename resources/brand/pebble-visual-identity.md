@@ -1,8 +1,15 @@
-# Pebble Visual Identity
+# Pebble / 溪石 Visual Identity
 
 This is the brand VI direction for replacing legacy assets with Pebble assets.
 It defines brand visuals only. Product UI layout, interaction, and component
 styling continue to follow `docs/STYLEGUIDE.md`.
+
+## Naming
+
+- English product name: `Pebble`.
+- Chinese product name: `溪石`.
+- Technical identifiers, package names, CLI names, environment variables, URLs,
+  and repo paths remain English/stable unless there is a separate migration plan.
 
 ## Brand Idea
 
@@ -245,11 +252,13 @@ The generation graph is staged:
    light direction.
 2. `foundation-pebbling-symbols` references the material board and turns the
    pebbling philosophy into simple motifs.
-3. `core-mark-seed` references both boards to create the first primary mark.
+3. `core-mark-seed` references both boards to create the first single-pebble
+   `>_` primary mark.
 4. `core-mark-production-clean` references the seed and removes clutter before
    downstream use.
 5. `app-icon-classic` references the production mark and material board. This
-   becomes the main visual anchor for app-icon variants and public materials.
+   becomes the no-background desktop icon anchor for variants and public
+   materials.
 6. Hero, social, mobile splash, onboarding, and overview outputs reference the
    icon/material/symbol anchors as needed.
 

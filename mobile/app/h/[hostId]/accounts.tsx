@@ -15,6 +15,7 @@ import { loadHosts } from '../../../src/transport/host-store'
 import { useHostClient } from '../../../src/transport/client-context'
 import type { RpcSuccess } from '../../../src/transport/types'
 import { colors, spacing } from '../../../src/theme/mobile-theme'
+import { getLoadingMicrocopy } from '../../../../src/shared/loading-microcopy'
 import { styles } from './accounts-screen-styles'
 import { ClaudeIcon, OpenAIIcon } from '../../../src/components/AgentIcons'
 import {
@@ -290,7 +291,7 @@ export default function AccountsScreen() {
         ) : !snapshot ? (
           <View style={styles.placeholder}>
             <ActivityIndicator color={colors.textSecondary} />
-            <Text style={styles.placeholderText}>Loading accounts…</Text>
+            <Text style={styles.placeholderText}>{getLoadingMicrocopy('mobile-accounts')}</Text>
           </View>
         ) : (
           <>

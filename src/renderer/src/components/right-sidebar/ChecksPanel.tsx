@@ -62,6 +62,7 @@ import type {
   PRCheckRunDetails,
   PRComment
 } from '../../../../shared/types'
+import { getLoadingMicrocopy } from '../../../../shared/loading-microcopy'
 import { getConnectionId } from '@/lib/connection-context'
 import {
   buildResolvePullRequestConflictsPrompt,
@@ -2552,7 +2553,7 @@ export default function ChecksPanel(): React.JSX.Element {
     }
   }, [sourceControlAiActionsVisible])
   const resolveCommentsWithAIDisabledReason = commentsLoading
-    ? 'Comments are still loading.'
+    ? getLoadingMicrocopy('review-comments')
     : aiActionDisabledReason
       ? aiActionDisabledReason
       : !activeReview

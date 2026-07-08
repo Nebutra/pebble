@@ -3,8 +3,9 @@
 # Structure:
 # 1. Foundation boards lock palette, material, and pebbling philosophy.
 # 2. Core mark tasks use those boards as actual refs, not prompt-only memory.
-# 3. App icon becomes the production visual anchor.
-# 4. Downstream material refs the same anchor so hero/social/mobile variants stay consistent.
+# 3. The approved mark is a single freestanding pebble with a clean >_ prompt.
+# 4. App icon becomes the production visual anchor.
+# 5. Downstream material refs the same anchor so hero/social/mobile variants stay consistent.
 tasks:
   - id: foundation-material-board
     name: 01-foundation-material-board
@@ -28,12 +29,12 @@ tasks:
     refs: ["@foundation-material-board"]
     prompt: >-
       Using the referenced Pebble material board, create a clean symbol sheet
-      of three small pebbling motifs: a single chosen pebble, a small pebble
-      placed beside a larger pebble as a thoughtful gift, and two rounded
-      stones leaning toward each other. Keep them simple, centered, high
+      of three small pebbling motifs: a single chosen pebble, a precise
+      terminal prompt >_ incised into a pebble face, and a subtle share/gift
+      gesture made from tiny scattered stones. Keep them simple, centered, high
       contrast, matte stone and ceramic feeling, warm and precise, plain warm
-      background, no text, no letters, no animal, no legacy whale mark, no
-      watermark.
+      background, no paired oval body shapes, no anatomical silhouette, no
+      animal, no legacy whale mark, no watermark.
 
   - id: core-mark-seed
     name: 03-core-mark-seed
@@ -43,13 +44,14 @@ tasks:
     refs: ["@foundation-material-board", "@foundation-pebbling-symbols"]
     prompt: >-
       Design the primary Pebble logo mark using the referenced material board
-      and pebbling symbol sheet. Create an abstract pebble-shaped letter P
-      without using text: one large smooth pebble forms the main bowl, one
-      smaller pebble reads as the thoughtful gift signal. Use warm stone and
-      mist palette, matte ceramic-mineral material, soft rounded asymmetry,
-      subtle upper-left light, high contrast, centered composition,
-      vector-friendly silhouette, plain warm off-white background, no animal,
-      no legacy whale mark, no letters, no words, no watermark.
+      and pebbling symbol sheet. Create one freestanding smooth pebble
+      silhouette with a clean terminal prompt >_ cut into or softly raised on
+      the face. The outer form is organic, rounded, slightly asymmetrical, and
+      tactile; the inner prompt is precise, geometric, and high contrast. Use
+      warm stone and mist palette, matte ceramic-mineral material, subtle
+      upper-left light, centered composition, vector-friendly silhouette, plain
+      warm off-white background, no letter P, no paired pebble ovals, no
+      anatomical silhouette, no animal, no legacy whale mark, no watermark.
 
   - id: core-mark-production-clean
     name: 04-core-mark-production-clean
@@ -59,10 +61,11 @@ tasks:
     refs: ["@core-mark-seed"]
     prompt: >-
       Refine the referenced Pebble logo mark into a production-clean symbol.
-      Keep the same abstract pebble P silhouette and gifted small pebble, but
-      simplify clutter, remove extra details, strengthen edge clarity, make the
-      shape readable at 48 pixels, preserve soft matte stone tactility, centered
-      with generous safe area on a plain warm background, no text, no letters,
+      Keep the same single freestanding pebble silhouette and clean terminal
+      prompt >_ signal, but simplify clutter, remove extra details, strengthen
+      edge clarity, make the shape readable at 48 pixels, preserve soft matte
+      stone tactility, centered with generous safe area on a plain warm
+      background, no letter P, no paired pebble ovals, no anatomical silhouette,
       no animal, no legacy whale mark, no watermark.
 
   - id: app-icon-classic
@@ -73,11 +76,13 @@ tasks:
     refs: ["@foundation-material-board", "@core-mark-production-clean"]
     prompt: >-
       Convert the referenced production Pebble mark and material board into a
-      polished desktop app icon. Rounded square icon field, warm Pebble Mist
-      base, centered abstract pebble P mark, matte mineral surface, subtle
-      depth, soft shadow, clean macOS Big Sur style icon volume but flatter and
-      calmer, excellent legibility at 48 pixels, no text, no animal, no legacy
-      whale mark, no watermark.
+      polished desktop app icon object. No rounded square field and no tile
+      background: render only one freestanding rounded pebble with the >_
+      terminal prompt on its face, centered with transparent-output intent and
+      generous safe area. Matte mineral surface, subtle depth, soft shadow
+      attached to the pebble only, calm 2026 flat-skeuomorphic tactility,
+      excellent legibility at 48 pixels, no text, no letter P, no animal, no
+      legacy whale mark, no watermark.
 
   - id: app-icon-soft-watercolor
     name: 06-app-icon-soft-watercolor
@@ -88,10 +93,12 @@ tasks:
     prompt: >-
       Create a soft lifestyle variant of the referenced Pebble app icon while
       preserving the exact same core mark silhouette and centered composition.
-      Rounded square app icon, warm matte stone base, gentle shell pink and
-      clay rose watercolor wash, tiny moss sage and tide blue mineral accents,
-      tactile but uncluttered, Xiaohongshu-friendly warmth, still precise and
-      technical, readable at small size, no text, no animal, no watermark.
+      No rounded square field and no tile background: render only the same
+      freestanding pebble and >_ prompt. Warm matte stone base, gentle shell
+      pink and clay rose watercolor wash, tiny moss sage and tide blue mineral
+      accents, tactile but uncluttered, Xiaohongshu-friendly warmth, still
+      precise and technical, readable at small size, no text, no letter P, no
+      animal, no watermark.
 
   - id: app-icon-technical-mineral
     name: 07-app-icon-technical-mineral
@@ -102,10 +109,11 @@ tasks:
     prompt: >-
       Create a cooler technical variant of the referenced Pebble app icon while
       preserving the exact same core mark silhouette and centered composition.
-      Rounded square app icon, sanded mineral surface, Tide Blue and Warm Stone
-      palette, restrained shell pink highlight, precise edge clarity, subtle
-      grid-like reflected light, calm engineering product feeling, readable at
-      48 pixels, no text, no animal, no watermark.
+      No rounded square field and no tile background: render only the same
+      freestanding pebble and >_ prompt. Sanded mineral surface, Tide Blue and
+      Warm Stone palette, restrained shell pink highlight, precise edge clarity,
+      subtle grid-like reflected light, calm engineering product feeling,
+      readable at 48 pixels, no text, no letter P, no animal, no watermark.
 
   - id: monochrome-glyph-chromakey
     name: 08-monochrome-glyph-chromakey
@@ -115,10 +123,11 @@ tasks:
     refs: ["@core-mark-production-clean"]
     prompt: >-
       Create a flat monochrome production glyph based on the referenced Pebble
-      mark. Preserve the exact same abstract pebble P silhouette. Single solid
-      black shape, no gradients, no texture, no shadow, no antialias fuzz,
-      centered, generous safe area, pure chroma key green background #00FF00,
-      no text, no letters, no animal, no watermark.
+      mark. Preserve the exact same single pebble silhouette and >_ prompt
+      relationship. Single solid black pebble shape with white/negative prompt,
+      no gradients, no texture, no shadow, no antialias fuzz, centered,
+      generous safe area, pure chroma key green background #00FF00, no letter P,
+      no animal, no watermark.
 
   - id: small-icon-legibility-proof
     name: 09-small-icon-legibility-proof

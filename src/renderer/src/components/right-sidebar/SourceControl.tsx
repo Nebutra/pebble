@@ -38,6 +38,7 @@ import { getHostedReviewCacheKey } from '@/store/slices/hosted-review'
 import { getGitHubPRCacheKey } from '@/store/slices/github-cache-key'
 import { detectLanguage } from '@/lib/language-detect'
 import { basename, dirname, joinPath } from '@/lib/path'
+import { getLoadingMicrocopy } from '../../../../shared/loading-microcopy'
 import { cn } from '@/lib/utils'
 import { WORKSPACE_FILE_PATH_MIME } from '@/lib/workspace-file-drag'
 import { isFolderRepo } from '../../../../shared/repo-kind'
@@ -541,7 +542,7 @@ const DEFAULT_COLLAPSED_SECTIONS = ['history'] as const
 const SUBMODULE_WORKTREE_ONLY_LABEL = 'Stage inside submodule'
 const SUBMODULE_WORKTREE_ONLY_TOOLTIP =
   'The parent repo (including Stage All) cannot stage file changes inside a submodule'
-const SUBMODULE_LOADING_LABEL = 'Loading submodule changes…'
+const SUBMODULE_LOADING_LABEL = getLoadingMicrocopy('submodule-changes')
 const SUBMODULE_EMPTY_LABEL = 'No changes in submodule'
 const SUBMODULE_ERROR_LABEL = 'Failed to load submodule changes'
 

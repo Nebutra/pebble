@@ -1,6 +1,5 @@
-import { Check } from 'lucide-react'
+import { Check, Terminal } from 'lucide-react'
 import type { GhosttyImportPreview } from '../../../../shared/types'
-import ghosttyIcon from '../../../../../resources/ghostty.svg'
 import { translate } from '@/i18n/i18n'
 import type { DiscoveryState } from './ThemeStep'
 
@@ -53,7 +52,7 @@ export function GhosttyDiscoveryRow({
   const { preview, fields } = discovery
   return (
     <div className="flex items-center gap-3 rounded-lg border border-violet-500/30 bg-violet-500/[0.06] px-3.5 py-2.5">
-      <img src={ghosttyIcon} alt="" className="size-4 shrink-0" />
+      <Terminal className="size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
         <div className="text-[12px] text-foreground">
           <span className="font-medium">
