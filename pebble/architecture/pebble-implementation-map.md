@@ -269,6 +269,20 @@ Current implementation:
 - Keybindings store command ids, context, optional platform, enabled state, and `CmdOrCtrl` style
   accelerators through HTTP and CLI.
 
+### Desktop Shell Mainline
+
+Owns the product workbench shell after Electron exits. Tauri must load the canonical React renderer
+and treat the Electron app only as a temporary screenshot and behavior reference during parity work.
+
+Current implementation:
+
+- `desktop-tauri` imports the root `@/App` renderer and root renderer stylesheet so shell migration
+  does not fork the workbench UI into a mock or reduced surface.
+- Tauri uses Pebble product identity and the Electron fallback window dimensions as the current
+  baseline for pixel-level parity.
+- `verify-tauri-mainline.mjs` checks the renderer entry, preload bridge, Vite aliasing, CSS source,
+  Tauri identity, window bounds, and Roadmap commitment before shell changes are accepted.
+
 ## Migration Rule
 
 Every migrated feature must move through this sequence:
@@ -281,3 +295,5 @@ Every migrated feature must move through this sequence:
 
 Direct line-by-line translation from Electron main into a single Go or Rust
 module is not allowed because it would preserve the current coupling.
+Electron is not a destination architecture; it is only the parity reference
+until Tauri plus the Go/Rust/Zig runtime path proves the same behavior.

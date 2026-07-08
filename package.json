@@ -20,6 +20,7 @@
     "check:styled-scrollbars": "node config/scripts/check-styled-scrollbars.mjs",
     "check:reliability-gates": "node config/scripts/check-reliability-gates.mjs",
     "check:feature-wall-assets": "node config/scripts/check-feature-wall-assets.mjs",
+    "verify:tauri-mainline": "node config/scripts/verify-tauri-mainline.mjs",
     "verify:macos-entitlements": "node config/scripts/verify-macos-entitlements.mjs",
     "vendor:feature-wall-assets": "node config/scripts/vendor-feature-wall-assets.mjs",
     "tc:node": "pnpm run typecheck:node",

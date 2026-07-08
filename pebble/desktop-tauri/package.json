@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 5174",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
+    "verify:mainline": "node ../../config/scripts/verify-tauri-mainline.mjs",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },

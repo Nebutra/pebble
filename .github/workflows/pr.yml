@@ -89,6 +89,9 @@ jobs:
       - name: Check feature wall asset budget
         run: pnpm check:feature-wall-assets
 
+      - name: Verify Tauri desktop mainline contract
+        run: pnpm verify:tauri-mainline
+
       - name: Verify macOS entitlements
         run: pnpm verify:macos-entitlements
 

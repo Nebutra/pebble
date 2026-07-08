@@ -54,6 +54,7 @@ Current verification status:
 - Go runtime and `pebble-control` tests pass with `go test ./...`.
 - Rust host tests pass with `cargo test`.
 - Tauri Rust host checks pass with `cargo check`.
+- Tauri mainline parity guard passes with `node config/scripts/verify-tauri-mainline.mjs`.
 - React Native protocol/app types pass with `npm run typecheck`.
 - React Native native crypto contracts pass with `npm run verify:native-crypto`.
 - Zig system tests pass with Zig 0.16 via `zig build test`.
