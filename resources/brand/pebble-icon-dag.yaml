@@ -9,7 +9,7 @@ tasks:
     model: gpt-image-2
     ratio: "1:1"
     refs:
-      - "resources/brand/generated/pebble-logo/selected-logo.png"
+      - "resources/brand/approved/pebble-logo.png"
       - "resources/brand/generated/pebble-foundation/01-foundation-material-board.png"
     prompt: >-
       Create the production classic app icon for Pebble using the referenced
@@ -60,7 +60,7 @@ tasks:
     model: gpt-image-2
     ratio: "1:1"
     refs:
-      - "resources/brand/generated/pebble-logo/selected-logo.png"
+      - "resources/brand/approved/pebble-logo.png"
     prompt: >-
       Create a flat monochrome production glyph from the referenced Pebble
       selected logo. Preserve the outer rounded pebble silhouette and the `>_`

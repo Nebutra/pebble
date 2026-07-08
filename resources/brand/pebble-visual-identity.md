@@ -64,14 +64,7 @@ Selected production direction:
   generic terminal app icon;
 - the outer silhouette stays organic and tactile, while the inner prompt is
   precise and technical;
-- source raster: `resources/brand/generated/pebble-logo/selected-logo.png`.
-
-Secondary exploration directions:
-
-- a single rounded pebble silhouette with a precise negative-space signal;
-- a compact path/caret cut through one pebble, suggesting a terminal prompt;
-- a small constellation of pebble dots arranged as a share/send gesture;
-- a stacked cairn silhouette only if it reads as balanced stones, not body parts.
+- source raster: `resources/brand/approved/pebble-logo.png`.
 
 Avoid logo structures made from one large oval plus one small oval. That shape
 language is too easy to read as anatomical and is banned for primary marks.
