@@ -12,8 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
-      setContextualToursBlockingSurfaceVisible:
-        mocks.setContextualToursBlockingSurfaceVisible
+      setContextualToursBlockingSurfaceVisible: mocks.setContextualToursBlockingSurfaceVisible
     })
 }))
 
@@ -74,6 +73,42 @@ describe('ConfirmationDialogProvider', () => {
 
     await act(async () => {
       root.unmount()
+    })
+
+    await expect(result).resolves.toBe(false)
+  })
+
+  it('routes confirmation requests through the mounted provider when context is split', async () => {
+    const providerContainer = document.createElement('div')
+    const consumerContainer = document.createElement('div')
+    document.body.append(providerContainer, consumerContainer)
+    const providerRoot: Root = createRoot(providerContainer)
+    const consumerRoot: Root = createRoot(consumerContainer)
+    let result: Promise<boolean> | null = null
+
+    await act(async () => {
+      providerRoot.render(
+        <ConfirmationDialogProvider>
+          <div />
+        </ConfirmationDialogProvider>
+      )
+    })
+
+    await act(async () => {
+      consumerRoot.render(
+        <AutoConfirmRequester
+          onResult={(nextResult) => {
+            result = nextResult
+          }}
+        />
+      )
+    })
+
+    expect(result).not.toBeNull()
+
+    await act(async () => {
+      providerRoot.unmount()
+      consumerRoot.unmount()
     })
 
     await expect(result).resolves.toBe(false)

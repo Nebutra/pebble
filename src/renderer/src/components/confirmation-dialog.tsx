@@ -30,6 +30,24 @@ type ConfirmationDialogContextValue = (options: ConfirmationDialogOptions) => Pr
 
 const ConfirmationDialogContext = createContext<ConfirmationDialogContextValue | null>(null)
 
+type ConfirmationDialogGlobalBridge = {
+  providers: ConfirmationDialogContextValue[]
+}
+
+const CONFIRMATION_DIALOG_GLOBAL_BRIDGE_KEY = Symbol.for('nebutra.pebble.confirmationDialog')
+
+function getConfirmationDialogGlobalBridge(): ConfirmationDialogGlobalBridge {
+  const globalScope = globalThis as typeof globalThis &
+    Record<symbol, ConfirmationDialogGlobalBridge | undefined>
+  const existingBridge = globalScope[CONFIRMATION_DIALOG_GLOBAL_BRIDGE_KEY]
+  if (existingBridge) {
+    return existingBridge
+  }
+  const bridge: ConfirmationDialogGlobalBridge = { providers: [] }
+  globalScope[CONFIRMATION_DIALOG_GLOBAL_BRIDGE_KEY] = bridge
+  return bridge
+}
+
 export function ConfirmationDialogProvider({
   children
 }: {
@@ -83,6 +101,17 @@ export function ConfirmationDialogProvider({
     })
   }, [])
 
+  useEffect(() => {
+    // Why: Vite dev HMR and symlinked worktrees can instantiate sidebar chunks
+    // through a different module URL than App. Keep confirmation routing stable.
+    const bridge = getConfirmationDialogGlobalBridge()
+    bridge.providers = bridge.providers.filter((provider) => provider !== confirm)
+    bridge.providers.push(confirm)
+    return () => {
+      bridge.providers = bridge.providers.filter((provider) => provider !== confirm)
+    }
+  }, [confirm])
+
   const settleActiveRequest = useCallback((confirmed: boolean) => {
     const request = activeRequestRef.current
     if (!request) {
@@ -133,8 +162,13 @@ export function ConfirmationDialogProvider({
 
 export function useConfirmationDialog(): ConfirmationDialogContextValue {
   const confirm = useContext(ConfirmationDialogContext)
-  if (!confirm) {
-    throw new Error('useConfirmationDialog must be used inside ConfirmationDialogProvider')
+  if (confirm) {
+    return confirm
   }
-  return confirm
+  const bridgedProviders = getConfirmationDialogGlobalBridge().providers
+  const bridgedConfirm = bridgedProviders.at(-1)
+  if (bridgedConfirm) {
+    return bridgedConfirm
+  }
+  throw new Error('useConfirmationDialog must be used inside ConfirmationDialogProvider')
 }
