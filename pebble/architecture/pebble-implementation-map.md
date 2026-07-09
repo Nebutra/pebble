@@ -60,13 +60,21 @@ Current implementation:
   order for worktrees; Tauri routes local and runtime RPC metadata writes through those runtime
   endpoints instead of renderer-only synthesis.
 - Tauri emits renderer-correlated `fetching`/`creating` progress events around runtime worktree
-  creation; base-status and remote-branch-conflict events still require source-control migration.
+  creation and now fans out local base-status plus remote-branch-conflict source-control events.
 - Project `locationKind` is validated to `local` or `ssh`; SSH workspaces must use relay-backed
   file, source-control, and session flows instead of accidental local execution, and SSH projects
   require a `hostId` so relay-fed state is scoped to an explicit remote host.
-- Folder workspace object storage is still a migration gap; current runtime lineage support only
-  records folder workspace parent keys referenced by child worktrees. Full linked issue/PR metadata
-  persistence is also still outside the current Go worktree schema.
+- Go now persists ProjectGroup objects plus full FolderWorkspace objects, including folder path,
+  connection id, linked task, comment/archive/read/pin state, smart/manual ordering, workspace
+  status, created agent, first-message rename state, and last activity. Tauri maps local
+  `projectGroups` and `folderWorkspaces` preload APIs plus runtime `projectGroup.*` and
+  `folderWorkspace.*` RPCs onto these Go routes. Local nested repo scan/import now runs through
+  Go runtime routes with `.gitignore` filtering, sparse folder subgroups, existing-project reuse,
+  and local worktree target normalization. Paired remote `connectionId` nested scan/import uses
+  the same runtime environment RPC names, so the desktop host does not inspect SSH paths. Tauri
+  now emits final scan progress events, lets the existing UI cancel active scan IDs into a stopped
+  result, and gives scan/import calls renderer-aligned bounded timeouts. Go HTTP context-level
+  cancellation/streaming plus legacy SSH relay-only nested import paths remain explicit gaps.
 
 ### Terminal Service
 
@@ -105,6 +113,11 @@ Current implementation:
   services.
 - HTTP and CLI expose automation create/update/delete/list, run listing, manual triggering, and
   interval evaluation endpoints.
+- Tauri maps local `window.api.automations` and `automation.*` runtime RPC calls onto the Go
+  automation HTTP routes, preserving the renderer's rich automation fields inside runtime payloads
+  so list/create/update/delete, run listing, and manual Run Now are backed by real runtime storage.
+  RRULE schedule execution, renderer/headless dispatch, native precheck execution, and external
+  automation managers are still explicit migration gaps, not fake-success fallbacks.
 
 ### External Task Service
 
@@ -127,6 +140,23 @@ Current implementation:
 
 - Go exposes local git status projections and file-scoped diff retrieval through the runtime
   gateway, with diff pathspecs constrained to workspace-relative paths.
+- Tauri local runtime RPC maps renderer `git.status`, `git.upstreamStatus`, and conflict-operation
+  fallback calls onto Go source-control projections so the canonical Source Control UI can render
+  real changed-file and branch/ahead/behind state without Electron IPC. Tauri also maps `git.diff`
+  to a Go content-diff endpoint for basic file diff viewing, maps `git.branchCompare`,
+  `git.history`, `git.commitCompare`, `git.branchDiff`, and `git.commitDiff` to bounded
+  history/compare/ref-diff commands, and maps stage/unstage/discard/commit plus
+  fetch/pull/push/fast-forward/rebase, abort merge/rebase, fork sync, remote file/commit URL
+  building, ignore checks, and basic submodule status to bounded Go git commands. Go also stores
+  the created base SHA for local runtime-created worktrees and exposes base-status reconciliation,
+  so Tauri can emit the existing renderer `worktree:baseStatus` and
+  `worktree:remoteBranchConflict` subscription payloads without Electron IPC. The Go projection
+  parser now preserves staged/unstaged/untracked areas and rename `oldPath` through the Tauri
+  status mapper. Tauri maps local `hostedReview.*` runtime calls to typed unsupported-provider
+  review states/results instead of unmapped runtime errors, keeping Source Control on its normal
+  blocked-review UI while provider backends move out of Electron. Full parity still needs conflict
+  metadata, rich submodule/binary diff metadata, remote/SSH base-status parity, provider review
+  actions, and native AI text-generation host wiring for commit and pull-request field generation.
 - SSH/remote source-control projections can be updated by relay workers through the runtime
   gateway; direct git status/diff execution still returns relay-required errors without a worker.
   The runtime normalizes external changed-file status values, drops invalid workspace paths, and
@@ -145,6 +175,23 @@ Current implementation:
 
 - Go exposes local file tree, read, and write APIs with workspace-relative path traversal and
   symlink escape protection plus read-size limits.
+- Go exposes local file create, directory create, chunk read/write, base64 upload write, server
+  directory browse, rename, copy, delete, stat, quick-open list, markdown document list, and
+  bounded text search APIs through the runtime gateway. Tauri maps the canonical renderer file
+  explorer RPCs onto these endpoints, including binary/image preview responses for supported
+  viewer types, so common browse/edit/upload/CRUD/search workflows no longer depend on Electron
+  IPC. For SSH worktrees backed by paired runtime environments, Tauri proxies the same file
+  explorer read/preview/chunk/write/CRUD/search/document RPCs to the owning runtime instead of
+  touching remote paths from the desktop host. Tauri also overrides the web preload's file-watch
+  no-op with a Rust `notify` watcher for local worktrees and bridges SSH/remote watches through
+  runtime-environment `files.watch` subscriptions, emitting the same Electron-compatible
+  `fs:changed` payloads in both cases.
+  Tauri also resolves terminal-tapped worktree paths and grants local temp-file terminal artifacts
+  through native Rust commands with recent-output provenance, TTL, no-follow, stale-file, preview,
+  and writeback checks. Paired remote runtime environments proxy the same terminal artifact RPCs
+  and keep remote grant IDs scoped to the originating connection/worktree/path. Legacy SSH
+  relay-only terminal artifact grants and richer binary viewer parity remain native file-adapter
+  gaps.
 - SSH/remote projects can serve cached file tree and content snapshots once relay workers upsert
   remote state; missing snapshots still return relay-required errors.
 - `pebble-relay-worker` can run in a remote workspace and post file tree/content snapshots back to
@@ -182,6 +229,14 @@ Current implementation:
 - Tauri local runtime RPC maps browser profile create/list/delete plus tab create/list/show/close
   lifecycle calls onto Go `/v1/browser/*` routes so renderer runtime callers do not fall back to
   `method_not_available` for stateful browser records.
+- Tauri maps runtime `browser.goto`, `browser.back`, `browser.forward`, and `browser.reload` to
+  Go browser provider actions while updating the tab projection first, so the native WebView
+  provider can consume real queued navigation work instead of the desktop shell dropping those
+  commands.
+- Tauri records toolbar viewport overrides per browser page and runtime `browser.viewport` returns
+  explicit request dimensions or the stored page override until the native WebView/CDP adapter
+  exists, so renderer input-scaling paths do not crash while avoiding a fake claim that real
+  viewport emulation is complete.
 - Rust/Tauri can register the desktop browser action bridge with `/v1/providers`, so runtime,
   desktop, and mobile projections show whether the native bridge is online; the desktop shell
   refreshes registration while connected so stale persisted providers do not claim readiness.
@@ -207,6 +262,10 @@ Current implementation:
 - Tauri exports these commands to the desktop shell without tying them to a specific platform
   provider, and the desktop UI can poll native/browser/emulator queues and mark actions completed
   or failed.
+- Tauri routes macOS computer-use permission status, setup, and reset through the bundled
+  `Pebble Computer Use.app` helper using the same TCC identity checks as Electron. Linux and
+  Windows still return explicit unsupported permission states instead of pretending setup
+  succeeded.
 - Mobile projections expose computer action queue status so paired devices can inspect native
   provider work without polling provider-specific endpoints.
 - Zig exposes the low-level C ABI that native providers can use for process, PTY, and signal
@@ -237,6 +296,9 @@ Current implementation:
 
 - Go owns pairing code issuance, persisted pairing records, pairing-secret validation, and the
   `/v1/mobile-relay` WebSocket transport, including fragmented client text-frame assembly.
+- Go exposes persisted mobile relay pairings as runtime access grants, supports revoking a pairing
+  by device id, and Tauri maps the renderer's mobile device/access-grant list and revoke APIs to
+  those runtime routes instead of the web preload's empty grant mock.
 - Unpaired WebSocket clients can only attempt `pair.start`; projection subscriptions and runtime
   commands require a paired device via encrypted handshake or pairing-secret `client.hello`.
 - Paired connections can upgrade to encrypted envelopes through X25519, HKDF-SHA256, and
@@ -332,6 +394,23 @@ Current implementation:
   contract, stop maps to session delete, and renderer-side resize/reportGeometry state preserves
   Electron's restore semantics until native winsize propagation lands. This is a fallback bridge,
   not the final Zig-backed PTY implementation.
+- Tauri local runtime RPC maps terminal list/show/read/send/wait/inspect/clear/stop/stopExact/agent-status
+  calls to Go process sessions so CLI, agent-note, sleep/restore, and runtime-probe flows do not
+  fall through to unmapped Electron-only methods. Go still needs hook-level idle/permission state
+  before those waits can match Electron's full TUI readiness model.
+- Tauri local runtime RPC maps file explorer read/readChunk/readPreview/write/writeBase64,
+  create/rename/copy/delete/stat/list/search, upload chunk, and server directory browse calls to
+  Go file endpoints. For SSH worktrees backed by paired runtime environments, Tauri proxies the
+  same file explorer read/preview/chunk/write/CRUD/search/document RPCs to the owning runtime
+  instead of touching remote paths from the desktop host. Tauri file watching uses Rust `notify`
+  for local worktrees and runtime-environment `files.watch` subscriptions for SSH/remote
+  worktrees, emitting the renderer's existing `fs:changed` payload shape instead of the web no-op.
+  Tauri resolves terminal-tapped worktree paths and grants local temp-file terminal artifacts
+  through native Rust commands with recent-output provenance, TTL, no-follow, stale-file, preview,
+  and writeback checks. Paired remote runtime environments proxy the same terminal artifact RPCs
+  and keep remote grant IDs scoped to the originating connection/worktree/path. Legacy SSH
+  relay-only terminal artifact grants and richer binary viewer parity remain native file-adapter
+  gaps.
 - Tauri now maps runtime-backed agent sessions into the existing renderer `agentStatus` IPC
   contract instead of leaving the Activity/Agents page on the web mock: spawn records the real
   `tabId`/`leafId` pane key, runtime `session.status` events emit `working`/`done`, kill maps to
@@ -341,6 +420,10 @@ Current implementation:
   desktop reclaim actions for terminal/browser presence-lock surfaces. This prevents stuck empty
   APIs in the renderer contract; live mobile/shared-control event ingestion remains a separate
   runtime RPC parity gate.
+- Tauri exposes the canonical speech model catalog and model states that explicitly mark the
+  native STT adapter as unavailable, plus functional lifecycle listener registration. This keeps
+  Settings and dictation surfaces on the Electron renderer contract without pretending Tauri can
+  download models or transcribe audio before the native speech backend is migrated.
 - Tauri detects installed local CLI agents by reusing the shared `TUI_AGENT_CONFIG` command catalog
   and a native Rust PATH/install-dir probe, so agent settings and launch surfaces are no longer fed
   mock empty detection results.
@@ -353,10 +436,23 @@ Current implementation:
 - Tauri streams runtime `project.changed` and `worktree.changed` events into the existing
   renderer repo/worktree refresh callbacks, so runtime-backed project/workspace mutations no
   longer rely only on manual list refreshes.
+- Tauri maps worktree create-base prefetch to a best-effort Go runtime git fetch for local git
+  projects, preserving Electron's warm-up behavior without touching SSH workspaces from the
+  desktop host.
+- Tauri maps `repo.hooksCheck`, setup-script import inspection, issue-command shared/local
+  resolution, and issue-command runner script creation through Go file reads, shared
+  `pebble.yaml` parsers, and a Rust `git rev-parse --git-path` writer. The runner preserves
+  Electron's `PEBBLE_*` plus historical compatibility env vars and writes under the real gitdir
+  for linked worktrees, so trusted hook prompts and linked-issue launches are no longer fed fake
+  no-hook state in the Tauri shell.
 - Tauri remote runtime environments now use the stored pairing material only inside Rust commands:
-  one-shot `runtimeEnvironments.call` opens the WebSocket, performs the same E2EE hello/auth flow as
-  the Electron shared client, and returns the remote RPC envelope instead of falling back to local
-  runtime results. Shared-control subscriptions and SSH relay detection remain separate parity gates.
+  one-shot `runtimeEnvironments.call` and subscription calls open the WebSocket, perform the same
+  E2EE hello/auth flow as the Electron shared client, and return or stream the remote RPC envelope
+  plus binary frames instead of falling back to local runtime results. Shared-control ingestion and
+  SSH relay detection remain separate parity gates.
+- Tauri file watching now uses native `notify` for local worktrees and resolves `connectionId`
+  worktree watches to runtime `files.watch` subscriptions, fanning both paths back into the same
+  Electron-compatible `FsChangedPayload` consumed by Explorer, Source Control, and editor reloads.
 - Tauri exposes updater version/status events and menu-triggered check errors so updater surfaces no
   longer silently no-op, initializes the native updater/process plugins, and now maps the existing
   UpdateCard lifecycle onto signed updater package download, native install, and process relaunch.
@@ -374,6 +470,8 @@ Current implementation:
   deep-link routing, updater release-feed checks and native plugin wiring, crash-report persistence,
   browser runtime bridge, local mock-UI drift, and Roadmap commitment before shell changes are
   accepted.
+  The verifier also locks local filesystem watch bridging so the Tauri shell keeps a native
+  `notify` watcher with Electron-compatible payloads instead of falling back to web no-ops.
 
 ## Migration Rule
 
