@@ -10,6 +10,10 @@ import {
 import { useAppStore } from '@/store'
 import type { FloatingTerminalTriggerLocation } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import {
+  getFloatingTerminalMenuSide,
+  type FloatingTerminalMenuSide
+} from './floating-terminal-menu-side'
 
 type FloatingTerminalIconContextMenuProps = {
   children: React.ReactNode
@@ -27,6 +31,7 @@ export function FloatingTerminalIconContextMenu({
   const updateSettings = useAppStore((s) => s.updateSettings)
   const [open, setOpen] = useState(false)
   const [menuPoint, setMenuPoint] = useState({ x: 0, y: 0 })
+  const [menuSide, setMenuSide] = useState<FloatingTerminalMenuSide>('bottom')
   const reopenFrameRef = useRef<number | null>(null)
 
   const setTriggerRef = useCallback((node: HTMLSpanElement | null): void => {
@@ -72,6 +77,9 @@ export function FloatingTerminalIconContextMenu({
           event.preventDefault()
           event.stopPropagation()
           setMenuPoint({ x: event.clientX, y: event.clientY })
+          // Why: the status-bar/floating trigger often sits on the viewport
+          // edge; picking the side explicitly avoids partially hidden menus.
+          setMenuSide(getFloatingTerminalMenuSide(event.clientY))
           setOpen(false)
           if (reopenFrameRef.current !== null) {
             window.cancelAnimationFrame(reopenFrameRef.current)
@@ -97,7 +105,13 @@ export function FloatingTerminalIconContextMenu({
             style={{ left: menuPoint.x, top: menuPoint.y }}
           />
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-52" sideOffset={0} align="start">
+        <DropdownMenuContent
+          className="w-52"
+          side={menuSide}
+          sideOffset={6}
+          align="start"
+          collisionPadding={8}
+        >
           <DropdownMenuItem
             className="whitespace-nowrap"
             onSelect={() => {
