@@ -1,6 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod window_chrome;
+
+use tauri::Manager;
 
 fn main() {
     run()
@@ -11,6 +14,14 @@ pub fn run() {
     let app = tauri::Builder::default()
         .manage(commands::crash_reports::CrashReportsState::default())
         .manage(commands::diagnostics::DiagnosticsState::default())
+        .setup(|app| {
+            // Anti-flash background + macOS traffic-light parity with the
+            // Electron shell; runs before the webview first paints.
+            if let Some(window) = app.get_webview_window("main") {
+                window_chrome::apply_window_chrome(&window);
+            }
+            Ok(())
+        })
         .manage(commands::runtime_process::RuntimeProcessState::default())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_process::init())
