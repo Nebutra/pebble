@@ -21,6 +21,10 @@ use super::diagnostics::{
 };
 
 const CRASH_REPORTS_FILE: &str = "crash-reports.json";
+// Mutations append one line here instead of rewriting the whole snapshot; replayed over
+// the snapshot on load and folded back in when the journal grows past MAX_JOURNAL_ENTRIES.
+const CRASH_REPORTS_JOURNAL_FILE: &str = "crash-reports.log.ndjson";
+const MAX_JOURNAL_ENTRIES: usize = 64;
 const FEEDBACK_API_URL: &str = "https://www.nebutra.com/pebble/v1/feedback";
 const MAX_REPORTS: usize = 5;
 const MAX_BREADCRUMBS: usize = 30;
@@ -156,6 +160,28 @@ pub struct CrashReportSubmitResult {
 #[serde(rename_all = "camelCase")]
 struct CrashReportFile {
     reports: Vec<CrashReportRecord>,
+}
+
+// Internal on-disk journal delta — never part of the renderer contract, so its shape is
+// free to change. `op` tags the variant; unknown/corrupt lines are ignored on replay.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "op", rename_all = "camelCase")]
+enum CrashReportJournalEntry {
+    // A newly recorded report, prepended then capped exactly like record_report.
+    Insert {
+        report: CrashReportRecord,
+    },
+    // One or more status assignments (target transition plus related-crash dismissals).
+    SetStatus {
+        changes: Vec<CrashReportStatusChange>,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CrashReportStatusChange {
+    id: String,
+    status: String,
 }
 
 #[derive(Debug)]
@@ -493,9 +519,8 @@ fn record_report(
     state: &CrashReportsState,
     input: CrashReportCreateInput,
 ) -> Result<CrashReportRecord, String> {
-    let path = crash_report_store_path(app)?;
+    let store = crash_report_store(app)?;
     let _lock = lock_state(&state.file_lock)?;
-    let mut reports = read_reports(&path)?;
     let report = CrashReportRecord {
         id: Uuid::new_v4().to_string(),
         created_at: current_iso_timestamp(),
@@ -513,9 +538,13 @@ fn record_report(
         details: sanitize_details(input.details),
         breadcrumbs: sanitize_breadcrumbs(input.breadcrumbs),
     };
-    reports.insert(0, report.clone());
-    reports.truncate(MAX_REPORTS);
-    write_reports(&path, &reports)?;
+    // O(1)-in-store-size append; the snapshot is compacted lazily when the journal fills.
+    append_journal_entry(
+        &store,
+        CrashReportJournalEntry::Insert {
+            report: report.clone(),
+        },
+    )?;
     Ok(report)
 }
 
@@ -523,9 +552,9 @@ fn read_reports_locked(
     app: &tauri::AppHandle,
     state: &CrashReportsState,
 ) -> Result<Vec<CrashReportRecord>, String> {
-    let path = crash_report_store_path(app)?;
+    let store = crash_report_store(app)?;
     let _lock = lock_state(&state.file_lock)?;
-    read_reports(&path)
+    read_reports(&store)
 }
 
 fn get_report_by_id_locked(
@@ -556,15 +585,20 @@ fn transition_report_status(
     from: &str,
     status: &str,
 ) -> Result<Option<CrashReportRecord>, String> {
-    let path = crash_report_store_path(app)?;
+    let store = crash_report_store(app)?;
     let _lock = lock_state(&state.file_lock)?;
-    let mut reports = read_reports(&path)?;
+    let mut reports = read_reports(&store)?;
     let anchor = reports.iter().find(|report| report.id == id).cloned();
     let mut result = None;
+    let mut changes = Vec::new();
     for report in &mut reports {
         if report.id == id {
             if report.status == from {
                 report.status = status.to_string();
+                changes.push(CrashReportStatusChange {
+                    id: report.id.clone(),
+                    status: report.status.clone(),
+                });
             }
             result = Some(report.clone());
             continue;
@@ -572,22 +606,51 @@ fn transition_report_status(
         if let Some(anchor) = &anchor {
             if anchor.status == from && is_related_crash_event(anchor, report) {
                 report.status = "dismissed".to_string();
+                changes.push(CrashReportStatusChange {
+                    id: report.id.clone(),
+                    status: report.status.clone(),
+                });
             }
         }
     }
-    write_reports(&path, &reports)?;
+    // Skip a disk write when nothing transitioned so idempotent calls stay free.
+    if !changes.is_empty() {
+        append_journal_entry(&store, CrashReportJournalEntry::SetStatus { changes })?;
+    }
     Ok(result)
 }
 
-fn crash_report_store_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    Ok(app
-        .path()
-        .app_data_dir()
-        .map_err(|error| format!("Could not resolve Pebble app data directory: {error}"))?
-        .join(CRASH_REPORTS_FILE))
+struct CrashReportStore {
+    snapshot: PathBuf,
+    journal: PathBuf,
 }
 
-fn read_reports(path: &Path) -> Result<Vec<CrashReportRecord>, String> {
+fn crash_report_store(app: &tauri::AppHandle) -> Result<CrashReportStore, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not resolve Pebble app data directory: {error}"))?;
+    Ok(CrashReportStore {
+        snapshot: dir.join(CRASH_REPORTS_FILE),
+        journal: dir.join(CRASH_REPORTS_JOURNAL_FILE),
+    })
+}
+
+// Load = compacted snapshot + replayed journal; compacts opportunistically when the
+// journal has grown, so an idle-then-reopen run heals fragmentation without a mutation.
+fn read_reports(store: &CrashReportStore) -> Result<Vec<CrashReportRecord>, String> {
+    let mut reports = read_snapshot(&store.snapshot)?;
+    let entries = read_journal_entries(&store.journal)?;
+    for entry in &entries {
+        replay_journal_entry(&mut reports, entry);
+    }
+    if entries.len() > MAX_JOURNAL_ENTRIES {
+        compact_store(store, &reports)?;
+    }
+    Ok(reports)
+}
+
+fn read_snapshot(path: &Path) -> Result<Vec<CrashReportRecord>, String> {
     if !path.exists() {
         return Ok(Vec::new());
     }
@@ -598,7 +661,78 @@ fn read_reports(path: &Path) -> Result<Vec<CrashReportRecord>, String> {
     Ok(file.reports.into_iter().take(MAX_REPORTS).collect())
 }
 
-fn write_reports(path: &Path, reports: &[CrashReportRecord]) -> Result<(), String> {
+// Corrupt or partially-written lines (e.g. a crash mid-append) are dropped rather than
+// surfaced as errors — crash reporting must never itself crash the app.
+fn read_journal_entries(path: &Path) -> Result<Vec<CrashReportJournalEntry>, String> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let contents = match fs::read_to_string(path) {
+        Ok(contents) => contents,
+        Err(_) => return Ok(Vec::new()),
+    };
+    Ok(contents
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .filter_map(|line| serde_json::from_str::<CrashReportJournalEntry>(line).ok())
+        .collect())
+}
+
+fn replay_journal_entry(reports: &mut Vec<CrashReportRecord>, entry: &CrashReportJournalEntry) {
+    match entry {
+        CrashReportJournalEntry::Insert { report } => {
+            reports.insert(0, report.clone());
+            reports.truncate(MAX_REPORTS);
+        }
+        CrashReportJournalEntry::SetStatus { changes } => {
+            for change in changes {
+                if let Some(report) = reports.iter_mut().find(|report| report.id == change.id) {
+                    report.status = change.status.clone();
+                }
+            }
+        }
+    }
+}
+
+fn append_journal_entry(
+    store: &CrashReportStore,
+    entry: CrashReportJournalEntry,
+) -> Result<(), String> {
+    ensure_store_dir(store)?;
+    let line = serde_json::to_string(&entry)
+        .map_err(|error| format!("Could not encode Pebble crash report journal: {error}"))?;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&store.journal)
+        .map_err(|error| format!("Could not open Pebble crash report journal: {error}"))?;
+    use std::io::Write;
+    file.write_all(format!("{line}\n").as_bytes())
+        .map_err(|error| format!("Could not append Pebble crash report journal: {error}"))?;
+    Ok(())
+}
+
+// Rewrite the snapshot atomically (tmp + rename) then drop the journal, matching the
+// original crash-report durability guarantee for the compacted state.
+fn compact_store(store: &CrashReportStore, reports: &[CrashReportRecord]) -> Result<(), String> {
+    write_snapshot(&store.snapshot, reports)?;
+    if store.journal.exists() {
+        fs::remove_file(&store.journal)
+            .map_err(|error| format!("Could not truncate Pebble crash report journal: {error}"))?;
+    }
+    Ok(())
+}
+
+fn ensure_store_dir(store: &CrashReportStore) -> Result<(), String> {
+    let parent = store
+        .snapshot
+        .parent()
+        .ok_or_else(|| "Could not resolve Pebble crash report directory.".to_string())?;
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("Could not create Pebble crash report directory: {error}"))
+}
+
+fn write_snapshot(path: &Path, reports: &[CrashReportRecord]) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| "Could not resolve Pebble crash report directory.".to_string())?;
@@ -1221,5 +1355,141 @@ mod tests {
             chrome_version: Some("1".to_string()),
         };
         assert!(normalize_renderer_error_input(input).is_err());
+    }
+
+    fn temp_store(tag: &str) -> CrashReportStore {
+        let dir = std::env::temp_dir().join(format!(
+            "pebble-crash-store-{}-{}-{}",
+            tag,
+            std::process::id(),
+            Uuid::new_v4()
+        ));
+        fs::create_dir_all(&dir).expect("create temp store dir");
+        CrashReportStore {
+            snapshot: dir.join(CRASH_REPORTS_FILE),
+            journal: dir.join(CRASH_REPORTS_JOURNAL_FILE),
+        }
+    }
+
+    fn sample_report(id: &str) -> CrashReportRecord {
+        CrashReportRecord {
+            id: id.to_string(),
+            created_at: "2024-01-01T00:00:00.000Z".to_string(),
+            status: "pending".to_string(),
+            source: "renderer".to_string(),
+            process_type: "react-render".to_string(),
+            reason: "react-error-boundary".to_string(),
+            exit_code: None,
+            app_version: "1.0.0".to_string(),
+            platform: "darwin".to_string(),
+            os_release: "test".to_string(),
+            arch: "arm64".to_string(),
+            electron_version: TAURI_ELECTRON_VERSION_SENTINEL.to_string(),
+            chrome_version: "unknown".to_string(),
+            details: Map::new(),
+            breadcrumbs: None,
+        }
+    }
+
+    #[test]
+    fn appends_without_rewriting_snapshot() {
+        let store = temp_store("append");
+        append_journal_entry(
+            &store,
+            CrashReportJournalEntry::Insert {
+                report: sample_report("a"),
+            },
+        )
+        .expect("append insert");
+        // The snapshot must stay untouched by an append — only the journal grows.
+        assert!(!store.snapshot.exists());
+        assert!(store.journal.exists());
+        let reports = read_reports(&store).expect("read after append");
+        assert_eq!(reports.len(), 1);
+        assert_eq!(reports[0].id, "a");
+    }
+
+    #[test]
+    fn replays_journal_over_snapshot_after_reopen() {
+        let store = temp_store("replay");
+        write_snapshot(&store.snapshot, &[sample_report("base")]).expect("seed snapshot");
+        append_journal_entry(
+            &store,
+            CrashReportJournalEntry::Insert {
+                report: sample_report("newer"),
+            },
+        )
+        .expect("append insert");
+        append_journal_entry(
+            &store,
+            CrashReportJournalEntry::SetStatus {
+                changes: vec![CrashReportStatusChange {
+                    id: "base".to_string(),
+                    status: "dismissed".to_string(),
+                }],
+            },
+        )
+        .expect("append status");
+
+        // Simulate a fresh process: read from paths only.
+        let reopened = CrashReportStore {
+            snapshot: store.snapshot.clone(),
+            journal: store.journal.clone(),
+        };
+        let reports = read_reports(&reopened).expect("read after reopen");
+        assert_eq!(reports.len(), 2);
+        assert_eq!(reports[0].id, "newer");
+        assert_eq!(reports[1].id, "base");
+        assert_eq!(reports[1].status, "dismissed");
+    }
+
+    #[test]
+    fn ignores_corrupt_trailing_journal_line() {
+        let store = temp_store("corrupt");
+        append_journal_entry(
+            &store,
+            CrashReportJournalEntry::Insert {
+                report: sample_report("good"),
+            },
+        )
+        .expect("append insert");
+        // Mimic a crash mid-append leaving a truncated JSON line.
+        let mut existing = fs::read_to_string(&store.journal).expect("read journal");
+        existing.push_str("{\"op\":\"insert\",\"report\":{\"id\":\"tru");
+        fs::write(&store.journal, existing).expect("write corrupt journal");
+
+        let reports = read_reports(&store).expect("read past corruption");
+        assert_eq!(reports.len(), 1);
+        assert_eq!(reports[0].id, "good");
+    }
+
+    #[test]
+    fn compacts_when_journal_exceeds_bound() {
+        let store = temp_store("compact");
+        write_snapshot(&store.snapshot, &[sample_report("base")]).expect("seed snapshot");
+        // One extra past the bound so read_reports triggers compaction.
+        for index in 0..=MAX_JOURNAL_ENTRIES {
+            append_journal_entry(
+                &store,
+                CrashReportJournalEntry::SetStatus {
+                    changes: vec![CrashReportStatusChange {
+                        id: "base".to_string(),
+                        status: if index % 2 == 0 { "dismissed" } else { "sent" }.to_string(),
+                    }],
+                },
+            )
+            .expect("append status");
+        }
+
+        let reports = read_reports(&store).expect("read triggers compaction");
+        assert_eq!(reports.len(), 1);
+        // Last write wins; MAX_JOURNAL_ENTRIES (64) is even → final status "dismissed".
+        assert_eq!(reports[0].status, "dismissed");
+        // Journal is folded into the snapshot and removed.
+        assert!(!store.journal.exists());
+        assert!(store.snapshot.exists());
+        // The compacted snapshot alone reproduces the same state.
+        let after = read_reports(&store).expect("read after compaction");
+        assert_eq!(after[0].status, "dismissed");
     }
 }
