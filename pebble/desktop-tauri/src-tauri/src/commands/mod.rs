@@ -1,4 +1,5 @@
 pub mod browser_detection;
+pub mod cli_registration;
 pub mod computer_permissions;
 pub mod crash_reports;
 pub mod deep_link;
@@ -7,6 +8,7 @@ pub mod file_picker;
 pub mod filesystem_watch;
 pub mod git_refs;
 pub mod hooks;
+pub mod notifications;
 pub mod preflight;
 pub mod remote_runtime_rpc;
 pub mod runtime_environments;

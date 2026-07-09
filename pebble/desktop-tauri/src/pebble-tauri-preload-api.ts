@@ -36,6 +36,9 @@ import {
   readTauriPreflightStatus,
   refreshTauriAgents
 } from './tauri-preflight-agent-api'
+import { createPebbleSshApi } from './tauri-ssh-targets-api'
+import { createPebbleNotificationsApi } from './tauri-notifications-api'
+import { createPebbleCliApi } from './tauri-cli-api'
 
 type RemoteWindowsTerminalCapabilities = Awaited<
   ReturnType<PreloadApi['preflight']['detectRemoteWindowsTerminalCapabilities']>
@@ -109,6 +112,9 @@ export function installPebbleTauriPreloadApi(): void {
   api.hooks = createPebbleHooksApi(api.hooks)
   api.mobile = createPebbleMobileApi(api.mobile)
   api.speech = createPebbleSpeechApi(api.speech)
+  api.ssh = createPebbleSshApi(api.ssh)
+  api.notifications = createPebbleNotificationsApi(api.notifications)
+  api.cli = createPebbleCliApi(api.cli)
 }
 
 function createPebbleAppApi(base: PreloadApi['app']): PreloadApi['app'] {
