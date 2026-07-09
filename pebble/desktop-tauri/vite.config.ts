@@ -39,7 +39,26 @@ export default defineConfig({
   },
   build: {
     outDir: resolve(packageDir, 'dist'),
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Split stable framework/UI vendors into their own long-cached chunks so
+        // the entry chunk carries app code only — app edits stop re-parsing/
+        // re-downloading react-dom and the radix/floating-ui primitives.
+        manualChunks(id) {
+          if (!id.includes('/node_modules/')) {
+            return undefined
+          }
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) {
+            return 'vendor-react'
+          }
+          if (/[\\/]node_modules[\\/](@radix-ui|@floating-ui|react-remove-scroll|cmdk)[\\/]/.test(id)) {
+            return 'vendor-ui'
+          }
+          return undefined
+        }
+      }
+    }
   },
   worker: {
     format: 'es'
