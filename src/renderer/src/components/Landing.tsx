@@ -28,7 +28,7 @@ type ShortcutItem = {
 }
 
 const PEBBLE_STARGAZERS_URL = 'https://github.com/nebutra/pebble/stargazers'
-const LANDING_STAR_MENU_COLLISION_PADDING = { top: 8, right: 8, bottom: 40, left: 8 } as const
+const LANDING_STAR_MENU_COLLISION_PADDING = { top: 8, right: 8, bottom: 72, left: 8 } as const
 
 type StarState = 'loading' | 'starred' | 'not-starred' | 'web-fallback' | 'hidden'
 
@@ -122,8 +122,11 @@ function GitHubStarButton({ hasRepos }: { hasRepos: boolean }): React.JSX.Elemen
         </PopoverAnchor>
         <PopoverContent
           align="end"
-          side="bottom"
-          sideOffset={4}
+          // Why: this footer control sits above Pebble's bottom status chrome;
+          // opening upward keeps the single-item menu visible instead of
+          // letting viewport-only collision math place it under the status bar.
+          side="top"
+          sideOffset={8}
           collisionPadding={LANDING_STAR_MENU_COLLISION_PADDING}
           className="z-[80] min-w-[100px] p-1"
         >

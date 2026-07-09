@@ -50,11 +50,23 @@ and cleanup policies.
 
 Current implementation:
 
-- Go persists projects and worktrees, supports project metadata updates/deletes, and removes
-  worktree metadata without deleting files from disk.
+- Go persists projects and worktrees, supports project metadata updates/deletes, persists project
+  order, and can run bounded local `git worktree remove` before deleting Tauri-created worktree
+  records. Metadata-only deletion remains available for legacy/runtime bookkeeping paths; SSH
+  worktree deletion, preserved-branch cleanup, and hook-aware archival remain parity gaps.
+- Go persists worktree instance identity plus worktree/folder workspace lineage records, and Tauri
+  bridges lineage list/set/create runtime calls into the existing renderer and CLI contracts.
+- Go persists display/comment/archive/pin/read status, workspace status, manual order, and smart-sort
+  order for worktrees; Tauri routes local and runtime RPC metadata writes through those runtime
+  endpoints instead of renderer-only synthesis.
+- Tauri emits renderer-correlated `fetching`/`creating` progress events around runtime worktree
+  creation; base-status and remote-branch-conflict events still require source-control migration.
 - Project `locationKind` is validated to `local` or `ssh`; SSH workspaces must use relay-backed
   file, source-control, and session flows instead of accidental local execution, and SSH projects
   require a `hostId` so relay-fed state is scoped to an explicit remote host.
+- Folder workspace object storage is still a migration gap; current runtime lineage support only
+  records folder workspace parent keys referenced by child worktrees. Full linked issue/PR metadata
+  persistence is also still outside the current Go worktree schema.
 
 ### Terminal Service
 
@@ -164,11 +176,18 @@ Current implementation:
 - Rust/Tauri expose browser action poll/update commands that claim only `browser.*` runtime actions
   and report completion through the shared computer-action endpoint.
 - The Tauri desktop shell bridges runtime browser profiles, download cancellation, and
-  `browser.changed` events into the existing Electron renderer contract, while registering a
-  degraded browser provider until native WebView/CDP execution is available.
+  `browser.changed` events into the existing Electron renderer contract, detects installed browser
+  profile candidates for the import picker through a native Rust command, and registers a degraded
+  browser provider until native WebView/CDP execution and cookie import are available.
+- Tauri local runtime RPC maps browser profile create/list/delete plus tab create/list/show/close
+  lifecycle calls onto Go `/v1/browser/*` routes so renderer runtime callers do not fall back to
+  `method_not_available` for stateful browser records.
 - Rust/Tauri can register the desktop browser action bridge with `/v1/providers`, so runtime,
   desktop, and mobile projections show whether the native bridge is online; the desktop shell
   refreshes registration while connected so stale persisted providers do not claim readiness.
+- Tauri runtime RPC now exposes provider list/status/register through the same Go routes, so
+  UI, mobile, and runtime diagnostics read the same TTL-bound provider truth instead of a preload
+  stub.
 - Mobile projections replace full browser tab and download lists on runtime events so closed tabs
   and completed/removed provider records do not linger.
 - Native page rendering plus binary screenshot capture and download execution remain assigned to
@@ -297,6 +316,9 @@ Current implementation:
 - Tauri backs local Git base-ref/default-branch lookups with native `git` commands so the
   canonical repository settings and worktree-create branch pickers no longer receive empty mock
   results.
+- Tauri's Vite build uses a relative asset base so packaged WebViews load the hashed renderer
+  scripts/styles from `frontendDist`; absolute `/assets/...` paths are treated as a white-screen
+  regression.
 - Tauri wraps the web-compatible settings and UI state APIs with renderer-visible change events so
   menu actions can update the canonical store the same way Electron main-process broadcasts do.
 - Tauri persists pairing-backed remote runtime environments through native Rust commands that read
@@ -305,25 +327,53 @@ Current implementation:
 - Tauri registers the `pebble` scheme, filters startup and opened URL events to Pebble protocol
   links, and routes `pebble://pair?...` through the runtime environment add/status refresh path.
 - Tauri maps workspace-backed renderer `pty` calls onto Go runtime process sessions for the
-  migration path: spawn starts `/v1/sessions`, input writes `/input`, output/status events feed the
-  renderer through the existing `pty.onData`/`pty.onExit` contract, and stop maps to session delete.
-  This is a fallback bridge, not the final Zig-backed PTY implementation.
+  migration path: spawn starts `/v1/sessions`, input writes `/input`, clearBuffer drops the runtime
+  tail, output/status events feed the renderer through the existing `pty.onData`/`pty.onExit`
+  contract, stop maps to session delete, and renderer-side resize/reportGeometry state preserves
+  Electron's restore semantics until native winsize propagation lands. This is a fallback bridge,
+  not the final Zig-backed PTY implementation.
+- Tauri now maps runtime-backed agent sessions into the existing renderer `agentStatus` IPC
+  contract instead of leaving the Activity/Agents page on the web mock: spawn records the real
+  `tabId`/`leafId` pane key, runtime `session.status` events emit `working`/`done`, kill maps to
+  interrupted completion, and `/v1/sessions` snapshots carry tab/leaf/launch metadata so hot reload
+  can rehydrate live agent rows.
+- Tauri exposes renderer-compatible mobile fit/driver snapshots, listener subscriptions, and
+  desktop reclaim actions for terminal/browser presence-lock surfaces. This prevents stuck empty
+  APIs in the renderer contract; live mobile/shared-control event ingestion remains a separate
+  runtime RPC parity gate.
 - Tauri detects installed local CLI agents by reusing the shared `TUI_AGENT_CONFIG` command catalog
   and a native Rust PATH/install-dir probe, so agent settings and launch surfaces are no longer fed
   mock empty detection results.
+- Tauri maps local runtime preflight RPC calls for agent detection/refresh back onto the same
+  native probe path, preserving renderer call sites that go through `callRuntimeRpc`.
+- Tauri maps passive remote preflight probes through `runtimeEnvironments.call` when the supplied
+  connection id resolves to a paired runtime environment, then sanitizes agent lists and Windows
+  terminal capabilities before they reach renderer state. Electron-style SSH mux detection remains
+  a separate parity gate.
+- Tauri streams runtime `project.changed` and `worktree.changed` events into the existing
+  renderer repo/worktree refresh callbacks, so runtime-backed project/workspace mutations no
+  longer rely only on manual list refreshes.
+- Tauri remote runtime environments now use the stored pairing material only inside Rust commands:
+  one-shot `runtimeEnvironments.call` opens the WebSocket, performs the same E2EE hello/auth flow as
+  the Electron shared client, and returns the remote RPC envelope instead of falling back to local
+  runtime results. Shared-control subscriptions and SSH relay detection remain separate parity gates.
 - Tauri exposes updater version/status events and menu-triggered check errors so updater surfaces no
-  longer silently no-op, and now checks the Nebutra/Pebble GitHub release feed plus platform
-  manifests before feeding the existing UpdateCard `available`/`not-available`/`error` states.
-  Actual Tauri updater download/install remains owned by the release/update service gate.
+  longer silently no-op, initializes the native updater/process plugins, and now maps the existing
+  UpdateCard lifecycle onto signed updater package download, native install, and process relaunch.
+  The Nebutra/Pebble GitHub release feed remains a readiness fallback for release visibility, while
+  missing updater signing config or platform endpoints must surface as explicit errors with manual
+  release links instead of fake downloaded states.
 - Tauri replaces the web crash-report mock with native commands for renderer error-boundary
   reports, breadcrumbs, pending/latest lookup, dismiss/sent transitions, copyable crash text, and
-  Nebutra crash feedback submission. Diagnostic bundle attachment is explicit `not_uploaded` until
-  the native diagnostics collector is wired.
+  Nebutra crash feedback submission with native NDJSON diagnostic bundle attachment. The same
+  diagnostics command path backs Settings privacy previews, preview-open enforcement, upload, and
+  delete requests.
 - `verify-tauri-mainline.mjs` checks the renderer entry, preload bridge, Vite aliasing, CSS source,
   Tauri identity, window bounds, native window/menu/settings/shell bridges, runtime PTY fallback,
-  remote runtime environment store commands, git base-ref lookup, preflight agent detection,
-  deep-link routing, updater release-feed checks, crash-report persistence, browser runtime bridge,
-  local mock-UI drift, and Roadmap commitment before shell changes are accepted.
+  mobile driver-state mirrors, remote runtime environment store commands, git base-ref lookup, preflight agent detection,
+  deep-link routing, updater release-feed checks and native plugin wiring, crash-report persistence,
+  browser runtime bridge, local mock-UI drift, and Roadmap commitment before shell changes are
+  accepted.
 
 ## Migration Rule
 

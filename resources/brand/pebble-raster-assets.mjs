@@ -17,7 +17,7 @@ const BUILD = join(ROOT, 'resources', 'build')
 const APP_ICONS = join(ROOT, 'resources', 'app-icons')
 const MOBILE = join(ROOT, 'mobile', 'assets')
 
-const CLASSIC_SOURCE = join(GENERATED, 'pebble-icon', 'selected-icon.png')
+const CLASSIC_TEXTURE_SOURCE = join(GENERATED, 'pebble-icon', 'selected-icon.png')
 const SOFT_SOURCE = join(GENERATED, 'pebble-icon', '02-icon-soft.png')
 const MINERAL_SOURCE = join(GENERATED, 'pebble-icon', '03-icon-mineral.png')
 const GLYPH_SOURCE = join(GENERATED, 'pebble-icon', 'selected-glyph-chromakey.png')
@@ -281,7 +281,7 @@ function writeIcns(source1024) {
 }
 
 function main() {
-  for (const path of [CLASSIC_SOURCE, SOFT_SOURCE, MINERAL_SOURCE, GLYPH_SOURCE]) {
+  for (const path of [CLASSIC_TEXTURE_SOURCE, SOFT_SOURCE, MINERAL_SOURCE, GLYPH_SOURCE]) {
     assertInput(path)
   }
   mkdirSync(PROCESSED, { recursive: true })
@@ -290,7 +290,9 @@ function main() {
   mkdirSync(MOBILE, { recursive: true })
 
   const glyph = readPng(GLYPH_SOURCE)
-  const classic = readPng(CLASSIC_SOURCE)
+  // Why: this source is texture-only and may include a generated app tile; the
+  // chromakey glyph mask below is the contract for publishable freeform icons.
+  const classic = readPng(CLASSIC_TEXTURE_SOURCE)
   const classic1024 = fitPebbleObjectOnCanvas(classic, glyph, 1024, 0.82, TRANSPARENT_BACKGROUND)
   const soft1024 = fitPebbleObjectOnCanvas(
     readPng(SOFT_SOURCE),
