@@ -21,7 +21,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { VisuallyHidden } from 'radix-ui'
-import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import CommentMarkdown from '@/components/sidebar/CommentMarkdownLazy'
 import { cn } from '@/lib/utils'
 import {
   getCommentBodySubmitState,

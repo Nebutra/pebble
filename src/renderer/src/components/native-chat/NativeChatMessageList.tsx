@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { ArrowDown, ArrowUp, Image as ImageIcon } from 'lucide-react'
 import CommentMarkdown, {
   type CommentMarkdownLinkClickHandler
-} from '@/components/sidebar/CommentMarkdown'
+} from '@/components/sidebar/CommentMarkdownLazy'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { basename } from '@/lib/path'

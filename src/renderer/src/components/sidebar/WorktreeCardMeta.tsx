@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { SelectedTextCopyMenu } from '@/components/SelectedTextCopyMenu'
-import CommentMarkdown from './CommentMarkdown'
+import CommentMarkdown from './CommentMarkdownLazy'
 import { WORKTREE_NATIVE_CONTEXT_MENU_ATTR } from './WorktreeContextMenu'
 import {
   WorktreeCardDetailSection,

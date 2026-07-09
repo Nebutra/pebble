@@ -12,7 +12,7 @@ import {
   Terminal
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import CommentMarkdown from '@/components/sidebar/CommentMarkdownLazy'
 import { cn } from '@/lib/utils'
 import {
   formatAutomationSchedule,

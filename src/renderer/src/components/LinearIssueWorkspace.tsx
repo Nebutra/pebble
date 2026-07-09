@@ -22,7 +22,7 @@ import { toast } from 'sonner'
 import { VisuallyHidden } from 'radix-ui'
 
 import { LinearIcon } from '@/components/icons/LinearIcon'
-import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import CommentMarkdown from '@/components/sidebar/CommentMarkdownLazy'
 import {
   initLinearIssueEditState,
   LinearIssueCommentFooter,

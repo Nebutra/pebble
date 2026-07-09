@@ -48,7 +48,7 @@ import { Toggle } from '@/components/ui/toggle'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { FilledBellIcon } from '../sidebar/WorktreeCardHelpers'
-import CommentMarkdown from '../sidebar/CommentMarkdown'
+import CommentMarkdown from '../sidebar/CommentMarkdownLazy'
 import {
   setActivityTerminalPortals,
   type ActivityTerminalPortalTarget

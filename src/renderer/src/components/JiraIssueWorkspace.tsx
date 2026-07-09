@@ -16,7 +16,7 @@ import {
 import { toast } from 'sonner'
 import { VisuallyHidden } from 'radix-ui'
 
-import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import CommentMarkdown from '@/components/sidebar/CommentMarkdownLazy'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

@@ -74,7 +74,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import CommentMarkdown from '@/components/sidebar/CommentMarkdownLazy'
 import { detectLanguage } from '@/lib/language-detect'
 import { cn } from '@/lib/utils'
 import { DiffSectionItem } from '@/components/editor/DiffSectionItem'

@@ -97,7 +97,7 @@ import {
   resolveAutomationRunOpenTarget
 } from './automation-run-open-target'
 import { getAutomationRunWorkspaceDisplay } from './automation-run-workspace-display'
-import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import CommentMarkdown from '@/components/sidebar/CommentMarkdownLazy'
 import { AutomationDetail } from './AutomationDetail'
 import { HermesCronOutputView } from './HermesCronOutputView'
 import {
