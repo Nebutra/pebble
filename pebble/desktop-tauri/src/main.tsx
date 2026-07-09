@@ -12,7 +12,6 @@ import {
 import { applyDocumentTheme } from '@/lib/document-theme'
 import { I18nProvider } from '@/i18n/I18nProvider'
 import { translate } from '@/i18n/i18n'
-import { installPebbleDomBranding, installPebbleI18nBranding } from './pebble-branding'
 import { installPebbleTauriPreloadApi } from './pebble-tauri-preload-api'
 import { PRODUCT_NAME } from './product-brand'
 import { installTauriBrowserRuntimeApi } from './tauri-browser-runtime-api'
@@ -24,7 +23,6 @@ import { installTauriShellApi } from './tauri-shell-api'
 import { installTauriUpdaterApi } from './tauri-updater-api'
 import { installTauriWindowApi } from './tauri-window-api'
 
-installPebbleI18nBranding()
 installPebbleTauriPreloadApi()
 installTauriSettingsEventApi()
 installTauriWindowApi()
@@ -43,7 +41,6 @@ if (!rootElement) {
   recordRendererCrashBreadcrumb('renderer_root_missing')
   throw new Error('Renderer root element not found.')
 }
-installPebbleDomBranding(document.body)
 
 function RendererRoot(): React.JSX.Element {
   useTranslation()
