@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"os/exec"
 	"path/filepath"
@@ -106,7 +107,12 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 	for _, project := range state.Projects {
 		manager.projects[project.ID] = project
 	}
+	migratedWorktreeInstances := false
 	for _, worktree := range state.Worktrees {
+		if worktree.InstanceID == "" {
+			worktree.InstanceID = newID("wti")
+			migratedWorktreeInstances = true
+		}
 		manager.worktrees[worktree.ID] = worktree
 	}
 	for _, agent := range state.Agents {
@@ -180,6 +186,11 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 	}
 	for _, pairing := range state.MobilePairings {
 		manager.mobilePairings[pairing.DeviceID] = pairing
+	}
+	if migratedWorktreeInstances {
+		if err := manager.saveLocked(); err != nil {
+			return nil, err
+		}
 	}
 	return manager, nil
 }
@@ -255,6 +266,9 @@ func (m *Manager) ListProjects() []Project {
 		projects = append(projects, project)
 	}
 	sort.Slice(projects, func(i, j int) bool {
+		if projects[i].SortOrder != projects[j].SortOrder {
+			return projects[i].SortOrder > projects[j].SortOrder
+		}
 		return projects[i].CreatedAt.Before(projects[j].CreatedAt)
 	})
 	return projects
@@ -340,6 +354,35 @@ func (m *Manager) DeleteProject(id string) (Project, error) {
 	return project, nil
 }
 
+func (m *Manager) PersistProjectSortOrder(orderedIDs []string) error {
+	if len(orderedIDs) == 0 {
+		return nil
+	}
+	now := time.Now().UTC()
+	nowMs := now.UnixMilli()
+	changed := make([]Project, 0, len(orderedIDs))
+	m.mu.Lock()
+	for index, id := range orderedIDs {
+		project, ok := m.projects[id]
+		if !ok {
+			continue
+		}
+		project.SortOrder = nowMs - int64(index)*1000
+		project.UpdatedAt = now
+		m.projects[id] = project
+		changed = append(changed, project)
+	}
+	err := m.saveLocked()
+	m.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	for _, project := range changed {
+		m.emit("project.changed", project)
+	}
+	return nil
+}
+
 func normalizeProjectLocationKind(locationKind string, defaultLocal bool) (string, error) {
 	locationKind = strings.TrimSpace(locationKind)
 	if locationKind == "" {
@@ -401,6 +444,7 @@ func (m *Manager) CreateWorktree(ctx context.Context, req CreateWorktreeRequest)
 	now := time.Now().UTC()
 	worktree := Worktree{
 		ID:         newID("wt"),
+		InstanceID: newID("wti"),
 		ProjectID:  project.ID,
 		Path:       path,
 		Branch:     strings.TrimSpace(req.Branch),
@@ -421,6 +465,190 @@ func (m *Manager) CreateWorktree(ctx context.Context, req CreateWorktreeRequest)
 	return worktree, nil
 }
 
+func (m *Manager) UpdateWorktree(id string, req UpdateWorktreeRequest) (Worktree, error) {
+	m.mu.Lock()
+	worktree, ok := m.worktrees[id]
+	if !ok {
+		m.mu.Unlock()
+		return Worktree{}, ErrNotFound
+	}
+	if worktree.InstanceID == "" {
+		worktree.InstanceID = newID("wti")
+	}
+	applyWorktreeMetadataUpdate(&worktree, req)
+	parentWorktreeID := strings.TrimSpace(req.ParentWorktreeID)
+	parentWorkspace := strings.TrimSpace(req.ParentWorkspace)
+	if req.NoParent && (parentWorktreeID != "" || parentWorkspace != "") {
+		m.mu.Unlock()
+		return Worktree{}, errors.New("choose either one lineage parent or no parent")
+	}
+	if parentWorktreeID != "" && parentWorkspace != "" {
+		m.mu.Unlock()
+		return Worktree{}, errors.New("choose either one lineage parent or no parent")
+	}
+	switch {
+	case req.NoParent:
+		worktree.Lineage = nil
+		worktree.WorkspaceLineage = nil
+	case parentWorkspace != "":
+		if err := m.applyWorktreeWorkspaceLineageLocked(&worktree, parentWorkspace, req); err != nil {
+			m.mu.Unlock()
+			return Worktree{}, err
+		}
+	case parentWorktreeID != "":
+		if err := m.applyWorktreeParentLineageLocked(&worktree, parentWorktreeID, req); err != nil {
+			m.mu.Unlock()
+			return Worktree{}, err
+		}
+	}
+	worktree.UpdatedAt = time.Now().UTC()
+	m.worktrees[id] = worktree
+	err := m.saveLocked()
+	m.mu.Unlock()
+	if err != nil {
+		return Worktree{}, err
+	}
+	m.emit("worktree.changed", worktree)
+	return worktree, nil
+}
+
+func applyWorktreeMetadataUpdate(worktree *Worktree, req UpdateWorktreeRequest) {
+	now := time.Now().UTC().UnixMilli()
+	if req.DisplayName != nil {
+		worktree.DisplayName = strings.TrimSpace(*req.DisplayName)
+		worktree.LastActivityAt = now
+	}
+	if req.Comment != nil {
+		worktree.Comment = *req.Comment
+		worktree.LastActivityAt = now
+	}
+	if req.IsArchived != nil {
+		worktree.IsArchived = *req.IsArchived
+	}
+	if req.IsUnread != nil {
+		worktree.IsUnread = *req.IsUnread
+	}
+	if req.IsPinned != nil {
+		worktree.IsPinned = *req.IsPinned
+	}
+	if req.SortOrder != nil {
+		worktree.SortOrder = *req.SortOrder
+	}
+	if req.ManualOrder != nil {
+		order := *req.ManualOrder
+		worktree.ManualOrder = &order
+	}
+	if req.WorkspaceStatus != nil {
+		worktree.WorkspaceStatus = strings.TrimSpace(*req.WorkspaceStatus)
+	}
+	applyWorktreeLinkedItemUpdate(worktree, req)
+}
+
+// applyWorktreeLinkedItemUpdate maps the renderer's number|null / string|null
+// link references onto the persisted worktree. A nil pointer leaves the field
+// untouched; an explicit JSON null clears it.
+func applyWorktreeLinkedItemUpdate(worktree *Worktree, req UpdateWorktreeRequest) {
+	if req.LinkedIssue != nil {
+		worktree.LinkedIssue = decodeLinkedInt(*req.LinkedIssue)
+	}
+	if req.LinkedPR != nil {
+		worktree.LinkedPR = decodeLinkedInt(*req.LinkedPR)
+	}
+	if req.LinkedLinearIssue != nil {
+		worktree.LinkedLinearIssue = decodeLinkedString(*req.LinkedLinearIssue)
+	}
+}
+
+func decodeLinkedInt(raw json.RawMessage) *int64 {
+	var value *int64
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return nil
+	}
+	return value
+}
+
+func decodeLinkedString(raw json.RawMessage) *string {
+	var value *string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return nil
+	}
+	return value
+}
+
+func (m *Manager) applyWorktreeWorkspaceLineageLocked(
+	worktree *Worktree,
+	parentWorkspace string,
+	req UpdateWorktreeRequest,
+) error {
+	if strings.HasPrefix(parentWorkspace, "worktree:") {
+		parentID := strings.TrimPrefix(parentWorkspace, "worktree:")
+		if parentID == "" {
+			return errors.New("parent workspace worktree id is required")
+		}
+		return m.applyWorktreeParentLineageLocked(worktree, parentID, req)
+	}
+	if !strings.HasPrefix(parentWorkspace, "folder:") || parentWorkspace == "folder:" {
+		return errors.New("parent workspace must be a worktree:<id> or folder:<id> key")
+	}
+	origin, capture := normalizeWorktreeLineageMetadata(req)
+	createdAt := time.Now().UTC().UnixMilli()
+	worktree.Lineage = nil
+	worktree.WorkspaceLineage = &WorkspaceLineage{
+		ChildWorkspaceKey:  worktreeWorkspaceKey(worktree.ID),
+		ChildInstanceID:    worktree.InstanceID,
+		ParentWorkspaceKey: parentWorkspace,
+		Origin:             origin,
+		Capture:            capture,
+		CreatedAt:          createdAt,
+	}
+	return nil
+}
+
+func (m *Manager) applyWorktreeParentLineageLocked(
+	worktree *Worktree,
+	parentID string,
+	req UpdateWorktreeRequest,
+) error {
+	parent, ok := m.worktrees[parentID]
+	if !ok {
+		return ErrNotFound
+	}
+	if parent.ID == worktree.ID {
+		return errors.New("worktree cannot be its own lineage parent")
+	}
+	if parent.ProjectID != worktree.ProjectID {
+		return errors.New("lineage parent must belong to the same project")
+	}
+	if parent.InstanceID == "" {
+		parent.InstanceID = newID("wti")
+		m.worktrees[parent.ID] = parent
+	}
+	if wouldCreateWorktreeLineageCycleLocked(m.worktrees, worktree.ID, parent.ID) {
+		return errors.New("lineage parent would create a cycle")
+	}
+	origin, capture := normalizeWorktreeLineageMetadata(req)
+	createdAt := time.Now().UTC().UnixMilli()
+	worktree.Lineage = &WorktreeLineage{
+		WorktreeID:               worktree.ID,
+		WorktreeInstanceID:       worktree.InstanceID,
+		ParentWorktreeID:         parent.ID,
+		ParentWorktreeInstanceID: parent.InstanceID,
+		Origin:                   origin,
+		Capture:                  capture,
+		CreatedAt:                createdAt,
+	}
+	worktree.WorkspaceLineage = &WorkspaceLineage{
+		ChildWorkspaceKey:  worktreeWorkspaceKey(worktree.ID),
+		ChildInstanceID:    worktree.InstanceID,
+		ParentWorkspaceKey: worktreeWorkspaceKey(parent.ID),
+		ParentInstanceID:   parent.InstanceID,
+		Origin:             origin,
+		Capture:            capture,
+		CreatedAt:          createdAt,
+	}
+	return nil
+}
+
 func (m *Manager) ListWorktrees(projectID string) []Worktree {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -436,21 +664,381 @@ func (m *Manager) ListWorktrees(projectID string) []Worktree {
 	return worktrees
 }
 
-func (m *Manager) DeleteWorktree(id string) (Worktree, error) {
+func (m *Manager) ListWorktreeLineage() WorktreeLineageListResponse {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	lineage := make(map[string]WorktreeLineage)
+	workspaceLineage := make(map[string]WorkspaceLineage)
+	for _, worktree := range m.worktrees {
+		if worktree.Lineage == nil {
+			if isWorkspaceLineageCurrentLocked(m.worktrees, worktree, worktree.WorkspaceLineage) {
+				workspaceLineage[worktree.WorkspaceLineage.ChildWorkspaceKey] = *worktree.WorkspaceLineage
+			}
+			continue
+		}
+		parent, ok := m.worktrees[worktree.Lineage.ParentWorktreeID]
+		if !ok {
+			continue
+		}
+		if worktree.InstanceID != worktree.Lineage.WorktreeInstanceID ||
+			parent.InstanceID != worktree.Lineage.ParentWorktreeInstanceID {
+			continue
+		}
+		lineage[worktree.ID] = *worktree.Lineage
+		if isWorkspaceLineageCurrentLocked(m.worktrees, worktree, worktree.WorkspaceLineage) {
+			workspaceLineage[worktree.WorkspaceLineage.ChildWorkspaceKey] = *worktree.WorkspaceLineage
+		} else {
+			childKey := worktreeWorkspaceKey(worktree.ID)
+			workspaceLineage[childKey] = WorkspaceLineage{
+				ChildWorkspaceKey:  childKey,
+				ChildInstanceID:    worktree.Lineage.WorktreeInstanceID,
+				ParentWorkspaceKey: worktreeWorkspaceKey(parent.ID),
+				ParentInstanceID:   worktree.Lineage.ParentWorktreeInstanceID,
+				Origin:             worktree.Lineage.Origin,
+				Capture:            worktree.Lineage.Capture,
+				CreatedAt:          worktree.Lineage.CreatedAt,
+			}
+		}
+	}
+	return WorktreeLineageListResponse{Lineage: lineage, WorkspaceLineage: workspaceLineage}
+}
+
+func (m *Manager) PersistWorktreeSortOrder(orderedIDs []string) error {
+	if len(orderedIDs) == 0 {
+		return nil
+	}
+	now := time.Now().UTC()
+	nowMs := now.UnixMilli()
+	changed := make([]Worktree, 0, len(orderedIDs))
 	m.mu.Lock()
+	for index, id := range orderedIDs {
+		worktree, ok := m.worktrees[id]
+		if !ok {
+			continue
+		}
+		worktree.SortOrder = nowMs - int64(index)*1000
+		worktree.UpdatedAt = now
+		m.worktrees[id] = worktree
+		changed = append(changed, worktree)
+	}
+	err := m.saveLocked()
+	m.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	for _, worktree := range changed {
+		m.emit("worktree.changed", worktree)
+	}
+	return nil
+}
+
+func (m *Manager) DeleteWorktree(ctx context.Context, id string, req DeleteWorktreeRequest) (DeleteWorktreeResponse, error) {
+	m.mu.RLock()
 	worktree, ok := m.worktrees[id]
 	if !ok {
+		m.mu.RUnlock()
+		return DeleteWorktreeResponse{}, ErrNotFound
+	}
+	project, ok := m.projects[worktree.ProjectID]
+	if !ok {
+		m.mu.RUnlock()
+		return DeleteWorktreeResponse{}, ErrNotFound
+	}
+	m.mu.RUnlock()
+	var preserved *PreservedWorktreeBranch
+	if req.ExecuteGit {
+		result, err := removeLocalGitWorktree(ctx, project, worktree, req.Force, req.ForceBranchDelete)
+		if err != nil {
+			return DeleteWorktreeResponse{}, err
+		}
+		preserved = result
+	}
+	m.mu.Lock()
+	worktree, ok = m.worktrees[id]
+	if !ok {
 		m.mu.Unlock()
-		return Worktree{}, ErrNotFound
+		return DeleteWorktreeResponse{}, ErrNotFound
 	}
 	delete(m.worktrees, id)
 	err := m.saveLocked()
 	m.mu.Unlock()
 	if err != nil {
-		return Worktree{}, err
+		return DeleteWorktreeResponse{}, err
 	}
 	m.emit("worktree.changed", map[string]interface{}{"deleted": worktree})
-	return worktree, nil
+	return DeleteWorktreeResponse{Worktree: worktree, PreservedBranch: preserved}, nil
+}
+
+// removeLocalGitWorktree detaches the worktree directory, then cleans up its
+// local branch. It mirrors the Electron main-process semantics: `git branch -d`
+// (safe delete) refuses to drop a branch with commits not merged into its
+// upstream or HEAD, so unpublished work is preserved and returned instead of
+// discarded. forceBranchDelete opts into `-D` for failed-creation rollback.
+//
+// Why the git-local subset only: Electron additionally recovers squash-merged
+// branches by diffing against provider base refs (remote/PR merge status). That
+// machinery is not available in the Go runtime, so a branch whose changes only
+// landed via squash merge is preserved here rather than auto-deleted; the caller
+// can still force-delete it explicitly.
+func removeLocalGitWorktree(
+	ctx context.Context,
+	project Project,
+	worktree Worktree,
+	force bool,
+	forceBranchDelete bool,
+) (*PreservedWorktreeBranch, error) {
+	if project.LocationKind != "local" {
+		return nil, ErrRemoteNeedsRelay
+	}
+	repoPath, err := normalizeLocalPath(project.Path)
+	if err != nil {
+		return nil, err
+	}
+	worktreePath, err := normalizeLocalPath(worktree.Path)
+	if err != nil {
+		return nil, err
+	}
+	if repoPath == worktreePath {
+		return nil, errors.New("refusing to remove the project root as a worktree")
+	}
+	branchName := normalizeLocalBranchRef(worktree.Branch)
+	// Capture the branch head before removal so a later force-delete can compare
+	// against the exact commit that Git preserved.
+	branchHead := gitBranchHead(ctx, repoPath, branchName)
+
+	args := []string{"-C", repoPath, "worktree", "remove"}
+	if force {
+		args = append(args, "--force")
+	}
+	args = append(args, worktreePath)
+	gitCtx, cancel := context.WithTimeout(ctx, gitWorktreeCommandLimit)
+	defer cancel()
+	if output, err := exec.CommandContext(gitCtx, "git", args...).CombinedOutput(); err != nil {
+		message := strings.TrimSpace(string(output))
+		if message == "" {
+			message = err.Error()
+		} else {
+			message += ": " + err.Error()
+		}
+		return nil, errors.New(message)
+	}
+
+	if branchName == "" {
+		return nil, nil
+	}
+	return deleteLocalBranchAfterWorktreeRemoval(ctx, repoPath, branchName, branchHead, forceBranchDelete), nil
+}
+
+// deleteLocalBranchAfterWorktreeRemoval drops the worktree's local branch with
+// the safe `-d` flag (or `-D` when forceBranchDelete). If Git refuses because the
+// branch still holds unmerged commits, the branch is preserved and returned so
+// the renderer can offer an explicit force-delete follow-up.
+func deleteLocalBranchAfterWorktreeRemoval(
+	ctx context.Context,
+	repoPath string,
+	branchName string,
+	branchHead string,
+	forceBranchDelete bool,
+) *PreservedWorktreeBranch {
+	deleteFlag := "-d"
+	if forceBranchDelete {
+		deleteFlag = "-D"
+	}
+	if runGitBranchDelete(ctx, repoPath, deleteFlag, branchName) == nil {
+		return nil
+	}
+	// Why: `branch -d` is the cheap live-checkout guard. Only pay for
+	// `worktree prune` when a stale admin record may still be blocking it.
+	pruneCtx, cancelPrune := context.WithTimeout(ctx, gitCommandTimeout)
+	_, _ = exec.CommandContext(pruneCtx, "git", "-C", repoPath, "worktree", "prune").CombinedOutput()
+	cancelPrune()
+	if runGitBranchDelete(ctx, repoPath, deleteFlag, branchName) == nil {
+		return nil
+	}
+	// The branch still refuses safe deletion (unmerged/unpublished commits) or is
+	// checked out elsewhere: keep it. Deleting a worktree must never silently
+	// discard commits.
+	preserved := &PreservedWorktreeBranch{BranchName: branchName}
+	if branchHead != "" {
+		preserved.Head = branchHead
+	}
+	return preserved
+}
+
+func runGitBranchDelete(ctx context.Context, repoPath, deleteFlag, branchName string) error {
+	cmdCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
+	defer cancel()
+	_, err := exec.CommandContext(cmdCtx, "git", "-C", repoPath, "branch", deleteFlag, "--", branchName).CombinedOutput()
+	return err
+}
+
+// gitBranchHead resolves a local branch to its commit sha, or "" when the branch
+// is missing or git errors.
+func gitBranchHead(ctx context.Context, repoPath, branchName string) string {
+	if branchName == "" {
+		return ""
+	}
+	cmdCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
+	defer cancel()
+	output, err := exec.CommandContext(cmdCtx, "git", "-C", repoPath, "rev-parse", "--verify", "--quiet", "refs/heads/"+branchName).Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+func normalizeLocalBranchRef(branch string) string {
+	return strings.TrimPrefix(strings.TrimSpace(branch), "refs/heads/")
+}
+
+// ForceDeletePreservedBranch force-deletes a local branch that a prior worktree
+// removal preserved. It errors with ErrBranchNotFound when the branch is absent,
+// and refuses when the branch is checked out or moved past ExpectedHead so a
+// stale force-delete cannot discard newer commits (mirrors Electron's
+// update-ref compare-and-swap).
+func (m *Manager) ForceDeletePreservedBranch(
+	ctx context.Context,
+	req ForceDeletePreservedBranchRequest,
+) (ForceDeletePreservedBranchResponse, error) {
+	projectID := strings.TrimSpace(req.ProjectID)
+	branchName := normalizeLocalBranchRef(req.BranchName)
+	if projectID == "" {
+		return ForceDeletePreservedBranchResponse{}, ErrProjectRequired
+	}
+	if branchName == "" || strings.ContainsRune(branchName, '\x00') {
+		return ForceDeletePreservedBranchResponse{}, errors.New("invalid branch name")
+	}
+	m.mu.RLock()
+	project, ok := m.projects[projectID]
+	m.mu.RUnlock()
+	if !ok {
+		return ForceDeletePreservedBranchResponse{}, ErrNotFound
+	}
+	if project.LocationKind != "local" {
+		return ForceDeletePreservedBranchResponse{}, ErrRemoteNeedsRelay
+	}
+	repoPath, err := normalizeLocalPath(project.Path)
+	if err != nil {
+		return ForceDeletePreservedBranchResponse{}, err
+	}
+	if gitBranchHead(ctx, repoPath, branchName) == "" {
+		return ForceDeletePreservedBranchResponse{}, ErrBranchNotFound
+	}
+	if gitBranchIsCheckedOut(ctx, repoPath, branchName) {
+		return ForceDeletePreservedBranchResponse{}, errors.New("local branch is checked out in another worktree")
+	}
+	expectedHead := strings.TrimSpace(req.ExpectedHead)
+	if expectedHead != "" {
+		// Compare-and-swap: delete only if the ref still points at expectedHead so
+		// a stale action cannot discard commits added after preservation.
+		cmdCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
+		_, err := exec.CommandContext(cmdCtx, "git", "-C", repoPath, "update-ref", "-d", "refs/heads/"+branchName, expectedHead).CombinedOutput()
+		cancel()
+		if err != nil {
+			return ForceDeletePreservedBranchResponse{}, errors.New("local branch changed after it was preserved; review it before deleting")
+		}
+		return ForceDeletePreservedBranchResponse{Deleted: true}, nil
+	}
+	cmdCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
+	defer cancel()
+	if output, err := exec.CommandContext(cmdCtx, "git", "-C", repoPath, "branch", "-D", "--", branchName).CombinedOutput(); err != nil {
+		message := strings.TrimSpace(string(output))
+		if message == "" {
+			message = err.Error()
+		}
+		return ForceDeletePreservedBranchResponse{}, errors.New(message)
+	}
+	return ForceDeletePreservedBranchResponse{Deleted: true}, nil
+}
+
+func gitBranchIsCheckedOut(ctx context.Context, repoPath, branchName string) bool {
+	cmdCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
+	defer cancel()
+	output, err := exec.CommandContext(cmdCtx, "git", "-C", repoPath, "worktree", "list", "--porcelain").Output()
+	if err != nil {
+		return false
+	}
+	target := "branch refs/heads/" + branchName
+	for _, line := range strings.Split(string(output), "\n") {
+		if strings.TrimSpace(line) == target {
+			return true
+		}
+	}
+	return false
+}
+
+func wouldCreateWorktreeLineageCycleLocked(
+	worktrees map[string]Worktree,
+	childID string,
+	parentID string,
+) bool {
+	cursor := parentID
+	for cursor != "" {
+		if cursor == childID {
+			return true
+		}
+		current, ok := worktrees[cursor]
+		if !ok || current.Lineage == nil {
+			return false
+		}
+		if current.Lineage.WorktreeInstanceID != current.InstanceID {
+			return false
+		}
+		parent, ok := worktrees[current.Lineage.ParentWorktreeID]
+		if !ok || parent.InstanceID != current.Lineage.ParentWorktreeInstanceID {
+			return false
+		}
+		cursor = parent.ID
+	}
+	return false
+}
+
+func worktreeWorkspaceKey(worktreeID string) string {
+	return "worktree:" + worktreeID
+}
+
+func isWorkspaceLineageCurrentLocked(
+	worktrees map[string]Worktree,
+	worktree Worktree,
+	lineage *WorkspaceLineage,
+) bool {
+	if lineage == nil {
+		return false
+	}
+	if lineage.ChildWorkspaceKey != worktreeWorkspaceKey(worktree.ID) {
+		return false
+	}
+	if lineage.ChildInstanceID != "" && lineage.ChildInstanceID != worktree.InstanceID {
+		return false
+	}
+	if strings.HasPrefix(lineage.ParentWorkspaceKey, "worktree:") {
+		parentID := strings.TrimPrefix(lineage.ParentWorkspaceKey, "worktree:")
+		parent, ok := worktrees[parentID]
+		return ok && (lineage.ParentInstanceID == "" || lineage.ParentInstanceID == parent.InstanceID)
+	}
+	return strings.HasPrefix(lineage.ParentWorkspaceKey, "folder:") && lineage.ParentWorkspaceKey != "folder:"
+}
+
+func normalizeWorktreeLineageMetadata(req UpdateWorktreeRequest) (string, WorktreeLineageCapture) {
+	origin := strings.TrimSpace(req.Origin)
+	switch origin {
+	case "orchestration", "cli", "manual":
+	default:
+		origin = "manual"
+	}
+	source := strings.TrimSpace(req.Capture.Source)
+	if source == "" {
+		if origin == "cli" {
+			source = "explicit-cli-flag"
+		} else {
+			source = "manual-action"
+		}
+	}
+	confidence := strings.TrimSpace(req.Capture.Confidence)
+	if confidence != "explicit" && confidence != "inferred" {
+		confidence = "explicit"
+	}
+	return origin, WorktreeLineageCapture{Source: source, Confidence: confidence}
 }
 
 func (m *Manager) StartSession(ctx context.Context, req StartSessionRequest) (Session, error) {
@@ -499,6 +1087,21 @@ func (m *Manager) WriteSession(id string, req SessionInputRequest) error {
 	return session.write(req)
 }
 
+func (m *Manager) ResizeSession(id string, req SessionResizeRequest) (Session, error) {
+	m.mu.RLock()
+	session, ok := m.sessions[id]
+	m.mu.RUnlock()
+	if !ok {
+		return Session{}, ErrSessionNotFound
+	}
+	snapshot, err := session.resize(req)
+	if err != nil {
+		return Session{}, err
+	}
+	m.emit("session.status", snapshot)
+	return snapshot, nil
+}
+
 func (m *Manager) TailSession(id string, limit int) (TailSessionResponse, error) {
 	m.mu.RLock()
 	session, ok := m.sessions[id]
@@ -507,6 +1110,18 @@ func (m *Manager) TailSession(id string, limit int) (TailSessionResponse, error)
 		return TailSessionResponse{}, ErrSessionNotFound
 	}
 	return TailSessionResponse{SessionID: id, Chunks: session.tail(limit)}, nil
+}
+
+func (m *Manager) ClearSessionBuffer(id string) (Session, error) {
+	m.mu.RLock()
+	session, ok := m.sessions[id]
+	m.mu.RUnlock()
+	if !ok {
+		return Session{}, ErrSessionNotFound
+	}
+	snapshot := session.clearBuffer()
+	m.emit("session.status", snapshot)
+	return snapshot, nil
 }
 
 func (m *Manager) StopSession(id string) (Session, error) {

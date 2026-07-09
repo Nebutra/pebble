@@ -2,6 +2,7 @@ package runtimecore
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -60,7 +61,7 @@ func TestProjectUpdateDeleteRemovesWorktrees(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := manager.DeleteWorktree(worktree.ID); err != nil {
+	if _, err := manager.DeleteWorktree(context.Background(), worktree.ID, DeleteWorktreeRequest{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := manager.ListWorktrees(project.ID); len(got) != 0 {
@@ -82,6 +83,388 @@ func TestProjectUpdateDeleteRemovesWorktrees(t *testing.T) {
 	}
 	if got := manager.ListWorktrees(""); len(got) != 0 || worktree.ID == "" {
 		t.Fatalf("project delete should remove worktrees: %#v", got)
+	}
+}
+
+func TestDeleteWorktreeCanExecuteGitRemove(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git executable is not available")
+	}
+	repo := t.TempDir()
+	runGitCommand(t, repo, "init")
+	runGitCommand(t, repo, "config", "user.email", "dev@example.test")
+	runGitCommand(t, repo, "config", "user.name", "Dev")
+	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("one\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runGitCommand(t, repo, "add", "README.md")
+	runGitCommand(t, repo, "commit", "-m", "init")
+
+	manager, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(CreateProjectRequest{Name: "repo", Path: repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	worktreePath := filepath.Join(t.TempDir(), "feature-worktree")
+	worktree, err := manager.CreateWorktree(context.Background(), CreateWorktreeRequest{
+		ProjectID:  project.ID,
+		Path:       worktreePath,
+		Branch:     "feature/git-remove",
+		Base:       "HEAD",
+		ExecuteGit: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(worktreePath); err != nil {
+		t.Fatalf("expected git worktree directory to exist: %v", err)
+	}
+	deleted, err := manager.DeleteWorktree(context.Background(), worktree.ID, DeleteWorktreeRequest{
+		ExecuteGit: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(worktreePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected git worktree directory to be removed, got %v", err)
+	}
+	if got := manager.ListWorktrees(project.ID); len(got) != 0 {
+		t.Fatalf("worktree record was not deleted: %#v", got)
+	}
+	// The branch had no unmerged work (created off HEAD), so it is safe-deleted
+	// and nothing is preserved.
+	if deleted.PreservedBranch != nil {
+		t.Fatalf("expected no preserved branch, got %#v", deleted.PreservedBranch)
+	}
+	branches := gitBranchNames(t, repo)
+	if slices.Contains(branches, "feature/git-remove") {
+		t.Fatalf("expected merged branch to be deleted, branches=%v", branches)
+	}
+}
+
+func gitBranchNames(t *testing.T, repo string) []string {
+	t.Helper()
+	cmd := exec.Command("git", "-C", repo, "for-each-ref", "--format=%(refname:short)", "refs/heads")
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git for-each-ref failed: %v\n%s", err, output)
+	}
+	var names []string
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			names = append(names, trimmed)
+		}
+	}
+	return names
+}
+
+func newGitBackedProject(t *testing.T) (*Manager, Project, string) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git executable is not available")
+	}
+	repo := t.TempDir()
+	runGitCommand(t, repo, "init")
+	runGitCommand(t, repo, "config", "user.email", "dev@example.test")
+	runGitCommand(t, repo, "config", "user.name", "Dev")
+	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("one\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runGitCommand(t, repo, "add", "README.md")
+	runGitCommand(t, repo, "commit", "-m", "init")
+	manager, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(CreateProjectRequest{Name: "repo", Path: repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return manager, project, repo
+}
+
+func TestDeleteWorktreePreservesBranchWithUnmergedCommits(t *testing.T) {
+	manager, project, repo := newGitBackedProject(t)
+	worktreePath := filepath.Join(t.TempDir(), "feature-worktree")
+	worktree, err := manager.CreateWorktree(context.Background(), CreateWorktreeRequest{
+		ProjectID:  project.ID,
+		Path:       worktreePath,
+		Branch:     "feature/unmerged",
+		Base:       "HEAD",
+		ExecuteGit: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Add a commit only on the feature branch so `git branch -d` refuses to drop it.
+	if err := os.WriteFile(filepath.Join(worktreePath, "work.txt"), []byte("wip\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runGitCommand(t, worktreePath, "add", "work.txt")
+	runGitCommand(t, worktreePath, "commit", "-m", "wip")
+
+	deleted, err := manager.DeleteWorktree(context.Background(), worktree.ID, DeleteWorktreeRequest{
+		ExecuteGit: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted.PreservedBranch == nil {
+		t.Fatal("expected the unmerged branch to be preserved")
+	}
+	if deleted.PreservedBranch.BranchName != "feature/unmerged" {
+		t.Fatalf("unexpected preserved branch: %#v", deleted.PreservedBranch)
+	}
+	if deleted.PreservedBranch.Head == "" {
+		t.Fatal("expected preserved branch head to be captured")
+	}
+	if branches := gitBranchNames(t, repo); !slices.Contains(branches, "feature/unmerged") {
+		t.Fatalf("preserved branch should still exist, branches=%v", branches)
+	}
+
+	// Force-delete the preserved branch with the captured head.
+	result, err := manager.ForceDeletePreservedBranch(context.Background(), ForceDeletePreservedBranchRequest{
+		ProjectID:    project.ID,
+		BranchName:   deleted.PreservedBranch.BranchName,
+		ExpectedHead: deleted.PreservedBranch.Head,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Deleted {
+		t.Fatal("expected force delete to report deleted")
+	}
+	if branches := gitBranchNames(t, repo); slices.Contains(branches, "feature/unmerged") {
+		t.Fatalf("preserved branch should be gone after force delete, branches=%v", branches)
+	}
+}
+
+func TestForceDeletePreservedBranchRejectsMissingBranch(t *testing.T) {
+	manager, project, _ := newGitBackedProject(t)
+	_, err := manager.ForceDeletePreservedBranch(context.Background(), ForceDeletePreservedBranchRequest{
+		ProjectID:  project.ID,
+		BranchName: "does/not/exist",
+	})
+	if !errors.Is(err, ErrBranchNotFound) {
+		t.Fatalf("expected ErrBranchNotFound, got %v", err)
+	}
+}
+
+func TestForceDeletePreservedBranchRejectsStaleHead(t *testing.T) {
+	manager, project, repo := newGitBackedProject(t)
+	runGitCommand(t, repo, "branch", "keep/me")
+	_, err := manager.ForceDeletePreservedBranch(context.Background(), ForceDeletePreservedBranchRequest{
+		ProjectID:    project.ID,
+		BranchName:   "keep/me",
+		ExpectedHead: "1111111111111111111111111111111111111111",
+	})
+	if err == nil {
+		t.Fatal("expected stale-head force delete to be rejected")
+	}
+	if branches := gitBranchNames(t, repo); !slices.Contains(branches, "keep/me") {
+		t.Fatalf("branch must survive a rejected stale-head delete, branches=%v", branches)
+	}
+}
+
+func TestProjectSortOrderPersists(t *testing.T) {
+	dir := t.TempDir()
+	manager, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := manager.CreateProject(CreateProjectRequest{Name: "first", Path: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := manager.CreateProject(CreateProjectRequest{Name: "second", Path: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.PersistProjectSortOrder([]string{second.ID, first.ID}); err != nil {
+		t.Fatal(err)
+	}
+	projects := manager.ListProjects()
+	if len(projects) != 2 || projects[0].ID != second.ID || projects[1].ID != first.ID {
+		t.Fatalf("project order was not persisted: %#v", projects)
+	}
+}
+
+func TestWorktreeLineageSetListAndClear(t *testing.T) {
+	dir := t.TempDir()
+	manager, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(CreateProjectRequest{Name: "repo", Path: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, err := manager.CreateWorktree(context.Background(), CreateWorktreeRequest{
+		ProjectID: project.ID,
+		Path:      t.TempDir(),
+		Branch:    "parent",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err := manager.CreateWorktree(context.Background(), CreateWorktreeRequest{
+		ProjectID: project.ID,
+		Path:      t.TempDir(),
+		Branch:    "child",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := manager.UpdateWorktree(child.ID, UpdateWorktreeRequest{
+		ParentWorktreeID: parent.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Lineage == nil || updated.Lineage.ParentWorktreeID != parent.ID {
+		t.Fatalf("lineage was not stored: %#v", updated.Lineage)
+	}
+	lineage := manager.ListWorktreeLineage()
+	if got := lineage.Lineage[child.ID]; got.ParentWorktreeID != parent.ID {
+		t.Fatalf("lineage list missed child: %#v", lineage)
+	}
+	if got := lineage.WorkspaceLineage["worktree:"+child.ID]; got.ParentWorkspaceKey != "worktree:"+parent.ID {
+		t.Fatalf("workspace lineage list missed child: %#v", lineage.WorkspaceLineage)
+	}
+	if _, err := manager.UpdateWorktree(parent.ID, UpdateWorktreeRequest{
+		ParentWorktreeID: child.ID,
+	}); err == nil {
+		t.Fatal("expected lineage cycle to be rejected")
+	}
+	cleared, err := manager.UpdateWorktree(child.ID, UpdateWorktreeRequest{NoParent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleared.Lineage != nil {
+		t.Fatalf("lineage was not cleared: %#v", cleared.Lineage)
+	}
+	if got := manager.ListWorktreeLineage(); len(got.Lineage) != 0 || len(got.WorkspaceLineage) != 0 {
+		t.Fatalf("expected no lineage after clear, got %#v", got)
+	}
+	updated, err = manager.UpdateWorktree(child.ID, UpdateWorktreeRequest{
+		ParentWorkspace: "folder:folder-1",
+		Origin:          "cli",
+		Capture: WorktreeLineageCapture{
+			Source:     "explicit-cli-flag",
+			Confidence: "explicit",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Lineage != nil {
+		t.Fatalf("folder parent should not create worktree lineage: %#v", updated.Lineage)
+	}
+	if updated.WorkspaceLineage == nil || updated.WorkspaceLineage.ParentWorkspaceKey != "folder:folder-1" {
+		t.Fatalf("workspace lineage was not stored: %#v", updated.WorkspaceLineage)
+	}
+	if got := manager.ListWorktreeLineage(); len(got.Lineage) != 0 || got.WorkspaceLineage["worktree:"+child.ID].ParentWorkspaceKey != "folder:folder-1" {
+		t.Fatalf("folder workspace lineage list mismatch: %#v", got)
+	}
+}
+
+func TestWorktreeMetadataAndSortOrderPersist(t *testing.T) {
+	dir := t.TempDir()
+	storeDir := t.TempDir()
+	manager, err := NewManager(storeDir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(CreateProjectRequest{Name: "repo", Path: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := manager.CreateWorktree(context.Background(), CreateWorktreeRequest{
+		ProjectID: project.ID,
+		Path:      t.TempDir(),
+		Branch:    "first",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := manager.CreateWorktree(context.Background(), CreateWorktreeRequest{
+		ProjectID: project.ID,
+		Path:      t.TempDir(),
+		Branch:    "second",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	displayName := "Readable name"
+	comment := "keep this note"
+	manualOrder := int64(42)
+	linkedIssue := json.RawMessage("101")
+	linkedPR := json.RawMessage("202")
+	linkedLinearIssue := json.RawMessage(`"ENG-303"`)
+	updated, err := manager.UpdateWorktree(first.ID, UpdateWorktreeRequest{
+		DisplayName:       &displayName,
+		Comment:           &comment,
+		ManualOrder:       &manualOrder,
+		LinkedIssue:       &linkedIssue,
+		LinkedPR:          &linkedPR,
+		LinkedLinearIssue: &linkedLinearIssue,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.DisplayName != displayName || updated.Comment != comment || updated.ManualOrder == nil || *updated.ManualOrder != manualOrder {
+		t.Fatalf("metadata was not stored: %#v", updated)
+	}
+	if updated.LinkedIssue == nil || *updated.LinkedIssue != 101 ||
+		updated.LinkedPR == nil || *updated.LinkedPR != 202 ||
+		updated.LinkedLinearIssue == nil || *updated.LinkedLinearIssue != "ENG-303" {
+		t.Fatalf("linked references were not stored: %#v", updated)
+	}
+	// An explicit null clears the link; an absent field leaves it untouched.
+	clear := json.RawMessage("null")
+	cleared, err := manager.UpdateWorktree(first.ID, UpdateWorktreeRequest{LinkedIssue: &clear})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleared.LinkedIssue != nil {
+		t.Fatalf("expected linkedIssue cleared: %#v", cleared)
+	}
+	if cleared.LinkedPR == nil || *cleared.LinkedPR != 202 {
+		t.Fatalf("expected linkedPR untouched by absent field: %#v", cleared)
+	}
+	if err := manager.PersistWorktreeSortOrder([]string{second.ID, first.ID}); err != nil {
+		t.Fatal(err)
+	}
+	worktrees := manager.ListWorktrees(project.ID)
+	byID := map[string]Worktree{}
+	for _, worktree := range worktrees {
+		byID[worktree.ID] = worktree
+	}
+	if byID[second.ID].SortOrder <= byID[first.ID].SortOrder {
+		t.Fatalf("expected second to have higher sort order: %#v", byID)
+	}
+	// Reopening the store must recover the persisted link references.
+	reopened, err := NewManager(storeDir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reloaded := map[string]Worktree{}
+	for _, worktree := range reopened.ListWorktrees(project.ID) {
+		reloaded[worktree.ID] = worktree
+	}
+	got := reloaded[first.ID]
+	if got.LinkedIssue != nil {
+		t.Fatalf("expected cleared linkedIssue to persist as nil: %#v", got)
+	}
+	if got.LinkedPR == nil || *got.LinkedPR != 202 {
+		t.Fatalf("expected linkedPR to persist across reload: %#v", got)
+	}
+	if got.LinkedLinearIssue == nil || *got.LinkedLinearIssue != "ENG-303" {
+		t.Fatalf("expected linkedLinearIssue to persist across reload: %#v", got)
 	}
 }
 
@@ -1036,7 +1419,8 @@ func TestAgentProfileAndRun(t *testing.T) {
 	}
 	found := false
 	for _, chunk := range tail.Chunks {
-		if chunk.Content == "pebble\n" {
+		// Why: PTY-backed sessions emit CRLF line endings; accept both framings.
+		if strings.TrimRight(chunk.Content, "\r\n") == "pebble" {
 			found = true
 		}
 	}
@@ -2070,12 +2454,92 @@ func TestSessionRunsCommand(t *testing.T) {
 	}
 	found := false
 	for _, chunk := range tail.Chunks {
-		if chunk.Content == "pebble\n" {
+		if strings.Contains(chunk.Content, "pebble") {
 			found = true
 		}
 	}
 	if !found {
 		t.Fatalf("expected command output, got %#v", tail.Chunks)
+	}
+}
+
+func TestResizeSessionUpdatesLiveSessionSize(t *testing.T) {
+	dir := t.TempDir()
+	manager, err := NewManager(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(CreateProjectRequest{Name: "repo", Path: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := manager.StartSession(context.Background(), StartSessionRequest{
+		ProjectID: project.ID,
+		Command:   testSleepCommand(),
+		Cols:      80,
+		Rows:      24,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_, _ = manager.StopSession(session.ID)
+	}()
+
+	resized, err := manager.ResizeSession(session.ID, SessionResizeRequest{Cols: 132, Rows: 43})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resized.Cols != 132 || resized.Rows != 43 {
+		t.Fatalf("expected resized snapshot, got cols=%d rows=%d", resized.Cols, resized.Rows)
+	}
+	current := manager.ListSessions()[0]
+	if current.Cols != 132 || current.Rows != 43 {
+		t.Fatalf("expected listed session size to update, got cols=%d rows=%d", current.Cols, current.Rows)
+	}
+}
+
+func TestClearSessionBufferDropsTail(t *testing.T) {
+	dir := t.TempDir()
+	manager, err := NewManager(dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(CreateProjectRequest{Name: "repo", Path: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := manager.StartSession(context.Background(), StartSessionRequest{
+		ProjectID: project.ID,
+		Command:   testEchoCommand(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		current := manager.ListSessions()[0]
+		if current.Status == SessionExited {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if tail, err := manager.TailSession(session.ID, 10); err != nil || len(tail.Chunks) == 0 {
+		t.Fatalf("expected output before clear, tail=%#v err=%v", tail, err)
+	}
+	cleared, err := manager.ClearSessionBuffer(session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cleared.OutputChunks != 0 {
+		t.Fatalf("expected cleared snapshot to report 0 chunks, got %d", cleared.OutputChunks)
+	}
+	tail, err := manager.TailSession(session.ID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tail.Chunks) != 0 {
+		t.Fatalf("expected cleared tail, got %#v", tail.Chunks)
 	}
 }
 

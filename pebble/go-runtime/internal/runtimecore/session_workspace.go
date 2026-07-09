@@ -26,6 +26,10 @@ func (m *Manager) resolveSessionStartRequest(req StartSessionRequest) (StartSess
 	req.ProjectID = strings.TrimSpace(req.ProjectID)
 	req.WorktreeID = strings.TrimSpace(req.WorktreeID)
 	req.Cwd = normalizedCwd
+	req.AgentKind = strings.TrimSpace(req.AgentKind)
+	req.TabID = strings.TrimSpace(req.TabID)
+	req.LeafID = strings.TrimSpace(req.LeafID)
+	req.LaunchToken = strings.TrimSpace(req.LaunchToken)
 	return req, nil
 }
 

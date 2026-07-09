@@ -67,6 +67,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/projects", s.handleProjects)
 	s.mux.HandleFunc("/v1/projects/", s.handleProjectByID)
 	s.mux.HandleFunc("/v1/worktrees", s.handleWorktrees)
+	s.mux.HandleFunc("/v1/worktrees/branches/force-delete", s.handleForceDeletePreservedBranch)
 	s.mux.HandleFunc("/v1/worktrees/", s.handleWorktreeByID)
 	s.mux.HandleFunc("/v1/sessions", s.handleSessions)
 	s.mux.HandleFunc("/v1/sessions/", s.handleSessionByID)
@@ -160,6 +161,22 @@ func (s *Server) handleProjectByID(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "project not found")
 		return
 	}
+	if id == "reorder" {
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		var req runtimecore.PersistProjectSortOrderRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		if err := s.manager.PersistProjectSortOrder(req.OrderedIDs); err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "applied"})
+		return
+	}
 	switch r.Method {
 	case http.MethodPatch:
 		var req runtimecore.UpdateProjectRequest
@@ -210,16 +227,76 @@ func (s *Server) handleWorktreeByID(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "worktree not found")
 		return
 	}
+	if id == "sort-order" {
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		var req runtimecore.PersistWorktreeSortOrderRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		if err := s.manager.PersistWorktreeSortOrder(req.OrderedIDs); err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "applied"})
+		return
+	}
+	if id == "lineage" {
+		if r.Method != http.MethodGet {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		writeJSON(w, http.StatusOK, s.manager.ListWorktreeLineage())
+		return
+	}
+	if r.Method == http.MethodPatch {
+		var req runtimecore.UpdateWorktreeRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		worktree, err := s.manager.UpdateWorktree(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, worktree)
+		return
+	}
 	if r.Method != http.MethodDelete {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	worktree, err := s.manager.DeleteWorktree(id)
+	var req runtimecore.DeleteWorktreeRequest
+	if r.ContentLength != 0 {
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+	}
+	worktree, err := s.manager.DeleteWorktree(r.Context(), id, req)
 	if err != nil {
 		writeRuntimeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, worktree)
+}
+
+func (s *Server) handleForceDeletePreservedBranch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.ForceDeletePreservedBranchRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.ForceDeletePreservedBranch(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
@@ -259,6 +336,17 @@ func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "accepted"})
+	case r.Method == http.MethodPost && action == "resize":
+		var req runtimecore.SessionResizeRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		session, err := s.manager.ResizeSession(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, session)
 	case r.Method == http.MethodGet && action == "tail":
 		limit := 200
 		if raw := r.URL.Query().Get("limit"); raw != "" {
@@ -272,6 +360,13 @@ func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, tail)
+	case r.Method == http.MethodPost && action == "clear-buffer":
+		session, err := s.manager.ClearSessionBuffer(id)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, session)
 	case r.Method == http.MethodDelete && action == "":
 		session, err := s.manager.StopSession(id)
 		if err != nil {
@@ -1093,7 +1188,9 @@ func writeJSON(w http.ResponseWriter, status int, value interface{}) {
 
 func writeRuntimeError(w http.ResponseWriter, err error) {
 	status := http.StatusBadRequest
-	if errors.Is(err, runtimecore.ErrNotFound) || errors.Is(err, runtimecore.ErrSessionNotFound) {
+	if errors.Is(err, runtimecore.ErrNotFound) ||
+		errors.Is(err, runtimecore.ErrSessionNotFound) ||
+		errors.Is(err, runtimecore.ErrBranchNotFound) {
 		status = http.StatusNotFound
 	}
 	writeError(w, status, err.Error())

@@ -1,6 +1,9 @@
 package runtimecore
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 const ProtocolVersion = "pebble.runtime.v1"
 
@@ -44,6 +47,7 @@ type Project struct {
 	LocationKind string    `json:"locationKind"`
 	HostID       string    `json:"hostId,omitempty"`
 	Provider     string    `json:"provider,omitempty"`
+	SortOrder    int64     `json:"sortOrder,omitempty"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
 }
@@ -64,16 +68,37 @@ type UpdateProjectRequest struct {
 	Provider     string `json:"provider,omitempty"`
 }
 
+type PersistProjectSortOrderRequest struct {
+	OrderedIDs []string `json:"orderedIds"`
+}
+
 type Worktree struct {
-	ID         string    `json:"id"`
-	ProjectID  string    `json:"projectId"`
-	Path       string    `json:"path"`
-	Branch     string    `json:"branch,omitempty"`
-	Base       string    `json:"base,omitempty"`
-	ReviewKind string    `json:"reviewKind,omitempty"`
-	ReviewID   string    `json:"reviewId,omitempty"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
+	ID          string `json:"id"`
+	InstanceID  string `json:"instanceId,omitempty"`
+	ProjectID   string `json:"projectId"`
+	Path        string `json:"path"`
+	Branch      string `json:"branch,omitempty"`
+	Base        string `json:"base,omitempty"`
+	ReviewKind  string `json:"reviewKind,omitempty"`
+	ReviewID    string `json:"reviewId,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
+	Comment     string `json:"comment,omitempty"`
+	// Linked work-item references round-trip losslessly for the desktop renderer.
+	// Pointers preserve the null-vs-unset distinction the renderer relies on.
+	LinkedIssue       *int64            `json:"linkedIssue,omitempty"`
+	LinkedPR          *int64            `json:"linkedPR,omitempty"`
+	LinkedLinearIssue *string           `json:"linkedLinearIssue,omitempty"`
+	IsArchived        bool              `json:"isArchived,omitempty"`
+	IsUnread          bool              `json:"isUnread,omitempty"`
+	IsPinned          bool              `json:"isPinned,omitempty"`
+	SortOrder         int64             `json:"sortOrder,omitempty"`
+	ManualOrder       *int64            `json:"manualOrder,omitempty"`
+	LastActivityAt    int64             `json:"lastActivityAt,omitempty"`
+	WorkspaceStatus   string            `json:"workspaceStatus,omitempty"`
+	Lineage           *WorktreeLineage  `json:"lineage,omitempty"`
+	WorkspaceLineage  *WorkspaceLineage `json:"workspaceLineage,omitempty"`
+	CreatedAt         time.Time         `json:"createdAt"`
+	UpdatedAt         time.Time         `json:"updatedAt"`
 }
 
 type CreateWorktreeRequest struct {
@@ -85,6 +110,99 @@ type CreateWorktreeRequest struct {
 	ReviewID     string `json:"reviewId,omitempty"`
 	ExecuteGit   bool   `json:"executeGit,omitempty"`
 	SkipCheckout bool   `json:"skipCheckout,omitempty"`
+}
+
+type UpdateWorktreeRequest struct {
+	ParentWorktreeID string                 `json:"parentWorktreeId,omitempty"`
+	ParentWorkspace  string                 `json:"parentWorkspace,omitempty"`
+	NoParent         bool                   `json:"noParent,omitempty"`
+	Origin           string                 `json:"origin,omitempty"`
+	Capture          WorktreeLineageCapture `json:"capture,omitempty"`
+	DisplayName      *string                `json:"displayName,omitempty"`
+	Comment          *string                `json:"comment,omitempty"`
+	IsArchived       *bool                  `json:"isArchived,omitempty"`
+	IsUnread         *bool                  `json:"isUnread,omitempty"`
+	IsPinned         *bool                  `json:"isPinned,omitempty"`
+	SortOrder        *int64                 `json:"sortOrder,omitempty"`
+	ManualOrder      *int64                 `json:"manualOrder,omitempty"`
+	WorkspaceStatus  *string                `json:"workspaceStatus,omitempty"`
+	// Raw pointers distinguish absent (leave untouched) from explicit null
+	// (clear the link) so the renderer can both set and clear these fields.
+	LinkedIssue       *json.RawMessage `json:"linkedIssue,omitempty"`
+	LinkedPR          *json.RawMessage `json:"linkedPR,omitempty"`
+	LinkedLinearIssue *json.RawMessage `json:"linkedLinearIssue,omitempty"`
+}
+
+type DeleteWorktreeRequest struct {
+	ExecuteGit bool `json:"executeGit,omitempty"`
+	Force      bool `json:"force,omitempty"`
+	// ForceBranchDelete opts into `git branch -D` for failed-creation rollback,
+	// where the fresh branch has no user work to protect. User-initiated deletes
+	// leave it false so unmerged commits are preserved instead of discarded.
+	ForceBranchDelete bool `json:"forceBranchDelete,omitempty"`
+}
+
+// PreservedWorktreeBranch names a local branch that a worktree removal kept
+// because it still held unmerged/unpushed commits. Head is the commit the
+// branch pointed at, so a later force-delete can compare-and-swap safely.
+type PreservedWorktreeBranch struct {
+	BranchName string `json:"branchName"`
+	Head       string `json:"head,omitempty"`
+}
+
+// DeleteWorktreeResponse mirrors the desktop worktree record but adds the
+// preserved-branch info the renderer needs to offer a force-delete follow-up.
+// PreservedBranch is null when the branch was cleaned up (or never existed).
+type DeleteWorktreeResponse struct {
+	Worktree
+	PreservedBranch *PreservedWorktreeBranch `json:"preservedBranch"`
+}
+
+// ForceDeletePreservedBranchRequest force-deletes a branch that a prior worktree
+// removal preserved. ExpectedHead guards against deleting a branch that moved
+// after preservation.
+type ForceDeletePreservedBranchRequest struct {
+	ProjectID    string `json:"projectId"`
+	BranchName   string `json:"branchName"`
+	ExpectedHead string `json:"expectedHead,omitempty"`
+}
+
+type ForceDeletePreservedBranchResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
+type PersistWorktreeSortOrderRequest struct {
+	OrderedIDs []string `json:"orderedIds"`
+}
+
+type WorktreeLineageCapture struct {
+	Source     string `json:"source"`
+	Confidence string `json:"confidence"`
+}
+
+type WorktreeLineage struct {
+	WorktreeID               string                 `json:"worktreeId"`
+	WorktreeInstanceID       string                 `json:"worktreeInstanceId"`
+	ParentWorktreeID         string                 `json:"parentWorktreeId"`
+	ParentWorktreeInstanceID string                 `json:"parentWorktreeInstanceId"`
+	Origin                   string                 `json:"origin"`
+	Capture                  WorktreeLineageCapture `json:"capture"`
+	CreatedAt                int64                  `json:"createdAt"`
+}
+
+type WorkspaceLineage struct {
+	ChildWorkspaceKey  string                 `json:"childWorkspaceKey"`
+	ChildInstanceID    string                 `json:"childInstanceId,omitempty"`
+	ParentWorkspaceKey string                 `json:"parentWorkspaceKey"`
+	ParentInstanceID   string                 `json:"parentInstanceId,omitempty"`
+	Origin             string                 `json:"origin"`
+	Capture            WorktreeLineageCapture `json:"capture"`
+	CreatedAt          int64                  `json:"createdAt"`
+}
+
+type WorktreeLineageListResponse struct {
+	Lineage          map[string]WorktreeLineage  `json:"lineage"`
+	WorkspaceLineage map[string]WorkspaceLineage `json:"workspaceLineage"`
 }
 
 type SessionStatus string
@@ -104,25 +222,41 @@ type Session struct {
 	Cwd          string        `json:"cwd"`
 	Command      []string      `json:"command"`
 	AgentKind    string        `json:"agentKind,omitempty"`
+	TabID        string        `json:"tabId,omitempty"`
+	LeafID       string        `json:"leafId,omitempty"`
+	LaunchToken  string        `json:"launchToken,omitempty"`
+	Prompt       string        `json:"prompt,omitempty"`
 	Status       SessionStatus `json:"status"`
 	ExitCode     *int          `json:"exitCode,omitempty"`
 	StartedAt    time.Time     `json:"startedAt"`
 	UpdatedAt    time.Time     `json:"updatedAt"`
 	OutputChunks int           `json:"outputChunks"`
+	Cols         int           `json:"cols,omitempty"`
+	Rows         int           `json:"rows,omitempty"`
 }
 
 type StartSessionRequest struct {
-	ProjectID  string   `json:"projectId"`
-	WorktreeID string   `json:"worktreeId,omitempty"`
-	Cwd        string   `json:"cwd,omitempty"`
-	Command    []string `json:"command,omitempty"`
-	AgentKind  string   `json:"agentKind,omitempty"`
-	Prompt     string   `json:"prompt,omitempty"`
+	ProjectID   string   `json:"projectId"`
+	WorktreeID  string   `json:"worktreeId,omitempty"`
+	Cwd         string   `json:"cwd,omitempty"`
+	Command     []string `json:"command,omitempty"`
+	AgentKind   string   `json:"agentKind,omitempty"`
+	TabID       string   `json:"tabId,omitempty"`
+	LeafID      string   `json:"leafId,omitempty"`
+	LaunchToken string   `json:"launchToken,omitempty"`
+	Prompt      string   `json:"prompt,omitempty"`
+	Cols        int      `json:"cols,omitempty"`
+	Rows        int      `json:"rows,omitempty"`
 }
 
 type SessionInputRequest struct {
 	Text          string `json:"text"`
 	AppendNewline bool   `json:"appendNewline,omitempty"`
+}
+
+type SessionResizeRequest struct {
+	Cols int `json:"cols"`
+	Rows int `json:"rows"`
 }
 
 type OutputChunk struct {

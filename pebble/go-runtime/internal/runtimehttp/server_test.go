@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -267,6 +268,320 @@ func TestSplitActionPathsPreserveExtraSegments(t *testing.T) {
 	if id, action := splitEmulatorSessionPath("/v1/emulator/sessions/emus_1/commands/extra"); id != "emus_1" || action != "commands/extra" {
 		t.Fatalf("unexpected emulator session split id=%q action=%q", id, action)
 	}
+}
+
+func TestSessionClearBufferEndpoint(t *testing.T) {
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(runtimecore.CreateProjectRequest{Name: "repo", Path: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := manager.StartSession(context.Background(), runtimecore.StartSessionRequest{
+		ProjectID: project.ID,
+		Command:   runtimeHTTPTestEchoCommand(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if current := manager.ListSessions()[0]; current.Status == runtimecore.SessionExited {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if tail, err := manager.TailSession(session.ID, 10); err != nil || len(tail.Chunks) == 0 {
+		t.Fatalf("expected output before clear, tail=%#v err=%v", tail, err)
+	}
+	server := NewServer(manager)
+	req := httptest.NewRequest(http.MethodPost, "/v1/sessions/"+session.ID+"/clear-buffer", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var cleared runtimecore.Session
+	if err := json.Unmarshal(rec.Body.Bytes(), &cleared); err != nil {
+		t.Fatal(err)
+	}
+	if cleared.OutputChunks != 0 {
+		t.Fatalf("expected cleared snapshot to report 0 chunks, got %d", cleared.OutputChunks)
+	}
+	tail, err := manager.TailSession(session.ID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tail.Chunks) != 0 {
+		t.Fatalf("expected cleared tail, got %#v", tail.Chunks)
+	}
+}
+
+func TestSessionResizeEndpoint(t *testing.T) {
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(runtimecore.CreateProjectRequest{Name: "repo", Path: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := manager.StartSession(context.Background(), runtimecore.StartSessionRequest{
+		ProjectID: project.ID,
+		Command:   runtimeHTTPTestSleepCommand(),
+		Cols:      80,
+		Rows:      24,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_, _ = manager.StopSession(session.ID)
+	}()
+
+	server := NewServer(manager)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/sessions/"+session.ID+"/resize",
+		strings.NewReader(`{"cols":144,"rows":47}`),
+	)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resized runtimecore.Session
+	if err := json.Unmarshal(rec.Body.Bytes(), &resized); err != nil {
+		t.Fatal(err)
+	}
+	if resized.Cols != 144 || resized.Rows != 47 {
+		t.Fatalf("expected resized session, got cols=%d rows=%d", resized.Cols, resized.Rows)
+	}
+}
+
+func TestWorktreeLineageEndpoints(t *testing.T) {
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(runtimecore.CreateProjectRequest{Name: "repo", Path: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, err := manager.CreateWorktree(context.Background(), runtimecore.CreateWorktreeRequest{
+		ProjectID: project.ID,
+		Path:      t.TempDir(),
+		Branch:    "parent",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err := manager.CreateWorktree(context.Background(), runtimecore.CreateWorktreeRequest{
+		ProjectID: project.ID,
+		Path:      t.TempDir(),
+		Branch:    "child",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := NewServer(manager)
+	updateReq := httptest.NewRequest(
+		http.MethodPatch,
+		"/v1/worktrees/"+child.ID,
+		strings.NewReader(`{"parentWorktreeId":"`+parent.ID+`"}`),
+	)
+	updateRec := httptest.NewRecorder()
+	server.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", updateRec.Code, updateRec.Body.String())
+	}
+	var updated runtimecore.Worktree
+	if err := json.Unmarshal(updateRec.Body.Bytes(), &updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Lineage == nil || updated.Lineage.ParentWorktreeID != parent.ID {
+		t.Fatalf("unexpected lineage update: %#v", updated.Lineage)
+	}
+	listReq := httptest.NewRequest(http.MethodGet, "/v1/worktrees/lineage", nil)
+	listRec := httptest.NewRecorder()
+	server.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", listRec.Code, listRec.Body.String())
+	}
+	var list runtimecore.WorktreeLineageListResponse
+	if err := json.Unmarshal(listRec.Body.Bytes(), &list); err != nil {
+		t.Fatal(err)
+	}
+	if got := list.Lineage[child.ID]; got.ParentWorktreeID != parent.ID {
+		t.Fatalf("lineage endpoint missed child: %#v", list)
+	}
+	if got := list.WorkspaceLineage["worktree:"+child.ID]; got.ParentWorkspaceKey != "worktree:"+parent.ID {
+		t.Fatalf("workspace lineage endpoint missed child: %#v", list)
+	}
+	folderReq := httptest.NewRequest(
+		http.MethodPatch,
+		"/v1/worktrees/"+child.ID,
+		strings.NewReader(`{"parentWorkspace":"folder:folder-1","origin":"cli","capture":{"source":"explicit-cli-flag","confidence":"explicit"}}`),
+	)
+	folderRec := httptest.NewRecorder()
+	server.ServeHTTP(folderRec, folderReq)
+	if folderRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", folderRec.Code, folderRec.Body.String())
+	}
+	listReq = httptest.NewRequest(http.MethodGet, "/v1/worktrees/lineage", nil)
+	listRec = httptest.NewRecorder()
+	server.ServeHTTP(listRec, listReq)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", listRec.Code, listRec.Body.String())
+	}
+	list = runtimecore.WorktreeLineageListResponse{}
+	if err := json.Unmarshal(listRec.Body.Bytes(), &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Lineage) != 0 || list.WorkspaceLineage["worktree:"+child.ID].ParentWorkspaceKey != "folder:folder-1" {
+		t.Fatalf("folder workspace lineage endpoint mismatch: %#v", list)
+	}
+}
+
+func TestForceDeletePreservedBranchEndpointRejectsMissingBranch(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git executable is not available")
+	}
+	repo := t.TempDir()
+	for _, args := range [][]string{
+		{"init"},
+		{"config", "user.email", "dev@example.test"},
+		{"config", "user.name", "Dev"},
+	} {
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v failed: %v\n%s", args, err, output)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("one\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"add", "README.md"}, {"commit", "-m", "init"}} {
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v failed: %v\n%s", args, err, output)
+		}
+	}
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(runtimecore.CreateProjectRequest{Name: "repo", Path: repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := NewServer(manager)
+	// The exact path must route to the force-delete handler, not the /v1/worktrees/
+	// by-id catch-all, and a missing branch must surface as a 404.
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/worktrees/branches/force-delete",
+		strings.NewReader(`{"projectId":"`+project.ID+`","branchName":"missing/branch"}`),
+	)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for missing branch, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestWorktreeSortOrderEndpoint(t *testing.T) {
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(runtimecore.CreateProjectRequest{Name: "repo", Path: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := manager.CreateWorktree(context.Background(), runtimecore.CreateWorktreeRequest{
+		ProjectID: project.ID,
+		Path:      t.TempDir(),
+		Branch:    "first",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := manager.CreateWorktree(context.Background(), runtimecore.CreateWorktreeRequest{
+		ProjectID: project.ID,
+		Path:      t.TempDir(),
+		Branch:    "second",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := NewServer(manager)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/worktrees/sort-order",
+		strings.NewReader(`{"orderedIds":["`+second.ID+`","`+first.ID+`"]}`),
+	)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	worktrees := manager.ListWorktrees(project.ID)
+	byID := map[string]runtimecore.Worktree{}
+	for _, worktree := range worktrees {
+		byID[worktree.ID] = worktree
+	}
+	if byID[second.ID].SortOrder <= byID[first.ID].SortOrder {
+		t.Fatalf("expected sort order to persist: %#v", byID)
+	}
+}
+
+func TestProjectReorderEndpoint(t *testing.T) {
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := manager.CreateProject(runtimecore.CreateProjectRequest{Name: "first", Path: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := manager.CreateProject(runtimecore.CreateProjectRequest{Name: "second", Path: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := NewServer(manager)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/projects/reorder",
+		strings.NewReader(`{"orderedIds":["`+second.ID+`","`+first.ID+`"]}`),
+	)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	projects := manager.ListProjects()
+	if len(projects) != 2 || projects[0].ID != second.ID || projects[1].ID != first.ID {
+		t.Fatalf("project reorder endpoint did not persist order: %#v", projects)
+	}
+}
+
+func runtimeHTTPTestEchoCommand() []string {
+	if runtime.GOOS == "windows" {
+		return []string{"cmd.exe", "/d", "/s", "/c", "echo pebble"}
+	}
+	return []string{"/bin/sh", "-c", "printf 'pebble\n'"}
+}
+
+func runtimeHTTPTestSleepCommand() []string {
+	if runtime.GOOS == "windows" {
+		return []string{"cmd.exe", "/d", "/s", "/c", "ping -n 10 127.0.0.1 > NUL"}
+	}
+	return []string{"/bin/sh", "-c", "sleep 10"}
 }
 
 func TestProjectLifecycleEndpoints(t *testing.T) {
