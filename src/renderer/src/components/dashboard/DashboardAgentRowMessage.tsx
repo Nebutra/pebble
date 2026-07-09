@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import CommentMarkdown from '@/components/sidebar/CommentMarkdownLazy'
 import { translate } from '@/i18n/i18n'
 
 type DashboardAgentRowMessageProps = {

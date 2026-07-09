@@ -4,7 +4,7 @@ import { CircleDot, ExternalLink, GitPullRequest, LoaderCircle, X } from 'lucide
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import CommentMarkdown from '@/components/sidebar/CommentMarkdownLazy'
 import { useAppStore } from '@/store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import type { GitHubWorkItemDetails } from '../../../../../shared/types'
