@@ -39,6 +39,7 @@ type persistedState struct {
 	EmulatorSessions   []EmulatorSession            `json:"emulatorSessions"`
 	NativeProviders    []NativeProviderRegistration `json:"nativeProviders"`
 	MobilePairings     []MobileRelayPairingRecord   `json:"mobilePairings"`
+	SshTargets         []SshTarget                  `json:"sshTargets"`
 }
 
 type fileStore struct {

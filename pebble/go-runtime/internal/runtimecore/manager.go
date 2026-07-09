@@ -55,6 +55,7 @@ type Manager struct {
 	nativeProviders          map[string]NativeProviderRegistration
 	mobilePairings           map[string]MobileRelayPairingRecord
 	mobilePairingCodes       map[string]MobileRelayPairingCode
+	sshTargets               map[string]SshTarget
 	sessions                 map[string]*processSession
 	subscribers              map[uint64]chan RuntimeEvent
 	nextSubscriber           uint64
@@ -102,6 +103,7 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 		nativeProviders:          make(map[string]NativeProviderRegistration),
 		mobilePairings:           make(map[string]MobileRelayPairingRecord),
 		mobilePairingCodes:       make(map[string]MobileRelayPairingCode),
+		sshTargets:               make(map[string]SshTarget),
 		sessions:                 make(map[string]*processSession),
 		subscribers:              make(map[uint64]chan RuntimeEvent),
 		unavailableTool:          append([]string(nil), unavailableTools...),
@@ -198,6 +200,9 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 	}
 	for _, pairing := range state.MobilePairings {
 		manager.mobilePairings[pairing.DeviceID] = pairing
+	}
+	for _, target := range state.SshTargets {
+		manager.sshTargets[target.ID] = target
 	}
 	if migratedWorktreeInstances {
 		if err := manager.saveLocked(); err != nil {
@@ -3664,6 +3669,7 @@ func (m *Manager) saveLocked() error {
 		EmulatorSessions:   make([]EmulatorSession, 0, len(m.emulatorSessions)),
 		NativeProviders:    make([]NativeProviderRegistration, 0, len(m.nativeProviders)),
 		MobilePairings:     make([]MobileRelayPairingRecord, 0, len(m.mobilePairings)),
+		SshTargets:         make([]SshTarget, 0, len(m.sshTargets)),
 	}
 	for _, project := range m.projects {
 		state.Projects = append(state.Projects, project)
@@ -3749,6 +3755,9 @@ func (m *Manager) saveLocked() error {
 	}
 	for _, pairing := range m.mobilePairings {
 		state.MobilePairings = append(state.MobilePairings, pairing)
+	}
+	for _, target := range m.sshTargets {
+		state.SshTargets = append(state.SshTargets, target)
 	}
 	return m.store.save(state)
 }
