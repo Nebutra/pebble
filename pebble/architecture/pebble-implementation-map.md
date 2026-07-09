@@ -12,9 +12,9 @@ removed.
 | Runtime service graph | Go | Long-lived concurrent services, cancellation, RPC, orchestration. |
 | Repo/worktree/git providers | Go | Process orchestration, network API clients, portable filesystem handling. |
 | Agent lifecycle | Go | Many independent process sessions and supervised state machines. |
-| Terminal API | Go + Zig | Go owns sessions and routing; Zig owns PTY/signal/platform primitives. |
+| Terminal API | Go | Go owns sessions, routing, and PTY spawn/winsize (`creack/pty`); Zig is unlinked, reserved only for a future binary output channel. |
 | Browser bridge | Rust + Go | Rust owns desktop WebView/security boundary; Go owns runtime-facing session state. |
-| Computer-use providers | Rust + Zig | Platform APIs, capability gating, native binary surfaces. |
+| Computer-use providers | Rust (Zig reserved, not yet linked) | Platform APIs, capability gating, native binary surfaces; Zig is a candidate future home for low-level accessibility primitives only. |
 | Desktop app shell | Rust/Tauri | Window lifecycle, native menus, IPC boundary. |
 | Desktop UI | React in Tauri | Preserve rich workbench semantics while removing Electron. |
 | Mobile app | React Native | Native companion with shared runtime protocol. |
@@ -233,6 +233,12 @@ Current implementation:
   Go browser provider actions while updating the tab projection first, so the native WebView
   provider can consume real queued navigation work instead of the desktop shell dropping those
   commands.
+- Tauri WebView shims register page-scoped action executors with the browser action consumer, so
+  queued `browser.goto`, reload, back, forward, and stop actions now complete against the active
+  native WebView and report results back to the shared runtime action endpoint.
+- Tauri runtime RPC queues `browser.screenshot` through the same provider action path and waits for
+  the action result, so native adapters can return `{ data, format }` without another renderer
+  contract change while the current WebView shim reports the native capture gap explicitly.
 - Tauri records toolbar viewport overrides per browser page and runtime `browser.viewport` returns
   explicit request dimensions or the stored page override until the native WebView/CDP adapter
   exists, so renderer input-scaling paths do not crash while avoiding a fake claim that real
@@ -268,8 +274,8 @@ Current implementation:
   succeeded.
 - Mobile projections expose computer action queue status so paired devices can inspect native
   provider work without polling provider-specific endpoints.
-- Zig exposes the low-level C ABI that native providers can use for process, PTY, and signal
-  primitives.
+- `pebble/zig-system/` defines a candidate C ABI for process/PTY/signal primitives but is not
+  linked into any build; it is a reserved future layer, not a current dependency (see its README).
 
 ### Emulator Service
 
@@ -392,8 +398,8 @@ Current implementation:
   migration path: spawn starts `/v1/sessions`, input writes `/input`, clearBuffer drops the runtime
   tail, output/status events feed the renderer through the existing `pty.onData`/`pty.onExit`
   contract, stop maps to session delete, and renderer-side resize/reportGeometry state preserves
-  Electron's restore semantics until native winsize propagation lands. This is a fallback bridge,
-  not the final Zig-backed PTY implementation.
+  Electron's restore semantics until native winsize propagation lands. This is a fallback bridge;
+  the runtime-owned PTY it targets is Go-backed (`creack/pty`), not Zig.
 - Tauri local runtime RPC maps terminal list/show/read/send/wait/inspect/clear/stop/stopExact/agent-status
   calls to Go process sessions so CLI, agent-note, sleep/restore, and runtime-probe flows do not
   fall through to unmapped Electron-only methods. Go still needs hook-level idle/permission state
