@@ -31,11 +31,12 @@ mod macos {
     use objc2_foundation::NSRect;
     use tauri::{WebviewWindow, WindowEvent};
 
-    // Electron places the traffic lights at x=TRAFFIC_LIGHT_X (16) and
-    // y=TITLEBAR_CSS_CENTER-TRAFFIC_LIGHT_RADIUS (18-6=12) so they sit centered
-    // in the 36px custom titlebar (createMainWindow.ts:85-87,280-287).
+    // Electron centers the lights on the 36px titlebar midline (y-center 18,
+    // createMainWindow.ts:85-96). In tao's inset algorithm `y` grows the button
+    // container and AppKit re-centers the buttons inside it, so the visual top
+    // offset is ~y/2: 24 lands the button center at 24/2 + 6 = 18.
     const TRAFFIC_LIGHT_X: f64 = 16.0;
-    const TRAFFIC_LIGHT_Y: f64 = 12.0;
+    const TRAFFIC_LIGHT_Y: f64 = 24.0;
 
     pub fn apply_traffic_light_inset(window: &WebviewWindow) {
         inset_now(window);
