@@ -10,7 +10,8 @@ import {
   PEBBLE_UPDATER_QUIT_AND_INSTALL_ABORTED_EVENT,
   PEBBLE_UPDATER_QUIT_AND_INSTALL_STARTED_EVENT
 } from '../../../src/shared/updater-renderer-events'
-import type { UpdateCheckOptions, UpdateStatus } from '../../../src/shared/types'
+import type { ChangelogData, UpdateCheckOptions, UpdateStatus } from '../../../src/shared/types'
+import { selectChangelogData } from '../../../src/shared/updater-changelog-selection'
 import rootPackage from '../../../package.json'
 
 const updaterStatusListeners = new Set<(status: UpdateStatus) => void>()
@@ -61,7 +62,7 @@ async function checkForTauriOrReleaseUpdate(options?: UpdateCheckOptions): Promi
     const update = await checkNativeTauriUpdate()
     if (update) {
       setPendingTauriUpdate(update)
-      emitAvailableUpdate(update.version, releaseUrlForVersion(update.version))
+      await emitAvailableUpdate(update.version, releaseUrlForVersion(update.version))
       return
     }
   } catch (error) {
@@ -95,7 +96,7 @@ async function checkPebbleReleaseFeed(
     })
     if (result.state === 'available' && result.version) {
       pendingReleaseUrl = result.releaseUrl ?? releaseUrlForVersion(result.version)
-      emitAvailableUpdate(result.version, pendingReleaseUrl)
+      await emitAvailableUpdate(result.version, pendingReleaseUrl)
       return
     }
     if (result.state === 'not-available') {
@@ -197,13 +198,23 @@ function setPendingTauriUpdate(update: Update): void {
   pendingReleaseUrl = releaseUrlForVersion(update.version)
 }
 
-function emitAvailableUpdate(version: string, releaseUrl: string | null): void {
+async function emitAvailableUpdate(version: string, releaseUrl: string | null): Promise<void> {
+  const changelog = await fetchTauriChangelog(version)
   emitUpdaterStatus({
     state: 'available',
     version,
     releaseUrl: releaseUrl ?? undefined,
-    changelog: null
+    changelog
   })
+}
+
+async function fetchTauriChangelog(incomingVersion: string): Promise<ChangelogData | null> {
+  try {
+    const json = await invoke<unknown>('updater_fetch_changelog_entries')
+    return selectChangelogData(json, incomingVersion, rootPackage.version)
+  } catch {
+    return null
+  }
 }
 
 function currentReleaseUrl(): string | null {

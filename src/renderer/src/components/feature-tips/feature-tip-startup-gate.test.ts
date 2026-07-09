@@ -153,6 +153,23 @@ describe('feature tip startup gate', () => {
     ).toEqual({ kind: 'skip' })
   })
 
+  it('does not open feature tips suppressed by the current runtime shell', () => {
+    expect(
+      getFeatureTipsAppOpenDecision({
+        activeModal: 'none',
+        cliInstalled: true,
+        featureTipsSeenIds: ['pebble-cli', 'cmd-j-palette'],
+        featureInteractions: {},
+        onboarding: existingUserOnboarding,
+        persistedUIReady: true,
+        promptedThisSession: false,
+        settings: makeSettings(),
+        suppressedTipIds: ['voice-dictation'],
+        suppressedByOnboardingThisSession: false
+      })
+    ).toEqual({ kind: 'skip' })
+  })
+
   it('does not open the voice tip after Settings marked it seen and dictation is disabled', () => {
     expect(
       getFeatureTipsAppOpenDecision({

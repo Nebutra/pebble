@@ -28,6 +28,7 @@ export function getFeatureTipsAppOpenDecision(args: {
   persistedUIReady: boolean
   promptedThisSession: boolean
   settings: { voice?: GlobalSettings['voice'] } | null | undefined
+  suppressedTipIds?: readonly FeatureTipId[]
   suppressedByOnboardingThisSession: boolean
 }): FeatureTipsAppOpenDecision {
   if (args.onboarding !== null && shouldShowOnboarding(args.onboarding)) {
@@ -47,8 +48,13 @@ export function getFeatureTipsAppOpenDecision(args: {
     return { kind: 'skip' }
   }
 
+  const hiddenTipIds = new Set<FeatureTipId>(args.featureTipsSeenIds)
+  for (const tipId of args.suppressedTipIds ?? []) {
+    hiddenTipIds.add(tipId)
+  }
+
   const unseenTips = getOrderedUnseenFeatureTips({
-    seenTipIds: new Set<FeatureTipId>(args.featureTipsSeenIds),
+    seenTipIds: hiddenTipIds,
     completedTipIds: getCompletedFeatureTipIds({
       cliInstalled: args.cliInstalled,
       voiceDictationEnabled: args.settings.voice?.enabled === true,

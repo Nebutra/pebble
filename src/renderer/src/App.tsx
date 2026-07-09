@@ -142,6 +142,7 @@ import {
 import { selectFloatingVisibleTabCount } from './store/selectors'
 import { selectActiveTerminalChromeState } from './store/active-terminal-chrome-selector'
 import type { VirtualizedScrollAnchor } from './hooks/useVirtualizedScrollAnchor'
+import type { FeatureTipId } from '../../shared/feature-tips'
 import type { RemoteWorkspacePatchResult } from '../../shared/remote-workspace-types'
 import type { OnboardingState, UpdateStatus } from '../../shared/types'
 import {
@@ -171,6 +172,8 @@ import PinnedTabCloseDialog from './components/terminal-pane/PinnedTabCloseDialo
 const isMac = navigator.userAgent.includes('Mac')
 const isWindows = !isMac && navigator.userAgent.includes('Windows')
 const shortcutPlatform: NodeJS.Platform = isMac ? 'darwin' : isWindows ? 'win32' : 'linux'
+const TAURI_UNAVAILABLE_FEATURE_TIP_IDS: readonly FeatureTipId[] =
+  '__TAURI_INTERNALS__' in window ? ['voice-dictation'] : []
 // Why: Windows and Linux both run with the native title bar removed (Windows
 // via titleBarStyle: 'hidden', Linux via frame: false), so the renderer draws
 // its own logo/menu anchor and min/max/close controls on both. Paired web
@@ -773,6 +776,7 @@ function App(): React.JSX.Element {
       persistedUIReady,
       promptedThisSession: featureTipsPromptedThisSessionRef.current,
       settings,
+      suppressedTipIds: TAURI_UNAVAILABLE_FEATURE_TIP_IDS,
       suppressedByOnboardingThisSession: featureTipsSuppressedByOnboardingThisSessionRef.current
     })
 
