@@ -41,15 +41,17 @@ type RuntimeStatus struct {
 }
 
 type Project struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Path         string    `json:"path"`
-	LocationKind string    `json:"locationKind"`
-	HostID       string    `json:"hostId,omitempty"`
-	Provider     string    `json:"provider,omitempty"`
-	SortOrder    int64     `json:"sortOrder,omitempty"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	ID                string    `json:"id"`
+	Name              string    `json:"name"`
+	Path              string    `json:"path"`
+	LocationKind      string    `json:"locationKind"`
+	HostID            string    `json:"hostId,omitempty"`
+	Provider          string    `json:"provider,omitempty"`
+	ProjectGroupID    *string   `json:"projectGroupId,omitempty"`
+	ProjectGroupOrder *float64  `json:"projectGroupOrder,omitempty"`
+	SortOrder         int64     `json:"sortOrder,omitempty"`
+	CreatedAt         time.Time `json:"createdAt"`
+	UpdatedAt         time.Time `json:"updatedAt"`
 }
 
 type CreateProjectRequest struct {
@@ -75,6 +77,172 @@ type UpdateProjectRequest struct {
 
 type PersistProjectSortOrderRequest struct {
 	OrderedIDs []string `json:"orderedIds"`
+}
+
+type ProjectGroup struct {
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	ParentPath    *string `json:"parentPath"`
+	ConnectionID  *string `json:"connectionId,omitempty"`
+	ParentGroupID *string `json:"parentGroupId"`
+	CreatedFrom   string  `json:"createdFrom"`
+	TabOrder      float64 `json:"tabOrder"`
+	IsCollapsed   bool    `json:"isCollapsed"`
+	Color         *string `json:"color"`
+	CreatedAt     int64   `json:"createdAt"`
+	UpdatedAt     int64   `json:"updatedAt"`
+}
+
+type CreateProjectGroupRequest struct {
+	Name          string  `json:"name"`
+	ParentPath    *string `json:"parentPath,omitempty"`
+	ConnectionID  *string `json:"connectionId,omitempty"`
+	ParentGroupID *string `json:"parentGroupId,omitempty"`
+	CreatedFrom   string  `json:"createdFrom,omitempty"`
+}
+
+type UpdateProjectGroupRequest struct {
+	Name        *string         `json:"name,omitempty"`
+	IsCollapsed *bool           `json:"isCollapsed,omitempty"`
+	TabOrder    *float64        `json:"tabOrder,omitempty"`
+	Color       json.RawMessage `json:"color,omitempty"`
+}
+
+type MoveProjectToGroupRequest struct {
+	ProjectID string   `json:"projectId,omitempty"`
+	Repo      string   `json:"repo,omitempty"`
+	GroupID   *string  `json:"groupId"`
+	Order     *float64 `json:"order,omitempty"`
+}
+
+type NestedRepoScanOptions struct {
+	MaxDepth  *float64 `json:"maxDepth,omitempty"`
+	MaxRepos  *float64 `json:"maxRepos,omitempty"`
+	TimeoutMs *float64 `json:"timeoutMs,omitempty"`
+}
+
+type NestedRepoScanRequest struct {
+	Path    string                `json:"path"`
+	Options NestedRepoScanOptions `json:"options,omitempty"`
+}
+
+type NestedRepoCandidate struct {
+	Path        string `json:"path"`
+	DisplayName string `json:"displayName"`
+	Depth       int    `json:"depth"`
+}
+
+type NestedRepoScanResult struct {
+	SelectedPath     string                `json:"selectedPath"`
+	SelectedPathKind string                `json:"selectedPathKind"`
+	Repos            []NestedRepoCandidate `json:"repos"`
+	Truncated        bool                  `json:"truncated"`
+	TimedOut         bool                  `json:"timedOut"`
+	Stopped          bool                  `json:"stopped"`
+	DurationMs       int64                 `json:"durationMs"`
+	MaxDepth         int                   `json:"maxDepth"`
+	MaxRepos         int                   `json:"maxRepos"`
+	TimeoutMs        *int64                `json:"timeoutMs"`
+}
+
+type ProjectGroupImportNestedRequest struct {
+	ParentPath   string   `json:"parentPath"`
+	GroupName    string   `json:"groupName,omitempty"`
+	ProjectPaths []string `json:"projectPaths"`
+	Mode         string   `json:"mode"`
+}
+
+type ProjectGroupImportProjectResult struct {
+	Path      string `json:"path"`
+	ProjectID string `json:"projectId,omitempty"`
+	Status    string `json:"status"`
+	Error     string `json:"error,omitempty"`
+}
+
+type ProjectGroupImportResult struct {
+	Group             *ProjectGroup                     `json:"group,omitempty"`
+	Projects          []ProjectGroupImportProjectResult `json:"projects"`
+	ImportedCount     int                               `json:"importedCount"`
+	AlreadyKnownCount int                               `json:"alreadyKnownCount"`
+	FailedCount       int                               `json:"failedCount"`
+}
+
+type FolderWorkspaceLinkedTask struct {
+	Provider         string  `json:"provider"`
+	Type             string  `json:"type"`
+	Number           float64 `json:"number"`
+	Title            string  `json:"title"`
+	URL              string  `json:"url"`
+	LinearIdentifier string  `json:"linearIdentifier,omitempty"`
+	JiraIdentifier   string  `json:"jiraIdentifier,omitempty"`
+	RepoID           string  `json:"repoId,omitempty"`
+}
+
+type FolderWorkspace struct {
+	ID                             string                     `json:"id"`
+	ProjectGroupID                 string                     `json:"projectGroupId"`
+	Name                           string                     `json:"name"`
+	FolderPath                     string                     `json:"folderPath"`
+	ConnectionID                   *string                    `json:"connectionId,omitempty"`
+	LinkedTask                     *FolderWorkspaceLinkedTask `json:"linkedTask"`
+	Comment                        string                     `json:"comment"`
+	IsArchived                     bool                       `json:"isArchived"`
+	IsUnread                       bool                       `json:"isUnread"`
+	IsPinned                       bool                       `json:"isPinned"`
+	SortOrder                      float64                    `json:"sortOrder"`
+	ManualOrder                    *float64                   `json:"manualOrder,omitempty"`
+	WorkspaceStatus                string                     `json:"workspaceStatus,omitempty"`
+	CreatedWithAgent               string                     `json:"createdWithAgent,omitempty"`
+	PendingFirstAgentMessageRename bool                       `json:"pendingFirstAgentMessageRename,omitempty"`
+	FirstAgentMessageRenameError   *string                    `json:"firstAgentMessageRenameError,omitempty"`
+	LastActivityAt                 int64                      `json:"lastActivityAt"`
+	CreatedAt                      int64                      `json:"createdAt"`
+	UpdatedAt                      int64                      `json:"updatedAt"`
+}
+
+type CreateFolderWorkspaceRequest struct {
+	ProjectGroupID                 string                     `json:"projectGroupId"`
+	Name                           string                     `json:"name,omitempty"`
+	FolderPath                     *string                    `json:"folderPath,omitempty"`
+	ConnectionID                   *string                    `json:"connectionId,omitempty"`
+	LinkedTask                     *FolderWorkspaceLinkedTask `json:"linkedTask,omitempty"`
+	CreatedWithAgent               string                     `json:"createdWithAgent,omitempty"`
+	PendingFirstAgentMessageRename bool                       `json:"pendingFirstAgentMessageRename,omitempty"`
+}
+
+type UpdateFolderWorkspaceRequest struct {
+	Updates FolderWorkspaceUpdate `json:"updates"`
+}
+
+type FolderWorkspaceUpdate struct {
+	Name                           *string         `json:"name,omitempty"`
+	FolderPath                     *string         `json:"folderPath,omitempty"`
+	LinkedTask                     json.RawMessage `json:"linkedTask,omitempty"`
+	Comment                        *string         `json:"comment,omitempty"`
+	IsArchived                     *bool           `json:"isArchived,omitempty"`
+	IsUnread                       *bool           `json:"isUnread,omitempty"`
+	IsPinned                       *bool           `json:"isPinned,omitempty"`
+	SortOrder                      *float64        `json:"sortOrder,omitempty"`
+	ManualOrder                    *float64        `json:"manualOrder,omitempty"`
+	WorkspaceStatus                *string         `json:"workspaceStatus,omitempty"`
+	CreatedWithAgent               *string         `json:"createdWithAgent,omitempty"`
+	PendingFirstAgentMessageRename *bool           `json:"pendingFirstAgentMessageRename,omitempty"`
+	FirstAgentMessageRenameError   json.RawMessage `json:"firstAgentMessageRenameError,omitempty"`
+	LastActivityAt                 *float64        `json:"lastActivityAt,omitempty"`
+}
+
+type FolderWorkspacePathStatusRequest struct {
+	Scope             string  `json:"scope"`
+	FolderWorkspaceID string  `json:"folderWorkspaceId,omitempty"`
+	ProjectGroupID    string  `json:"projectGroupId,omitempty"`
+	Path              string  `json:"path,omitempty"`
+	ConnectionID      *string `json:"connectionId,omitempty"`
+}
+
+type FolderWorkspacePathStatus struct {
+	Path   string `json:"path"`
+	Exists bool   `json:"exists"`
+	Reason string `json:"reason,omitempty"`
 }
 
 type Worktree struct {

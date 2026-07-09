@@ -62,6 +62,7 @@ type terminalInputPayload struct {
 type browserCommandPayload struct {
 	TabID   string `json:"tabId"`
 	Command string `json:"command"`
+	URL     string `json:"url,omitempty"`
 }
 
 type fileReadPayload struct {
@@ -339,13 +340,21 @@ func (s *Server) handleMobileRelayBrowserCommand(conn *websocketConn, state *mob
 		return true
 	}
 	command := strings.TrimSpace(payload.Command)
-	if command != "reload" && command != "goBack" && command != "goForward" && command != "stop" && command != "screenshot" {
+	if command != "goto" && command != "reload" && command != "goBack" && command != "goForward" && command != "stop" && command != "screenshot" {
 		_ = writeMobileRelayError(conn, state, "browser_command_failed", "unsupported browser command")
 		return true
 	}
-	_, err := s.manager.QueueBrowserCommand(strings.TrimSpace(payload.TabID), runtimecore.BrowserCommandRequest{
-		Command: command,
-	})
+	actionPayload := map[string]interface{}{}
+	if url := strings.TrimSpace(payload.URL); url != "" {
+		actionPayload["url"] = url
+	}
+	_, err := s.manager.QueueBrowserCommand(
+		strings.TrimSpace(payload.TabID),
+		runtimecore.BrowserCommandRequest{
+			Command: command,
+			Payload: actionPayload,
+		},
+	)
 	if err != nil {
 		_ = writeMobileRelayError(conn, state, "browser_command_failed", err.Error())
 	}

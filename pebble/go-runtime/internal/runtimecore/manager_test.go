@@ -36,6 +36,185 @@ func TestProjectPersistence(t *testing.T) {
 	}
 }
 
+func TestProjectGroupsAndFolderWorkspacesPersist(t *testing.T) {
+	storeDir := t.TempDir()
+	folderPath := t.TempDir()
+	manager, err := NewManager(storeDir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	group, err := manager.CreateProjectGroup(CreateProjectGroupRequest{
+		Name:        " Platform ",
+		ParentPath:  &folderPath,
+		CreatedFrom: "manual",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if group.Name != "Platform" || group.ParentPath == nil || *group.ParentPath != folderPath {
+		t.Fatalf("unexpected project group: %#v", group)
+	}
+	status := manager.GetFolderWorkspacePathStatus(FolderWorkspacePathStatusRequest{
+		Scope:          "project-group",
+		ProjectGroupID: group.ID,
+	})
+	if !status.Exists || status.Path != folderPath {
+		t.Fatalf("expected usable folder path, got %#v", status)
+	}
+	workspace, err := manager.CreateFolderWorkspace(CreateFolderWorkspaceRequest{
+		ProjectGroupID: group.ID,
+		Name:           " Feature Area ",
+		LinkedTask: &FolderWorkspaceLinkedTask{
+			Provider: "github",
+			Type:     "issue",
+			Number:   7,
+			Title:    "Build it",
+			URL:      "https://example.test/7",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if workspace.Name != "Feature Area" || workspace.FolderPath != folderPath || workspace.LinkedTask == nil {
+		t.Fatalf("unexpected folder workspace: %#v", workspace)
+	}
+	comment := "ready"
+	pinned := true
+	manualOrder := 42.0
+	updated, ok, err := manager.UpdateFolderWorkspace(workspace.ID, FolderWorkspaceUpdate{
+		Comment:     &comment,
+		IsPinned:    &pinned,
+		ManualOrder: &manualOrder,
+		LinkedTask:  json.RawMessage(`null`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || updated.Comment != comment || !updated.IsPinned || updated.ManualOrder == nil || updated.LinkedTask != nil {
+		t.Fatalf("unexpected folder workspace update: %#v", updated)
+	}
+	project, err := manager.CreateProject(CreateProjectRequest{Name: "repo", Path: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	moved, err := manager.MoveProjectToGroup(MoveProjectToGroupRequest{
+		ProjectID: project.ID,
+		GroupID:   &group.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moved.ProjectGroupID == nil || *moved.ProjectGroupID != group.ID || moved.ProjectGroupOrder == nil {
+		t.Fatalf("expected project group metadata on project: %#v", moved)
+	}
+	reopened, err := NewManager(storeDir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := reopened.ListProjectGroups(); len(got) != 1 || got[0].ID != group.ID {
+		t.Fatalf("expected persisted project group, got %#v", got)
+	}
+	if got := reopened.ListFolderWorkspaces(); len(got) != 1 || got[0].Comment != comment {
+		t.Fatalf("expected persisted folder workspace, got %#v", got)
+	}
+	reloadedProjects := reopened.ListProjects()
+	if len(reloadedProjects) != 1 || reloadedProjects[0].ProjectGroupID == nil {
+		t.Fatalf("expected persisted project group membership, got %#v", reloadedProjects)
+	}
+}
+
+func TestNestedRepoScanAndImport(t *testing.T) {
+	parentPath := t.TempDir()
+	apiPath := filepath.Join(parentPath, "services", "api")
+	webPath := filepath.Join(parentPath, "services", "web")
+	cliPath := filepath.Join(parentPath, "tools", "cli")
+	ignoredPath := filepath.Join(parentPath, "ignored-by-rule", "repo")
+	nodeModulesPath := filepath.Join(parentPath, "node_modules", "ignored")
+	createGitMarker(t, apiPath)
+	createGitMarker(t, webPath)
+	createGitMarker(t, cliPath)
+	createGitMarker(t, ignoredPath)
+	createGitMarker(t, nodeModulesPath)
+	if err := os.WriteFile(filepath.Join(parentPath, ".gitignore"), []byte("ignored-by-rule\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manager, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scan, err := manager.ScanNestedRepos(NestedRepoScanRequest{
+		Path:    parentPath,
+		Options: NestedRepoScanOptions{MaxDepth: floatPointer(4)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scannedPaths := map[string]struct{}{}
+	for _, repo := range scan.Repos {
+		scannedPaths[repo.Path] = struct{}{}
+	}
+	for _, path := range []string{apiPath, webPath, cliPath} {
+		if _, ok := scannedPaths[path]; !ok {
+			t.Fatalf("expected scan to include %s, got %#v", path, scan.Repos)
+		}
+	}
+	for _, path := range []string{ignoredPath, nodeModulesPath} {
+		if _, ok := scannedPaths[path]; ok {
+			t.Fatalf("expected scan to skip %s, got %#v", path, scan.Repos)
+		}
+	}
+	result, err := manager.ImportNestedRepos(ProjectGroupImportNestedRequest{
+		ParentPath:   parentPath,
+		GroupName:    "Platform",
+		ProjectPaths: []string{apiPath, webPath, cliPath},
+		Mode:         "group",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Group == nil || result.Group.Name != "Platform" {
+		t.Fatalf("expected root group, got %#v", result.Group)
+	}
+	if result.ImportedCount != 3 || result.AlreadyKnownCount != 0 || result.FailedCount != 0 {
+		t.Fatalf("unexpected import result: %#v", result)
+	}
+	groups := manager.ListProjectGroups()
+	if len(groups) != 2 {
+		t.Fatalf("expected root and services groups, got %#v", groups)
+	}
+	var servicesGroup *ProjectGroup
+	for index := range groups {
+		if groups[index].Name == "services" {
+			servicesGroup = &groups[index]
+		}
+	}
+	if servicesGroup == nil || servicesGroup.ParentGroupID == nil || *servicesGroup.ParentGroupID != result.Group.ID {
+		t.Fatalf("expected services subgroup under root, got %#v", groups)
+	}
+	projects := manager.ListProjects()
+	if len(projects) != 3 {
+		t.Fatalf("expected imported projects, got %#v", projects)
+	}
+	secondResult, err := manager.ImportNestedRepos(ProjectGroupImportNestedRequest{
+		ParentPath:   parentPath,
+		ProjectPaths: []string{apiPath, webPath, cliPath},
+		Mode:         "separate",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if secondResult.ImportedCount != 0 || secondResult.AlreadyKnownCount != 3 || secondResult.FailedCount != 0 {
+		t.Fatalf("expected already-known on second import, got %#v", secondResult)
+	}
+}
+
+func createGitMarker(t *testing.T, repoPath string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(repoPath, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestProjectUpdateDeleteRemovesWorktrees(t *testing.T) {
 	dir := t.TempDir()
 	manager, err := NewManager(t.TempDir(), nil)
@@ -1572,6 +1751,21 @@ func TestBrowserComputerAndEmulatorState(t *testing.T) {
 	if browserAction.Payload["tabId"] != tab.ID || browserAction.Payload["command"] != "reload" {
 		t.Fatalf("browser command payload did not include tab context: %#v", browserAction.Payload)
 	}
+	gotoAction, err := manager.QueueBrowserCommand(tab.ID, BrowserCommandRequest{
+		Command: "goto",
+		Payload: map[string]interface{}{"url": "https://pebble.example"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotoAction.Kind != "browser.goto" || gotoAction.Target != tab.ID {
+		t.Fatalf("browser goto did not queue a tab-targeted action: %#v", gotoAction)
+	}
+	if gotoAction.Payload["url"] != "https://pebble.example" ||
+		gotoAction.Payload["tabId"] != tab.ID ||
+		gotoAction.Payload["command"] != "goto" {
+		t.Fatalf("browser goto payload did not include command context: %#v", gotoAction.Payload)
+	}
 	permission, err := manager.SetBrowserPermission(SetBrowserPermissionRequest{
 		ProfileID: profile.ID,
 		Origin:    "https://example.test",
@@ -1702,7 +1896,7 @@ func TestBrowserComputerAndEmulatorState(t *testing.T) {
 		t.Fatalf("browser download was not persisted: %#v", got)
 	}
 	actions := reloaded.ListComputerActions("", "")
-	if len(actions) != 4 {
+	if len(actions) != 5 {
 		t.Fatalf("computer actions were not persisted: %#v", actions)
 	}
 	var completedClick bool

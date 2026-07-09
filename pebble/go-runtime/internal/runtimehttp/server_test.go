@@ -445,6 +445,160 @@ func TestWorktreeLineageEndpoints(t *testing.T) {
 	}
 }
 
+func TestProjectGroupAndFolderWorkspaceEndpoints(t *testing.T) {
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := NewServer(manager)
+	folderPath := t.TempDir()
+	folderPathJSON, err := json.Marshal(folderPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	groupReq := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/project-groups",
+		strings.NewReader(`{"name":"Platform","parentPath":`+string(folderPathJSON)+`}`),
+	)
+	groupRec := httptest.NewRecorder()
+	server.ServeHTTP(groupRec, groupReq)
+	if groupRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", groupRec.Code, groupRec.Body.String())
+	}
+	var group runtimecore.ProjectGroup
+	if err := json.Unmarshal(groupRec.Body.Bytes(), &group); err != nil {
+		t.Fatal(err)
+	}
+	groupIDJSON, err := json.Marshal(group.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	statusReq := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/folder-workspaces/path-status",
+		strings.NewReader(`{"scope":"project-group","projectGroupId":`+string(groupIDJSON)+`}`),
+	)
+	statusRec := httptest.NewRecorder()
+	server.ServeHTTP(statusRec, statusReq)
+	if statusRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", statusRec.Code, statusRec.Body.String())
+	}
+	var status runtimecore.FolderWorkspacePathStatus
+	if err := json.Unmarshal(statusRec.Body.Bytes(), &status); err != nil {
+		t.Fatal(err)
+	}
+	if !status.Exists {
+		t.Fatalf("expected path to exist, got %#v", status)
+	}
+	workspaceReq := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/folder-workspaces",
+		strings.NewReader(`{"projectGroupId":`+string(groupIDJSON)+`,"name":"Area"}`),
+	)
+	workspaceRec := httptest.NewRecorder()
+	server.ServeHTTP(workspaceRec, workspaceReq)
+	if workspaceRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", workspaceRec.Code, workspaceRec.Body.String())
+	}
+	var workspace runtimecore.FolderWorkspace
+	if err := json.Unmarshal(workspaceRec.Body.Bytes(), &workspace); err != nil {
+		t.Fatal(err)
+	}
+	updateReq := httptest.NewRequest(
+		http.MethodPatch,
+		"/v1/folder-workspaces/"+workspace.ID,
+		strings.NewReader(`{"updates":{"comment":"Ready","isPinned":true}}`),
+	)
+	updateRec := httptest.NewRecorder()
+	server.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", updateRec.Code, updateRec.Body.String())
+	}
+	var updated runtimecore.FolderWorkspace
+	if err := json.Unmarshal(updateRec.Body.Bytes(), &updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated.Comment != "Ready" || !updated.IsPinned {
+		t.Fatalf("unexpected folder workspace update: %#v", updated)
+	}
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/v1/folder-workspaces/"+workspace.ID, nil)
+	deleteRec := httptest.NewRecorder()
+	server.ServeHTTP(deleteRec, deleteReq)
+	if deleteRec.Code != http.StatusOK || !strings.Contains(deleteRec.Body.String(), `"deleted":true`) {
+		t.Fatalf("expected successful delete, got %d: %s", deleteRec.Code, deleteRec.Body.String())
+	}
+}
+
+func TestProjectGroupNestedRepoEndpoints(t *testing.T) {
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := NewServer(manager)
+	parentPath := t.TempDir()
+	appPath := filepath.Join(parentPath, "apps", "app")
+	libPath := filepath.Join(parentPath, "apps", "lib")
+	createHTTPGitMarker(t, appPath)
+	createHTTPGitMarker(t, libPath)
+	parentPathJSON, err := json.Marshal(parentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scanReq := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/project-groups/scan-nested",
+		strings.NewReader(`{"path":`+string(parentPathJSON)+`,"options":{"maxDepth":4}}`),
+	)
+	scanRec := httptest.NewRecorder()
+	server.ServeHTTP(scanRec, scanReq)
+	if scanRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", scanRec.Code, scanRec.Body.String())
+	}
+	var scan runtimecore.NestedRepoScanResult
+	if err := json.Unmarshal(scanRec.Body.Bytes(), &scan); err != nil {
+		t.Fatal(err)
+	}
+	if len(scan.Repos) != 2 {
+		t.Fatalf("expected nested repo scan results, got %#v", scan)
+	}
+	appPathJSON, err := json.Marshal(appPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	libPathJSON, err := json.Marshal(libPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	importReq := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/project-groups/import-nested",
+		strings.NewReader(
+			`{"parentPath":`+string(parentPathJSON)+`,"groupName":"Apps","projectPaths":[`+
+				string(appPathJSON)+`,`+string(libPathJSON)+`],"mode":"group"}`,
+		),
+	)
+	importRec := httptest.NewRecorder()
+	server.ServeHTTP(importRec, importReq)
+	if importRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", importRec.Code, importRec.Body.String())
+	}
+	var result runtimecore.ProjectGroupImportResult
+	if err := json.Unmarshal(importRec.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.ImportedCount != 2 || result.Group == nil {
+		t.Fatalf("expected imported nested repos, got %#v", result)
+	}
+}
+
+func createHTTPGitMarker(t *testing.T, repoPath string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(repoPath, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestForceDeletePreservedBranchEndpointRejectsMissingBranch(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git executable is not available")

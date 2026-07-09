@@ -28,6 +28,8 @@ type Manager struct {
 	startedAt                time.Time
 	store                    *fileStore
 	projects                 map[string]Project
+	projectGroups            map[string]ProjectGroup
+	folderWorkspaces         map[string]FolderWorkspace
 	worktrees                map[string]Worktree
 	agents                   map[string]AgentProfile
 	agentRuns                map[string]AgentRun
@@ -73,6 +75,8 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 		startedAt:                time.Now().UTC(),
 		store:                    store,
 		projects:                 make(map[string]Project),
+		projectGroups:            make(map[string]ProjectGroup),
+		folderWorkspaces:         make(map[string]FolderWorkspace),
 		worktrees:                make(map[string]Worktree),
 		agents:                   make(map[string]AgentProfile),
 		agentRuns:                make(map[string]AgentRun),
@@ -108,6 +112,12 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 	}
 	for _, project := range state.Projects {
 		manager.projects[project.ID] = project
+	}
+	for _, group := range state.ProjectGroups {
+		manager.projectGroups[group.ID] = group
+	}
+	for _, workspace := range state.FolderWorkspaces {
+		manager.folderWorkspaces[workspace.ID] = workspace
 	}
 	migratedWorktreeInstances := false
 	for _, worktree := range state.Worktrees {
@@ -3628,6 +3638,8 @@ func (m *Manager) saveLocked() error {
 	state := persistedState{
 		RelayID:            m.relayID,
 		Projects:           make([]Project, 0, len(m.projects)),
+		ProjectGroups:      make([]ProjectGroup, 0, len(m.projectGroups)),
+		FolderWorkspaces:   make([]FolderWorkspace, 0, len(m.folderWorkspaces)),
 		Worktrees:          make([]Worktree, 0, len(m.worktrees)),
 		Agents:             make([]AgentProfile, 0, len(m.agents)),
 		AgentRuns:          make([]AgentRun, 0, len(m.agentRuns)),
@@ -3655,6 +3667,12 @@ func (m *Manager) saveLocked() error {
 	}
 	for _, project := range m.projects {
 		state.Projects = append(state.Projects, project)
+	}
+	for _, group := range m.projectGroups {
+		state.ProjectGroups = append(state.ProjectGroups, group)
+	}
+	for _, workspace := range m.folderWorkspaces {
+		state.FolderWorkspaces = append(state.FolderWorkspaces, workspace)
 	}
 	for _, worktree := range m.worktrees {
 		state.Worktrees = append(state.Worktrees, worktree)
@@ -3916,7 +3934,7 @@ func isBrowserTabStatus(status BrowserTabStatus) bool {
 
 func isBrowserCommand(command string) bool {
 	switch command {
-	case "reload", "goBack", "goForward", "stop", "screenshot":
+	case "goto", "reload", "goBack", "goForward", "stop", "screenshot":
 		return true
 	default:
 		return false

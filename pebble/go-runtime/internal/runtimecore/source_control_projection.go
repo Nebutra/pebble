@@ -12,6 +12,8 @@ import (
 type SourceControlChange struct {
 	Path      string `json:"path"`
 	Status    string `json:"status"`
+	Area      string `json:"area,omitempty"`
+	OldPath   string `json:"oldPath,omitempty"`
 	Additions int    `json:"additions,omitempty"`
 	Deletions int    `json:"deletions,omitempty"`
 }
@@ -239,8 +241,8 @@ func applyGitStatusLines(projection *SourceControlProjection, lines []string) {
 			parseGitBranchLine(projection, strings.TrimSpace(strings.TrimPrefix(line, "## ")))
 			continue
 		}
-		if change, ok := parseGitChangeLine(line); ok {
-			changes = append(changes, change)
+		if parsedChanges := parseGitChangeLine(line); len(parsedChanges) > 0 {
+			changes = append(changes, parsedChanges...)
 		}
 	}
 	projection.Changes = changes
@@ -282,34 +284,55 @@ func parseGitBranchLine(projection *SourceControlProjection, line string) {
 	}
 }
 
-func parseGitChangeLine(line string) (SourceControlChange, bool) {
+func parseGitChangeLine(line string) []SourceControlChange {
 	if len(line) < 4 {
-		return SourceControlChange{}, false
+		return nil
 	}
 	statusCode := line[:2]
-	path := strings.TrimSpace(line[3:])
-	if _, renamedTo, ok := strings.Cut(path, " -> "); ok {
-		path = strings.TrimSpace(renamedTo)
+	oldPath, path := parseGitStatusPath(strings.TrimSpace(line[3:]))
+	if path == "" {
+		return nil
 	}
-	status := gitChangeStatus(statusCode)
-	if status == "" || path == "" {
-		return SourceControlChange{}, false
+	if statusCode == "??" {
+		return []SourceControlChange{{Path: path, Status: "untracked", Area: "untracked"}}
 	}
-	return SourceControlChange{Path: path, Status: status}, true
+	changes := make([]SourceControlChange, 0, 2)
+	if status := gitChangeStatusCode(statusCode[0]); status != "" {
+		changes = append(changes, sourceControlChangeForGitStatus(path, oldPath, status, "staged"))
+	}
+	if status := gitChangeStatusCode(statusCode[1]); status != "" {
+		changes = append(changes, sourceControlChangeForGitStatus(path, oldPath, status, "unstaged"))
+	}
+	return changes
 }
 
-func gitChangeStatus(statusCode string) string {
-	switch {
-	case strings.Contains(statusCode, "?"):
-		return "untracked"
-	case strings.Contains(statusCode, "R"):
+func parseGitStatusPath(rawPath string) (string, string) {
+	if renamedFrom, renamedTo, ok := strings.Cut(rawPath, " -> "); ok {
+		return strings.TrimSpace(renamedFrom), strings.TrimSpace(renamedTo)
+	}
+	return "", rawPath
+}
+
+func sourceControlChangeForGitStatus(path string, oldPath string, status string, area string) SourceControlChange {
+	change := SourceControlChange{Path: path, Status: status, Area: area}
+	if status == "renamed" && strings.TrimSpace(oldPath) != "" {
+		change.OldPath = strings.TrimSpace(oldPath)
+	}
+	return change
+}
+
+func gitChangeStatusCode(statusCode byte) string {
+	switch statusCode {
+	case 'R':
 		return "renamed"
-	case strings.Contains(statusCode, "A"):
+	case 'A':
 		return "added"
-	case strings.Contains(statusCode, "D"):
+	case 'D':
 		return "deleted"
-	case strings.Contains(statusCode, "M"):
+	case 'M':
 		return "modified"
+	case 'C':
+		return "copied"
 	default:
 		return ""
 	}
@@ -327,9 +350,18 @@ func normalizeSourceControlChanges(changes []SourceControlChange) []SourceContro
 		if path == "" || status == "" {
 			continue
 		}
+		area := normalizeSourceControlChangeArea(change.Area, status)
+		oldPath := ""
+		if change.OldPath != "" {
+			if cleanedOldPath, err := cleanWorkspaceRelativePath(change.OldPath); err == nil {
+				oldPath = filepath.ToSlash(cleanedOldPath)
+			}
+		}
 		normalized = append(normalized, SourceControlChange{
 			Path:      path,
 			Status:    status,
+			Area:      area,
+			OldPath:   oldPath,
 			Additions: change.Additions,
 			Deletions: change.Deletions,
 		})
@@ -347,12 +379,30 @@ func normalizeSourceControlChangeStatus(status string) string {
 		return "deleted"
 	case "r", "rename", "renamed":
 		return "renamed"
+	case "c", "copy", "copied":
+		return "copied"
 	case "?", "??", "untracked":
 		return "untracked"
 	case "!", "ignored":
 		return "ignored"
 	default:
 		return ""
+	}
+}
+
+func normalizeSourceControlChangeArea(area string, status string) string {
+	switch strings.ToLower(strings.TrimSpace(area)) {
+	case "staged", "index":
+		return "staged"
+	case "unstaged", "working", "worktree":
+		return "unstaged"
+	case "untracked":
+		return "untracked"
+	default:
+		if status == "untracked" {
+			return "untracked"
+		}
+		return "unstaged"
 	}
 }
 

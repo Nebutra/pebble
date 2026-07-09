@@ -20,6 +20,9 @@ func TestApplyGitStatusLinesParsesBranchAndChanges(t *testing.T) {
 		"?? docs/new.md",
 		"R  old.txt -> new.txt",
 		"D  deleted.go",
+		"M  staged.ts",
+		"MM both.ts",
+		"AM added-modified.ts",
 	})
 	if projection.Branch != "feature" {
 		t.Fatalf("expected feature branch, got %q", projection.Branch)
@@ -31,10 +34,15 @@ func TestApplyGitStatusLinesParsesBranchAndChanges(t *testing.T) {
 		t.Fatalf("expected dirty sync status, got %q", projection.SyncStatus)
 	}
 	expected := []SourceControlChange{
-		{Path: "src/app.ts", Status: "modified"},
-		{Path: "docs/new.md", Status: "untracked"},
-		{Path: "new.txt", Status: "renamed"},
-		{Path: "deleted.go", Status: "deleted"},
+		{Path: "src/app.ts", Status: "modified", Area: "unstaged"},
+		{Path: "docs/new.md", Status: "untracked", Area: "untracked"},
+		{Path: "new.txt", Status: "renamed", Area: "staged", OldPath: "old.txt"},
+		{Path: "deleted.go", Status: "deleted", Area: "staged"},
+		{Path: "staged.ts", Status: "modified", Area: "staged"},
+		{Path: "both.ts", Status: "modified", Area: "staged"},
+		{Path: "both.ts", Status: "modified", Area: "unstaged"},
+		{Path: "added-modified.ts", Status: "added", Area: "staged"},
+		{Path: "added-modified.ts", Status: "modified", Area: "unstaged"},
 	}
 	if len(projection.Changes) != len(expected) {
 		t.Fatalf("expected %d changes, got %#v", len(expected), projection.Changes)
@@ -141,7 +149,7 @@ func TestUpdateSourceControlProjectionOverridesRemoteUnknown(t *testing.T) {
 		BaseBranch:   "main",
 		Ahead:        2,
 		Changes: []SourceControlChange{
-			{Path: " README.md ", Status: "M"},
+			{Path: " README.md ", Status: "M", Area: "staged"},
 			{Path: "", Status: "modified"},
 			{Path: "skip.bin", Status: "unknown"},
 			{Path: "../outside.txt", Status: "modified"},
@@ -160,6 +168,9 @@ func TestUpdateSourceControlProjectionOverridesRemoteUnknown(t *testing.T) {
 		t.Fatalf("expected cached remote projection, got %#v", after)
 	}
 	assertProjectionChange(t, after[0].Changes, "README.md", "modified")
+	if after[0].Changes[0].Area != "staged" {
+		t.Fatalf("expected staged remote projection change, got %#v", after[0].Changes[0])
+	}
 }
 
 func TestUpdateSourceControlProjectionRejectsForeignWorkspace(t *testing.T) {

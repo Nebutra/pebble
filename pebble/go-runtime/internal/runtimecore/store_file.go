@@ -13,6 +13,8 @@ type persistedState struct {
 	SchemaVersion      int                          `json:"schemaVersion"`
 	RelayID            string                       `json:"relayId"`
 	Projects           []Project                    `json:"projects"`
+	ProjectGroups      []ProjectGroup               `json:"projectGroups"`
+	FolderWorkspaces   []FolderWorkspace            `json:"folderWorkspaces"`
 	Worktrees          []Worktree                   `json:"worktrees"`
 	Agents             []AgentProfile               `json:"agents"`
 	AgentRuns          []AgentRun                   `json:"agentRuns"`
