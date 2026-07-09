@@ -17,9 +17,11 @@ import type {
   RemoveWorktreeResult,
   Repo,
   Worktree,
+  WorktreeBaseStatusEvent,
   WorktreeLineage,
   WorkspaceLineage,
-  WorktreeMeta
+  WorktreeMeta,
+  WorktreeRemoteBranchConflictEvent
 } from '../../../src/shared/types'
 import { MANAGED_WORKTREE_OWNERSHIP } from '../../../src/shared/worktree-ownership'
 import { pickNativeDirectories, pickNativeDirectory } from './native-dialog-bridge'
@@ -45,6 +47,8 @@ import {
 } from './pebble-tauri-workspace-runtime-records'
 import {
   getTauriBaseRefDefault,
+  resolveTauriMrBase,
+  resolveTauriPrBase,
   searchTauriBaseRefDetails,
   searchTauriBaseRefs
 } from './tauri-git-base-ref-api'
@@ -81,10 +85,33 @@ type WorktreeWithRuntimeLineage = Worktree & {
 type RepoChangedListener = Parameters<PreloadApi['repos']['onChanged']>[0]
 type WorktreeChangedListener = Parameters<PreloadApi['worktrees']['onChanged']>[0]
 type WorktreeCreateProgressListener = Parameters<PreloadApi['worktrees']['onCreateProgress']>[0]
+type WorktreeBaseStatusListener = Parameters<PreloadApi['worktrees']['onBaseStatus']>[0]
+type WorktreeRemoteBranchConflictListener = Parameters<
+  PreloadApi['worktrees']['onRemoteBranchConflict']
+>[0]
+
+type RuntimeGitBaseStatusResult = {
+  status: WorktreeBaseStatusEvent['status']
+  base: string
+  remote?: string
+  behind?: number
+  recentSubjects?: string[]
+  conflict?: {
+    remote: string
+    branchName: string
+  }
+}
+
+type RuntimeCreateWorktreeInternalResult = {
+  worktree: WorktreeWithRuntimeLineage
+  initialBaseStatus?: WorktreeBaseStatusEvent
+}
 
 const repoChangedListeners = new Set<RepoChangedListener>()
 const worktreeChangedListeners = new Set<WorktreeChangedListener>()
 const worktreeCreateProgressListeners = new Set<WorktreeCreateProgressListener>()
+const worktreeBaseStatusListeners = new Set<WorktreeBaseStatusListener>()
+const worktreeRemoteBranchConflictListeners = new Set<WorktreeRemoteBranchConflictListener>()
 let projectEventPumpStarted = false
 let worktreeEventPumpStarted = false
 
@@ -154,6 +181,14 @@ export function createPebbleReposApi(base: PreloadApi['repos']): PreloadApi['rep
         return { error: getErrorMessage(error) }
       }
     },
+    clone: async ({ url, destination }) => {
+      const project = await requestRuntimeJson<PebbleRuntimeProject>('/v1/projects/clone', {
+        method: 'POST',
+        timeoutMs: 10 * 60_000,
+        body: { url, destination }
+      })
+      return mapRuntimeProjectToRepo(project, 'git')
+    },
     remove: async ({ repoId }) => {
       await requestRuntimeJson<PebbleRuntimeProject>(`/v1/projects/${encodeURIComponent(repoId)}`, {
         method: 'DELETE'
@@ -209,8 +244,11 @@ export function createPebbleWorktreesApi(base: PreloadApi['worktrees']): Preload
       } satisfies DetectedWorktreeListResult
     },
     create: async (args) => {
-      const worktree = await createRuntimeWorktree(args)
-      return { worktree } satisfies CreateWorktreeResult
+      const result = await createRuntimeWorktreeWithStatus(args)
+      return {
+        worktree: result.worktree,
+        ...(result.initialBaseStatus ? { initialBaseStatus: result.initialBaseStatus } : {})
+      } satisfies CreateWorktreeResult
     },
     remove: async ({ worktreeId, force }) => {
       const preservedBranch = await removeRuntimeWorktreeById(worktreeId, { force })
@@ -222,17 +260,15 @@ export function createPebbleWorktreesApi(base: PreloadApi['worktrees']): Preload
     listLineage: readRuntimeWorktreeLineage,
     updateLineage: updateRuntimeWorktreeLineage,
     persistSortOrder: ({ orderedIds }) => persistRuntimeWorktreeSortOrder(orderedIds),
-    prefetchCreateBase: () => Promise.resolve(),
-    resolvePrBase: () =>
-      Promise.resolve({ error: 'Pull request base resolution is not available.' }),
-    resolveMrBase: () =>
-      Promise.resolve({ error: 'Merge request base resolution is not available.' }),
+    prefetchCreateBase: (args) => prefetchRuntimeWorktreeCreateBase(args),
+    resolvePrBase: (args) => resolveTauriPrBase(readRepos(), args),
+    resolveMrBase: (args) => resolveTauriMrBase(readRepos(), args),
     forceDeletePreservedBranch: ({ worktreeId, branchName, expectedHead }) =>
       forceDeleteRuntimePreservedBranch(worktreeId, branchName, expectedHead),
     onChanged: (callback) => subscribeWorktreeChanged(callback),
     onCreateProgress: (callback) => subscribeWorktreeCreateProgress(callback),
-    onBaseStatus: () => noopUnsubscribe,
-    onRemoteBranchConflict: () => noopUnsubscribe
+    onBaseStatus: (callback) => subscribeWorktreeBaseStatus(callback),
+    onRemoteBranchConflict: (callback) => subscribeWorktreeRemoteBranchConflict(callback)
   }
 }
 
@@ -270,6 +306,12 @@ export async function readWorktrees(projectId?: string): Promise<Worktree[]> {
 export async function createRuntimeWorktree(
   args: RuntimeCreateWorktreeArgs
 ): Promise<WorktreeWithRuntimeLineage> {
+  return (await createRuntimeWorktreeWithStatus(args)).worktree
+}
+
+async function createRuntimeWorktreeWithStatus(
+  args: RuntimeCreateWorktreeArgs
+): Promise<RuntimeCreateWorktreeInternalResult> {
   emitWorktreeCreateProgress(args.creationId, 'fetching')
   const repo = (await readRepos()).find((entry) => entry.id === args.repoId)
   const parentPath = repo?.worktreeBasePath || repo?.path || ''
@@ -312,7 +354,21 @@ export async function createRuntimeWorktree(
     })
     worktree = { ...worktree, lineage: updated.lineage }
   }
-  return worktree
+  const initialBaseStatus = createInitialRuntimeBaseStatus(args.repoId, runtimeWorktree)
+  if (initialBaseStatus) {
+    emitRuntimeWorktreeBaseStatus(initialBaseStatus)
+    void reconcileRuntimeWorktreeBaseStatus(worktree, runtimeWorktree).catch((error) => {
+      emitRuntimeWorktreeBaseStatus({
+        ...initialBaseStatus,
+        status: 'unknown',
+        recentSubjects: [getErrorMessage(error)]
+      })
+    })
+  }
+  return {
+    worktree,
+    ...(initialBaseStatus ? { initialBaseStatus } : {})
+  }
 }
 
 export async function createRuntimeWorktreeResult(
@@ -795,6 +851,138 @@ async function resolveDefaultCreateProjectParent(): Promise<string> {
 }
 
 function noopUnsubscribe(): void {}
+
+function subscribeWorktreeBaseStatus(callback: WorktreeBaseStatusListener): () => void {
+  worktreeBaseStatusListeners.add(callback)
+  return () => {
+    worktreeBaseStatusListeners.delete(callback)
+  }
+}
+
+function subscribeWorktreeRemoteBranchConflict(
+  callback: WorktreeRemoteBranchConflictListener
+): () => void {
+  worktreeRemoteBranchConflictListeners.add(callback)
+  return () => {
+    worktreeRemoteBranchConflictListeners.delete(callback)
+  }
+}
+
+function emitRuntimeWorktreeBaseStatus(event: WorktreeBaseStatusEvent): void {
+  for (const listener of Array.from(worktreeBaseStatusListeners)) {
+    listener(event)
+  }
+}
+
+function emitRuntimeWorktreeRemoteBranchConflict(event: WorktreeRemoteBranchConflictEvent): void {
+  for (const listener of Array.from(worktreeRemoteBranchConflictListeners)) {
+    listener(event)
+  }
+}
+
+function createInitialRuntimeBaseStatus(
+  repoId: string,
+  worktree: PebbleRuntimeWorktree
+): WorktreeBaseStatusEvent | undefined {
+  const base = worktree.base?.trim()
+  const createdBaseSha = worktree.createdBaseSha?.trim()
+  if (!base || !createdBaseSha) {
+    return undefined
+  }
+  const remote = parseRemoteTrackingBase(base)?.remote
+  return {
+    repoId,
+    worktreeId: worktree.id,
+    status: 'checking',
+    base,
+    ...(remote ? { remote } : {})
+  }
+}
+
+async function reconcileRuntimeWorktreeBaseStatus(
+  worktree: Worktree,
+  runtimeWorktree: PebbleRuntimeWorktree
+): Promise<void> {
+  const base = runtimeWorktree.base?.trim()
+  const createdBaseSha = runtimeWorktree.createdBaseSha?.trim()
+  if (!base || !createdBaseSha) {
+    return
+  }
+  const result = await requestRuntimeJson<RuntimeGitBaseStatusResult>(
+    '/v1/source-control/base-status',
+    {
+      method: 'POST',
+      timeoutMs: 30_000,
+      body: {
+        projectId: worktree.repoId,
+        worktreeId: worktree.id,
+        baseRef: base,
+        createdBaseSha,
+        branchName: worktree.branch
+      }
+    }
+  )
+  emitRuntimeWorktreeBaseStatus({
+    repoId: worktree.repoId,
+    worktreeId: worktree.id,
+    status: result.status,
+    base: result.base || base,
+    ...(result.remote ? { remote: result.remote } : {}),
+    ...(typeof result.behind === 'number' ? { behind: result.behind } : {}),
+    ...(result.recentSubjects?.length ? { recentSubjects: result.recentSubjects } : {})
+  })
+  if (result.conflict) {
+    emitRuntimeWorktreeRemoteBranchConflict({
+      repoId: worktree.repoId,
+      worktreeId: worktree.id,
+      remote: result.conflict.remote,
+      branchName: result.conflict.branchName
+    })
+  }
+}
+
+async function prefetchRuntimeWorktreeCreateBase(args: {
+  repoId: string
+  baseBranch?: string
+}): Promise<void> {
+  const repo = (await readRepos()).find((entry) => entry.id === args.repoId)
+  if (!repo || repo.kind === 'folder' || repo.connectionId) {
+    return
+  }
+  const remoteBranch = parseRemoteTrackingBase(args.baseBranch)
+  try {
+    await requestRuntimeJson('/v1/source-control/mutate', {
+      method: 'POST',
+      timeoutMs: 10_000,
+      body: {
+        projectId: repo.id,
+        operation: 'fetch',
+        remoteName: remoteBranch?.remote ?? '',
+        branchName: remoteBranch?.branch ?? ''
+      }
+    })
+  } catch {
+    // Why: this is an optimistic warm-up. The actual worktree create path still
+    // performs its own fetch and reports user-visible failures there.
+  }
+}
+
+function parseRemoteTrackingBase(
+  baseBranch: string | undefined
+): { remote: string; branch: string } | null {
+  const normalized = baseBranch?.trim().replace(/^refs\/remotes\//, '')
+  if (!normalized || normalized.startsWith('refs/') || normalized.includes('..')) {
+    return null
+  }
+  const slashIndex = normalized.indexOf('/')
+  if (slashIndex <= 0 || slashIndex === normalized.length - 1) {
+    return null
+  }
+  return {
+    remote: normalized.slice(0, slashIndex),
+    branch: normalized.slice(slashIndex + 1)
+  }
+}
 
 function subscribeRepoChanged(callback: RepoChangedListener): () => void {
   repoChangedListeners.add(callback)

@@ -21,6 +21,7 @@ import {
   resolveTauriBrowserSessionPartition,
   TAURI_BROWSER_GUEST_UNAVAILABLE
 } from './tauri-browser-runtime-profiles'
+import { ensureTauriBrowserActionConsumer } from './tauri-browser-action-consumer'
 
 export function installTauriBrowserRuntimeApi(): void {
   if (!hasTauriInternals()) {
@@ -80,6 +81,7 @@ export function installTauriBrowserRuntimeApi(): void {
 
   ensureTauriBrowserRuntimeEventPump()
   ensureTauriBrowserProviderRefresh()
+  ensureTauriBrowserActionConsumer()
 }
 
 function hasTauriInternals(): boolean {

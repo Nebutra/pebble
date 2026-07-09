@@ -14,6 +14,15 @@ import type {
 } from '../../../src/shared/runtime-types'
 import type { PublicKnownRuntimeEnvironment } from '../../../src/shared/runtime-environments'
 import { projectHostSetupProjectionFromRepos } from '../../../src/shared/project-host-setup-projection'
+import { parsePebbleYaml } from '../../../src/shared/pebble-yaml'
+import type { SetupScriptImportCandidate } from '../../../src/shared/setup-script-imports'
+import { inspectSetupScriptImportCandidates } from '../../../src/shared/setup-script-imports'
+import type {
+  CreateHostedReviewResult,
+  HostedReviewCreationEligibility,
+  HostedReviewInfo
+} from '../../../src/shared/hosted-review'
+import type { PebbleHooks } from '../../../src/shared/types'
 import { PRODUCT_NAME } from './product-brand'
 import { warnUnmappedRuntimeMethod } from './runtime-unmapped-method-warning'
 import {
@@ -37,6 +46,18 @@ import {
   toCreateWorktreeArgs
 } from './pebble-tauri-workspace-runtime-api'
 import { callTauriBrowserRuntimeRpc } from './tauri-browser-runtime-rpc'
+import { callTauriFileRuntimeRpc } from './tauri-file-runtime-rpc'
+import {
+  callTauriFolderWorkspaceRuntimeRpc,
+  callTauriProjectGroupRuntimeRpc
+} from './tauri-folder-workspace-api'
+import { callTauriGitRuntimeRpc } from './tauri-git-runtime-rpc'
+import {
+  openTauriComputerUsePermissionSetup,
+  readTauriComputerUsePermissionStatus
+} from './tauri-computer-use-permissions-api'
+import { subscribeTauriRuntimeEnvironment } from './tauri-runtime-environment-subscription-api'
+import { callTauriTerminalRuntimeRpc } from './tauri-terminal-runtime-rpc'
 
 const PEBBLE_RUNTIME_ID = 'pebble-local'
 
@@ -149,15 +170,10 @@ export function createPebbleRuntimeEnvironmentsApi(
       invoke<{ disconnected: PublicKnownRuntimeEnvironment }>('runtime_environments_disconnect', {
         input: { selector }
       }),
-    subscribe: async (_args, callbacks) => {
-      callbacks.onError?.({
-        code: 'remote_subscription_unavailable',
-        message:
-          'Remote runtime subscriptions are not available in the Tauri shell yet. One-shot runtime calls remain available.'
-      })
-      callbacks.onClose?.()
-      return { unsubscribe: noopUnsubscribe, sendBinary: noopSendBinary }
-    }
+    subscribe: (args, callbacks) =>
+      hasTauriInternals()
+        ? subscribeTauriRuntimeEnvironment(args, callbacks)
+        : base.subscribe(args, callbacks)
   }
 }
 
@@ -170,13 +186,52 @@ async function callPebbleRuntimeMethod(
     if (browserResult.handled) {
       return okRuntimeRpc(browserResult.result)
     }
+    const terminalResult = await callTauriTerminalRuntimeRpc(method, params)
+    if (terminalResult.handled) {
+      return okRuntimeRpc(terminalResult.result)
+    }
+    const fileResult = await callTauriFileRuntimeRpc(method, params)
+    if (fileResult.handled) {
+      return okRuntimeRpc(fileResult.result)
+    }
+    const gitResult = await callTauriGitRuntimeRpc(method, params)
+    if (gitResult.handled) {
+      return okRuntimeRpc(gitResult.result)
+    }
     switch (method) {
       case 'status.get':
         return okRuntimeRpc(await readOrCreateRuntimeStatus())
       case 'repo.list':
         return okRuntimeRpc({ repos: await readRepos() })
+      case 'repo.add':
+        return okRuntimeRpc(await window.api.repos.add(toRepoAddArgs(params)))
+      case 'repo.create':
+        return okRuntimeRpc(await window.api.repos.create(toRepoCreateArgs(params)))
+      case 'repo.clone':
+        return okRuntimeRpc({ repo: await window.api.repos.clone(toRepoCloneArgs(params)) })
+      case 'repo.gitAvailable':
+        return okRuntimeRpc({ available: await window.api.repos.isGitAvailable() })
+      case 'repo.update':
+        return okRuntimeRpc({ repo: await window.api.repos.update(toRepoUpdateArgs(params)) })
+      case 'repo.rm':
+        await window.api.repos.remove({ repoId: requireRepoId(params) })
+        return okRuntimeRpc({ removed: true })
       case 'repo.reorder':
         return okRuntimeRpc(await persistRuntimeProjectSortOrder(toOrderedIds(params)))
+      case 'repo.baseRefDefault':
+        return okRuntimeRpc(
+          await window.api.repos.getBaseRefDefault({ repoId: requireRepoId(params) })
+        )
+      case 'repo.searchRefs':
+        return okRuntimeRpc(await searchRuntimeRepoRefs(params))
+      case 'repo.hooksCheck':
+        return okRuntimeRpc(await readRuntimeRepoHooksCheck(params))
+      case 'repo.setupScriptImports':
+        return okRuntimeRpc(await inspectRuntimeRepoSetupScriptImports(params))
+      case 'repo.issueCommandRead':
+        return okRuntimeRpc(await readRuntimeRepoIssueCommand(params))
+      case 'repo.issueCommandWrite':
+        return okRuntimeRpc(await writeRuntimeRepoIssueCommand(params))
       case 'project.list':
         return okRuntimeRpc({
           projects: projectHostSetupProjectionFromRepos(await readRepos()).projects
@@ -185,6 +240,42 @@ async function callPebbleRuntimeMethod(
         return okRuntimeRpc({
           setups: projectHostSetupProjectionFromRepos(await readRepos()).setups
         })
+      case 'projectGroup.list':
+      case 'projectGroup.create':
+      case 'projectGroup.update':
+      case 'projectGroup.delete':
+      case 'projectGroup.moveProject': {
+        const projectGroupResult = await callTauriProjectGroupRuntimeRpc(method, params)
+        if (projectGroupResult.handled) {
+          return okRuntimeRpc(projectGroupResult.result)
+        }
+        return failRuntimeRpc('method_not_available', `${PRODUCT_NAME} runtime method is not mapped: ${method}`)
+      }
+      case 'projectGroup.scanNested':
+      case 'projectGroup.importNested': {
+        const projectGroupResult = await callTauriProjectGroupRuntimeRpc(method, params)
+        if (projectGroupResult.handled) {
+          return okRuntimeRpc(projectGroupResult.result)
+        }
+        return failRuntimeRpc('method_not_available', `${PRODUCT_NAME} runtime method is not mapped: ${method}`)
+      }
+      case 'folderWorkspace.list':
+      case 'folderWorkspace.create':
+      case 'folderWorkspace.update':
+      case 'folderWorkspace.delete':
+      case 'folderWorkspace.getPathStatus': {
+        const folderWorkspaceResult = await callTauriFolderWorkspaceRuntimeRpc(method, params)
+        if (folderWorkspaceResult.handled) {
+          return okRuntimeRpc(folderWorkspaceResult.result)
+        }
+        return failRuntimeRpc('method_not_available', `${PRODUCT_NAME} runtime method is not mapped: ${method}`)
+      }
+      case 'hostedReview.forBranch':
+        return okRuntimeRpc(readTauriHostedReviewForBranch())
+      case 'hostedReview.getCreationEligibility':
+        return okRuntimeRpc(readTauriHostedReviewCreationEligibility())
+      case 'hostedReview.create':
+        return okRuntimeRpc(createTauriHostedReviewUnavailableResult())
       case 'provider.list':
       case 'providers.list':
       case 'nativeProvider.list':
@@ -195,19 +286,43 @@ async function callPebbleRuntimeMethod(
       case 'provider.register':
       case 'nativeProvider.register':
         return okRuntimeRpc({ provider: await registerRuntimeNativeProvider(params) })
+      case 'computer.permissionsStatus':
+        return okRuntimeRpc(await readTauriComputerUsePermissionStatus())
+      case 'computer.permissions':
+        return okRuntimeRpc(await openTauriComputerUsePermissionSetup(readComputerPermissionsArgs(params)))
       case 'worktree.list':
         return okRuntimeRpc({ worktrees: await readWorktrees(getRuntimeRepoId(params)) })
+      case 'worktree.detectedList':
+        return okRuntimeRpc(
+          await window.api.worktrees.listDetected({ repoId: requireRepoId(params) })
+        )
       case 'worktree.lineageList':
         return okRuntimeRpc(await readRuntimeWorktreeLineage())
       case 'worktree.create':
         return okRuntimeRpc(await createRuntimeWorktreeResult(toCreateWorktreeArgs(params)))
+      case 'worktree.prefetchCreateBase':
+        await window.api.worktrees.prefetchCreateBase(toWorktreePrefetchArgs(params))
+        return okRuntimeRpc(null)
+      case 'worktree.resolvePrBase':
+        return okRuntimeRpc(
+          await window.api.worktrees.resolvePrBase(toWorktreeResolvePrArgs(params))
+        )
+      case 'worktree.resolveMrBase':
+        return okRuntimeRpc(
+          await window.api.worktrees.resolveMrBase(toWorktreeResolveMrArgs(params))
+        )
       case 'worktree.set':
         return okRuntimeRpc({ worktree: await setRuntimeWorktreeMeta(params) })
       case 'worktree.persistSortOrder':
         await persistRuntimeWorktreeSortOrder(toOrderedIds(params))
         return okRuntimeRpc({ status: 'applied' })
+      case 'worktree.rm':
       case 'worktree.remove':
         return okRuntimeRpc({ preservedBranch: await removeRuntimeWorktree(params) })
+      case 'worktree.forceDeleteBranch':
+        return okRuntimeRpc(
+          await window.api.worktrees.forceDeletePreservedBranch(toForceDeleteBranchArgs(params))
+        )
       case 'preflight.check':
         return okRuntimeRpc(await window.api.preflight.check())
       case 'preflight.detectAgents':
@@ -263,6 +378,31 @@ async function registerRuntimeNativeProvider(params: unknown): Promise<RuntimeNa
       message: readProviderOptionalString(input.message)
     }
   })
+}
+
+// Why: provider-backed review APIs still live in the Electron host; return
+// typed unsupported states so the renderer uses normal blocked-review UX.
+function readTauriHostedReviewForBranch(): HostedReviewInfo | null {
+  return null
+}
+
+function readTauriHostedReviewCreationEligibility(): HostedReviewCreationEligibility {
+  return {
+    provider: 'unsupported',
+    review: null,
+    canCreate: false,
+    blockedReason: 'unsupported_provider',
+    nextAction: null
+  }
+}
+
+function createTauriHostedReviewUnavailableResult(): CreateHostedReviewResult {
+  return {
+    ok: false,
+    code: 'unsupported_provider',
+    error:
+      'Hosted review provider actions are not migrated to the Tauri shell yet. Use the Electron reference shell or a paired runtime environment for provider-backed PR/MR creation.'
+  }
 }
 
 async function readOrCreateRuntimeStatus(
@@ -474,6 +614,294 @@ function emitToSet<TEvent>(listeners: Set<(event: TEvent) => void>, event: TEven
   }
 }
 
+function readComputerPermissionsArgs(
+  params: unknown
+): Parameters<typeof openTauriComputerUsePermissionSetup>[0] {
+  const id = readRuntimeObject(params).id
+  if (id === 'accessibility' || id === 'screenshots') {
+    return { id }
+  }
+  return {}
+}
+
+function toRepoAddArgs(params: unknown): Parameters<PreloadApi['repos']['add']>[0] {
+  const input = readRuntimeObject(params)
+  return {
+    path: readRuntimeRequiredString(input.path, 'repo path'),
+    kind: readRuntimeString(input.kind) === 'folder' ? 'folder' : 'git'
+  }
+}
+
+function toRepoCreateArgs(params: unknown): Parameters<PreloadApi['repos']['create']>[0] {
+  const input = readRuntimeObject(params)
+  return {
+    parentPath: readRuntimeRequiredString(input.parentPath, 'parent path'),
+    name: readRuntimeRequiredString(input.name, 'repo name'),
+    kind: readRuntimeString(input.kind) === 'folder' ? 'folder' : 'git'
+  }
+}
+
+function toRepoCloneArgs(params: unknown): Parameters<PreloadApi['repos']['clone']>[0] {
+  const input = readRuntimeObject(params)
+  return {
+    url: readRuntimeRequiredString(input.url, 'clone url'),
+    destination: readRuntimeRequiredString(input.destination, 'clone destination')
+  }
+}
+
+function toRepoUpdateArgs(params: unknown): Parameters<PreloadApi['repos']['update']>[0] {
+  const input = readRuntimeObject(params)
+  return {
+    repoId: requireRepoId(params),
+    updates: readRuntimeObject(input.updates)
+  }
+}
+
+async function searchRuntimeRepoRefs(params: unknown): Promise<{
+  refs: string[]
+  refDetails: { refName: string; localBranchName: string }[]
+  truncated: boolean
+}> {
+  const input = readRuntimeObject(params)
+  const repoId = requireRepoId(params)
+  const query = readRuntimeString(input.query) ?? ''
+  const limit = readRuntimeNumber(input.limit)
+  const [refs, refDetails] = await Promise.all([
+    window.api.repos.searchBaseRefs({ repoId, query, limit }),
+    window.api.repos.searchBaseRefDetails({ repoId, query, limit }).catch(() => [])
+  ])
+  return { refs, refDetails, truncated: false }
+}
+
+async function readRuntimeRepoHooksCheck(params: unknown): Promise<{
+  status: 'ok' | 'error'
+  hasHooks: boolean
+  hooks: PebbleHooks | null
+  mayNeedUpdate: boolean
+}> {
+  const repoId = requireRepoId(params)
+  const repo = (await readRepos()).find((entry) => entry.id === repoId)
+  if (!repo || repo.kind === 'folder') {
+    return { status: 'ok', hasHooks: false, hooks: null, mayNeedUpdate: false }
+  }
+  if (repo.connectionId) {
+    return { status: 'error', hasHooks: false, hooks: null, mayNeedUpdate: false }
+  }
+  const content = await readRuntimeRepoTextFile(repoId, 'pebble.yaml')
+  if (content === null) {
+    return { status: 'ok', hasHooks: false, hooks: null, mayNeedUpdate: false }
+  }
+  const hooks = parsePebbleYaml(content)
+  return {
+    status: 'ok',
+    hasHooks: true,
+    hooks,
+    mayNeedUpdate: hooks === null && hasUnrecognizedPebbleYamlKeys(content)
+  }
+}
+
+async function inspectRuntimeRepoSetupScriptImports(
+  params: unknown
+): Promise<SetupScriptImportCandidate[]> {
+  const repoId = requireRepoId(params)
+  const repo = (await readRepos()).find((entry) => entry.id === repoId)
+  if (!repo || repo.kind === 'folder' || repo.connectionId) {
+    return []
+  }
+  return inspectSetupScriptImportCandidates((relativePath) =>
+    readRuntimeRepoTextFile(repoId, relativePath)
+  )
+}
+
+function hasUnrecognizedPebbleYamlKeys(content: string): boolean {
+  const recognized = new Set(['scripts', 'issueCommand', 'defaultTabs', 'environmentRecipes'])
+  for (const line of content.split('\n')) {
+    const match = line.match(/^([A-Za-z][A-Za-z0-9_-]*):(\s|$)/)
+    if (match && !recognized.has(match[1])) {
+      return true
+    }
+  }
+  return false
+}
+
+async function readRuntimeRepoIssueCommand(params: unknown): Promise<{
+  status: 'ok' | 'error'
+  localContent: string | null
+  sharedContent: string | null
+  effectiveContent: string | null
+  localFilePath: string
+  source: 'local' | 'shared' | 'none'
+}> {
+  const repoId = requireRepoId(params)
+  const repo = (await readRepos()).find((entry) => entry.id === repoId)
+  if (!repo || repo.kind === 'folder') {
+    return {
+      status: 'ok',
+      localContent: null,
+      sharedContent: null,
+      effectiveContent: null,
+      localFilePath: '',
+      source: 'none'
+    }
+  }
+  if (repo.connectionId) {
+    return {
+      status: 'error',
+      localContent: null,
+      sharedContent: null,
+      effectiveContent: null,
+      localFilePath: '',
+      source: 'none'
+    }
+  }
+  const localFilePath = joinRuntimeControlPath(repo.path, '.pebble/issue-command')
+  const localContent = (await readRuntimeRepoTextFile(repoId, '.pebble/issue-command'))?.trim() || null
+  const sharedContent = parsePebbleYaml((await readRuntimeRepoTextFile(repoId, 'pebble.yaml')) ?? '')
+    ?.issueCommand?.trim() || null
+  const effectiveContent = localContent ?? sharedContent
+  return {
+    status: 'ok',
+    localContent,
+    sharedContent,
+    effectiveContent,
+    localFilePath,
+    source: localContent ? 'local' : sharedContent ? 'shared' : 'none'
+  }
+}
+
+async function readRuntimeRepoTextFile(repoId: string, filePath: string): Promise<string | null> {
+  return requestRuntimeJson<{ content: string }>(
+    '/v1/files/read?' + new URLSearchParams({ projectId: repoId, path: filePath }).toString(),
+    { method: 'GET', timeoutMs: 3000 }
+  )
+    .then((result) => result.content)
+    .catch(() => null)
+}
+
+async function writeRuntimeRepoIssueCommand(params: unknown): Promise<{ ok: true }> {
+  const input = readRuntimeObject(params)
+  await requestRuntimeJson('/v1/files/write', {
+    method: 'POST',
+    timeoutMs: 5000,
+    body: {
+      projectId: requireRepoId(params),
+      path: '.pebble/issue-command',
+      content: readRuntimeRawString(input.content) ?? '',
+      createDirs: true
+    }
+  })
+  return { ok: true }
+}
+
+function toWorktreePrefetchArgs(
+  params: unknown
+): Parameters<PreloadApi['worktrees']['prefetchCreateBase']>[0] {
+  const input = readRuntimeObject(params)
+  return {
+    repoId: requireRepoId(params),
+    baseBranch: readRuntimeString(input.baseBranch) ?? undefined
+  }
+}
+
+function toWorktreeResolvePrArgs(
+  params: unknown
+): Parameters<PreloadApi['worktrees']['resolvePrBase']>[0] {
+  const input = readRuntimeObject(params)
+  return {
+    repoId: requireRepoId(params),
+    prNumber: readRuntimeNumber(input.prNumber) ?? 0,
+    headRefName: readRuntimeString(input.headRefName) ?? '',
+    baseRefName: readRuntimeString(input.baseRefName) ?? '',
+    isCrossRepository: input.isCrossRepository === true
+  }
+}
+
+function toWorktreeResolveMrArgs(
+  params: unknown
+): Parameters<PreloadApi['worktrees']['resolveMrBase']>[0] {
+  const input = readRuntimeObject(params)
+  return {
+    repoId: requireRepoId(params),
+    mrIid: readRuntimeNumber(input.mrIid) ?? 0,
+    sourceBranch: readRuntimeString(input.sourceBranch) ?? '',
+    targetBranch: readRuntimeString(input.targetBranch) ?? '',
+    isCrossRepository: input.isCrossRepository === true
+  }
+}
+
+function toForceDeleteBranchArgs(
+  params: unknown
+): Parameters<PreloadApi['worktrees']['forceDeletePreservedBranch']>[0] {
+  const input = readRuntimeObject(params)
+  return {
+    worktreeId: requireWorktreeId(params),
+    branchName: readRuntimeRequiredString(input.branchName, 'branch name'),
+    expectedHead: readRuntimeRequiredString(input.expectedHead, 'expected branch head')
+  }
+}
+
+function requireRepoId(params: unknown): string {
+  const repoId = getRuntimeRepoId(params)
+  if (!repoId) {
+    throw new Error('Missing repo id')
+  }
+  return repoId
+}
+
+function requireWorktreeId(params: unknown): string {
+  const input = readRuntimeObject(params)
+  const nested = readRuntimeObject(input.worktree)
+  const value =
+    readRuntimeString(input.worktreeId) ??
+    readRuntimeString(input.worktree) ??
+    readRuntimeString(nested.id) ??
+    readRuntimeString(nested.worktreeId)
+  if (!value) {
+    throw new Error('Missing worktree id')
+  }
+  if (value.startsWith('id:worktree:')) {
+    return value.slice('id:worktree:'.length)
+  }
+  if (value.startsWith('worktree:')) {
+    return value.slice('worktree:'.length)
+  }
+  return value.startsWith('id:') ? value.slice('id:'.length) : value
+}
+
+function joinRuntimeControlPath(base: string, child: string): string {
+  if (!base) {
+    return child
+  }
+  const separator = base.includes('\\') && !base.includes('/') ? '\\' : '/'
+  return base.endsWith('/') || base.endsWith('\\')
+    ? `${base}${child}`
+    : `${base}${separator}${child}`
+}
+
+function readRuntimeObject(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
+}
+
+function readRuntimeString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
+function readRuntimeRawString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null
+}
+
+function readRuntimeRequiredString(value: unknown, label: string): string {
+  const result = readRuntimeString(value)
+  if (!result) {
+    throw new Error(`${label} is required`)
+  }
+  return result
+}
+
+function readRuntimeNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
 function toConnectionParams(params: unknown): { connectionId: string } {
   const connectionId =
     typeof params === 'object' && params !== null && 'connectionId' in params
@@ -493,5 +921,3 @@ function toOrderedIds(params: unknown): string[] {
 }
 
 function noopUnsubscribe(): void {}
-
-function noopSendBinary(_bytes: Uint8Array<ArrayBufferLike>): void {}

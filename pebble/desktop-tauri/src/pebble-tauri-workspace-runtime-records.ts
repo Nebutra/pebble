@@ -14,6 +14,8 @@ export type PebbleRuntimeProject = {
   locationKind: string
   hostId?: string
   provider?: string
+  projectGroupId?: string | null
+  projectGroupOrder?: number | null
   sortOrder?: number
   createdAt: string
   updatedAt: string
@@ -26,6 +28,7 @@ export type PebbleRuntimeWorktree = {
   path: string
   branch?: string
   base?: string
+  createdBaseSha?: string
   reviewKind?: string
   reviewId?: string
   displayName?: string
@@ -66,6 +69,10 @@ export function mapRuntimeProjectToRepo(
     kind,
     connectionId: project.locationKind === 'ssh' ? (project.hostId ?? null) : null,
     executionHostId,
+    projectGroupId: project.projectGroupId ?? null,
+    ...(project.projectGroupOrder !== undefined && project.projectGroupOrder !== null
+      ? { projectGroupOrder: project.projectGroupOrder }
+      : {}),
     projectHostSetupMethod: 'imported-existing-folder'
   }
 }

@@ -18,7 +18,16 @@ import {
   createPebbleRuntimeEnvironmentsApi
 } from './pebble-tauri-runtime-control-api'
 import { createPebbleCrashReportsApi } from './tauri-crash-reports-api'
+import { createPebbleComputerUsePermissionsApi } from './tauri-computer-use-permissions-api'
 import { createPebbleDiagnosticsApi } from './tauri-diagnostics-api'
+import { createPebbleFileWatchApi } from './tauri-file-watch-api'
+import {
+  createPebbleFolderWorkspacesApi,
+  createPebbleProjectGroupsApi
+} from './tauri-folder-workspace-api'
+import { createPebbleHooksApi } from './tauri-hooks-api'
+import { createPebbleMobileApi } from './tauri-mobile-runtime-api'
+import { createPebbleSpeechApi } from './tauri-speech-api'
 import {
   detectTauriAgents,
   readTauriPreflightStatus,
@@ -81,11 +90,18 @@ export function installPebbleTauriPreloadApi(): void {
   api.preflight = createPebblePreflightApi(api.preflight)
   api.projects = createPebbleProjectsApi(api.projects)
   api.repos = createPebbleReposApi(api.repos)
+  api.projectGroups = createPebbleProjectGroupsApi(api.projectGroups)
+  api.folderWorkspaces = createPebbleFolderWorkspacesApi(api.folderWorkspaces)
   api.worktrees = createPebbleWorktreesApi(api.worktrees)
   api.runtime = createPebbleRuntimeApi(api.runtime)
   api.runtimeEnvironments = createPebbleRuntimeEnvironmentsApi(api.runtimeEnvironments)
   api.crashReports = createPebbleCrashReportsApi(api.crashReports)
+  api.computerUsePermissions = createPebbleComputerUsePermissionsApi(api.computerUsePermissions)
   api.diagnostics = createPebbleDiagnosticsApi(api.diagnostics)
+  api.fs = createPebbleFileWatchApi(api.fs)
+  api.hooks = createPebbleHooksApi(api.hooks)
+  api.mobile = createPebbleMobileApi(api.mobile)
+  api.speech = createPebbleSpeechApi(api.speech)
 }
 
 function createPebbleAppApi(base: PreloadApi['app']): PreloadApi['app'] {

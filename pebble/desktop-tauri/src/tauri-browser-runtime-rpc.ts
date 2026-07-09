@@ -1,5 +1,6 @@
 import type { DetectedBrowserInfo } from '../../../src/preload/api-types'
 import { PEBBLE_BROWSER_PARTITION } from '../../../src/shared/constants'
+import type { BrowserViewportResult } from '../../../src/shared/runtime-types'
 import type { BrowserSessionProfile, BrowserSessionProfileScope } from '../../../src/shared/types'
 import { requestRuntimeJson } from './pebble-tauri-runtime-transport'
 import { detectTauriBrowserSessionBrowsers } from './tauri-browser-runtime-profiles'
@@ -15,9 +16,11 @@ type RuntimeBrowserTab = {
   profileId?: string
   title: string
   url: string
+  status?: 'loading' | 'ready' | 'error'
 }
 
 type BrowserTabInfo = ReturnType<typeof mapRuntimeTab>
+type BrowserNavigationResult = Pick<BrowserTabInfo, 'url' | 'title'>
 
 type RuntimeBrowserRpcResult = {
   handled: boolean
@@ -60,6 +63,16 @@ export async function callTauriBrowserRuntimeRpc(
       return handled({ closed: await closeBrowserTab(params) })
     case 'browser.tabShow':
       return handled({ tab: await showBrowserTab(params) })
+    case 'browser.goto':
+      return handled(await queueBrowserNavigation('goto', params))
+    case 'browser.back':
+      return handled(await queueBrowserNavigation('goBack', params))
+    case 'browser.forward':
+      return handled(await queueBrowserNavigation('goForward', params))
+    case 'browser.reload':
+      return handled(await queueBrowserNavigation('reload', params))
+    case 'browser.viewport':
+      return handled(readBrowserViewport(params))
     default:
       return { handled: false }
   }
@@ -144,6 +157,59 @@ async function showBrowserTab(params: unknown): Promise<BrowserTabInfo> {
   return tab
 }
 
+async function queueBrowserNavigation(
+  command: 'goto' | 'goBack' | 'goForward' | 'reload',
+  params: unknown
+): Promise<BrowserNavigationResult> {
+  const input = readObject(params)
+  const pageId = readBrowserPageId(params)
+  let tab = await readRuntimeBrowserTab(pageId)
+  const payload: Record<string, unknown> = {}
+  if (command === 'goto') {
+    const url = readString(input.url) ?? 'about:blank'
+    payload.url = url
+    tab = await updateRuntimeBrowserTab(pageId, {
+      url,
+      title: url,
+      status: 'loading'
+    })
+  } else if (command === 'reload') {
+    tab = await updateRuntimeBrowserTab(pageId, { status: 'loading' })
+  }
+
+  await requestRuntimeJson(`/v1/browser/tabs/${encodeURIComponent(pageId)}/commands`, {
+    method: 'POST',
+    body: {
+      command,
+      payload
+    }
+  })
+
+  return {
+    url: tab.url,
+    title: tab.title || tab.url
+  }
+}
+
+async function readRuntimeBrowserTab(pageId: string): Promise<RuntimeBrowserTab> {
+  const tabs = await requestRuntimeJson<RuntimeBrowserTab[]>('/v1/browser/tabs', { method: 'GET' })
+  const tab = tabs.find((entry) => entry.id === pageId)
+  if (!tab) {
+    throw new Error(`Browser tab not found: ${pageId}`)
+  }
+  return tab
+}
+
+async function updateRuntimeBrowserTab(
+  pageId: string,
+  body: Partial<Pick<RuntimeBrowserTab, 'title' | 'url' | 'status'>>
+): Promise<RuntimeBrowserTab> {
+  return requestRuntimeJson<RuntimeBrowserTab>(`/v1/browser/tabs/${encodeURIComponent(pageId)}`, {
+    method: 'PATCH',
+    body
+  })
+}
+
 function mapRuntimeProfile(
   profile: RuntimeBrowserProfile,
   scope: BrowserSessionProfileScope
@@ -174,6 +240,18 @@ function handled(result: unknown): RuntimeBrowserRpcResult {
   return { handled: true, result }
 }
 
+// Why: until native WebView/CDP exists, echo the requested viewport so renderer
+// input-scaling paths stay deterministic instead of failing before fallback.
+function readBrowserViewport(params: unknown): BrowserViewportResult {
+  const input = readObject(params)
+  return {
+    width: readPositiveNumber(input.width) ?? 1280,
+    height: readPositiveNumber(input.height) ?? 720,
+    deviceScaleFactor: readPositiveNumber(input.deviceScaleFactor) ?? 1,
+    mobile: input.mobile === true
+  }
+}
+
 function readBrowserPageId(params: unknown): string {
   const input = readObject(params)
   return readRequiredString(input.page ?? input.browserPageId ?? input.tabId, 'browser page id')
@@ -199,6 +277,10 @@ function readObject(value: unknown): Record<string, unknown> {
 
 function readString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
+function readPositiveNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
 }
 
 function readRequiredString(value: unknown, label: string): string {

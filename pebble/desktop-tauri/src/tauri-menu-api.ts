@@ -9,31 +9,37 @@ import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 import type { PreloadApi } from '../../../src/preload/api-types'
+import {
+  formatKeybindingList,
+  getEffectiveKeybindingsForAction,
+  type KeybindingActionId,
+  type KeybindingOverrides
+} from '../../../src/shared/keybindings'
 import { buildTauriAppearanceMenuItems } from './tauri-appearance-menu-state'
 import { PRODUCT_NAME } from './product-brand'
+import {
+  emitTauriEmptyUiEvent as emitEmptyUiEvent,
+  emitTauriTerminalZoom as emitTerminalZoom,
+  subscribeTauriEmptyUiEvent as subscribeEmptyUiEvent,
+  subscribeTauriIndexedUiEvent as subscribeIndexedUiEvent,
+  subscribeTauriTerminalShortcutCaptured as subscribeTerminalShortcutCaptured,
+  subscribeTauriTerminalZoom as subscribeTerminalZoom,
+  subscribeTauriWorktreeHistoryNavigate as subscribeWorktreeHistoryNavigate
+} from './tauri-ui-events'
+import { installTauriWindowShortcutBridge } from './tauri-window-shortcut-bridge'
 
-type EmptyUiEvent =
-  | 'openSettings'
-  | 'openSetupGuide'
-  | 'openFeatureTour'
-  | 'openCrashReport'
-  | 'toggleLeftSidebar'
-  | 'toggleRightSidebar'
-  | 'toggleWorktreePalette'
-  | 'appMenuPaste'
-
-type ZoomDirection = 'in' | 'out' | 'reset'
 type TauriMenuEntry =
   | SubmenuOptions
   | MenuItemOptions
   | PredefinedMenuItemOptions
   | CheckMenuItemOptions
+type TauriMenuPlatform = Extract<NodeJS.Platform, 'darwin' | 'linux' | 'win32'>
+type ShortcutLabelResolver = (actionId: KeybindingActionId) => string
 
-const emptyUiEventListeners = new Map<EmptyUiEvent, Set<() => void>>()
-const terminalZoomListeners = new Set<(direction: ZoomDirection) => void>()
 let tauriMenu: Menu | null = null
 let pendingTauriMenu: Promise<Menu> | null = null
 let tauriZoomLevel = 0
+let tauriMenuKeybindingSubscriptionInstalled = false
 
 export function installTauriMenuApi(): void {
   if (!hasTauriInternals()) {
@@ -55,6 +61,19 @@ export function installTauriMenuApi(): void {
     onToggleLeftSidebar: subscribeEmptyUiEvent('toggleLeftSidebar'),
     onToggleRightSidebar: subscribeEmptyUiEvent('toggleRightSidebar'),
     onToggleWorktreePalette: subscribeEmptyUiEvent('toggleWorktreePalette'),
+    onToggleFloatingTerminal: subscribeEmptyUiEvent('toggleFloatingTerminal'),
+    onTerminalShortcutCaptured: subscribeTerminalShortcutCaptured,
+    onOpenQuickOpen: subscribeEmptyUiEvent('openQuickOpen'),
+    onToggleQuickCommandsMenu: subscribeEmptyUiEvent('toggleQuickCommandsMenu'),
+    onOpenNewWorkspace: subscribeEmptyUiEvent('openNewWorkspace'),
+    onDeleteCurrentWorkspace: subscribeEmptyUiEvent('deleteCurrentWorkspace'),
+    onOpenWorkspaceBoard: subscribeEmptyUiEvent('openWorkspaceBoard'),
+    onOpenTasks: subscribeEmptyUiEvent('openTasks'),
+    onJumpToWorktreeIndex: subscribeIndexedUiEvent('jumpToWorktreeIndex'),
+    onJumpToTabIndex: subscribeIndexedUiEvent('jumpToTabIndex'),
+    onWorktreeHistoryNavigate: subscribeWorktreeHistoryNavigate,
+    onSwitchRecentTab: subscribeEmptyUiEvent('switchRecentTab'),
+    onDictationKeyDown: subscribeEmptyUiEvent('dictationKeyDown'),
     onAppMenuPaste: subscribeEmptyUiEvent('appMenuPaste'),
     onTerminalZoom: subscribeTerminalZoom,
     popupMenu: () => {
@@ -63,49 +82,12 @@ export function installTauriMenuApi(): void {
   } satisfies PreloadApi['ui']
 
   void installTauriApplicationMenu()
+  installTauriMenuKeybindingSubscription()
+  installTauriWindowShortcutBridge()
 }
 
 function hasTauriInternals(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-}
-
-function subscribeEmptyUiEvent(event: EmptyUiEvent): (callback: () => void) => () => void {
-  return (callback) => {
-    const listeners = getEmptyUiEventListeners(event)
-    listeners.add(callback)
-    return () => {
-      listeners.delete(callback)
-    }
-  }
-}
-
-function getEmptyUiEventListeners(event: EmptyUiEvent): Set<() => void> {
-  const existing = emptyUiEventListeners.get(event)
-  if (existing) {
-    return existing
-  }
-  const created = new Set<() => void>()
-  emptyUiEventListeners.set(event, created)
-  return created
-}
-
-function emitEmptyUiEvent(event: EmptyUiEvent): void {
-  for (const listener of getEmptyUiEventListeners(event)) {
-    listener()
-  }
-}
-
-function subscribeTerminalZoom(callback: (direction: ZoomDirection) => void): () => void {
-  terminalZoomListeners.add(callback)
-  return () => {
-    terminalZoomListeners.delete(callback)
-  }
-}
-
-function emitTerminalZoom(direction: ZoomDirection): void {
-  for (const listener of terminalZoomListeners) {
-    listener(direction)
-  }
 }
 
 async function installTauriApplicationMenu(): Promise<void> {
@@ -133,7 +115,7 @@ async function getTauriMenu(): Promise<Menu> {
 }
 
 async function createTauriMenu(): Promise<Menu> {
-  return Menu.new({ items: await buildTauriMenuTemplate() })
+  return Menu.new({ items: await buildTauriMenuTemplate(await readTauriKeybindingOverrides()) })
 }
 
 async function rebuildTauriApplicationMenu(): Promise<void> {
@@ -142,26 +124,32 @@ async function rebuildTauriApplicationMenu(): Promise<void> {
   await tauriMenu.setAsAppMenu()
 }
 
-async function buildTauriMenuTemplate(): Promise<SubmenuOptions[]> {
-  const isMac = navigator.userAgent.includes('Mac')
+export async function buildTauriMenuTemplate(
+  keybindings?: KeybindingOverrides
+): Promise<SubmenuOptions[]> {
+  const platform = getTauriMenuPlatform()
+  const isMac = platform === 'darwin'
+  const shortcutLabel = createShortcutLabelResolver(platform, keybindings)
   return [
-    ...(isMac ? [buildMacAppMenu()] : []),
-    ...(isMac ? [] : [buildFileMenu()]),
+    ...(isMac ? [buildMacAppMenu(shortcutLabel)] : []),
+    ...(isMac ? [] : [buildFileMenu(shortcutLabel)]),
     buildEditMenu(),
-    await buildViewMenu(),
+    await buildViewMenu(shortcutLabel),
     buildWindowMenu(),
     buildHelpMenu()
   ]
 }
 
-function buildMacAppMenu(): SubmenuOptions {
+function buildMacAppMenu(shortcutLabel: ShortcutLabelResolver): SubmenuOptions {
   return submenu(PRODUCT_NAME, [
     aboutItem(),
     menuItem('Check for Updates...', () => {
       void window.api.updater.check({})
     }),
     separator(),
-    menuItem('Settings', () => emitEmptyUiEvent('openSettings'), 'CmdOrCtrl+,'),
+    menuItem(menuLabelWithShortcut('Settings', 'app.settings', shortcutLabel), () =>
+      emitEmptyUiEvent('openSettings')
+    ),
     separator(),
     predefined('Services'),
     separator(),
@@ -173,9 +161,11 @@ function buildMacAppMenu(): SubmenuOptions {
   ])
 }
 
-function buildFileMenu(): SubmenuOptions {
+function buildFileMenu(shortcutLabel: ShortcutLabelResolver): SubmenuOptions {
   return submenu('File', [
-    menuItem('Settings', () => emitEmptyUiEvent('openSettings'), 'CmdOrCtrl+,'),
+    menuItem(menuLabelWithShortcut('Settings', 'app.settings', shortcutLabel), () =>
+      emitEmptyUiEvent('openSettings')
+    ),
     separator(),
     predefined('Quit', 'Exit')
   ])
@@ -193,27 +183,39 @@ function buildEditMenu(): SubmenuOptions {
   ])
 }
 
-async function buildViewMenu(): Promise<SubmenuOptions> {
+async function buildViewMenu(shortcutLabel: ShortcutLabelResolver): Promise<SubmenuOptions> {
   return submenu('View', [
-    menuItem('Reload', () => reloadTauriRenderer(false), 'CmdOrCtrl+R'),
-    menuItem('Force Reload', () => reloadTauriRenderer(true), 'CmdOrCtrl+Shift+R'),
+    menuItem('Reload', () => reloadTauriRenderer(false)),
+    menuItem(menuLabelWithShortcut('Force Reload', 'app.forceReload', shortcutLabel), () =>
+      reloadTauriRenderer(true)
+    ),
     separator(),
-    menuItem('Reset Size', () => emitTerminalZoom('reset'), 'CmdOrCtrl+0'),
-    menuItem('Zoom In', () => emitTerminalZoom('in'), 'CmdOrCtrl+='),
-    menuItem('Zoom Out', () => emitTerminalZoom('out'), 'CmdOrCtrl+-'),
+    menuItem(menuLabelWithShortcut('Reset Size', 'zoom.reset', shortcutLabel), () =>
+      emitTerminalZoom('reset')
+    ),
+    menuItem(menuLabelWithShortcut('Zoom In', 'zoom.in', shortcutLabel), () =>
+      emitTerminalZoom('in')
+    ),
+    menuItem(menuLabelWithShortcut('Zoom Out', 'zoom.out', shortcutLabel), () =>
+      emitTerminalZoom('out')
+    ),
     separator(),
-    menuItem('Open Worktree Palette', () => emitEmptyUiEvent('toggleWorktreePalette')),
+    menuItem(menuLabelWithShortcut('Open Worktree Palette', 'worktree.palette', shortcutLabel), () =>
+      emitEmptyUiEvent('toggleWorktreePalette')
+    ),
     separator(),
     menuItem('Toggle Full Screen', () => {
       void toggleTauriFullscreen()
     }),
     separator(),
     submenu('Appearance', [
-      menuItem('Toggle Left Sidebar', () => emitEmptyUiEvent('toggleLeftSidebar'), 'CmdOrCtrl+B'),
       menuItem(
-        'Toggle Right Sidebar',
-        () => emitEmptyUiEvent('toggleRightSidebar'),
-        'CmdOrCtrl+Shift+B'
+        menuLabelWithShortcut('Toggle Left Sidebar', 'sidebar.left.toggle', shortcutLabel),
+        () => emitEmptyUiEvent('toggleLeftSidebar')
+      ),
+      menuItem(
+        menuLabelWithShortcut('Toggle Right Sidebar', 'sidebar.right.toggle', shortcutLabel),
+        () => emitEmptyUiEvent('toggleRightSidebar')
       ),
       separator(),
       ...(await buildTauriAppearanceMenuItems(rebuildTauriApplicationMenu))
@@ -270,4 +272,51 @@ function predefined(
 
 function aboutItem(): PredefinedMenuItemOptions {
   return { item: { About: { name: PRODUCT_NAME } } }
+}
+
+function installTauriMenuKeybindingSubscription(): void {
+  if (tauriMenuKeybindingSubscriptionInstalled) {
+    return
+  }
+  tauriMenuKeybindingSubscriptionInstalled = true
+  window.api.keybindings.onChanged(() => {
+    void rebuildTauriApplicationMenu()
+  })
+}
+
+async function readTauriKeybindingOverrides(): Promise<KeybindingOverrides | undefined> {
+  try {
+    return (await window.api.keybindings.get()).overrides
+  } catch {
+    return undefined
+  }
+}
+
+function createShortcutLabelResolver(
+  platform: TauriMenuPlatform,
+  keybindings?: KeybindingOverrides
+): ShortcutLabelResolver {
+  return (actionId) =>
+    formatKeybindingList(getEffectiveKeybindingsForAction(actionId, platform, keybindings), platform)
+}
+
+function menuLabelWithShortcut(
+  label: string,
+  actionId: KeybindingActionId,
+  shortcutLabel: ShortcutLabelResolver
+): string {
+  // Why: these shortcuts are renderer-policy-routed; menu labels may show them,
+  // but native accelerators would steal terminal/editor/recorder key events.
+  return `${label}\t${shortcutLabel(actionId)}`
+}
+
+function getTauriMenuPlatform(): TauriMenuPlatform {
+  const userAgent = navigator.userAgent
+  if (userAgent.includes('Mac')) {
+    return 'darwin'
+  }
+  if (userAgent.includes('Windows')) {
+    return 'win32'
+  }
+  return 'linux'
 }

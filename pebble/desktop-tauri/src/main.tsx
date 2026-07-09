@@ -16,6 +16,7 @@ import { installPebbleTauriPreloadApi } from './pebble-tauri-preload-api'
 import { PRODUCT_NAME } from './product-brand'
 import { installTauriAgentStatusApi } from './tauri-agent-status-api'
 import { installTauriBrowserRuntimeApi } from './tauri-browser-runtime-api'
+import { installTauriDevEducationSuppression } from './tauri-dev-education-suppression'
 import { installTauriDeepLinkApi } from './tauri-deep-link-api'
 import { installTauriMenuApi } from './tauri-menu-api'
 import { installTauriRuntimePtyApi } from './tauri-runtime-pty-api'
@@ -25,6 +26,7 @@ import { installTauriUpdaterApi } from './tauri-updater-api'
 import { installTauriWindowApi } from './tauri-window-api'
 
 installPebbleTauriPreloadApi()
+installTauriDevEducationSuppression()
 installTauriSettingsEventApi()
 installTauriWindowApi()
 installTauriUpdaterApi()
@@ -52,10 +54,7 @@ function RendererRoot(): React.JSX.Element {
     <RecoverableRenderErrorBoundary
       boundaryId="app.root"
       surface="app-root"
-      title={translate(
-        'app.recoverableError.rootTitle',
-        `${PRODUCT_NAME} hit a renderer error.`
-      )}
+      title={translate('app.recoverableError.rootTitle', `${PRODUCT_NAME} hit a renderer error.`)}
       description={translate(
         'app.recoverableError.rootDescription',
         `The app shell could not finish rendering. Retry to remount it, or relaunch ${PRODUCT_NAME} if the error persists.`
