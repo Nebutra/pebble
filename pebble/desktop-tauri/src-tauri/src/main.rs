@@ -8,11 +8,22 @@ fn main() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
+        .manage(commands::crash_reports::CrashReportsState::default())
         .manage(commands::runtime_process::RuntimeProcessState::default())
+        .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
+            commands::crash_reports::crash_reports_dismiss,
+            commands::crash_reports::crash_reports_format,
+            commands::crash_reports::crash_reports_get_latest_pending,
+            commands::crash_reports::crash_reports_get_latest_report,
+            commands::crash_reports::crash_reports_record_breadcrumb,
+            commands::crash_reports::crash_reports_record_renderer_error,
+            commands::crash_reports::crash_reports_submit,
+            commands::deep_link::deep_link_initial_urls,
             commands::file_picker::pick_directory,
             commands::file_picker::pick_directories,
+            commands::preflight::preflight_detect_commands,
             commands::runtime_environments::runtime_environments_add_from_pairing_code,
             commands::runtime_environments::runtime_environments_disconnect,
             commands::runtime_environments::runtime_environments_list,
@@ -41,8 +52,19 @@ pub fn run() {
             commands::shell::shell_pick_file,
             commands::shell::shell_pick_directory,
             commands::shell::shell_pick_repo_icon_image,
-            commands::shell::shell_copy_file
+            commands::shell::shell_copy_file,
+            commands::updater::updater_check_latest_release
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to run Pebble Tauri desktop shell");
+        .build(tauri::generate_context!())
+        .expect("failed to build Pebble Tauri desktop shell");
+
+    app.run(|app_handle, event| {
+        #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
+        if let tauri::RunEvent::Opened { urls } = event {
+            commands::deep_link::emit_deep_links(
+                app_handle,
+                urls.into_iter().map(|url| url.to_string()),
+            );
+        }
+    });
 }

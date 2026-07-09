@@ -32,5 +32,12 @@
       "../../../resources/build/icon.icns",
       "../../../resources/build/icon.ico"
     ]
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["pebble"]
+      }
+    }
   }
 }

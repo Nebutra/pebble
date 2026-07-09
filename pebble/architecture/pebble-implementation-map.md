@@ -299,17 +299,28 @@ Current implementation:
 - Tauri persists pairing-backed remote runtime environments through native Rust commands that read
   and write `pebble-environments.json`, validate `pebble://pair?...` payloads, redact device
   secrets from renderer responses, and harden the credential file on supported platforms.
+- Tauri registers the `pebble` scheme, filters startup and opened URL events to Pebble protocol
+  links, and routes `pebble://pair?...` through the runtime environment add/status refresh path.
 - Tauri maps workspace-backed renderer `pty` calls onto Go runtime process sessions for the
   migration path: spawn starts `/v1/sessions`, input writes `/input`, output/status events feed the
   renderer through the existing `pty.onData`/`pty.onExit` contract, and stop maps to session delete.
   This is a fallback bridge, not the final Zig-backed PTY implementation.
+- Tauri detects installed local CLI agents by reusing the shared `TUI_AGENT_CONFIG` command catalog
+  and a native Rust PATH/install-dir probe, so agent settings and launch surfaces are no longer fed
+  mock empty detection results.
 - Tauri exposes updater version/status events and menu-triggered check errors so updater surfaces no
-  longer silently no-op; actual Tauri updater download/install remains owned by the release/update
-  service gate.
+  longer silently no-op, and now checks the Nebutra/Pebble GitHub release feed plus platform
+  manifests before feeding the existing UpdateCard `available`/`not-available`/`error` states.
+  Actual Tauri updater download/install remains owned by the release/update service gate.
+- Tauri replaces the web crash-report mock with native commands for renderer error-boundary
+  reports, breadcrumbs, pending/latest lookup, dismiss/sent transitions, copyable crash text, and
+  Nebutra crash feedback submission. Diagnostic bundle attachment is explicit `not_uploaded` until
+  the native diagnostics collector is wired.
 - `verify-tauri-mainline.mjs` checks the renderer entry, preload bridge, Vite aliasing, CSS source,
   Tauri identity, window bounds, native window/menu/settings/shell bridges, runtime PTY fallback,
-  remote runtime environment store commands, updater status bridge, browser runtime bridge, local
-  mock-UI drift, and Roadmap commitment before shell changes are accepted.
+  remote runtime environment store commands, preflight agent detection, deep-link routing, updater
+  release-feed checks, crash-report persistence, browser runtime bridge, local mock-UI drift, and
+  Roadmap commitment before shell changes are accepted.
 
 ## Migration Rule
 

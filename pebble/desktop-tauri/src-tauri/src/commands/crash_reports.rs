@@ -1,0 +1,1167 @@
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+    sync::{Mutex, MutexGuard},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+
+use chrono::{DateTime, Utc};
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Map, Value};
+use tauri::Manager;
+use uuid::Uuid;
+
+const CRASH_REPORTS_FILE: &str = "crash-reports.json";
+const FEEDBACK_API_URL: &str = "https://www.nebutra.com/pebble/v1/feedback";
+const MAX_REPORTS: usize = 5;
+const MAX_BREADCRUMBS: usize = 30;
+const MAX_BREADCRUMB_NAME_LENGTH: usize = 80;
+const MAX_STRING_DETAIL_LENGTH: usize = 240;
+const MAX_STACK_DETAIL_LENGTH: usize = 4_000;
+const MAX_FORMATTED_REPORT_LENGTH: usize = 64_000;
+const RENDERER_ERROR_DEDUPE_MS: u128 = 10 * 60 * 1000;
+const MAX_RENDERER_ERROR_KEY_AGE_MS: u128 = RENDERER_ERROR_DEDUPE_MS * 2;
+const RELATED_CRASH_WINDOW_MS: i128 = 5_000;
+const FEEDBACK_REQUEST_TIMEOUT_SECONDS: u64 = 10;
+const TAURI_ELECTRON_VERSION_SENTINEL: &str = "tauri";
+const DIAGNOSTIC_NOT_UPLOADED_REASON: &str =
+    "diagnostic bundle collection is not wired in Tauri yet";
+const FORMATTED_REPORT_TRUNCATION_SUFFIX: &str =
+    "\n\n[Crash report truncated to fit feedback endpoint limits.]";
+
+#[derive(Default)]
+pub struct CrashReportsState {
+    breadcrumbs: Mutex<Vec<CrashReportBreadcrumb>>,
+    recent_renderer_error_report_keys: Mutex<HashMap<String, u128>>,
+    submitted_report_ids: Mutex<Vec<String>>,
+    in_flight_submissions: Mutex<HashSet<String>>,
+    file_lock: Mutex<()>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrashReportRecord {
+    id: String,
+    created_at: String,
+    status: String,
+    source: String,
+    process_type: String,
+    reason: String,
+    exit_code: Option<i64>,
+    app_version: String,
+    platform: String,
+    os_release: String,
+    arch: String,
+    electron_version: String,
+    chrome_version: String,
+    details: Map<String, Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    breadcrumbs: Option<Vec<CrashReportBreadcrumb>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrashReportBreadcrumb {
+    created_at: String,
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<Map<String, Value>>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrashReportRendererErrorInput {
+    boundary_id: String,
+    surface: String,
+    error_name: String,
+    error_message: String,
+    error_stack: Option<String>,
+    component_stack: Option<String>,
+    active_view: Option<String>,
+    active_modal: Option<Value>,
+    active_tab_type: Option<String>,
+    active_right_sidebar_tab: Option<String>,
+    has_active_worktree: Option<bool>,
+    app_version: String,
+    chrome_version: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrashReportRendererErrorResult {
+    ok: bool,
+    report: Option<CrashReportRecord>,
+    deduped: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrashReportBreadcrumbInput {
+    name: String,
+    data: Option<Value>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrashReportIdInput {
+    report_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrashReportTextInput {
+    report_id: Option<String>,
+    notes: Option<String>,
+    app_version: String,
+    chrome_version: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrashReportSubmitInput {
+    report_id: Option<String>,
+    notes: Option<String>,
+    include_diagnostic_logs: Option<bool>,
+    submit_anonymously: Option<bool>,
+    github_login: Option<String>,
+    github_email: Option<String>,
+    app_version: String,
+    chrome_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrashReportDiagnosticBundle {
+    status: String,
+    reason: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrashReportSubmitResult {
+    ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    report: Option<CrashReportRecord>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    diagnostic_bundle: Option<CrashReportDiagnosticBundle>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CrashReportFile {
+    reports: Vec<CrashReportRecord>,
+}
+
+#[derive(Debug)]
+struct CrashReportCreateInput {
+    source: String,
+    process_type: String,
+    reason: String,
+    exit_code: Option<i64>,
+    app_version: String,
+    platform: String,
+    os_release: String,
+    arch: String,
+    electron_version: String,
+    chrome_version: String,
+    details: Map<String, Value>,
+    breadcrumbs: Option<Vec<CrashReportBreadcrumb>>,
+}
+
+#[tauri::command]
+pub fn crash_reports_get_latest_pending(
+    app: tauri::AppHandle,
+    state: tauri::State<CrashReportsState>,
+) -> Result<Option<CrashReportRecord>, String> {
+    let reports = read_reports_locked(&app, &state)?;
+    let submitted = lock_state(&state.submitted_report_ids)?;
+    Ok(reports
+        .into_iter()
+        .find(|report| report.status == "pending" && !submitted.contains(&report.id)))
+}
+
+#[tauri::command]
+pub fn crash_reports_get_latest_report(
+    app: tauri::AppHandle,
+    state: tauri::State<CrashReportsState>,
+) -> Result<Option<CrashReportRecord>, String> {
+    let reports = read_reports_locked(&app, &state)?;
+    let submitted = lock_state(&state.submitted_report_ids)?;
+    Ok(reports.into_iter().find(|report| {
+        (report.status == "pending" || report.status == "dismissed")
+            && !submitted.contains(&report.id)
+    }))
+}
+
+#[tauri::command]
+pub fn crash_reports_dismiss(
+    app: tauri::AppHandle,
+    state: tauri::State<CrashReportsState>,
+    input: CrashReportIdInput,
+) -> Result<Option<CrashReportRecord>, String> {
+    if lock_state(&state.in_flight_submissions)?.contains(&input.report_id) {
+        return get_report_by_id_locked(&app, &state, &input.report_id);
+    }
+    if lock_state(&state.submitted_report_ids)?.contains(&input.report_id) {
+        return Ok(
+            get_report_by_id_locked(&app, &state, &input.report_id)?.map(|report| {
+                CrashReportRecord {
+                    status: "sent".to_string(),
+                    ..report
+                }
+            }),
+        );
+    }
+    transition_report_status(&app, &state, &input.report_id, "pending", "dismissed")
+}
+
+#[tauri::command]
+pub fn crash_reports_record_breadcrumb(
+    state: tauri::State<CrashReportsState>,
+    input: CrashReportBreadcrumbInput,
+) -> Result<(), String> {
+    if let Some(breadcrumb) = sanitize_breadcrumb(input) {
+        let mut breadcrumbs = lock_state(&state.breadcrumbs)?;
+        breadcrumbs.push(breadcrumb);
+        if breadcrumbs.len() > MAX_BREADCRUMBS {
+            let remove_count = breadcrumbs.len() - MAX_BREADCRUMBS;
+            breadcrumbs.drain(0..remove_count);
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn crash_reports_record_renderer_error(
+    app: tauri::AppHandle,
+    state: tauri::State<CrashReportsState>,
+    input: CrashReportRendererErrorInput,
+) -> Result<CrashReportRendererErrorResult, String> {
+    let normalized = normalize_renderer_error_input(input)?;
+    let key = renderer_error_report_key(&normalized);
+    if is_recent_renderer_error_duplicate(&state, &key)? {
+        return Ok(CrashReportRendererErrorResult {
+            ok: true,
+            report: None,
+            deduped: true,
+            error: None,
+        });
+    }
+
+    let breadcrumbs = lock_state(&state.breadcrumbs)?.clone();
+    let report = record_report(
+        &app,
+        &state,
+        CrashReportCreateInput {
+            source: "renderer".to_string(),
+            process_type: "react-render".to_string(),
+            reason: "react-error-boundary".to_string(),
+            exit_code: None,
+            app_version: normalized.app_version,
+            platform: current_node_platform(),
+            os_release: current_os_release(),
+            arch: current_node_arch(),
+            electron_version: TAURI_ELECTRON_VERSION_SENTINEL.to_string(),
+            chrome_version: normalized.chrome_version,
+            details: normalized.details,
+            breadcrumbs: if breadcrumbs.is_empty() {
+                None
+            } else {
+                Some(breadcrumbs)
+            },
+        },
+    )?;
+
+    Ok(CrashReportRendererErrorResult {
+        ok: true,
+        report: Some(report),
+        deduped: false,
+        error: None,
+    })
+}
+
+#[tauri::command]
+pub fn crash_reports_format(
+    app: tauri::AppHandle,
+    state: tauri::State<CrashReportsState>,
+    input: CrashReportTextInput,
+) -> Result<String, String> {
+    let report = get_requested_report_locked(&app, &state, input.report_id.as_deref())?;
+    Ok(match report {
+        Some(report) => format_crash_report_text(&report, input.notes.as_deref(), None),
+        None => format_uncaptured_crash_report_text(
+            input.notes.as_deref(),
+            &input.app_version,
+            input.chrome_version.as_deref(),
+            None,
+        ),
+    })
+}
+
+#[tauri::command]
+pub async fn crash_reports_submit(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, CrashReportsState>,
+    input: CrashReportSubmitInput,
+) -> Result<CrashReportSubmitResult, String> {
+    let report = get_requested_report_locked(&app, &state, input.report_id.as_deref())?;
+    let diagnostic_bundle = skipped_diagnostic_bundle(input.include_diagnostic_logs);
+    let feedback = match &report {
+        Some(report) => {
+            format_crash_report_text(report, input.notes.as_deref(), Some(&diagnostic_bundle))
+        }
+        None => format_uncaptured_crash_report_text(
+            input.notes.as_deref(),
+            &input.app_version,
+            input.chrome_version.as_deref(),
+            Some(&diagnostic_bundle),
+        ),
+    };
+
+    if let Some(report) = &report {
+        if report.status != "pending" && report.status != "dismissed" {
+            return Ok(CrashReportSubmitResult {
+                ok: true,
+                status: None,
+                error: None,
+                report: Some(report.clone()),
+                diagnostic_bundle: Some(diagnostic_bundle),
+            });
+        }
+        if lock_state(&state.submitted_report_ids)?.contains(&report.id) {
+            return Ok(CrashReportSubmitResult {
+                ok: true,
+                status: None,
+                error: None,
+                report: Some(CrashReportRecord {
+                    status: "sent".to_string(),
+                    ..report.clone()
+                }),
+                diagnostic_bundle: Some(diagnostic_bundle),
+            });
+        }
+        if !mark_submission_started(&state, &report.id)? {
+            return Ok(CrashReportSubmitResult {
+                ok: false,
+                status: None,
+                error: Some("Crash report submission already in progress.".to_string()),
+                report: Some(report.clone()),
+                diagnostic_bundle: Some(diagnostic_bundle),
+            });
+        }
+    }
+
+    let result = post_crash_feedback(&input, feedback).await;
+    if let Some(report) = &report {
+        mark_submission_finished(&state, &report.id)?;
+    }
+
+    match result {
+        Ok(()) => {
+            let sent_report = if let Some(report) = report {
+                remember_submitted_report_id(&state, &report.id)?;
+                let from_status = if report.status == "dismissed" {
+                    "dismissed"
+                } else {
+                    "pending"
+                };
+                transition_report_status(&app, &state, &report.id, from_status, "sent")?.or(Some(
+                    CrashReportRecord {
+                        status: "sent".to_string(),
+                        ..report
+                    },
+                ))
+            } else {
+                None
+            };
+            Ok(CrashReportSubmitResult {
+                ok: true,
+                status: None,
+                error: None,
+                report: sent_report,
+                diagnostic_bundle: Some(diagnostic_bundle),
+            })
+        }
+        Err((status, error)) => Ok(CrashReportSubmitResult {
+            ok: false,
+            status,
+            error: Some(error),
+            report,
+            diagnostic_bundle: Some(diagnostic_bundle),
+        }),
+    }
+}
+
+fn normalize_renderer_error_input(
+    input: CrashReportRendererErrorInput,
+) -> Result<NormalizedRendererErrorInput, String> {
+    let boundary_id = required_string(input.boundary_id, 120, "Invalid renderer error report.")?;
+    let surface = required_string(input.surface, 80, "Invalid renderer error report.")?;
+    if !is_react_error_boundary_surface(&surface) {
+        return Err("Invalid renderer error report.".to_string());
+    }
+    let error_name = optional_string(input.error_name, 120).unwrap_or_else(|| "Error".to_string());
+    let error_message = optional_string(input.error_message, 1_000)
+        .unwrap_or_else(|| "Unknown render error".to_string());
+
+    let mut details = Map::new();
+    details.insert(
+        "boundary_id".to_string(),
+        Value::String(boundary_id.clone()),
+    );
+    details.insert("surface".to_string(), Value::String(surface.clone()));
+    details.insert("error_name".to_string(), Value::String(error_name.clone()));
+    details.insert(
+        "error_message".to_string(),
+        Value::String(error_message.clone()),
+    );
+    insert_optional_string(&mut details, "error_stack", input.error_stack, 8_000);
+    insert_optional_string(
+        &mut details,
+        "component_stack",
+        input.component_stack,
+        8_000,
+    );
+    insert_optional_string(&mut details, "active_view", input.active_view, 80);
+    if let Some(active_modal) = normalize_nullable_string(input.active_modal, 80) {
+        details.insert("active_modal".to_string(), active_modal);
+    }
+    insert_optional_string(&mut details, "active_tab_type", input.active_tab_type, 80);
+    insert_optional_string(
+        &mut details,
+        "right_sidebar_tab",
+        input.active_right_sidebar_tab,
+        80,
+    );
+    if let Some(has_active_worktree) = input.has_active_worktree {
+        details.insert(
+            "has_active_worktree".to_string(),
+            Value::Bool(has_active_worktree),
+        );
+    }
+
+    Ok(NormalizedRendererErrorInput {
+        boundary_id,
+        surface,
+        error_name,
+        error_message,
+        component_stack: details
+            .get("component_stack")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
+        app_version: optional_string(input.app_version, 120)
+            .unwrap_or_else(|| "unknown".to_string()),
+        chrome_version: input
+            .chrome_version
+            .and_then(|value| optional_string(value, 120))
+            .unwrap_or_else(|| "unknown".to_string()),
+        details: sanitize_details(details),
+    })
+}
+
+#[derive(Debug)]
+struct NormalizedRendererErrorInput {
+    boundary_id: String,
+    surface: String,
+    error_name: String,
+    error_message: String,
+    component_stack: Option<String>,
+    app_version: String,
+    chrome_version: String,
+    details: Map<String, Value>,
+}
+
+fn record_report(
+    app: &tauri::AppHandle,
+    state: &CrashReportsState,
+    input: CrashReportCreateInput,
+) -> Result<CrashReportRecord, String> {
+    let path = crash_report_store_path(app)?;
+    let _lock = lock_state(&state.file_lock)?;
+    let mut reports = read_reports(&path)?;
+    let report = CrashReportRecord {
+        id: Uuid::new_v4().to_string(),
+        created_at: current_iso_timestamp(),
+        status: "pending".to_string(),
+        source: input.source,
+        process_type: input.process_type,
+        reason: input.reason,
+        exit_code: input.exit_code,
+        app_version: input.app_version,
+        platform: input.platform,
+        os_release: input.os_release,
+        arch: input.arch,
+        electron_version: input.electron_version,
+        chrome_version: input.chrome_version,
+        details: sanitize_details(input.details),
+        breadcrumbs: sanitize_breadcrumbs(input.breadcrumbs),
+    };
+    reports.insert(0, report.clone());
+    reports.truncate(MAX_REPORTS);
+    write_reports(&path, &reports)?;
+    Ok(report)
+}
+
+fn read_reports_locked(
+    app: &tauri::AppHandle,
+    state: &CrashReportsState,
+) -> Result<Vec<CrashReportRecord>, String> {
+    let path = crash_report_store_path(app)?;
+    let _lock = lock_state(&state.file_lock)?;
+    read_reports(&path)
+}
+
+fn get_report_by_id_locked(
+    app: &tauri::AppHandle,
+    state: &CrashReportsState,
+    id: &str,
+) -> Result<Option<CrashReportRecord>, String> {
+    Ok(read_reports_locked(app, state)?
+        .into_iter()
+        .find(|report| report.id == id))
+}
+
+fn get_requested_report_locked(
+    app: &tauri::AppHandle,
+    state: &CrashReportsState,
+    report_id: Option<&str>,
+) -> Result<Option<CrashReportRecord>, String> {
+    match report_id {
+        Some(id) if !id.trim().is_empty() => get_report_by_id_locked(app, state, id.trim()),
+        _ => Ok(None),
+    }
+}
+
+fn transition_report_status(
+    app: &tauri::AppHandle,
+    state: &CrashReportsState,
+    id: &str,
+    from: &str,
+    status: &str,
+) -> Result<Option<CrashReportRecord>, String> {
+    let path = crash_report_store_path(app)?;
+    let _lock = lock_state(&state.file_lock)?;
+    let mut reports = read_reports(&path)?;
+    let anchor = reports.iter().find(|report| report.id == id).cloned();
+    let mut result = None;
+    for report in &mut reports {
+        if report.id == id {
+            if report.status == from {
+                report.status = status.to_string();
+            }
+            result = Some(report.clone());
+            continue;
+        }
+        if let Some(anchor) = &anchor {
+            if anchor.status == from && is_related_crash_event(anchor, report) {
+                report.status = "dismissed".to_string();
+            }
+        }
+    }
+    write_reports(&path, &reports)?;
+    Ok(result)
+}
+
+fn crash_report_store_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Could not resolve Pebble app data directory: {error}"))?
+        .join(CRASH_REPORTS_FILE))
+}
+
+fn read_reports(path: &Path) -> Result<Vec<CrashReportRecord>, String> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let contents = fs::read_to_string(path)
+        .map_err(|error| format!("Could not read Pebble crash reports: {error}"))?;
+    let file: CrashReportFile = serde_json::from_str(&contents)
+        .map_err(|error| format!("Could not parse Pebble crash reports: {error}"))?;
+    Ok(file.reports.into_iter().take(MAX_REPORTS).collect())
+}
+
+fn write_reports(path: &Path, reports: &[CrashReportRecord]) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "Could not resolve Pebble crash report directory.".to_string())?;
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("Could not create Pebble crash report directory: {error}"))?;
+    let tmp_path = path.with_extension(format!(
+        "json.{}.{}.tmp",
+        std::process::id(),
+        Uuid::new_v4()
+    ));
+    let contents = serde_json::to_string_pretty(&CrashReportFile {
+        reports: reports.to_vec(),
+    })
+    .map_err(|error| format!("Could not encode Pebble crash reports: {error}"))?;
+    fs::write(&tmp_path, format!("{contents}\n"))
+        .map_err(|error| format!("Could not write Pebble crash reports: {error}"))?;
+    fs::rename(&tmp_path, path)
+        .map_err(|error| format!("Could not replace Pebble crash reports: {error}"))?;
+    Ok(())
+}
+
+async fn post_crash_feedback(
+    input: &CrashReportSubmitInput,
+    feedback: String,
+) -> Result<(), (Option<u16>, String)> {
+    let anonymous = input.submit_anonymously.unwrap_or(false);
+    let body = json!({
+        "feedback": feedback,
+        "submissionType": "crash",
+        "githubLogin": if anonymous { None } else { input.github_login.clone() },
+        "githubEmail": if anonymous { None } else { input.github_email.clone() },
+        "appVersion": input.app_version,
+        "platform": current_node_platform(),
+        "osRelease": current_os_release(),
+        "arch": current_node_arch(),
+    });
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(FEEDBACK_REQUEST_TIMEOUT_SECONDS))
+        .build()
+        .map_err(|error| (None, error.to_string()))?;
+    let response = client
+        .post(FEEDBACK_API_URL)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|error| (None, error.to_string()))?;
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        Err((
+            Some(response.status().as_u16()),
+            format!("status {}", response.status().as_u16()),
+        ))
+    }
+}
+
+fn mark_submission_started(state: &CrashReportsState, report_id: &str) -> Result<bool, String> {
+    let mut submissions = lock_state(&state.in_flight_submissions)?;
+    if submissions.contains(report_id) {
+        return Ok(false);
+    }
+    submissions.insert(report_id.to_string());
+    Ok(true)
+}
+
+fn mark_submission_finished(state: &CrashReportsState, report_id: &str) -> Result<(), String> {
+    lock_state(&state.in_flight_submissions)?.remove(report_id);
+    Ok(())
+}
+
+fn remember_submitted_report_id(state: &CrashReportsState, report_id: &str) -> Result<(), String> {
+    let mut submitted = lock_state(&state.submitted_report_ids)?;
+    submitted.retain(|id| id != report_id);
+    submitted.push(report_id.to_string());
+    while submitted.len() > 256 {
+        submitted.remove(0);
+    }
+    Ok(())
+}
+
+fn is_recent_renderer_error_duplicate(
+    state: &CrashReportsState,
+    key: &str,
+) -> Result<bool, String> {
+    let now = current_time_millis();
+    let mut keys = lock_state(&state.recent_renderer_error_report_keys)?;
+    keys.retain(|_, seen_at| now.saturating_sub(*seen_at) <= MAX_RENDERER_ERROR_KEY_AGE_MS);
+    if now.saturating_sub(*keys.get(key).unwrap_or(&0)) < RENDERER_ERROR_DEDUPE_MS {
+        return Ok(true);
+    }
+    keys.insert(key.to_string(), now);
+    while keys.len() > 256 {
+        if let Some(oldest) = keys
+            .iter()
+            .min_by_key(|(_, seen_at)| **seen_at)
+            .map(|(key, _)| key.clone())
+        {
+            keys.remove(&oldest);
+        } else {
+            break;
+        }
+    }
+    Ok(false)
+}
+
+fn renderer_error_report_key(input: &NormalizedRendererErrorInput) -> String {
+    json!({
+        "boundaryId": input.boundary_id,
+        "surface": input.surface,
+        "errorName": input.error_name,
+        "errorMessage": input.error_message,
+        "componentStack": input.component_stack,
+    })
+    .to_string()
+    .chars()
+    .take(12_000)
+    .collect()
+}
+
+fn is_related_crash_event(anchor: &CrashReportRecord, candidate: &CrashReportRecord) -> bool {
+    if anchor.id == candidate.id || candidate.status != "pending" {
+        return false;
+    }
+    let anchor_time = parse_iso_millis(&anchor.created_at);
+    let candidate_time = parse_iso_millis(&candidate.created_at);
+    match (anchor_time, candidate_time) {
+        (Some(anchor_time), Some(candidate_time)) => {
+            (anchor_time - candidate_time).abs() <= RELATED_CRASH_WINDOW_MS
+                && anchor.reason == candidate.reason
+                && anchor.exit_code == candidate.exit_code
+                && anchor.app_version == candidate.app_version
+                && anchor.platform == candidate.platform
+        }
+        _ => false,
+    }
+}
+
+fn sanitize_breadcrumb(input: CrashReportBreadcrumbInput) -> Option<CrashReportBreadcrumb> {
+    let name = optional_string(input.name, MAX_BREADCRUMB_NAME_LENGTH)?;
+    Some(CrashReportBreadcrumb {
+        created_at: current_iso_timestamp(),
+        name,
+        data: input.data.and_then(sanitize_breadcrumb_data),
+    })
+}
+
+fn sanitize_breadcrumbs(
+    breadcrumbs: Option<Vec<CrashReportBreadcrumb>>,
+) -> Option<Vec<CrashReportBreadcrumb>> {
+    let sanitized: Vec<CrashReportBreadcrumb> = breadcrumbs?
+        .into_iter()
+        .rev()
+        .take(MAX_BREADCRUMBS)
+        .filter(|breadcrumb| {
+            !breadcrumb.name.trim().is_empty() && !breadcrumb.created_at.trim().is_empty()
+        })
+        .map(|breadcrumb| CrashReportBreadcrumb {
+            created_at: sanitize_crash_report_string(
+                &breadcrumb.created_at,
+                MAX_STRING_DETAIL_LENGTH,
+            ),
+            name: sanitize_crash_report_string(&breadcrumb.name, MAX_STRING_DETAIL_LENGTH)
+                .chars()
+                .take(MAX_BREADCRUMB_NAME_LENGTH)
+                .collect(),
+            data: breadcrumb
+                .data
+                .map(sanitize_details)
+                .filter(|data| !data.is_empty()),
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    if sanitized.is_empty() {
+        None
+    } else {
+        Some(sanitized)
+    }
+}
+
+fn sanitize_breadcrumb_data(value: Value) -> Option<Map<String, Value>> {
+    match value {
+        Value::Object(map) => {
+            let sanitized = sanitize_details(map);
+            if sanitized.is_empty() {
+                None
+            } else {
+                Some(sanitized)
+            }
+        }
+        _ => None,
+    }
+}
+
+fn sanitize_details(details: Map<String, Value>) -> Map<String, Value> {
+    details
+        .into_iter()
+        .filter_map(|(key, value)| sanitize_detail_value(&key, value).map(|value| (key, value)))
+        .collect()
+}
+
+fn sanitize_detail_value(key: &str, value: Value) -> Option<Value> {
+    match value {
+        Value::String(value) => Some(Value::String(sanitize_crash_report_string(
+            &value,
+            max_detail_string_length_for_key(key),
+        ))),
+        Value::Number(_) | Value::Bool(_) | Value::Null => Some(value),
+        _ => None,
+    }
+}
+
+fn sanitize_crash_report_string(value: &str, max_length: usize) -> String {
+    let mut sanitized = value.to_string();
+    let replacements = [
+        (r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b", "[redacted-secret]"),
+        (r"\bsk-[A-Za-z0-9_-]{20,}\b", "[redacted-secret]"),
+        (
+            r"[A-Za-z0-9._%+-]+:[A-Za-z0-9._%+-]+@",
+            "[redacted-credential]@",
+        ),
+        (
+            r"(?i)\b(token|api[_-]?key|secret|password)=([^&\s]+)",
+            "$1=[redacted]",
+        ),
+        (r#"/(?:Users|home)/[^\s"'`<>\n\r)]+"#, "[redacted-path]"),
+        (r#"[A-Za-z]:\\[^\s"'`<>\n\r)]+"#, "[redacted-path]"),
+        (
+            r#"\\\\[^\\\s"'`<>\n\r)]+\\[^\s"'`<>\n\r)]+"#,
+            "[redacted-path]",
+        ),
+    ];
+    for (pattern, replacement) in replacements {
+        if let Ok(regex) = Regex::new(pattern) {
+            sanitized = regex.replace_all(&sanitized, replacement).to_string();
+        }
+    }
+    truncate_chars(&sanitized, max_length)
+}
+
+fn max_detail_string_length_for_key(key: &str) -> usize {
+    if key.eq_ignore_ascii_case("stack")
+        || key.to_ascii_lowercase().ends_with("_stack")
+        || key.eq_ignore_ascii_case("component_stack")
+        || key.eq_ignore_ascii_case("error_stack")
+    {
+        MAX_STACK_DETAIL_LENGTH
+    } else {
+        MAX_STRING_DETAIL_LENGTH
+    }
+}
+
+fn format_crash_report_text(
+    report: &CrashReportRecord,
+    notes: Option<&str>,
+    diagnostic_bundle: Option<&CrashReportDiagnosticBundle>,
+) -> String {
+    let mut lines = vec![
+        "[Crash Report]".to_string(),
+        String::new(),
+        format!("Report ID: {}", report.id),
+        format!("Created: {}", report.created_at),
+        format!("Status: {}", report.status),
+        format!("Source: {}", report.source),
+        format!("Process: {}", report.process_type),
+        format!("Reason: {}", report.reason),
+        format!(
+            "Exit code: {}",
+            report
+                .exit_code
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        ),
+        format!("App version: {}", report.app_version),
+        format!(
+            "Platform: {} {} {}",
+            report.platform, report.os_release, report.arch
+        ),
+        format!("Electron: {}", report.electron_version),
+        format!("Chrome: {}", report.chrome_version),
+    ];
+    append_diagnostic_bundle_lines(&mut lines, diagnostic_bundle);
+    if !report.details.is_empty() {
+        lines.push(String::new());
+        lines.push("Details:".to_string());
+        for (key, value) in &report.details {
+            lines.push(format!("- {key}: {}", detail_value_to_string(value)));
+        }
+    }
+    if let Some(breadcrumbs) = &report.breadcrumbs {
+        if !breadcrumbs.is_empty() {
+            lines.push(String::new());
+            lines.push("Recent activity:".to_string());
+            for breadcrumb in breadcrumbs {
+                lines.push(format_breadcrumb_line(breadcrumb));
+            }
+        }
+    }
+    append_notes(&mut lines, notes);
+    truncate_formatted_report(&lines.join("\n"))
+}
+
+fn format_uncaptured_crash_report_text(
+    notes: Option<&str>,
+    app_version: &str,
+    chrome_version: Option<&str>,
+    diagnostic_bundle: Option<&CrashReportDiagnosticBundle>,
+) -> String {
+    let mut lines = vec![
+        "[Crash Report]".to_string(),
+        String::new(),
+        "Report ID: not captured".to_string(),
+        format!("Created: {}", current_iso_timestamp()),
+        "Status: uncaptured".to_string(),
+        "Source: user-reported".to_string(),
+        "Process: unknown".to_string(),
+        "Reason: no captured crash report".to_string(),
+        "Exit code: unknown".to_string(),
+        format!(
+            "App version: {}",
+            sanitize_crash_report_string(app_version, 120)
+        ),
+        format!(
+            "Platform: {} {} {}",
+            current_node_platform(),
+            current_os_release(),
+            current_node_arch()
+        ),
+        format!("Electron: {TAURI_ELECTRON_VERSION_SENTINEL}"),
+        format!(
+            "Chrome: {}",
+            chrome_version
+                .map(|value| sanitize_crash_report_string(value, 120))
+                .unwrap_or_else(|| "unknown".to_string())
+        ),
+        String::new(),
+        "Details:".to_string(),
+        "- captured_crash_report: false".to_string(),
+        "- report_source: help_menu".to_string(),
+    ];
+    append_diagnostic_bundle_lines(&mut lines, diagnostic_bundle);
+    append_notes(&mut lines, notes);
+    truncate_formatted_report(&lines.join("\n"))
+}
+
+fn append_diagnostic_bundle_lines(
+    lines: &mut Vec<String>,
+    diagnostic_bundle: Option<&CrashReportDiagnosticBundle>,
+) {
+    if let Some(diagnostic_bundle) = diagnostic_bundle {
+        lines.push(String::new());
+        lines.push("Diagnostic log:".to_string());
+        lines.push("- Status: not uploaded".to_string());
+        lines.push(format!(
+            "- Reason: {}",
+            sanitize_crash_report_string(&diagnostic_bundle.reason, MAX_STRING_DETAIL_LENGTH)
+        ));
+    }
+}
+
+fn append_notes(lines: &mut Vec<String>, notes: Option<&str>) {
+    if let Some(notes) =
+        notes.and_then(|value| optional_string(value.to_string(), MAX_STRING_DETAIL_LENGTH))
+    {
+        lines.push(String::new());
+        lines.push("User notes:".to_string());
+        lines.push(notes);
+    }
+}
+
+fn format_breadcrumb_line(breadcrumb: &CrashReportBreadcrumb) -> String {
+    let suffix = breadcrumb
+        .data
+        .as_ref()
+        .filter(|data| !data.is_empty())
+        .map(|data| {
+            format!(
+                " ({})",
+                data.iter()
+                    .map(|(key, value)| format!("{key}={}", detail_value_to_string(value)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        })
+        .unwrap_or_default();
+    format!("- {}: {}{}", breadcrumb.created_at, breadcrumb.name, suffix)
+}
+
+fn detail_value_to_string(value: &Value) -> String {
+    match value {
+        Value::String(value) => value.clone(),
+        Value::Number(value) => value.to_string(),
+        Value::Bool(value) => value.to_string(),
+        Value::Null => "null".to_string(),
+        _ => String::new(),
+    }
+}
+
+fn skipped_diagnostic_bundle(include_diagnostic_logs: Option<bool>) -> CrashReportDiagnosticBundle {
+    let reason = if include_diagnostic_logs == Some(false) {
+        "diagnostic log upload skipped by user"
+    } else {
+        DIAGNOSTIC_NOT_UPLOADED_REASON
+    };
+    CrashReportDiagnosticBundle {
+        status: "not_uploaded".to_string(),
+        reason: reason.to_string(),
+    }
+}
+
+fn truncate_formatted_report(text: &str) -> String {
+    if text.chars().count() <= MAX_FORMATTED_REPORT_LENGTH {
+        return text.to_string();
+    }
+    let budget = MAX_FORMATTED_REPORT_LENGTH - FORMATTED_REPORT_TRUNCATION_SUFFIX.chars().count();
+    format!(
+        "{}{FORMATTED_REPORT_TRUNCATION_SUFFIX}",
+        truncate_chars(text, budget).trim_end()
+    )
+}
+
+fn insert_optional_string(
+    map: &mut Map<String, Value>,
+    key: &str,
+    value: Option<String>,
+    max: usize,
+) {
+    if let Some(value) = value.and_then(|value| optional_string(value, max)) {
+        map.insert(key.to_string(), Value::String(value));
+    }
+}
+
+fn normalize_nullable_string(value: Option<Value>, max: usize) -> Option<Value> {
+    match value {
+        Some(Value::Null) => Some(Value::Null),
+        Some(Value::String(value)) => optional_string(value, max).map(Value::String),
+        _ => None,
+    }
+}
+
+fn required_string(value: String, max: usize, error: &str) -> Result<String, String> {
+    optional_string(value, max).ok_or_else(|| error.to_string())
+}
+
+fn optional_string(value: String, max: usize) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(truncate_chars(trimmed, max))
+    }
+}
+
+fn truncate_chars(value: &str, max: usize) -> String {
+    if value.chars().count() <= max {
+        return value.to_string();
+    }
+    format!("{}...", value.chars().take(max).collect::<String>())
+}
+
+fn is_react_error_boundary_surface(surface: &str) -> bool {
+    matches!(
+        surface,
+        "app-root"
+            | "web-root"
+            | "workspace-shell"
+            | "sidebar"
+            | "terminal-workbench"
+            | "right-sidebar"
+            | "page"
+            | "modal"
+            | "overlay"
+            | "rich-markdown-editor"
+    )
+}
+
+fn current_iso_timestamp() -> String {
+    let now: DateTime<Utc> = SystemTime::now().into();
+    now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+}
+
+fn parse_iso_millis(value: &str) -> Option<i128> {
+    DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|timestamp| timestamp.timestamp_millis() as i128)
+}
+
+fn current_time_millis() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+}
+
+fn current_node_platform() -> String {
+    match std::env::consts::OS {
+        "macos" => "darwin",
+        "windows" => "win32",
+        other => other,
+    }
+    .to_string()
+}
+
+fn current_node_arch() -> String {
+    match std::env::consts::ARCH {
+        "aarch64" => "arm64",
+        "x86_64" => "x64",
+        other => other,
+    }
+    .to_string()
+}
+
+fn current_os_release() -> String {
+    #[cfg(windows)]
+    {
+        command_stdout("cmd", &["/C", "ver"]).unwrap_or_else(|| "unknown".to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        command_stdout("uname", &["-r"]).unwrap_or_else(|| "unknown".to_string())
+    }
+}
+
+fn command_stdout(command: &str, args: &[&str]) -> Option<String> {
+    let output = Command::new(command).args(args).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8(output.stdout).ok()?;
+    optional_string(text, 120)
+}
+
+fn lock_state<T>(mutex: &Mutex<T>) -> Result<MutexGuard<'_, T>, String> {
+    mutex
+        .lock()
+        .map_err(|_| "Pebble crash report state lock was poisoned.".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitizes_secrets_and_paths() {
+        let value = sanitize_crash_report_string(
+            "token=abc123 /Users/alice/project ghp_123456789012345678901234",
+            240,
+        );
+        assert!(value.contains("token=[redacted]"));
+        assert!(value.contains("[redacted-path]"));
+        assert!(value.contains("[redacted-secret]"));
+    }
+
+    #[test]
+    fn rejects_unknown_renderer_surfaces() {
+        let input = CrashReportRendererErrorInput {
+            boundary_id: "right-sidebar".to_string(),
+            surface: "unknown".to_string(),
+            error_name: "Error".to_string(),
+            error_message: "boom".to_string(),
+            error_stack: None,
+            component_stack: None,
+            active_view: None,
+            active_modal: None,
+            active_tab_type: None,
+            active_right_sidebar_tab: None,
+            has_active_worktree: None,
+            app_version: "1.0.0".to_string(),
+            chrome_version: Some("1".to_string()),
+        };
+        assert!(normalize_renderer_error_input(input).is_err());
+    }
+}

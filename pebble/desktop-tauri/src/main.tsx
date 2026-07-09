@@ -16,6 +16,7 @@ import { installPebbleDomBranding, installPebbleI18nBranding } from './pebble-br
 import { installPebbleTauriPreloadApi } from './pebble-tauri-preload-api'
 import { PRODUCT_NAME } from './product-brand'
 import { installTauriBrowserRuntimeApi } from './tauri-browser-runtime-api'
+import { installTauriDeepLinkApi } from './tauri-deep-link-api'
 import { installTauriMenuApi } from './tauri-menu-api'
 import { installTauriRuntimePtyApi } from './tauri-runtime-pty-api'
 import { installTauriSettingsEventApi } from './tauri-settings-event-api'
@@ -32,6 +33,7 @@ installTauriMenuApi()
 installTauriRuntimePtyApi()
 installTauriBrowserRuntimeApi()
 installTauriShellApi()
+installTauriDeepLinkApi()
 recordRendererCrashBreadcrumb('renderer_bootstrap_started', { dev: import.meta.env.DEV })
 installRendererCrashDiagnostics()
 applyDocumentTheme('system', { disableTransitions: false })

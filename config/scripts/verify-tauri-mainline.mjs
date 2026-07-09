@@ -22,7 +22,9 @@ const checks = [
       text.includes("import { installTauriBrowserRuntimeApi } from './tauri-browser-runtime-api'") &&
       text.includes('installTauriBrowserRuntimeApi()') &&
       text.includes("import { installTauriShellApi } from './tauri-shell-api'") &&
-      text.includes('installTauriShellApi()')
+      text.includes('installTauriShellApi()') &&
+      text.includes("import { installTauriDeepLinkApi } from './tauri-deep-link-api'") &&
+      text.includes('installTauriDeepLinkApi()')
   },
   {
     name: 'Tauri preload installs the web-compatible API bridge',
@@ -30,7 +32,12 @@ const checks = [
     expect: (text) =>
       text.includes("import { installWebPreloadApi } from '@/web/web-preload-api'") &&
       text.includes("from './pebble-tauri-runtime-control-api'") &&
+      text.includes("from './tauri-crash-reports-api'") &&
+      text.includes("from './tauri-preflight-agent-api'") &&
       text.includes('createPebbleRuntimeEnvironmentsApi(api.runtimeEnvironments)') &&
+      text.includes('createPebbleCrashReportsApi(api.crashReports)') &&
+      text.includes('detectTauriAgents()') &&
+      text.includes('refreshTauriAgents()') &&
       text.includes('installWebPreloadApi()') &&
       text.includes('void ensurePebbleRuntimeProcess()')
   },
@@ -123,7 +130,10 @@ const checks = [
       text.includes('export function installTauriUpdaterApi') &&
       text.includes('getVersion: () => Promise.resolve(rootPackage.version)') &&
       text.includes("state: 'checking'") &&
-      text.includes('Tauri updater is not configured yet') &&
+      text.includes("invoke<TauriReleaseCheckResult>('updater_check_latest_release'") &&
+      text.includes("state: 'available'") &&
+      text.includes('https://github.com/nebutra/pebble/releases/tag/v') &&
+      text.includes('Automatic Tauri update download is not wired yet') &&
       text.includes('updaterStatusListeners')
   },
   {
@@ -224,6 +234,116 @@ const checks = [
       text.includes('s.manager.DeleteBrowserProfile(id)')
   },
   {
+    name: 'Tauri deep link API handles pebble pairing links through runtime environments',
+    file: 'pebble/desktop-tauri/src/tauri-deep-link-api.ts',
+    expect: (text) =>
+      text.includes('export function installTauriDeepLinkApi') &&
+      text.includes("invoke<string[]>('deep_link_initial_urls')") &&
+      text.includes("listen<string>(DEEP_LINK_EVENT") &&
+      text.includes('function isPairingDeepLink') &&
+      text.includes("parsed.protocol === 'pebble:' && parsed.hostname === 'pair'") &&
+      text.includes('handledDeepLinks.delete(normalized)') &&
+      text.includes('runtimeEnvironments.addFromPairingCode') &&
+      text.includes('setRuntimeEnvironments(environments)') &&
+      text.includes('refreshRuntimeEnvironmentStatus(result.environment.id)')
+  },
+  {
+    name: 'Tauri Rust deep link bridge filters Pebble protocol events',
+    file: 'pebble/desktop-tauri/src-tauri/src/commands/deep_link.rs',
+    expect: (text) =>
+      text.includes('pub fn deep_link_initial_urls') &&
+      text.includes('pub fn emit_deep_links') &&
+      text.includes('collect_pebble_deep_links') &&
+      text.includes('PEBBLE_URL_PREFIX') &&
+      text.includes('pebble://pair?code=abc')
+  },
+  {
+    name: 'Tauri registers deep link commands and opened URL events',
+    file: 'pebble/desktop-tauri/src-tauri/src/main.rs',
+    expect: (text) =>
+      text.includes('tauri_plugin_deep_link::init()') &&
+      text.includes('commands::deep_link::deep_link_initial_urls') &&
+      text.includes('tauri::RunEvent::Opened') &&
+      text.includes('commands::deep_link::emit_deep_links')
+  },
+  {
+    name: 'Tauri crash report API persists renderer errors through native commands',
+    file: 'pebble/desktop-tauri/src/tauri-crash-reports-api.ts',
+    expect: (text) =>
+      text.includes('export function createPebbleCrashReportsApi') &&
+      text.includes("invoke<CrashReportRecord | null>('crash_reports_get_latest_pending'") &&
+      text.includes("invoke<ReactErrorBoundaryReportResult>('crash_reports_record_renderer_error'") &&
+      text.includes("invoke<void>('crash_reports_record_breadcrumb'") &&
+      text.includes("invoke<CrashReportSubmitResult>('crash_reports_submit'") &&
+      text.includes("invoke<string>('crash_reports_format'") &&
+      text.includes('rootPackage.version')
+  },
+  {
+    name: 'Tauri Rust crash report store mirrors Electron crash-report lifecycle',
+    file: 'pebble/desktop-tauri/src-tauri/src/commands/crash_reports.rs',
+    expect: (text) =>
+      text.includes('const CRASH_REPORTS_FILE: &str = "crash-reports.json"') &&
+      text.includes('pub fn crash_reports_get_latest_pending') &&
+      text.includes('pub fn crash_reports_record_renderer_error') &&
+      text.includes('pub fn crash_reports_record_breadcrumb') &&
+      text.includes('pub async fn crash_reports_submit') &&
+      text.includes('is_related_crash_event') &&
+      text.includes('sanitize_crash_report_string') &&
+      text.includes('FEEDBACK_API_URL')
+  },
+  {
+    name: 'Tauri registers native crash report commands with the Rust invoke handler',
+    file: 'pebble/desktop-tauri/src-tauri/src/main.rs',
+    expect: (text) =>
+      text.includes('commands::crash_reports::CrashReportsState::default()') &&
+      text.includes('commands::crash_reports::crash_reports_get_latest_pending') &&
+      text.includes('commands::crash_reports::crash_reports_record_renderer_error') &&
+      text.includes('commands::crash_reports::crash_reports_record_breadcrumb') &&
+      text.includes('commands::crash_reports::crash_reports_submit')
+  },
+  {
+    name: 'Tauri Rust updater command checks Nebutra Pebble GitHub release readiness',
+    file: 'pebble/desktop-tauri/src-tauri/src/commands/updater.rs',
+    expect: (text) =>
+      text.includes('const ATOM_FEED_URL: &str = "https://github.com/nebutra/pebble/releases.atom"') &&
+      text.includes('pub async fn updater_check_latest_release') &&
+      text.includes('has_ready_platform_manifest') &&
+      text.includes('latest-mac.yml') &&
+      text.includes('is_perf_prerelease_tag') &&
+      text.includes('compare_versions')
+  },
+  {
+    name: 'Tauri registers native updater check command with the Rust invoke handler',
+    file: 'pebble/desktop-tauri/src-tauri/src/main.rs',
+    expect: (text) => text.includes('commands::updater::updater_check_latest_release')
+  },
+  {
+    name: 'Tauri preflight API detects installed agents instead of returning mock empties',
+    file: 'pebble/desktop-tauri/src/tauri-preflight-agent-api.ts',
+    expect: (text) =>
+      text.includes('TUI_AGENT_CONFIG') &&
+      text.includes('getTuiAgentDetectCommands') &&
+      text.includes('export async function detectTauriAgents') &&
+      text.includes("invoke<string[]>('preflight_detect_commands'") &&
+      text.includes('export async function refreshTauriAgents') &&
+      text.includes("pathSource: 'sync_seed_only'")
+  },
+  {
+    name: 'Tauri Rust preflight command performs native PATH command detection',
+    file: 'pebble/desktop-tauri/src-tauri/src/commands/preflight.rs',
+    expect: (text) =>
+      text.includes('pub fn preflight_detect_commands') &&
+      text.includes('fn is_command_on_path') &&
+      text.includes('fn common_agent_install_dirs') &&
+      text.includes('PATHEXT') &&
+      text.includes('/opt/homebrew/bin')
+  },
+  {
+    name: 'Tauri registers native preflight command detection with the Rust invoke handler',
+    file: 'pebble/desktop-tauri/src-tauri/src/main.rs',
+    expect: (text) => text.includes('commands::preflight::preflight_detect_commands')
+  },
+  {
     name: 'Tauri Vite aliases @ to the canonical renderer source',
     file: 'pebble/desktop-tauri/vite.config.ts',
     expect: (text) =>
@@ -319,6 +439,7 @@ const tauriConfigFailures = [
   ['identifier', tauriConfig.identifier, 'nebutra.pebble'],
   ['devUrl', tauriConfig.build?.devUrl, 'http://127.0.0.1:5174'],
   ['bundle.active', tauriConfig.bundle?.active, true],
+  ['deepLinkScheme', tauriConfig.plugins?.['deep-link']?.desktop?.schemes?.[0], 'pebble'],
   ['width', mainWindow?.width, 1200],
   ['height', mainWindow?.height, 800],
   ['minWidth', mainWindow?.minWidth, 600],

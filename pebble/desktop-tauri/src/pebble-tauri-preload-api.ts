@@ -2,8 +2,7 @@ import { installWebPreloadApi } from '@/web/web-preload-api'
 
 import type {
   PreflightStatus,
-  PreloadApi,
-  RefreshAgentsResult
+  PreloadApi
 } from '../../../src/preload/api-types'
 import { PRODUCT_NAME } from './product-brand'
 import {
@@ -19,6 +18,12 @@ import {
   createPebbleRuntimeApi,
   createPebbleRuntimeEnvironmentsApi
 } from './pebble-tauri-runtime-control-api'
+import { createPebbleCrashReportsApi } from './tauri-crash-reports-api'
+import {
+  detectTauriAgents,
+  readTauriPreflightStatus,
+  refreshTauriAgents
+} from './tauri-preflight-agent-api'
 
 const fallbackPreflightStatus: PreflightStatus = {
   git: { installed: true },
@@ -41,14 +46,6 @@ const fallbackPreflightStatus: PreflightStatus = {
   }
 }
 
-const fallbackRefreshAgents: RefreshAgentsResult = {
-  agents: [],
-  addedPathSegments: [],
-  shellHydrationOk: false,
-  pathSource: 'sync_seed_only',
-  pathFailureReason: 'spawn_error'
-}
-
 export function installPebbleTauriPreloadApi(): void {
   installWebPreloadApi()
   void ensurePebbleRuntimeProcess()
@@ -61,6 +58,7 @@ export function installPebbleTauriPreloadApi(): void {
   api.worktrees = createPebbleWorktreesApi(api.worktrees)
   api.runtime = createPebbleRuntimeApi(api.runtime)
   api.runtimeEnvironments = createPebbleRuntimeEnvironmentsApi(api.runtimeEnvironments)
+  api.crashReports = createPebbleCrashReportsApi(api.crashReports)
 }
 
 function createPebbleAppApi(base: PreloadApi['app']): PreloadApi['app'] {
@@ -87,15 +85,15 @@ function createPebblePreflightApi(base: PreloadApi['preflight']): PreloadApi['pr
     check: async () => {
       const status = await readPebbleStatusOrNull()
       if (!status) {
-        return fallbackPreflightStatus
+        return readTauriPreflightStatus(fallbackPreflightStatus)
       }
-      return {
+      return readTauriPreflightStatus({
         ...fallbackPreflightStatus,
         git: { installed: !status.unavailableTools?.includes('git') }
-      }
+      })
     },
-    detectAgents: () => Promise.resolve([]),
-    refreshAgents: () => Promise.resolve(fallbackRefreshAgents),
+    detectAgents: () => detectTauriAgents(),
+    refreshAgents: () => refreshTauriAgents(),
     detectRemoteAgents: () => Promise.resolve([]),
     detectRemoteWindowsTerminalCapabilities: () =>
       Promise.resolve({
