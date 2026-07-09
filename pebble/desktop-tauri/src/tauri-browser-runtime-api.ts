@@ -15,6 +15,7 @@ import {
   cancelTauriBrowserDownload,
   createTauriBrowserSessionProfile,
   deleteTauriBrowserSessionProfile,
+  detectTauriBrowserSessionBrowsers,
   ensureTauriBrowserProviderRefresh,
   listTauriBrowserSessionProfiles,
   resolveTauriBrowserSessionPartition,
@@ -68,14 +69,13 @@ export function installTauriBrowserRuntimeApi(): void {
       reason: TAURI_BROWSER_GUEST_UNAVAILABLE
     }),
     sessionResolvePartition: resolveTauriBrowserSessionPartition,
-    sessionDetectBrowsers: () => Promise.resolve([]),
+    sessionDetectBrowsers: detectTauriBrowserSessionBrowsers,
     sessionImportFromBrowser: async () => ({
       ok: false,
       reason: TAURI_BROWSER_GUEST_UNAVAILABLE
     }),
     sessionClearDefaultCookies: () => Promise.resolve(false),
-    notifyActiveTabChanged: async ({ browserPageId }) =>
-      notifyTauriBrowserActiveTab(browserPageId)
+    notifyActiveTabChanged: async ({ browserPageId }) => notifyTauriBrowserActiveTab(browserPageId)
   } satisfies BrowserApi
 
   ensureTauriBrowserRuntimeEventPump()

@@ -1,4 +1,6 @@
-import type { BrowserApi } from '../../../src/preload/api-types'
+import { invoke } from '@tauri-apps/api/core'
+
+import type { BrowserApi, DetectedBrowserInfo } from '../../../src/preload/api-types'
 import { PEBBLE_BROWSER_PARTITION } from '../../../src/shared/constants'
 import type { BrowserSessionProfile } from '../../../src/shared/types'
 import {
@@ -36,9 +38,10 @@ export const TAURI_BROWSER_GUEST_UNAVAILABLE =
 let browserProviderRefreshStarted = false
 
 export async function listTauriBrowserSessionProfiles(): Promise<BrowserSessionProfile[]> {
-  const profiles = await requestRuntimeJson<RuntimeBrowserProfile[]>('GET', '/v1/browser/profiles').catch(
-    () => []
-  )
+  const profiles = await requestRuntimeJson<RuntimeBrowserProfile[]>(
+    'GET',
+    '/v1/browser/profiles'
+  ).catch(() => [])
   return [DEFAULT_PROFILE, ...profiles.map((profile) => mapRuntimeProfile(profile, 'isolated'))]
 }
 
@@ -75,7 +78,9 @@ export async function resolveTauriBrowserSessionPartition(args: {
     return PEBBLE_BROWSER_PARTITION
   }
   const profiles = await listTauriBrowserSessionProfiles()
-  return profiles.find((profile) => profile.id === args.profileId)?.partition ?? PEBBLE_BROWSER_PARTITION
+  return (
+    profiles.find((profile) => profile.id === args.profileId)?.partition ?? PEBBLE_BROWSER_PARTITION
+  )
 }
 
 export async function cancelTauriBrowserDownload(args: { downloadId: string }): Promise<boolean> {
@@ -85,6 +90,10 @@ export async function cancelTauriBrowserDownload(args: { downloadId: string }): 
     { status: 'canceled' }
   )
   return true
+}
+
+export function detectTauriBrowserSessionBrowsers(): Promise<DetectedBrowserInfo[]> {
+  return invoke<DetectedBrowserInfo[]>('browser_detect_installed_browsers')
 }
 
 export function ensureTauriBrowserProviderRefresh(): void {

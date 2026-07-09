@@ -10,6 +10,7 @@ const rendererSource = resolve(repoRoot, 'src/renderer/src')
 const rootNodeModules = resolve(repoRoot, 'node_modules')
 
 export default defineConfig({
+  base: './',
   clearScreen: false,
   root: packageDir,
   plugins: [react(), tailwindcss()],

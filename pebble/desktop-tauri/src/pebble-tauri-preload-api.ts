@@ -1,9 +1,8 @@
 import { installWebPreloadApi } from '@/web/web-preload-api'
 
-import type {
-  PreflightStatus,
-  PreloadApi
-} from '../../../src/preload/api-types'
+import type { PreflightStatus, PreloadApi } from '../../../src/preload/api-types'
+import { sanitizeCrashReportDetails } from '../../../src/shared/crash-reporting'
+import type { RuntimeRpcResponse } from '../../../src/shared/runtime-rpc-envelope'
 import { PRODUCT_NAME } from './product-brand'
 import {
   ensurePebbleRuntimeProcess,
@@ -19,11 +18,16 @@ import {
   createPebbleRuntimeEnvironmentsApi
 } from './pebble-tauri-runtime-control-api'
 import { createPebbleCrashReportsApi } from './tauri-crash-reports-api'
+import { createPebbleDiagnosticsApi } from './tauri-diagnostics-api'
 import {
   detectTauriAgents,
   readTauriPreflightStatus,
   refreshTauriAgents
 } from './tauri-preflight-agent-api'
+
+type RemoteWindowsTerminalCapabilities = Awaited<
+  ReturnType<PreloadApi['preflight']['detectRemoteWindowsTerminalCapabilities']>
+>
 
 const fallbackPreflightStatus: PreflightStatus = {
   git: { installed: true },
@@ -46,6 +50,28 @@ const fallbackPreflightStatus: PreflightStatus = {
   }
 }
 
+const fallbackRemoteWindowsTerminalCapabilities = {
+  wslAvailable: false,
+  wslDistros: [],
+  pwshAvailable: false,
+  gitBashAvailable: false,
+  hostPlatform: null
+} satisfies RemoteWindowsTerminalCapabilities
+
+const nodePlatforms = new Set([
+  'aix',
+  'android',
+  'darwin',
+  'freebsd',
+  'haiku',
+  'linux',
+  'openbsd',
+  'sunos',
+  'win32',
+  'cygwin',
+  'netbsd'
+])
+
 export function installPebbleTauriPreloadApi(): void {
   installWebPreloadApi()
   void ensurePebbleRuntimeProcess()
@@ -59,6 +85,7 @@ export function installPebbleTauriPreloadApi(): void {
   api.runtime = createPebbleRuntimeApi(api.runtime)
   api.runtimeEnvironments = createPebbleRuntimeEnvironmentsApi(api.runtimeEnvironments)
   api.crashReports = createPebbleCrashReportsApi(api.crashReports)
+  api.diagnostics = createPebbleDiagnosticsApi(api.diagnostics)
 }
 
 function createPebbleAppApi(base: PreloadApi['app']): PreloadApi['app'] {
@@ -74,9 +101,27 @@ function createPebbleAppApi(base: PreloadApi['app']): PreloadApi['app'] {
         devRepoRoot: null,
         dockBadgeLabel: null
       }),
-    awaitFirstWindowStartupServices: () => Promise.resolve(),
-    startupDiagnostic: () => Promise.resolve()
+    awaitFirstWindowStartupServices: waitForTauriStartupServices,
+    startupDiagnostic: recordTauriStartupDiagnostic
   }
+}
+
+async function waitForTauriStartupServices(): Promise<void> {
+  await ensurePebbleRuntimeProcess()
+  await Promise.allSettled([readPebbleStatusOrNull(), refreshTauriAgents()])
+}
+
+async function recordTauriStartupDiagnostic(
+  event: string,
+  details?: Record<string, unknown>
+): Promise<void> {
+  if (!event.startsWith('renderer-')) {
+    return
+  }
+  window.api.crashReports.recordBreadcrumb({
+    name: `startup:${event}`,
+    data: details ? sanitizeCrashReportDetails(details) : undefined
+  })
 }
 
 function createPebblePreflightApi(base: PreloadApi['preflight']): PreloadApi['preflight'] {
@@ -94,14 +139,76 @@ function createPebblePreflightApi(base: PreloadApi['preflight']): PreloadApi['pr
     },
     detectAgents: () => detectTauriAgents(),
     refreshAgents: () => refreshTauriAgents(),
-    detectRemoteAgents: () => Promise.resolve([]),
-    detectRemoteWindowsTerminalCapabilities: () =>
-      Promise.resolve({
-        wslAvailable: false,
-        wslDistros: [],
-        pwshAvailable: false,
-        gitBashAvailable: false,
-        hostPlatform: null
-      })
+    detectRemoteAgents: async ({ connectionId }) => {
+      try {
+        return readRemoteAgentIds(
+          await callRuntimeEnvironmentResult(connectionId, 'preflight.detectAgents')
+        )
+      } catch {
+        return []
+      }
+    },
+    detectRemoteWindowsTerminalCapabilities: async ({ connectionId }) => {
+      try {
+        return readRemoteWindowsTerminalCapabilities(
+          await callRuntimeEnvironmentResult(
+            connectionId,
+            'preflight.detectRemoteWindowsTerminalCapabilities',
+            { connectionId },
+            15_000
+          )
+        )
+      } catch {
+        return fallbackRemoteWindowsTerminalCapabilities
+      }
+    }
   }
+}
+
+async function callRuntimeEnvironmentResult(
+  selector: string,
+  method: string,
+  params?: unknown,
+  timeoutMs?: number
+): Promise<unknown> {
+  const response = (await window.api.runtimeEnvironments.call({
+    selector,
+    method,
+    params,
+    timeoutMs
+  })) as RuntimeRpcResponse<unknown>
+  if (response.ok) {
+    return response.result
+  }
+  throw new Error(response.error.message)
+}
+
+function readRemoteAgentIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return [...new Set(value.filter((entry): entry is string => typeof entry === 'string'))]
+}
+
+function readRemoteWindowsTerminalCapabilities(value: unknown): RemoteWindowsTerminalCapabilities {
+  if (typeof value !== 'object' || value === null) {
+    return fallbackRemoteWindowsTerminalCapabilities
+  }
+  const record = value as Record<string, unknown>
+  return {
+    wslAvailable: record.wslAvailable === true,
+    wslDistros: Array.isArray(record.wslDistros)
+      ? record.wslDistros.filter((entry): entry is string => typeof entry === 'string')
+      : [],
+    pwshAvailable: record.pwshAvailable === true,
+    gitBashAvailable: record.gitBashAvailable === true,
+    hostPlatform: readNodePlatform(record.hostPlatform)
+  }
+}
+
+function readNodePlatform(value: unknown): NodeJS.Platform | null {
+  if (typeof value !== 'string' || !nodePlatforms.has(value)) {
+    return null
+  }
+  return value as NodeJS.Platform
 }

@@ -14,6 +14,7 @@ import { I18nProvider } from '@/i18n/I18nProvider'
 import { translate } from '@/i18n/i18n'
 import { installPebbleTauriPreloadApi } from './pebble-tauri-preload-api'
 import { PRODUCT_NAME } from './product-brand'
+import { installTauriAgentStatusApi } from './tauri-agent-status-api'
 import { installTauriBrowserRuntimeApi } from './tauri-browser-runtime-api'
 import { installTauriDeepLinkApi } from './tauri-deep-link-api'
 import { installTauriMenuApi } from './tauri-menu-api'
@@ -28,11 +29,14 @@ installTauriSettingsEventApi()
 installTauriWindowApi()
 installTauriUpdaterApi()
 installTauriMenuApi()
+installTauriAgentStatusApi()
 installTauriRuntimePtyApi()
 installTauriBrowserRuntimeApi()
 installTauriShellApi()
 installTauriDeepLinkApi()
-recordRendererCrashBreadcrumb('renderer_bootstrap_started', { dev: import.meta.env.DEV })
+recordRendererCrashBreadcrumb('renderer_bootstrap_started', {
+  dev: import.meta.env.DEV
+})
 installRendererCrashDiagnostics()
 applyDocumentTheme('system', { disableTransitions: false })
 
@@ -48,7 +52,10 @@ function RendererRoot(): React.JSX.Element {
     <RecoverableRenderErrorBoundary
       boundaryId="app.root"
       surface="app-root"
-      title={translate('app.recoverableError.rootTitle', `${PRODUCT_NAME} hit a renderer error.`)}
+      title={translate(
+        'app.recoverableError.rootTitle',
+        `${PRODUCT_NAME} hit a renderer error.`
+      )}
       description={translate(
         'app.recoverableError.rootDescription',
         `The app shell could not finish rendering. Retry to remount it, or relaunch ${PRODUCT_NAME} if the error persists.`

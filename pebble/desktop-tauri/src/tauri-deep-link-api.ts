@@ -32,9 +32,7 @@ async function handlePebbleDeepLink(url: string): Promise<void> {
     return
   }
   if (!isPairingDeepLink(normalized)) {
-    toast.error(
-      translate('tauri.deepLink.unsupported', 'This Pebble link is not supported yet.')
-    )
+    toast.error(translate('tauri.deepLink.unsupported', 'This Pebble link is not supported yet.'))
     return
   }
 
@@ -49,9 +47,7 @@ async function handlePebbleDeepLink(url: string): Promise<void> {
     const state = useAppStore.getState()
     state.setRuntimeEnvironments(environments)
     await state.refreshRuntimeEnvironmentStatus(result.environment.id)
-    toast.success(
-      translate('tauri.deepLink.runtimeAdded', 'Remote server added.')
-    )
+    toast.success(translate('tauri.deepLink.runtimeAdded', 'Remote server added.'))
   } catch (error) {
     handledDeepLinks.delete(normalized)
     toast.error(error instanceof Error ? error.message : String(error))

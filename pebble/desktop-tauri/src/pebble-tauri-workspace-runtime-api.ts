@@ -1,13 +1,24 @@
+import { homeDir, join as joinNativePath } from '@tauri-apps/api/path'
+
 import type { PreloadApi } from '../../../src/preload/api-types'
 import { projectHostSetupProjectionFromRepos } from '../../../src/shared/project-host-setup-projection'
+import type {
+  RuntimeWorktreeCreateResult,
+  RuntimeWorktreeRecord
+} from '../../../src/shared/runtime-types'
 import type {
   CreateWorktreeArgs,
   CreateWorktreeResult,
   DetectedWorktreeListResult,
+  ForceDeleteWorktreeBranchResult,
+  GitWorktreeInfo,
+  PreservedWorktreeBranch,
   Project,
   RemoveWorktreeResult,
   Repo,
   Worktree,
+  WorktreeLineage,
+  WorkspaceLineage,
   WorktreeMeta
 } from '../../../src/shared/types'
 import { MANAGED_WORKTREE_OWNERSHIP } from '../../../src/shared/worktree-ownership'
@@ -18,12 +29,15 @@ import {
   readPebbleStatusOrNull,
   requestRuntimeJson
 } from './pebble-tauri-runtime-transport'
+import { createRuntimeEventStreamCommand, readRuntimeEventStream } from './runtime-bridge'
+import type { RuntimeEventStreamEntry } from './runtime-command-shapes'
 import {
   applyWorktreeMeta,
   joinRuntimePath,
   mapRuntimeProjectToRepo,
   mapRuntimeWorktreeToWorktree,
   pathBasename,
+  readBoolean,
   readObject,
   readString,
   type PebbleRuntimeProject,
@@ -34,6 +48,45 @@ import {
   searchTauriBaseRefDetails,
   searchTauriBaseRefs
 } from './tauri-git-base-ref-api'
+
+type RuntimeEvent = {
+  topic: string
+  payload?: unknown
+}
+
+type RuntimeWorktreeLineageListResponse = {
+  lineage: Record<string, WorktreeLineage>
+  workspaceLineage?: Record<string, WorkspaceLineage>
+}
+
+export type RuntimeCreateWorktreeArgs = CreateWorktreeArgs & {
+  parentWorktree?: string
+  parentWorkspace?: string
+  envParentWorkspace?: string
+  cwdParentWorktree?: string
+  noParent?: boolean
+  lineageOrigin?: 'cli' | 'manual'
+}
+
+type RuntimeLineageUpdateResult = {
+  lineage: WorktreeLineage | null
+  workspaceLineage?: WorkspaceLineage | null
+}
+
+type WorktreeWithRuntimeLineage = Worktree & {
+  lineage?: WorktreeLineage | null
+  workspaceLineage?: WorkspaceLineage | null
+}
+
+type RepoChangedListener = Parameters<PreloadApi['repos']['onChanged']>[0]
+type WorktreeChangedListener = Parameters<PreloadApi['worktrees']['onChanged']>[0]
+type WorktreeCreateProgressListener = Parameters<PreloadApi['worktrees']['onCreateProgress']>[0]
+
+const repoChangedListeners = new Set<RepoChangedListener>()
+const worktreeChangedListeners = new Set<WorktreeChangedListener>()
+const worktreeCreateProgressListeners = new Set<WorktreeCreateProgressListener>()
+let projectEventPumpStarted = false
+let worktreeEventPumpStarted = false
 
 export function createPebbleProjectsApi(base: PreloadApi['projects']): PreloadApi['projects'] {
   return {
@@ -106,7 +159,7 @@ export function createPebbleReposApi(base: PreloadApi['repos']): PreloadApi['rep
         method: 'DELETE'
       })
     },
-    reorder: () => Promise.resolve({ status: 'applied' }),
+    reorder: ({ orderedIds }) => persistRuntimeProjectSortOrder(orderedIds),
     pickFolder: pickNativeDirectory,
     pickDirectory: pickNativeDirectory,
     pickFolders: pickNativeDirectories,
@@ -128,11 +181,11 @@ export function createPebbleReposApi(base: PreloadApi['repos']): PreloadApi['rep
       const status = await readPebbleStatusOrNull()
       return !status?.unavailableTools?.includes('git')
     },
-    getDefaultCreateProjectParent: () => Promise.resolve('~/pebble/workspaces'),
+    getDefaultCreateProjectParent: resolveDefaultCreateProjectParent,
     getBaseRefDefault: ({ repoId }) => getTauriBaseRefDefault(readRepos(), repoId),
     searchBaseRefs: (args) => searchTauriBaseRefs(readRepos(), args),
     searchBaseRefDetails: (args) => searchTauriBaseRefDetails(readRepos(), args),
-    onChanged: () => noopUnsubscribe
+    onChanged: (callback) => subscribeRepoChanged(callback)
   }
 }
 
@@ -159,30 +212,25 @@ export function createPebbleWorktreesApi(base: PreloadApi['worktrees']): Preload
       const worktree = await createRuntimeWorktree(args)
       return { worktree } satisfies CreateWorktreeResult
     },
-    remove: async ({ worktreeId }) => {
-      await requestRuntimeJson<PebbleRuntimeWorktree>(
-        `/v1/worktrees/${encodeURIComponent(worktreeId)}`,
-        { method: 'DELETE' }
-      )
-      return {} satisfies RemoveWorktreeResult
+    remove: async ({ worktreeId, force }) => {
+      const preservedBranch = await removeRuntimeWorktreeById(worktreeId, { force })
+      return (preservedBranch ? { preservedBranch } : {}) satisfies RemoveWorktreeResult
     },
     updateMeta: async ({ worktreeId, updates }) => {
-      const current = (await readWorktrees()).find((entry) => entry.id === worktreeId)
-      if (!current) {
-        throw new Error(`Worktree not found: ${worktreeId}`)
-      }
-      return applyWorktreeMeta(current, updates)
+      return updateRuntimeWorktreeMeta(worktreeId, updates)
     },
-    listLineage: () => Promise.resolve({ lineage: {}, workspaceLineage: {} }),
-    updateLineage: () => Promise.resolve(null),
-    persistSortOrder: () => Promise.resolve(),
+    listLineage: readRuntimeWorktreeLineage,
+    updateLineage: updateRuntimeWorktreeLineage,
+    persistSortOrder: ({ orderedIds }) => persistRuntimeWorktreeSortOrder(orderedIds),
     prefetchCreateBase: () => Promise.resolve(),
-    resolvePrBase: () => Promise.resolve({ error: 'Pull request base resolution is not available.' }),
+    resolvePrBase: () =>
+      Promise.resolve({ error: 'Pull request base resolution is not available.' }),
     resolveMrBase: () =>
       Promise.resolve({ error: 'Merge request base resolution is not available.' }),
-    forceDeletePreservedBranch: () => Promise.resolve({ deleted: true }),
-    onChanged: () => noopUnsubscribe,
-    onCreateProgress: () => noopUnsubscribe,
+    forceDeletePreservedBranch: ({ worktreeId, branchName, expectedHead }) =>
+      forceDeleteRuntimePreservedBranch(worktreeId, branchName, expectedHead),
+    onChanged: (callback) => subscribeWorktreeChanged(callback),
+    onCreateProgress: (callback) => subscribeWorktreeCreateProgress(callback),
     onBaseStatus: () => noopUnsubscribe,
     onRemoteBranchConflict: () => noopUnsubscribe
   }
@@ -196,6 +244,19 @@ export async function readRepos(): Promise<Repo[]> {
   return projects.map((project) => mapRuntimeProjectToRepo(project))
 }
 
+export async function persistRuntimeProjectSortOrder(
+  orderedIds: string[]
+): Promise<{ status: 'applied' | 'rejected' }> {
+  if (orderedIds.length === 0) {
+    return { status: 'rejected' }
+  }
+  await requestRuntimeJson<{ status: string }>('/v1/projects/reorder', {
+    method: 'POST',
+    body: { orderedIds }
+  })
+  return { status: 'applied' }
+}
+
 export async function readWorktrees(projectId?: string): Promise<Worktree[]> {
   await ensurePebbleRuntimeProcess()
   const query = projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''
@@ -206,10 +267,15 @@ export async function readWorktrees(projectId?: string): Promise<Worktree[]> {
   return runtimeWorktrees.map(mapRuntimeWorktreeToWorktree)
 }
 
-export async function createRuntimeWorktree(args: CreateWorktreeArgs): Promise<Worktree> {
+export async function createRuntimeWorktree(
+  args: RuntimeCreateWorktreeArgs
+): Promise<WorktreeWithRuntimeLineage> {
+  emitWorktreeCreateProgress(args.creationId, 'fetching')
   const repo = (await readRepos()).find((entry) => entry.id === args.repoId)
   const parentPath = repo?.worktreeBasePath || repo?.path || ''
   const path = joinRuntimePath(parentPath, args.name)
+  const lineageUpdate = await resolveCreateRuntimeWorktreeLineage(args)
+  emitWorktreeCreateProgress(args.creationId, 'creating')
   const runtimeWorktree = await requestRuntimeJson<PebbleRuntimeWorktree>('/v1/worktrees', {
     method: 'POST',
     body: {
@@ -220,7 +286,7 @@ export async function createRuntimeWorktree(args: CreateWorktreeArgs): Promise<W
       executeGit: true
     }
   })
-  return applyWorktreeMeta(mapRuntimeWorktreeToWorktree(runtimeWorktree), {
+  const initialMetaUpdates: Partial<WorktreeMeta> = {
     ...(args.displayName ? { displayName: args.displayName } : {}),
     ...(args.linkedIssue !== undefined ? { linkedIssue: args.linkedIssue } : {}),
     ...(args.linkedPR !== undefined ? { linkedPR: args.linkedPR } : {}),
@@ -231,10 +297,42 @@ export async function createRuntimeWorktree(args: CreateWorktreeArgs): Promise<W
     ...(args.pendingFirstAgentMessageRename !== undefined
       ? { pendingFirstAgentMessageRename: args.pendingFirstAgentMessageRename }
       : {})
-  })
+  }
+  let worktree: WorktreeWithRuntimeLineage = applyWorktreeMeta(
+    mapRuntimeWorktreeToWorktree(runtimeWorktree),
+    initialMetaUpdates
+  )
+  if (hasRuntimeWorktreeMetaBody(initialMetaUpdates)) {
+    worktree = await updateRuntimeWorktreeMeta(worktree.id, initialMetaUpdates)
+  }
+  if (lineageUpdate) {
+    const updated = await writeRuntimeWorktreeLineage({
+      worktreeId: worktree.id,
+      ...lineageUpdate
+    })
+    worktree = { ...worktree, lineage: updated.lineage }
+  }
+  return worktree
 }
 
-export async function setRuntimeWorktreeMeta(params: unknown): Promise<Worktree> {
+export async function createRuntimeWorktreeResult(
+  args: RuntimeCreateWorktreeArgs
+): Promise<RuntimeWorktreeCreateResult> {
+  const worktree = await createRuntimeWorktree(args)
+  const lineageList = await readRuntimeWorktreeLineage().catch(() => ({
+    lineage: {},
+    workspaceLineage: {}
+  }))
+  const record = mapWorktreeToRuntimeRecord(worktree, lineageList)
+  return {
+    worktree: record,
+    lineage: record.lineage,
+    workspaceLineage: record.workspaceLineage ?? null,
+    warnings: []
+  }
+}
+
+export async function setRuntimeWorktreeMeta(params: unknown): Promise<WorktreeWithRuntimeLineage> {
   const selector = readObject(params)
   const worktreeId =
     readString(selector.worktreeId) ??
@@ -243,15 +341,221 @@ export async function setRuntimeWorktreeMeta(params: unknown): Promise<Worktree>
   if (!worktreeId) {
     throw new Error('Missing worktree id')
   }
-  const updates = readObject(params) as Partial<WorktreeMeta>
-  const current = (await readWorktrees()).find((entry) => entry.id === worktreeId)
-  if (!current) {
-    throw new Error(`Worktree not found: ${worktreeId}`)
+  if (
+    selector.noParent === true ||
+    selector.parentWorktree !== undefined ||
+    selector.parentWorktreeId !== undefined ||
+    selector.parentWorkspace !== undefined
+  ) {
+    const updated = await writeRuntimeWorktreeLineage({
+      worktreeId,
+      noParent: selector.noParent === true,
+      parentWorktreeId:
+        readRuntimeWorktreeSelectorId(selector.parentWorktreeId) ??
+        readRuntimeWorktreeSelectorId(selector.parentWorktree),
+      parentWorkspace: readString(selector.parentWorkspace),
+      origin: 'manual'
+    })
+    const worktree = (await readWorktrees()).find((entry) => entry.id === worktreeId)
+    if (!worktree) {
+      throw new Error(`Worktree not found: ${worktreeId}`)
+    }
+    return { ...worktree, lineage: updated.lineage }
   }
-  return applyWorktreeMeta(current, updates)
+  const updates = readObject(params) as Partial<WorktreeMeta>
+  return updateRuntimeWorktreeMeta(worktreeId, updates)
 }
 
-export async function removeRuntimeWorktree(params: unknown): Promise<void> {
+export async function readRuntimeWorktreeLineage(): Promise<RuntimeWorktreeLineageListResponse> {
+  return requestRuntimeJson<RuntimeWorktreeLineageListResponse>('/v1/worktrees/lineage', {
+    method: 'GET'
+  })
+}
+
+async function resolveCreateRuntimeWorktreeLineage(
+  args: RuntimeCreateWorktreeArgs
+): Promise<Omit<Parameters<typeof writeRuntimeWorktreeLineage>[0], 'worktreeId'> | null> {
+  if (args.noParent === true) {
+    return null
+  }
+  const origin = args.lineageOrigin ?? 'manual'
+  const explicitCaptureSource = origin === 'cli' ? 'explicit-cli-flag' : 'manual-action'
+  if (args.parentWorkspace) {
+    const parentWorkspace = normalizeRuntimeParentWorkspace(args.parentWorkspace)
+    if (!parentWorkspace) {
+      throw new Error(`Invalid parent workspace: ${args.parentWorkspace}`)
+    }
+    return {
+      parentWorkspace,
+      origin,
+      captureSource: explicitCaptureSource,
+      captureConfidence: 'explicit'
+    }
+  }
+  if (args.parentWorktree) {
+    return {
+      parentWorktreeId: await resolveRuntimeWorktreeSelectorId(args.parentWorktree),
+      origin,
+      captureSource: explicitCaptureSource,
+      captureConfidence: 'explicit'
+    }
+  }
+  if (args.envParentWorkspace) {
+    const parentWorkspace = normalizeRuntimeParentWorkspace(args.envParentWorkspace)
+    if (parentWorkspace) {
+      return {
+        parentWorkspace,
+        origin: 'cli',
+        captureSource: 'env-workspace',
+        captureConfidence: 'inferred'
+      }
+    }
+  }
+  if (args.cwdParentWorktree) {
+    return {
+      parentWorktreeId: await resolveRuntimeWorktreeSelectorId(args.cwdParentWorktree),
+      origin: 'cli',
+      captureSource: 'cwd-context',
+      captureConfidence: 'inferred'
+    }
+  }
+  return null
+}
+
+async function updateRuntimeWorktreeLineage(args: {
+  worktreeId: string
+  parentWorktreeId?: string
+  noParent?: boolean
+}): Promise<WorktreeLineage | null> {
+  return (await writeRuntimeWorktreeLineage(args)).lineage
+}
+
+async function writeRuntimeWorktreeLineage(args: {
+  worktreeId: string
+  parentWorktreeId?: string
+  parentWorkspace?: string
+  noParent?: boolean
+  origin?: 'cli' | 'manual'
+  captureSource?: string
+  captureConfidence?: string
+}): Promise<RuntimeLineageUpdateResult> {
+  const worktree = await requestRuntimeJson<PebbleRuntimeWorktree>(
+    `/v1/worktrees/${encodeURIComponent(args.worktreeId)}`,
+    {
+      method: 'PATCH',
+      body: {
+        ...(args.parentWorktreeId ? { parentWorktreeId: args.parentWorktreeId } : {}),
+        ...(args.parentWorkspace ? { parentWorkspace: args.parentWorkspace } : {}),
+        ...(args.noParent === true ? { noParent: true } : {}),
+        ...(args.origin ? { origin: args.origin } : {}),
+        ...(args.captureSource || args.captureConfidence
+          ? {
+              capture: {
+                ...(args.captureSource ? { source: args.captureSource } : {}),
+                ...(args.captureConfidence ? { confidence: args.captureConfidence } : {})
+              }
+            }
+          : {})
+      }
+    }
+  )
+  return {
+    lineage: worktree.lineage ?? null,
+    workspaceLineage: worktree.workspaceLineage ?? null
+  }
+}
+
+async function updateRuntimeWorktreeMeta(
+  worktreeId: string,
+  updates: Partial<WorktreeMeta>
+): Promise<WorktreeWithRuntimeLineage> {
+  const body = toRuntimeWorktreeMetaBody(updates)
+  if (Object.keys(body).length === 0) {
+    const current = (await readWorktrees()).find((entry) => entry.id === worktreeId)
+    if (!current) {
+      throw new Error(`Worktree not found: ${worktreeId}`)
+    }
+    return current
+  }
+  const worktree = await requestRuntimeJson<PebbleRuntimeWorktree>(
+    `/v1/worktrees/${encodeURIComponent(worktreeId)}`,
+    { method: 'PATCH', body }
+  )
+  return mapRuntimeWorktreeToWorktree(worktree)
+}
+
+export async function persistRuntimeWorktreeSortOrder(orderedIds: string[]): Promise<void> {
+  if (orderedIds.length === 0) {
+    return
+  }
+  await requestRuntimeJson<{ status: string }>('/v1/worktrees/sort-order', {
+    method: 'POST',
+    body: { orderedIds }
+  })
+}
+
+function hasRuntimeWorktreeMetaBody(updates: Partial<WorktreeMeta>): boolean {
+  return Object.keys(toRuntimeWorktreeMetaBody(updates)).length > 0
+}
+
+function toRuntimeWorktreeMetaBody(updates: Partial<WorktreeMeta>): Record<string, unknown> {
+  const body: Record<string, unknown> = {}
+  if (updates.displayName !== undefined) {
+    body.displayName = updates.displayName
+  }
+  if (updates.comment !== undefined) {
+    body.comment = updates.comment
+  }
+  if (updates.isArchived !== undefined) {
+    body.isArchived = updates.isArchived
+  }
+  if (updates.isUnread !== undefined) {
+    body.isUnread = updates.isUnread
+  }
+  if (updates.isPinned !== undefined) {
+    body.isPinned = updates.isPinned
+  }
+  if (updates.sortOrder !== undefined) {
+    body.sortOrder = updates.sortOrder
+  }
+  if (updates.manualOrder !== undefined) {
+    body.manualOrder = updates.manualOrder
+  }
+  if (updates.workspaceStatus !== undefined) {
+    body.workspaceStatus = updates.workspaceStatus
+  }
+  // Forward link references (including explicit null to clear) so the runtime
+  // round-trips them instead of silently dropping the write.
+  if (updates.linkedIssue !== undefined) {
+    body.linkedIssue = updates.linkedIssue
+  }
+  if (updates.linkedPR !== undefined) {
+    body.linkedPR = updates.linkedPR
+  }
+  if (updates.linkedLinearIssue !== undefined) {
+    body.linkedLinearIssue = updates.linkedLinearIssue
+  }
+  return body
+}
+
+type PebbleRuntimeDeleteWorktreeResponse = PebbleRuntimeWorktree & {
+  preservedBranch: PreservedWorktreeBranch | null
+}
+
+type PreservedBranchCleanupTarget = {
+  projectId: string
+  branchName: string
+  head?: string
+}
+
+// Track the runtime project + preserved branch for each removed worktree so a
+// later force-delete can resolve the repo after the worktree record is gone,
+// mirroring Electron's preservedBranchCleanupByWorktreeId map.
+const preservedBranchCleanupByWorktreeId = new Map<string, PreservedBranchCleanupTarget>()
+
+export async function removeRuntimeWorktree(
+  params: unknown
+): Promise<PreservedWorktreeBranch | null> {
   const payload = readObject(params)
   const worktreeId =
     readString(payload.worktreeId) ??
@@ -260,25 +564,213 @@ export async function removeRuntimeWorktree(params: unknown): Promise<void> {
   if (!worktreeId) {
     throw new Error('Missing worktree id')
   }
-  await requestRuntimeJson<PebbleRuntimeWorktree>(`/v1/worktrees/${encodeURIComponent(worktreeId)}`, {
-    method: 'DELETE'
-  })
+  return removeRuntimeWorktreeById(worktreeId, { force: readBoolean(payload.force) ?? false })
 }
 
-export function toCreateWorktreeArgs(params: unknown): CreateWorktreeArgs {
+async function removeRuntimeWorktreeById(
+  worktreeId: string,
+  options: { force?: boolean }
+): Promise<PreservedWorktreeBranch | null> {
+  const response = await deleteRuntimeWorktree(worktreeId, options)
+  const preservedBranch = response.preservedBranch ?? null
+  if (preservedBranch) {
+    preservedBranchCleanupByWorktreeId.set(worktreeId, {
+      projectId: response.projectId,
+      branchName: preservedBranch.branchName,
+      ...(preservedBranch.head ? { head: preservedBranch.head } : {})
+    })
+  } else {
+    preservedBranchCleanupByWorktreeId.delete(worktreeId)
+  }
+  return preservedBranch
+}
+
+async function deleteRuntimeWorktree(
+  worktreeId: string,
+  options: { force?: boolean }
+): Promise<PebbleRuntimeDeleteWorktreeResponse> {
+  return requestRuntimeJson<PebbleRuntimeDeleteWorktreeResponse>(
+    `/v1/worktrees/${encodeURIComponent(worktreeId)}`,
+    {
+      method: 'DELETE',
+      body: {
+        executeGit: true,
+        force: options.force === true
+      }
+    }
+  )
+}
+
+async function forceDeleteRuntimePreservedBranch(
+  worktreeId: string,
+  branchName: string,
+  expectedHead: string
+): Promise<ForceDeleteWorktreeBranchResult> {
+  const target = preservedBranchCleanupByWorktreeId.get(worktreeId)
+  const projectId = target?.projectId
+  if (!projectId) {
+    throw new Error(`No preserved branch is tracked for workspace: ${worktreeId}`)
+  }
+  await requestRuntimeJson<{ deleted: boolean }>('/v1/worktrees/branches/force-delete', {
+    method: 'POST',
+    body: {
+      projectId,
+      branchName: target.branchName || branchName,
+      // Prefer the head Git preserved at removal time; fall back to the caller's.
+      expectedHead: target.head ?? expectedHead
+    }
+  })
+  preservedBranchCleanupByWorktreeId.delete(worktreeId)
+  return { deleted: true }
+}
+
+export function toCreateWorktreeArgs(params: unknown): RuntimeCreateWorktreeArgs {
   const payload = readObject(params)
   return {
-    repoId: readString(payload.repoId) ?? readString(payload.projectId) ?? '',
+    repoId:
+      readRuntimeRepoSelectorId(payload.repo) ??
+      readString(payload.repoId) ??
+      readString(payload.projectId) ??
+      '',
     name: readString(payload.name) ?? readString(payload.branch) ?? 'workspace',
     displayName: readString(payload.displayName),
     baseBranch: readString(payload.baseBranch) ?? readString(payload.base),
-    branchNameOverride: readString(payload.branchNameOverride) ?? readString(payload.branch)
-  }
+    branchNameOverride: readString(payload.branchNameOverride) ?? readString(payload.branch),
+    parentWorktree: readString(payload.parentWorktree),
+    parentWorkspace: normalizeRuntimeParentWorkspace(payload.parentWorkspace),
+    envParentWorkspace: readString(payload.envParentWorkspace),
+    cwdParentWorktree: readString(payload.cwdParentWorktree),
+    noParent: payload.noParent === true,
+    creationId: readString(payload.creationId),
+    lineageOrigin: 'cli'
+  } satisfies RuntimeCreateWorktreeArgs
 }
 
 export function getRuntimeRepoId(params: unknown): string | undefined {
   const payload = readObject(params)
-  return readString(payload.repoId) ?? readString(payload.projectId)
+  return (
+    readRuntimeRepoSelectorId(payload.repo) ??
+    readString(payload.repoId) ??
+    readString(payload.projectId)
+  )
+}
+
+function mapWorktreeToRuntimeRecord(
+  worktree: WorktreeWithRuntimeLineage,
+  lineageList: RuntimeWorktreeLineageListResponse
+): RuntimeWorktreeRecord {
+  const lineage = lineageList.lineage[worktree.id] ?? worktree.lineage ?? null
+  const workspaceLineage = lineageList.workspaceLineage?.[`worktree:${worktree.id}`] ?? null
+  const childWorktreeIds = Object.values(lineageList.lineage)
+    .filter((entry) => entry.parentWorktreeId === worktree.id)
+    .map((entry) => entry.worktreeId)
+  return {
+    ...worktree,
+    parentWorktreeId: lineage?.parentWorktreeId ?? null,
+    childWorktreeIds,
+    lineage,
+    workspaceLineage,
+    git: mapWorktreeGitInfo(worktree)
+  }
+}
+
+function mapWorktreeGitInfo(worktree: Worktree): GitWorktreeInfo {
+  return {
+    path: worktree.path,
+    head: worktree.head,
+    branch: worktree.branch,
+    isBare: worktree.isBare,
+    isSparse: worktree.isSparse,
+    isMainWorktree: worktree.isMainWorktree
+  }
+}
+
+function normalizeRuntimeParentWorkspace(
+  value: unknown
+): RuntimeCreateWorktreeArgs['parentWorkspace'] {
+  const raw = readString(value)
+  if (!raw) {
+    return undefined
+  }
+  const workspaceKey = raw.startsWith('id:') ? raw.slice('id:'.length) : raw
+  if (workspaceKey.startsWith('worktree:') || workspaceKey.startsWith('folder:')) {
+    return workspaceKey as RuntimeCreateWorktreeArgs['parentWorkspace']
+  }
+  return undefined
+}
+
+function readRuntimeRepoSelectorId(value: unknown): string | undefined {
+  const raw = readString(value)
+  const selector = readObject(value)
+  const objectId =
+    readString(selector.id) ?? readString(selector.repoId) ?? readString(selector.projectId)
+  if (objectId) {
+    return objectId
+  }
+  if (!raw) {
+    return undefined
+  }
+  return raw.startsWith('id:') ? raw.slice('id:'.length) : raw
+}
+
+async function resolveRuntimeWorktreeSelectorId(value: unknown): Promise<string> {
+  const directId = readRuntimeWorktreeSelectorId(value)
+  if (directId) {
+    return directId
+  }
+  const selector = readString(value)
+  if (!selector) {
+    throw new Error('Missing parent worktree selector')
+  }
+  const worktrees = await readWorktrees()
+  const match = findRuntimeWorktreeBySelector(worktrees, selector)
+  if (!match) {
+    throw new Error(`Parent worktree selector was not found: ${selector}`)
+  }
+  return match.id
+}
+
+function readRuntimeWorktreeSelectorId(value: unknown): string | undefined {
+  const raw = readString(value)
+  const selector = readObject(value)
+  const objectId = readString(selector.id) ?? readString(selector.worktreeId)
+  if (objectId) {
+    return objectId
+  }
+  if (!raw) {
+    return undefined
+  }
+  if (raw.startsWith('id:worktree:')) {
+    return raw.slice('id:worktree:'.length)
+  }
+  if (raw.startsWith('worktree:')) {
+    return raw.slice('worktree:'.length)
+  }
+  if (raw.startsWith('id:')) {
+    return raw.slice('id:'.length)
+  }
+  return raw.includes(':') ? undefined : raw
+}
+
+function findRuntimeWorktreeBySelector(
+  worktrees: Worktree[],
+  selector: string
+): Worktree | undefined {
+  if (selector.startsWith('branch:')) {
+    const branch = selector.slice('branch:'.length)
+    return worktrees.find((entry) => entry.branch === branch)
+  }
+  if (selector.startsWith('path:')) {
+    const path = selector.slice('path:'.length)
+    return worktrees.find((entry) => entry.path === path)
+  }
+  if (selector.startsWith('name:')) {
+    const name = selector.slice('name:'.length)
+    return worktrees.find(
+      (entry) => entry.displayName === name || pathBasename(entry.path) === name
+    )
+  }
+  return undefined
 }
 
 async function createRuntimeProject(args: {
@@ -298,4 +790,135 @@ async function createRuntimeProject(args: {
   })
 }
 
+async function resolveDefaultCreateProjectParent(): Promise<string> {
+  return joinNativePath(await homeDir(), 'pebble', 'workspaces')
+}
+
 function noopUnsubscribe(): void {}
+
+function subscribeRepoChanged(callback: RepoChangedListener): () => void {
+  repoChangedListeners.add(callback)
+  ensureProjectEventPump()
+  return () => {
+    repoChangedListeners.delete(callback)
+  }
+}
+
+function subscribeWorktreeChanged(callback: WorktreeChangedListener): () => void {
+  worktreeChangedListeners.add(callback)
+  ensureWorktreeEventPump()
+  return () => {
+    worktreeChangedListeners.delete(callback)
+  }
+}
+
+function subscribeWorktreeCreateProgress(callback: WorktreeCreateProgressListener): () => void {
+  worktreeCreateProgressListeners.add(callback)
+  return () => {
+    worktreeCreateProgressListeners.delete(callback)
+  }
+}
+
+function emitWorktreeCreateProgress(
+  creationId: string | undefined,
+  phase: 'fetching' | 'creating'
+): void {
+  if (worktreeCreateProgressListeners.size === 0) {
+    return
+  }
+  const event = creationId ? { creationId, phase } : { phase }
+  for (const listener of worktreeCreateProgressListeners) {
+    listener(event)
+  }
+}
+
+function ensureProjectEventPump(): void {
+  if (projectEventPumpStarted) {
+    return
+  }
+  projectEventPumpStarted = true
+  void pumpProjectEvents()
+}
+
+function ensureWorktreeEventPump(): void {
+  if (worktreeEventPumpStarted) {
+    return
+  }
+  worktreeEventPumpStarted = true
+  void pumpWorktreeEvents()
+}
+
+async function pumpProjectEvents(): Promise<void> {
+  for (;;) {
+    const events = await readRuntimeEvents('project.changed')
+    if (events.length === 0) {
+      await delay(1000)
+    }
+    for (const entry of events) {
+      if (isRuntimeTopic(entry, 'project.changed')) {
+        emitTo(repoChangedListeners)
+      }
+    }
+  }
+}
+
+async function pumpWorktreeEvents(): Promise<void> {
+  for (;;) {
+    const events = await readRuntimeEvents('worktree.changed')
+    if (events.length === 0) {
+      await delay(1000)
+    }
+    for (const entry of events) {
+      const repoId = readRuntimeWorktreeEventRepoId(entry)
+      if (repoId) {
+        emitTo(worktreeChangedListeners, { repoId })
+      }
+    }
+  }
+}
+
+async function readRuntimeEvents(topic: string): Promise<RuntimeEventStreamEntry[]> {
+  const result = await readRuntimeEventStream(
+    // Why: Tauri invokes still cross the macOS WebKit IPC path; short polling
+    // keeps event pumps responsive even when the runtime has no new events.
+    createRuntimeEventStreamCommand({ topic, limit: 20 })
+  ).catch(() => null)
+  return result?.transport === 'connected' ? result.events : []
+}
+
+function isRuntimeTopic(entry: RuntimeEventStreamEntry, topic: string): boolean {
+  const event = parseRuntimeEvent(entry)
+  return entry.topic === topic || event?.topic === topic
+}
+
+function readRuntimeWorktreeEventRepoId(entry: RuntimeEventStreamEntry): string | null {
+  if (!isRuntimeTopic(entry, 'worktree.changed')) {
+    return null
+  }
+  const event = parseRuntimeEvent(entry)
+  const payload = readObject(event?.payload)
+  const deleted = readObject(payload.deleted)
+  const value = Object.keys(deleted).length > 0 ? deleted : payload
+  return readString(value.projectId) ?? readString(value.repoId) ?? null
+}
+
+function parseRuntimeEvent(entry: RuntimeEventStreamEntry): RuntimeEvent | null {
+  try {
+    return JSON.parse(entry.data) as RuntimeEvent
+  } catch {
+    return null
+  }
+}
+
+function emitTo<Callback extends (...args: never[]) => void>(
+  listeners: Set<Callback>,
+  ...args: Parameters<Callback>
+): void {
+  for (const listener of listeners) {
+    listener(...args)
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}

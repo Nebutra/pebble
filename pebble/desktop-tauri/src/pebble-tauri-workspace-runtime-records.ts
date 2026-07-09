@@ -1,5 +1,11 @@
 import { LOCAL_EXECUTION_HOST_ID } from '../../../src/shared/execution-host'
-import type { Repo, Worktree, WorktreeMeta } from '../../../src/shared/types'
+import type {
+  Repo,
+  Worktree,
+  WorktreeLineage,
+  WorkspaceLineage,
+  WorktreeMeta
+} from '../../../src/shared/types'
 
 export type PebbleRuntimeProject = {
   id: string
@@ -8,18 +14,34 @@ export type PebbleRuntimeProject = {
   locationKind: string
   hostId?: string
   provider?: string
+  sortOrder?: number
   createdAt: string
   updatedAt: string
 }
 
 export type PebbleRuntimeWorktree = {
   id: string
+  instanceId?: string
   projectId: string
   path: string
   branch?: string
   base?: string
   reviewKind?: string
   reviewId?: string
+  displayName?: string
+  comment?: string
+  linkedIssue?: number | null
+  linkedPR?: number | null
+  linkedLinearIssue?: string | null
+  isArchived?: boolean
+  isUnread?: boolean
+  isPinned?: boolean
+  sortOrder?: number
+  manualOrder?: number
+  lastActivityAt?: number
+  workspaceStatus?: string
+  lineage?: WorktreeLineage | null
+  workspaceLineage?: WorkspaceLineage | null
   createdAt: string
   updatedAt: string
 }
@@ -52,7 +74,7 @@ export function mapRuntimeWorktreeToWorktree(worktree: PebbleRuntimeWorktree): W
   const createdAt = dateMs(worktree.createdAt)
   return {
     id: worktree.id,
-    instanceId: worktree.id,
+    instanceId: worktree.instanceId ?? worktree.id,
     repoId: worktree.projectId,
     projectId: worktree.projectId,
     hostId: LOCAL_EXECUTION_HOST_ID,
@@ -63,28 +85,30 @@ export function mapRuntimeWorktreeToWorktree(worktree: PebbleRuntimeWorktree): W
     isBare: false,
     isSparse: false,
     isMainWorktree: false,
-    displayName: pathBasename(worktree.path),
-    comment: '',
-    linkedIssue: null,
-    linkedPR: null,
-    linkedLinearIssue: null,
-    isArchived: false,
-    isUnread: false,
-    isPinned: false,
-    sortOrder: createdAt,
-    lastActivityAt: dateMs(worktree.updatedAt),
+    displayName: worktree.displayName || pathBasename(worktree.path),
+    comment: worktree.comment ?? '',
+    linkedIssue: worktree.linkedIssue ?? null,
+    linkedPR: worktree.linkedPR ?? null,
+    linkedLinearIssue: worktree.linkedLinearIssue ?? null,
+    isArchived: worktree.isArchived ?? false,
+    isUnread: worktree.isUnread ?? false,
+    isPinned: worktree.isPinned ?? false,
+    sortOrder: worktree.sortOrder ?? createdAt,
+    ...(worktree.manualOrder !== undefined ? { manualOrder: worktree.manualOrder } : {}),
+    lastActivityAt: worktree.lastActivityAt ?? dateMs(worktree.updatedAt),
     createdAt,
-    ...(worktree.base ? { baseRef: worktree.base } : {})
+    ...(worktree.workspaceStatus ? { workspaceStatus: worktree.workspaceStatus } : {}),
+    ...(worktree.base ? { baseRef: worktree.base } : {}),
+    ...(worktree.lineage !== undefined ? { lineage: worktree.lineage } : {})
   }
 }
 
 export function applyWorktreeMeta(worktree: Worktree, updates: Partial<WorktreeMeta>): Worktree {
   return {
     ...worktree,
+    // Why: linked* use null to mean "unlink"; a ??-fallback to the old value
+    // would silently swallow the clear, so the plain spread must win.
     ...updates,
-    linkedIssue: updates.linkedIssue ?? worktree.linkedIssue,
-    linkedPR: updates.linkedPR ?? worktree.linkedPR,
-    linkedLinearIssue: updates.linkedLinearIssue ?? worktree.linkedLinearIssue,
     lastActivityAt: Date.now()
   }
 }
@@ -95,6 +119,10 @@ export function readObject(value: unknown): Record<string, unknown> {
 
 export function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+export function readBoolean(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined
 }
 
 export function pathBasename(path: string): string {

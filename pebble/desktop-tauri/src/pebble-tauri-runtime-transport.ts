@@ -58,9 +58,9 @@ export async function ensurePebbleRuntimeProcess(): Promise<void> {
   if (processStatus?.running) {
     return
   }
-  await startRuntimeProcess(
-    createRuntimeProcessStartCommand({ listen: '127.0.0.1:17777' })
-  ).catch(() => undefined)
+  await startRuntimeProcess(createRuntimeProcessStartCommand({ listen: '127.0.0.1:17777' })).catch(
+    () => undefined
+  )
 }
 
 export async function requestRuntimeJson<T>(

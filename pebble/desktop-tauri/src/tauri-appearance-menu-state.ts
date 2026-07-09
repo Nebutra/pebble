@@ -13,20 +13,14 @@ export async function buildTauriAppearanceMenuItems(
       await window.api.ui.set({ statusBarVisible: !(ui.statusBarVisible !== false) })
       await rebuildMenu()
     }),
-    checkItem(
-      'Show Tasks Button',
-      settings.showTasksButton !== false,
-      () => toggleAppearanceSetting('showTasksButton', rebuildMenu)
+    checkItem('Show Tasks Button', settings.showTasksButton !== false, () =>
+      toggleAppearanceSetting('showTasksButton', rebuildMenu)
     ),
-    checkItem(
-      'Show Automations Button',
-      settings.showAutomationsButton !== false,
-      () => toggleAppearanceSetting('showAutomationsButton', rebuildMenu)
+    checkItem('Show Automations Button', settings.showAutomationsButton !== false, () =>
+      toggleAppearanceSetting('showAutomationsButton', rebuildMenu)
     ),
-    checkItem(
-      'Show Pebble Mobile Button',
-      settings.showMobileButton !== false,
-      () => toggleAppearanceSetting('showMobileButton', rebuildMenu)
+    checkItem('Show Pebble Mobile Button', settings.showMobileButton !== false, () =>
+      toggleAppearanceSetting('showMobileButton', rebuildMenu)
     ),
     checkItem('Show Titlebar App Name', settings.showTitlebarAppName !== false, async () => {
       await window.api.settings.set({

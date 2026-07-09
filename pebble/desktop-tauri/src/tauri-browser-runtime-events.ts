@@ -1,8 +1,5 @@
 import type { BrowserApi } from '../../../src/preload/api-types'
-import {
-  createRuntimeEventStreamCommand,
-  readRuntimeEventStream
-} from './runtime-bridge'
+import { createRuntimeEventStreamCommand, readRuntimeEventStream } from './runtime-bridge'
 import type { RuntimeEventStreamEntry } from './runtime-command-shapes'
 
 type RuntimeBrowserTab = {
@@ -51,9 +48,7 @@ const downloadProgressListeners = new Set<DownloadProgressListener>()
 const downloadFinishedListeners = new Set<DownloadFinishedListener>()
 let browserEventPumpStarted = false
 
-export function registerTauriBrowserGuest(
-  args: Parameters<BrowserApi['registerGuest']>[0]
-): void {
+export function registerTauriBrowserGuest(args: Parameters<BrowserApi['registerGuest']>[0]): void {
   guestRegistrations.set(args.browserPageId, {
     browserPageId: args.browserPageId,
     worktreeId: args.worktreeId,
@@ -132,7 +127,9 @@ async function pumpBrowserEvents(): Promise<void> {
 
 async function readRuntimeEvents(): Promise<RuntimeEventStreamEntry[]> {
   const result = await readRuntimeEventStream(
-    createRuntimeEventStreamCommand({ topic: 'browser.changed', limit: 20, timeoutMs: 30000 })
+    // Why: browser events are polled from the renderer; keep each native invoke
+    // bounded so a quiet runtime cannot make the desktop shell feel hung.
+    createRuntimeEventStreamCommand({ topic: 'browser.changed', limit: 20 })
   ).catch(() => null)
   return result?.transport === 'connected' ? result.events : []
 }
