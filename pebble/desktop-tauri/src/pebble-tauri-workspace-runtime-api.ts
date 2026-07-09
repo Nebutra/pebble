@@ -29,6 +29,11 @@ import {
   type PebbleRuntimeProject,
   type PebbleRuntimeWorktree
 } from './pebble-tauri-workspace-runtime-records'
+import {
+  getTauriBaseRefDefault,
+  searchTauriBaseRefDetails,
+  searchTauriBaseRefs
+} from './tauri-git-base-ref-api'
 
 export function createPebbleProjectsApi(base: PreloadApi['projects']): PreloadApi['projects'] {
   return {
@@ -124,9 +129,9 @@ export function createPebbleReposApi(base: PreloadApi['repos']): PreloadApi['rep
       return !status?.unavailableTools?.includes('git')
     },
     getDefaultCreateProjectParent: () => Promise.resolve('~/pebble/workspaces'),
-    getBaseRefDefault: () => Promise.resolve({ defaultBaseRef: null, remoteCount: 0 }),
-    searchBaseRefs: () => Promise.resolve([]),
-    searchBaseRefDetails: () => Promise.resolve([]),
+    getBaseRefDefault: ({ repoId }) => getTauriBaseRefDefault(readRepos(), repoId),
+    searchBaseRefs: (args) => searchTauriBaseRefs(readRepos(), args),
+    searchBaseRefDetails: (args) => searchTauriBaseRefDetails(readRepos(), args),
     onChanged: () => noopUnsubscribe
   }
 }

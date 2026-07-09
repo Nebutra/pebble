@@ -60,6 +60,8 @@ const checks = [
       text.includes('export function createPebbleWorktreesApi') &&
       text.includes("'/v1/worktrees'") &&
       text.includes('MANAGED_WORKTREE_OWNERSHIP') &&
+      text.includes('getTauriBaseRefDefault(readRepos(), repoId)') &&
+      text.includes('searchTauriBaseRefs(readRepos(), args)') &&
       text.includes('createRuntimeWorktree(args)')
   },
   {
@@ -342,6 +344,33 @@ const checks = [
     name: 'Tauri registers native preflight command detection with the Rust invoke handler',
     file: 'pebble/desktop-tauri/src-tauri/src/main.rs',
     expect: (text) => text.includes('commands::preflight::preflight_detect_commands')
+  },
+  {
+    name: 'Tauri git base-ref API backs the canonical branch picker with native git refs',
+    file: 'pebble/desktop-tauri/src/tauri-git-base-ref-api.ts',
+    expect: (text) =>
+      text.includes('export async function getTauriBaseRefDefault') &&
+      text.includes("invoke<BaseRefDefaultResult>('git_get_base_ref_default'") &&
+      text.includes('export async function searchTauriBaseRefDetails') &&
+      text.includes("invoke<BaseRefSearchResult[]>('git_search_base_ref_details'") &&
+      text.includes("repo.kind === 'folder'")
+  },
+  {
+    name: 'Tauri Rust git base-ref commands query local refs without Electron IPC',
+    file: 'pebble/desktop-tauri/src-tauri/src/commands/git_refs.rs',
+    expect: (text) =>
+      text.includes('pub fn git_search_base_ref_details') &&
+      text.includes('pub fn git_get_base_ref_default') &&
+      text.includes('for-each-ref') &&
+      text.includes('refs/remotes') &&
+      text.includes('resolve_local_branch_name')
+  },
+  {
+    name: 'Tauri registers native git base-ref commands with the Rust invoke handler',
+    file: 'pebble/desktop-tauri/src-tauri/src/main.rs',
+    expect: (text) =>
+      text.includes('commands::git_refs::git_get_base_ref_default') &&
+      text.includes('commands::git_refs::git_search_base_ref_details')
   },
   {
     name: 'Tauri Vite aliases @ to the canonical renderer source',

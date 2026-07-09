@@ -294,6 +294,9 @@ Current implementation:
 - Tauri replaces the web shell no-ops with native Rust commands for validated file-manager reveal,
   external editor/default app launch, URL/file URI open, path existence checks, attachment/image/
   audio/directory pickers, repo-icon PNG import, and no-overwrite file copy.
+- Tauri backs local Git base-ref/default-branch lookups with native `git` commands so the
+  canonical repository settings and worktree-create branch pickers no longer receive empty mock
+  results.
 - Tauri wraps the web-compatible settings and UI state APIs with renderer-visible change events so
   menu actions can update the canonical store the same way Electron main-process broadcasts do.
 - Tauri persists pairing-backed remote runtime environments through native Rust commands that read
@@ -318,9 +321,9 @@ Current implementation:
   the native diagnostics collector is wired.
 - `verify-tauri-mainline.mjs` checks the renderer entry, preload bridge, Vite aliasing, CSS source,
   Tauri identity, window bounds, native window/menu/settings/shell bridges, runtime PTY fallback,
-  remote runtime environment store commands, preflight agent detection, deep-link routing, updater
-  release-feed checks, crash-report persistence, browser runtime bridge, local mock-UI drift, and
-  Roadmap commitment before shell changes are accepted.
+  remote runtime environment store commands, git base-ref lookup, preflight agent detection,
+  deep-link routing, updater release-feed checks, crash-report persistence, browser runtime bridge,
+  local mock-UI drift, and Roadmap commitment before shell changes are accepted.
 
 ## Migration Rule
 

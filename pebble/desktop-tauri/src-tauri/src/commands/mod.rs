@@ -1,6 +1,7 @@
 pub mod crash_reports;
 pub mod deep_link;
 pub mod file_picker;
+pub mod git_refs;
 pub mod preflight;
 pub mod runtime_environments;
 pub mod runtime_process;
