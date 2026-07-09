@@ -59,6 +59,7 @@ import {
 } from './tauri-computer-use-permissions-api'
 import { subscribeTauriRuntimeEnvironment } from './tauri-runtime-environment-subscription-api'
 import { callTauriTerminalRuntimeRpc } from './tauri-terminal-runtime-rpc'
+import { fetchGitHubPRChecks, fetchGitLabMRs } from './tauri-provider-review-bridge'
 
 const PEBBLE_RUNTIME_ID = 'pebble-local'
 
@@ -176,6 +177,14 @@ export function createPebbleRuntimeEnvironmentsApi(
         ? subscribeTauriRuntimeEnvironment(args, callbacks)
         : base.subscribe(args, callbacks)
   }
+}
+
+// GET adapter for the provider-review bridge; ensures the runtime is up first,
+// then a non-2xx (501 CLI-missing, 401 unauthenticated) throws so the dispatcher
+// surfaces a failed RPC like Electron's provider load failures.
+async function getProviderJson<T>(path: string): Promise<T> {
+  await ensurePebbleRuntimeProcess()
+  return requestRuntimeJson<T>(path, { method: 'GET' })
 }
 
 async function callPebbleRuntimeMethod(
@@ -344,6 +353,10 @@ async function callPebbleRuntimeMethod(
             toConnectionParams(params)
           )
         )
+      case 'github.prChecks':
+        return okRuntimeRpc(await fetchGitHubPRChecks(getProviderJson, params))
+      case 'gitlab.listMRs':
+        return okRuntimeRpc(await fetchGitLabMRs(getProviderJson, params))
       default:
         warnUnmappedRuntimeMethod(method)
         return failRuntimeRpc(
