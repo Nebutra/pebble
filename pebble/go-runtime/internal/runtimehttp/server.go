@@ -103,6 +103,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/browser/tabs", s.handleBrowserTabs)
 	s.mux.HandleFunc("/v1/browser/tabs/", s.handleBrowserTabByID)
 	s.mux.HandleFunc("/v1/browser/profiles", s.handleBrowserProfiles)
+	s.mux.HandleFunc("/v1/browser/profiles/", s.handleBrowserProfileByID)
 	s.mux.HandleFunc("/v1/browser/permissions", s.handleBrowserPermissions)
 	s.mux.HandleFunc("/v1/browser/downloads", s.handleBrowserDownloads)
 	s.mux.HandleFunc("/v1/browser/downloads/", s.handleBrowserDownloadByID)
@@ -663,6 +664,24 @@ func (s *Server) handleBrowserProfiles(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+func (s *Server) handleBrowserProfileByID(w http.ResponseWriter, r *http.Request) {
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/v1/browser/profiles/"), "/")
+	if id == "" {
+		writeError(w, http.StatusNotFound, "browser profile not found")
+		return
+	}
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	profile, err := s.manager.DeleteBrowserProfile(id)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, profile)
 }
 
 func (s *Server) handleBrowserPermissions(w http.ResponseWriter, r *http.Request) {

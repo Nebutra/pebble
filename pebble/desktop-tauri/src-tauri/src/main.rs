@@ -13,6 +13,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::file_picker::pick_directory,
             commands::file_picker::pick_directories,
+            commands::runtime_environments::runtime_environments_add_from_pairing_code,
+            commands::runtime_environments::runtime_environments_disconnect,
+            commands::runtime_environments::runtime_environments_list,
+            commands::runtime_environments::runtime_environments_remove,
+            commands::runtime_environments::runtime_environments_resolve,
             commands::runtime_process::start_runtime_process,
             commands::runtime_process::stop_runtime_process,
             commands::runtime_process::runtime_process_status,
@@ -26,7 +31,17 @@ pub fn run() {
             commands::runtime_status::update_browser_action,
             commands::runtime_status::poll_emulator_actions,
             commands::runtime_status::update_emulator_action,
-            commands::runtime_status::register_native_provider
+            commands::runtime_status::register_native_provider,
+            commands::shell::shell_path_exists,
+            commands::shell::shell_open_in_file_manager,
+            commands::shell::shell_open_in_external_editor,
+            commands::shell::shell_open_file_path,
+            commands::shell::shell_open_url,
+            commands::shell::shell_open_file_uri,
+            commands::shell::shell_pick_file,
+            commands::shell::shell_pick_directory,
+            commands::shell::shell_pick_repo_icon_image,
+            commands::shell::shell_copy_file
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Pebble Tauri desktop shell");

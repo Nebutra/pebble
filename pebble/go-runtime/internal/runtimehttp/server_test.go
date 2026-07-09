@@ -543,6 +543,20 @@ func TestBrowserProfilePermissionAndDownloadEndpoints(t *testing.T) {
 	if updated.Status != runtimecore.BrowserDownloadCompleted || updated.BytesReceived != 100 {
 		t.Fatalf("unexpected updated browser download: %#v", updated)
 	}
+
+	deleteProfileReq := httptest.NewRequest(
+		http.MethodDelete,
+		"/v1/browser/profiles/"+profile.ID,
+		nil,
+	)
+	deleteProfileRec := httptest.NewRecorder()
+	server.ServeHTTP(deleteProfileRec, deleteProfileReq)
+	if deleteProfileRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", deleteProfileRec.Code, deleteProfileRec.Body.String())
+	}
+	if got := manager.ListBrowserProfiles(); len(got) != 0 {
+		t.Fatalf("browser profile was not deleted: %#v", got)
+	}
 }
 
 func TestAutomationEndpointsCreateTriggerAndListRuns(t *testing.T) {

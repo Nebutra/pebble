@@ -1,0 +1,106 @@
+name: Tauri Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or SHA to build
+        required: true
+        default: main
+      release_tag:
+        description: Existing or new GitHub release tag to upload to
+        required: false
+        default: ''
+      upload_to_github_release:
+        description: Upload Tauri bundles to the GitHub release
+        required: true
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macos-universal
+            os: macos-latest
+            args: --target universal-apple-darwin --bundles app
+            rust_targets: aarch64-apple-darwin x86_64-apple-darwin
+          - label: linux-x64
+            os: ubuntu-22.04
+            args: ''
+            rust_targets: ''
+          - label: linux-arm64
+            os: ubuntu-24.04-arm
+            args: ''
+            rust_targets: ''
+          - label: windows-x64
+            os: windows-2022
+            args: ''
+            rust_targets: ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust targets
+        if: matrix.rust_targets != ''
+        run: rustup target add ${{ matrix.rust_targets }}
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            pebble/desktop-tauri/src-tauri -> target
+
+      - name: Install Linux Tauri dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify Tauri mainline contract
+        run: pnpm verify:tauri-mainline
+
+      - name: Build Tauri desktop bundle
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: pebble/desktop-tauri
+          tauriScript: pnpm exec tauri
+          args: ${{ matrix.args }}
+          includeDebug: false
+          uploadWorkflowArtifacts: true
+          releaseAssetNamePattern: pebble-tauri-[platform]-[arch][ext]
+          tagName: ${{ github.event_name == 'push' && github.ref_name || (inputs.upload_to_github_release && inputs.release_tag || '') }}
+          releaseName: Pebble ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
+          releaseDraft: true
+          prerelease: ${{ contains(github.event_name == 'push' && github.ref_name || inputs.release_tag, '-rc.') }}
+          retryAttempts: 2

@@ -15,11 +15,23 @@ import { translate } from '@/i18n/i18n'
 import { installPebbleDomBranding, installPebbleI18nBranding } from './pebble-branding'
 import { installPebbleTauriPreloadApi } from './pebble-tauri-preload-api'
 import { PRODUCT_NAME } from './product-brand'
+import { installTauriBrowserRuntimeApi } from './tauri-browser-runtime-api'
+import { installTauriMenuApi } from './tauri-menu-api'
+import { installTauriRuntimePtyApi } from './tauri-runtime-pty-api'
+import { installTauriSettingsEventApi } from './tauri-settings-event-api'
+import { installTauriShellApi } from './tauri-shell-api'
+import { installTauriUpdaterApi } from './tauri-updater-api'
 import { installTauriWindowApi } from './tauri-window-api'
 
 installPebbleI18nBranding()
 installPebbleTauriPreloadApi()
+installTauriSettingsEventApi()
 installTauriWindowApi()
+installTauriUpdaterApi()
+installTauriMenuApi()
+installTauriRuntimePtyApi()
+installTauriBrowserRuntimeApi()
+installTauriShellApi()
 recordRendererCrashBreadcrumb('renderer_bootstrap_started', { dev: import.meta.env.DEV })
 installRendererCrashDiagnostics()
 applyDocumentTheme('system', { disableTransitions: false })

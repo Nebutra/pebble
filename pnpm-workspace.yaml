@@ -1,0 +1,3 @@
+packages:
+  - .
+  - pebble/desktop-tauri

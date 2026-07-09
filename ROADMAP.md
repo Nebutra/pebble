@@ -12,6 +12,9 @@ Mainline rules:
 
 - `pebble/desktop-tauri/` is the desktop-shell migration track and must load the
   same React workbench renderer, not a reduced or mock UI.
+- Pixel parity is the bar: Tauri may be more reliable, faster, and more native, but
+  it must not ship placeholder screens, simplified flows, or UI forks that only
+  resemble Electron from a distance.
 - Electron is a parity reference only; it is not the destination desktop shell.
 - The Tauri shell must keep pixel-level parity with the Electron reference
   while Electron remains available for comparison.
@@ -24,14 +27,14 @@ Migration gates:
 
 | Area | Target owner | Current status | Exit criterion |
 | --- | --- | --- | --- |
-| Window shell, sizing, and app identity | Tauri/Rust | Tauri config uses Pebble identity and Electron fallback window dimensions. | Tauri window controls, titlebar behavior, traffic-light placement, menus, and shortcuts match Electron screenshots on macOS, Windows, and Linux. |
+| Window shell, sizing, and app identity | Tauri/Rust | Tauri config uses Pebble identity and Electron fallback window dimensions; Tauri now installs native window, settings-event, and menu bridges for close guards, titlebar popup menus, paste, help/settings events, sidebar toggles, Appearance checkbox state, and zoom. | Tauri window controls, titlebar behavior, traffic-light placement, menus, updater menu checks, and shortcut parity match Electron screenshots on macOS, Windows, and Linux. |
 | Renderer parity | React in Tauri | Tauri renderer imports the canonical `@/App` and root renderer stylesheet. | Desktop Tauri screenshots match Electron reference views for landing, workspace, terminal, browser, source control, checks, settings, update dialogs, and crash surfaces. |
-| File/project pickers | Tauri commands + Rust host | Native folder picker commands exist for local project add flows. | Project add/remove, folder workspaces, SSH project setup, and trusted hook prompts run without Electron IPC. |
-| Runtime RPC and PTY/session control | Go runtime + Zig PTY/system | Tauri can start/probe the local Go runtime and call bounded runtime resources. | Terminal creation, split panes, agent launch, session tail/input/stop, and SSH relay paths are driven through runtime contracts. |
+| File/project pickers and shell actions | Tauri commands + Rust host | Native folder picker commands exist for local project add flows; Tauri now bridges validated open-in-file-manager, open-in-editor/default app, URL/file URI open, path existence, attachment/image/audio/directory pickers, repo-icon PNG import, and no-overwrite file copy through the existing renderer shell contract. | Project add/remove, folder workspaces, file attachment flows, repo icon import, markdown image copy, SSH project setup, and trusted hook prompts run without Electron IPC. |
+| Runtime RPC, remote environments, and PTY/session control | Go runtime + Rust/Tauri + Zig PTY/system | Tauri can start/probe the local Go runtime, call bounded runtime resources, and map workspace-backed terminal spawn/write/output/stop onto Go process sessions as a fallback. Tauri now also persists pairing-backed remote runtime environments in `pebble-environments.json`, validates `pebble://pair?...` payloads, redacts secrets in renderer responses, and supports list/resolve/remove/disconnect through native commands instead of mock local environments. | Terminal creation, split panes, agent launch, session tail/input/stop, PTY sizing, alternate screen, foreground process tracking, remote runtime status/call/subscribe, and SSH relay paths are driven through runtime contracts with Zig PTY primitives where needed. |
 | Source control and reviews | Go runtime + provider adapters | Go owns source-control projections and diffs for local/relay-fed workspaces. | GitHub, GitLab, and provider-neutral review surfaces work in Tauri with no Electron-only IPC assumptions. |
-| Browser/webview/automation | Rust/Tauri browser adapter + Go state | Runtime queues browser actions and Tauri exposes provider polling/completion. | Browser tabs, screenshots, downloads, permissions, design mode, and automation run through native adapters with mobile/CLI parity. |
+| Browser/webview/automation | Rust/Tauri browser adapter + Go state | Go persists browser tabs/profiles/permissions/downloads, queues `browser.*` actions, supports profile deletion, and Tauri now bridges runtime profile create/list/delete, download cancellation, `browser.changed` events, and degraded provider registration into the Electron renderer contract. Guest WebView/CDP execution still returns explicit unsupported errors instead of fake success. | Browser tabs, screenshots, downloads, permissions, design mode, action polling/completion, and automation run through native adapters with mobile/CLI parity. |
 | Computer use and emulator | Rust/Zig adapters + Go queues | Native/browser/emulator action queues are exposed through Tauri commands. | Accessibility trees, screenshots, safe actions, and iOS/Android device control work through provider queues. |
-| Updates, release, diagnostics | Tauri updater/release service + Go release plans | Go release plans and Nebutra routes are tracked; Electron updater remains reference. | Tauri signing, notarization, updater manifests, crash reports, release notes, and diagnostics endpoints are release-blocking checks. |
+| Updates, release, diagnostics | Tauri updater/release service + Go release plans | Go release plans and Nebutra routes are tracked; Tauri exposes version/status/update-check errors instead of silent updater no-ops; Electron updater remains reference for download/install. | Tauri signing, notarization, updater manifests, crash reports, release notes, diagnostics endpoints, and real updater download/install are release-blocking checks. |
 
 ## Nebutra web route backfill
 

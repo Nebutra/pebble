@@ -1153,6 +1153,39 @@ func (m *Manager) ListBrowserProfiles() []BrowserProfile {
 	return profiles
 }
 
+func (m *Manager) DeleteBrowserProfile(id string) (BrowserProfile, error) {
+	cleanID := strings.TrimSpace(id)
+	if cleanID == "" {
+		return BrowserProfile{}, ErrNotFound
+	}
+	m.mu.Lock()
+	profile, ok := m.browserProfiles[cleanID]
+	if !ok {
+		m.mu.Unlock()
+		return BrowserProfile{}, ErrNotFound
+	}
+	delete(m.browserProfiles, cleanID)
+	for permissionID, permission := range m.browserPermissions {
+		if permission.ProfileID == cleanID {
+			delete(m.browserPermissions, permissionID)
+		}
+	}
+	for tabID, tab := range m.browserTabs {
+		if tab.ProfileID == cleanID {
+			tab.ProfileID = ""
+			tab.UpdatedAt = time.Now().UTC()
+			m.browserTabs[tabID] = tab
+		}
+	}
+	err := m.saveLocked()
+	m.mu.Unlock()
+	if err != nil {
+		return BrowserProfile{}, err
+	}
+	m.emit("browser.changed", map[string]interface{}{"deleted": profile})
+	return profile, nil
+}
+
 func (m *Manager) SetBrowserPermission(req SetBrowserPermissionRequest) (BrowserPermission, error) {
 	origin := strings.TrimSpace(req.Origin)
 	name := strings.TrimSpace(req.Name)

@@ -151,8 +151,9 @@ Current implementation:
   gateway.
 - Go exposes tab-scoped browser command queuing so desktop, CLI, and mobile callers all create the
   same provider-consumable `browser.*` actions.
-- Go persists browser profiles, per-origin permissions, and download lifecycle records so native
-  browser adapters can report state without coupling to Electron WebContents.
+- Go persists browser profiles, supports browser profile deletion, clears profile-scoped
+  permissions, falls tabs back to the default profile, and stores download lifecycle records so
+  native browser adapters can report state without coupling to Electron WebContents.
 - Go queues explicit `browser.download` provider actions from download records so binary transfer
   execution stays in the native adapter boundary.
 - CLI/provider callers can report browser download filename, path, byte progress, and error
@@ -160,8 +161,11 @@ Current implementation:
 - Go records browser screenshot references and exposes `browser.screenshot` provider commands;
   CLI/provider callers can report screenshot URI metadata, while binary capture remains in the
   native adapter boundary.
-- Rust/Tauri expose a browser provider bridge that claims only `browser.*` runtime actions and
-  reports completion through the shared computer-action endpoint.
+- Rust/Tauri expose browser action poll/update commands that claim only `browser.*` runtime actions
+  and report completion through the shared computer-action endpoint.
+- The Tauri desktop shell bridges runtime browser profiles, download cancellation, and
+  `browser.changed` events into the existing Electron renderer contract, while registering a
+  degraded browser provider until native WebView/CDP execution is available.
 - Rust/Tauri can register the desktop browser action bridge with `/v1/providers`, so runtime,
   desktop, and mobile projections show whether the native bridge is online; the desktop shell
   refreshes registration while connected so stale persisted providers do not claim readiness.
@@ -278,10 +282,34 @@ Current implementation:
 
 - `desktop-tauri` imports the root `@/App` renderer and root renderer stylesheet so shell migration
   does not fork the workbench UI into a mock or reduced surface.
+- The Tauri shell is required to preserve pixel parity with the Electron reference; copied TSX is
+  acceptable only when it is a deliberate migration step toward the same product surface, not a
+  placeholder or simplified alternate UI.
 - Tauri uses Pebble product identity and the Electron fallback window dimensions as the current
   baseline for pixel-level parity.
+- Tauri installs renderer-side native shell bridges for window close guards, maximize/fullscreen
+  state, native menu construction, titlebar menu popup, app-menu paste, help/settings events,
+  sidebar toggles, Appearance menu settings state, and zoom routed through the same renderer
+  callbacks Electron uses.
+- Tauri replaces the web shell no-ops with native Rust commands for validated file-manager reveal,
+  external editor/default app launch, URL/file URI open, path existence checks, attachment/image/
+  audio/directory pickers, repo-icon PNG import, and no-overwrite file copy.
+- Tauri wraps the web-compatible settings and UI state APIs with renderer-visible change events so
+  menu actions can update the canonical store the same way Electron main-process broadcasts do.
+- Tauri persists pairing-backed remote runtime environments through native Rust commands that read
+  and write `pebble-environments.json`, validate `pebble://pair?...` payloads, redact device
+  secrets from renderer responses, and harden the credential file on supported platforms.
+- Tauri maps workspace-backed renderer `pty` calls onto Go runtime process sessions for the
+  migration path: spawn starts `/v1/sessions`, input writes `/input`, output/status events feed the
+  renderer through the existing `pty.onData`/`pty.onExit` contract, and stop maps to session delete.
+  This is a fallback bridge, not the final Zig-backed PTY implementation.
+- Tauri exposes updater version/status events and menu-triggered check errors so updater surfaces no
+  longer silently no-op; actual Tauri updater download/install remains owned by the release/update
+  service gate.
 - `verify-tauri-mainline.mjs` checks the renderer entry, preload bridge, Vite aliasing, CSS source,
-  Tauri identity, window bounds, and Roadmap commitment before shell changes are accepted.
+  Tauri identity, window bounds, native window/menu/settings/shell bridges, runtime PTY fallback,
+  remote runtime environment store commands, updater status bridge, browser runtime bridge, local
+  mock-UI drift, and Roadmap commitment before shell changes are accepted.
 
 ## Migration Rule
 

@@ -9,15 +9,15 @@ use pebble_rust_host::{
     read_runtime_events as read_runtime_events_boundary,
     register_native_provider as register_native_provider_boundary,
     update_browser_action as update_browser_action_boundary,
-    update_emulator_action as update_emulator_action_boundary, BrowserActionPollCommand,
-    BrowserActionUpdateCommand, EmulatorActionPollCommand, EmulatorActionUpdateCommand,
-    NativeActionCompletionStatus, NativeActionPollCommand, NativeActionUpdateCommand,
-    NativeProviderRegistrationCommand, RuntimeEventStreamRequest,
+    update_emulator_action as update_emulator_action_boundary, write_runtime_resource,
+    BrowserActionPollCommand, BrowserActionUpdateCommand, EmulatorActionPollCommand,
+    EmulatorActionUpdateCommand, NativeActionCompletionStatus, NativeActionPollCommand,
+    NativeActionUpdateCommand, NativeProviderRegistrationCommand, RuntimeEventStreamRequest,
     RuntimeEventStreamResult as HostRuntimeEventStreamResult, RuntimeResourceGetRequest,
-    RuntimeResourceGetResult as HostRuntimeResourceGetResult, RuntimeStatusProbeRequest,
+    RuntimeResourceGetResult as HostRuntimeResourceGetResult, RuntimeResourceWriteMethod,
+    RuntimeResourceWriteRequest, RuntimeStatusProbeRequest,
     RuntimeStatusProbeResult as HostRuntimeStatusProbeResult, RuntimeTransportState,
-    RuntimeResourceWriteMethod, RuntimeResourceWriteRequest, DEFAULT_RUNTIME_URL,
-    write_runtime_resource,
+    DEFAULT_RUNTIME_URL,
 };
 use serde::{Deserialize, Serialize};
 

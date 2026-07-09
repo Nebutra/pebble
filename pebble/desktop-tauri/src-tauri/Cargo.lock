@@ -2379,9 +2379,11 @@ dependencies = [
 name = "pebble-desktop-tauri"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "pebble-rust-host",
  "rfd",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
 ]

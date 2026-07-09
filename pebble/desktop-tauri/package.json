@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit",
     "verify:mainline": "node ../../config/scripts/verify-tauri-mainline.mjs",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build --ci --bundles app",
+    "tauri:build:all": "tauri build --ci",
+    "tauri:build:no-bundle": "tauri build --ci --no-bundle"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

@@ -1312,6 +1312,54 @@ func TestQueueBrowserCommandRejectsUnknownTabsAndCommands(t *testing.T) {
 	}
 }
 
+func TestBrowserProfileDeleteClearsReferences(t *testing.T) {
+	manager, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile, err := manager.CreateBrowserProfile(CreateBrowserProfileRequest{
+		Name:       "Isolated",
+		Persistent: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tab, err := manager.CreateBrowserTab(CreateBrowserTabRequest{
+		ProfileID: profile.ID,
+		Title:     "Docs",
+		URL:       "https://example.test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.SetBrowserPermission(SetBrowserPermissionRequest{
+		ProfileID: profile.ID,
+		Origin:    "https://example.test",
+		Name:      "camera",
+		State:     BrowserPermissionGranted,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	deleted, err := manager.DeleteBrowserProfile(profile.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted.ID != profile.ID {
+		t.Fatalf("unexpected deleted profile: %#v", deleted)
+	}
+	if got := manager.ListBrowserProfiles(); len(got) != 0 {
+		t.Fatalf("browser profile was not deleted: %#v", got)
+	}
+	if got := manager.ListBrowserPermissions(profile.ID, ""); len(got) != 0 {
+		t.Fatalf("profile permissions were not deleted: %#v", got)
+	}
+	tabs := manager.ListBrowserTabs()
+	if len(tabs) != 1 || tabs[0].ID != tab.ID || tabs[0].ProfileID != "" {
+		t.Fatalf("browser tab did not fall back to the default profile: %#v", tabs)
+	}
+}
+
 func TestBrowserDownloadRejectsInvalidProgress(t *testing.T) {
 	manager, err := NewManager(t.TempDir(), nil)
 	if err != nil {
