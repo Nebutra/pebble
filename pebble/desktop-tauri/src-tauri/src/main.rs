@@ -12,6 +12,7 @@ fn main() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .manage(commands::crash_reports::CrashReportsState::default())
         .manage(commands::diagnostics::DiagnosticsState::default())
         .manage(commands::filesystem_watch::FsWatcherState::default())
@@ -100,7 +101,13 @@ pub fn run() {
             commands::terminal_artifacts::terminal_artifact_read,
             commands::terminal_artifacts::terminal_artifact_write,
             commands::updater::updater_check_latest_release,
-            commands::updater::updater_fetch_changelog_entries
+            commands::updater::updater_fetch_changelog_entries,
+            commands::notifications::show_native_notification,
+            commands::notifications::native_notification_permission,
+            commands::notifications::request_native_notification_permission,
+            commands::cli_registration::cli_install_status,
+            commands::cli_registration::cli_install,
+            commands::cli_registration::cli_remove
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Pebble Tauri desktop shell");
