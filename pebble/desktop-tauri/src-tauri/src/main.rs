@@ -14,6 +14,9 @@ pub fn run() {
     let app = tauri::Builder::default()
         .manage(commands::crash_reports::CrashReportsState::default())
         .manage(commands::diagnostics::DiagnosticsState::default())
+        .manage(commands::filesystem_watch::FsWatcherState::default())
+        .manage(commands::terminal_artifacts::TerminalArtifactsState::default())
+        .manage(commands::runtime_environments::RuntimeEnvironmentSubscriptionsState::default())
         .setup(|app| {
             // Anti-flash background + macOS traffic-light parity with the
             // Electron shell; runs before the webview first paints.
@@ -28,6 +31,9 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::browser_detection::browser_detect_installed_browsers,
+            commands::computer_permissions::computer_permissions_open,
+            commands::computer_permissions::computer_permissions_reset,
+            commands::computer_permissions::computer_permissions_status,
             commands::crash_reports::crash_reports_dismiss,
             commands::crash_reports::crash_reports_format,
             commands::crash_reports::crash_reports_get_latest_pending,
@@ -44,8 +50,13 @@ pub fn run() {
             commands::diagnostics::diagnostics_upload_bundle,
             commands::file_picker::pick_directory,
             commands::file_picker::pick_directories,
+            commands::filesystem_watch::fs_unwatch_worktree,
+            commands::filesystem_watch::fs_watch_worktree,
             commands::git_refs::git_get_base_ref_default,
+            commands::git_refs::git_resolve_mr_start_point,
+            commands::git_refs::git_resolve_pr_start_point,
             commands::git_refs::git_search_base_ref_details,
+            commands::hooks::hooks_create_issue_command_runner,
             commands::preflight::preflight_detect_commands,
             commands::preflight::preflight_probe_auth,
             commands::preflight::preflight_hydrate_shell_path,
@@ -55,6 +66,9 @@ pub fn run() {
             commands::runtime_environments::runtime_environments_list,
             commands::runtime_environments::runtime_environments_remove,
             commands::runtime_environments::runtime_environments_resolve,
+            commands::runtime_environments::runtime_environments_send_subscription_binary,
+            commands::runtime_environments::runtime_environments_subscribe,
+            commands::runtime_environments::runtime_environments_unsubscribe,
             commands::runtime_process::start_runtime_process,
             commands::runtime_process::stop_runtime_process,
             commands::runtime_process::runtime_process_status,
@@ -79,6 +93,10 @@ pub fn run() {
             commands::shell::shell_pick_directory,
             commands::shell::shell_pick_repo_icon_image,
             commands::shell::shell_copy_file,
+            commands::terminal_artifacts::terminal_artifact_grant,
+            commands::terminal_artifacts::terminal_artifact_preview,
+            commands::terminal_artifacts::terminal_artifact_read,
+            commands::terminal_artifacts::terminal_artifact_write,
             commands::updater::updater_check_latest_release
         ])
         .build(tauri::generate_context!())

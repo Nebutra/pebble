@@ -1,24 +1,30 @@
-#[cfg(windows)]
-use std::{env, process::Command};
 use std::{
+    collections::HashMap,
     fs,
     io::Write,
     path::{Path, PathBuf},
+    sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
 };
+#[cfg(windows)]
+use std::{env, process::Command};
 
 use base64::{
-    engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD},
+    engine::general_purpose::{STANDARD, URL_SAFE, URL_SAFE_NO_PAD},
     Engine as _,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
-use super::remote_runtime_rpc::{call_remote_runtime, RemoteRuntimePairing};
+use super::remote_runtime_rpc::{
+    call_remote_runtime, subscribe_remote_runtime_request, RemoteRuntimePairing,
+    RemoteRuntimeSubscription, RemoteRuntimeSubscriptionCallbacks,
+};
 
 const ENVIRONMENTS_FILE: &str = "pebble-environments.json";
 const PAIRING_OFFER_VERSION: u8 = 2;
+pub const RUNTIME_ENVIRONMENT_SUBSCRIPTION_EVENT: &str = "pebble:runtime-environment-subscription";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,6 +50,31 @@ pub struct RuntimeEnvironmentCallInput {
     timeout_ms: Option<u64>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeEnvironmentSubscribeInput {
+    selector: String,
+    method: String,
+    #[serde(default)]
+    params: Option<Value>,
+    #[serde(default)]
+    timeout_ms: Option<u64>,
+    subscription_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeEnvironmentUnsubscribeInput {
+    subscription_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeEnvironmentSubscriptionBinaryInput {
+    subscription_id: String,
+    bytes_base64: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeEnvironmentResult {
@@ -60,6 +91,35 @@ pub struct RuntimeEnvironmentRemovedResult {
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeEnvironmentDisconnectedResult {
     disconnected: PublicKnownRuntimeEnvironment,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeEnvironmentSubscribeResult {
+    subscription_id: String,
+    request_id: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeEnvironmentUnsubscribeResult {
+    unsubscribed: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeEnvironmentSubscriptionBinaryResult {
+    sent: bool,
+}
+
+#[derive(Default)]
+pub struct RuntimeEnvironmentSubscriptionsState {
+    subscriptions: Mutex<HashMap<String, RuntimeEnvironmentSubscriptionEntry>>,
+}
+
+struct RuntimeEnvironmentSubscriptionEntry {
+    environment_id: String,
+    subscription: RemoteRuntimeSubscription,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -185,6 +245,7 @@ pub fn runtime_environments_resolve(
 #[tauri::command]
 pub fn runtime_environments_remove(
     app: tauri::AppHandle,
+    state: tauri::State<'_, RuntimeEnvironmentSubscriptionsState>,
     input: RuntimeEnvironmentSelectorInput,
 ) -> Result<RuntimeEnvironmentRemovedResult, String> {
     let path = environment_store_path(&app)?;
@@ -194,6 +255,7 @@ pub fn runtime_environments_remove(
         .environments
         .retain(|environment| environment.id != removed.id);
     write_store(&path, &store)?;
+    close_runtime_environment_subscriptions_for_id(&state, &removed.id)?;
     Ok(RuntimeEnvironmentRemovedResult {
         removed: redact_environment(&removed),
     })
@@ -202,10 +264,12 @@ pub fn runtime_environments_remove(
 #[tauri::command]
 pub fn runtime_environments_disconnect(
     app: tauri::AppHandle,
+    state: tauri::State<'_, RuntimeEnvironmentSubscriptionsState>,
     input: RuntimeEnvironmentSelectorInput,
 ) -> Result<RuntimeEnvironmentDisconnectedResult, String> {
     let store = read_store(&environment_store_path(&app)?)?;
     let environment = resolve_environment(&store, input.selector.trim())?;
+    close_runtime_environment_subscriptions_for_id(&state, &environment.id)?;
     Ok(RuntimeEnvironmentDisconnectedResult {
         disconnected: redact_environment(environment),
     })
@@ -228,6 +292,194 @@ pub async fn runtime_environments_call(
         input.timeout_ms.unwrap_or(15_000),
     )
     .await
+}
+
+#[tauri::command]
+pub async fn runtime_environments_subscribe(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, RuntimeEnvironmentSubscriptionsState>,
+    input: RuntimeEnvironmentSubscribeInput,
+) -> Result<RuntimeEnvironmentSubscribeResult, String> {
+    let subscription_id = input.subscription_id.trim();
+    if subscription_id.is_empty() {
+        return Err("Subscription id is required.".to_string());
+    }
+    let method = input.method.trim();
+    if method.is_empty() {
+        return Err("Runtime method is required.".to_string());
+    }
+    {
+        let subscriptions = state
+            .subscriptions
+            .lock()
+            .map_err(|_| "Runtime subscription state is unavailable.".to_string())?;
+        if subscriptions.contains_key(subscription_id) {
+            return Err("Runtime environment subscription id already exists.".to_string());
+        }
+    }
+
+    let selector = input.selector.trim();
+    let environment_id = resolve_environment_id_for_selector(&app, selector)?;
+    let pairing = runtime_environment_pairing_for_selector(&app, selector)?;
+    let event_subscription_id = subscription_id.to_string();
+    let response_app = app.clone();
+    let response_subscription_id = event_subscription_id.clone();
+    let binary_app = app.clone();
+    let binary_subscription_id = event_subscription_id.clone();
+    let error_app = app.clone();
+    let error_subscription_id = event_subscription_id.clone();
+    let close_app = app.clone();
+    let close_subscription_id = event_subscription_id.clone();
+    let callbacks = RemoteRuntimeSubscriptionCallbacks {
+        on_response: Box::new(move |response| {
+            let _ = response_app.emit(
+                RUNTIME_ENVIRONMENT_SUBSCRIPTION_EVENT,
+                serde_json::json!({
+                    "subscriptionId": response_subscription_id,
+                    "type": "response",
+                    "response": response,
+                }),
+            );
+        }),
+        on_binary: Box::new(move |bytes| {
+            let _ = binary_app.emit(
+                RUNTIME_ENVIRONMENT_SUBSCRIPTION_EVENT,
+                serde_json::json!({
+                    "subscriptionId": binary_subscription_id,
+                    "type": "binary",
+                    "bytesBase64": STANDARD.encode(bytes),
+                }),
+            );
+        }),
+        on_error: Box::new(move |code, message| {
+            let _ = error_app.emit(
+                RUNTIME_ENVIRONMENT_SUBSCRIPTION_EVENT,
+                serde_json::json!({
+                    "subscriptionId": error_subscription_id,
+                    "type": "error",
+                    "code": code,
+                    "message": message,
+                }),
+            );
+        }),
+        on_close: Box::new(move || {
+            if let Some(state) = close_app.try_state::<RuntimeEnvironmentSubscriptionsState>() {
+                let _ = detach_finished_runtime_environment_subscription(
+                    &state,
+                    &close_subscription_id,
+                );
+            }
+            let _ = close_app.emit(
+                RUNTIME_ENVIRONMENT_SUBSCRIPTION_EVENT,
+                serde_json::json!({
+                    "subscriptionId": close_subscription_id,
+                    "type": "close",
+                }),
+            );
+        }),
+    };
+    let subscription = subscribe_remote_runtime_request(
+        pairing,
+        method.to_string(),
+        input.params,
+        input.timeout_ms.unwrap_or(15_000),
+        callbacks,
+    )
+    .await?;
+    let request_id = subscription.request_id.clone();
+    let mut subscriptions = state
+        .subscriptions
+        .lock()
+        .map_err(|_| "Runtime subscription state is unavailable.".to_string())?;
+    if subscriptions.contains_key(subscription_id) {
+        let mut subscription = subscription;
+        subscription.close();
+        return Err("Runtime environment subscription id already exists.".to_string());
+    }
+    subscriptions.insert(
+        subscription_id.to_string(),
+        RuntimeEnvironmentSubscriptionEntry {
+            environment_id,
+            subscription,
+        },
+    );
+    Ok(RuntimeEnvironmentSubscribeResult {
+        subscription_id: subscription_id.to_string(),
+        request_id,
+    })
+}
+
+#[tauri::command]
+pub fn runtime_environments_unsubscribe(
+    state: tauri::State<'_, RuntimeEnvironmentSubscriptionsState>,
+    input: RuntimeEnvironmentUnsubscribeInput,
+) -> Result<RuntimeEnvironmentUnsubscribeResult, String> {
+    let mut subscriptions = state
+        .subscriptions
+        .lock()
+        .map_err(|_| "Runtime subscription state is unavailable.".to_string())?;
+    let removed = subscriptions.remove(input.subscription_id.trim());
+    drop(subscriptions);
+    if let Some(mut entry) = removed {
+        entry.subscription.close();
+        return Ok(RuntimeEnvironmentUnsubscribeResult { unsubscribed: true });
+    }
+    Ok(RuntimeEnvironmentUnsubscribeResult {
+        unsubscribed: false,
+    })
+}
+
+#[tauri::command]
+pub fn runtime_environments_send_subscription_binary(
+    state: tauri::State<'_, RuntimeEnvironmentSubscriptionsState>,
+    input: RuntimeEnvironmentSubscriptionBinaryInput,
+) -> Result<RuntimeEnvironmentSubscriptionBinaryResult, String> {
+    let bytes = STANDARD
+        .decode(input.bytes_base64.trim())
+        .map_err(|_| "Invalid remote subscription binary payload.".to_string())?;
+    let subscriptions = state
+        .subscriptions
+        .lock()
+        .map_err(|_| "Runtime subscription state is unavailable.".to_string())?;
+    let sent = subscriptions
+        .get(input.subscription_id.trim())
+        .map(|entry| entry.subscription.send_binary(bytes))
+        .unwrap_or(false);
+    Ok(RuntimeEnvironmentSubscriptionBinaryResult { sent })
+}
+
+fn close_runtime_environment_subscriptions_for_id(
+    state: &RuntimeEnvironmentSubscriptionsState,
+    environment_id: &str,
+) -> Result<(), String> {
+    let mut subscriptions = state
+        .subscriptions
+        .lock()
+        .map_err(|_| "Runtime subscription state is unavailable.".to_string())?;
+    let ids = subscriptions
+        .iter()
+        .filter_map(|(id, entry)| (entry.environment_id == environment_id).then(|| id.clone()))
+        .collect::<Vec<_>>();
+    for id in ids {
+        if let Some(mut entry) = subscriptions.remove(&id) {
+            entry.subscription.close();
+        }
+    }
+    Ok(())
+}
+
+fn detach_finished_runtime_environment_subscription(
+    state: &RuntimeEnvironmentSubscriptionsState,
+    subscription_id: &str,
+) -> Result<(), String> {
+    let mut subscriptions = state
+        .subscriptions
+        .lock()
+        .map_err(|_| "Runtime subscription state is unavailable.".to_string())?;
+    if let Some(mut entry) = subscriptions.remove(subscription_id) {
+        entry.subscription.detach_finished();
+    }
+    Ok(())
 }
 
 fn environment_store_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -459,6 +711,14 @@ fn runtime_environment_pairing_for_selector(
         device_token: endpoint.device_token.clone(),
         public_key_b64: endpoint.public_key_b64.clone(),
     })
+}
+
+fn resolve_environment_id_for_selector(
+    app: &tauri::AppHandle,
+    selector: &str,
+) -> Result<String, String> {
+    let store = read_store(&environment_store_path(app)?)?;
+    Ok(resolve_environment(&store, selector)?.id.clone())
 }
 
 fn redact_environment(environment: &KnownRuntimeEnvironment) -> PublicKnownRuntimeEnvironment {
