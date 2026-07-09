@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/tsekaluk/pebble/go-runtime/internal/runtimecore"
 )
@@ -1403,10 +1404,16 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	defer s.manager.Unsubscribe(id)
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
+	// Keep idle connections (and any proxy in the SSH path) alive when no events flow.
+	heartbeat := time.NewTicker(eventStreamHeartbeatInterval)
+	defer heartbeat.Stop()
 	for {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-heartbeat.C:
+			_, _ = io.WriteString(w, ": heartbeat\n\n")
+			flusher.Flush()
 		case event, ok := <-ch:
 			if !ok {
 				return

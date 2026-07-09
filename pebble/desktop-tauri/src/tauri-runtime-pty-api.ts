@@ -1,26 +1,27 @@
 import type { PreloadApi } from '../../../src/preload/api-types'
 import type { Worktree } from '../../../src/shared/types'
 import {
-  createRuntimeEventStreamCommand,
   createRuntimeResourceGetCommand,
   createRuntimeResourceRequestCommand,
   getRuntimeResourceJson,
-  readRuntimeEventStream,
   requestRuntimeResourceJson
 } from './runtime-bridge'
-import type { RuntimeEventStreamEntry, RuntimeResourceGetResult } from './runtime-command-shapes'
+import type { RuntimeResourceGetResult } from './runtime-command-shapes'
 import {
-  emitRuntimeAgentSessionStatus,
   markRuntimeAgentSessionStopped,
   recordRuntimeAgentSessionSpawn,
   type TauriRuntimeAgentSession
 } from './tauri-agent-status-api'
+import {
+  addRuntimePtyDataListener,
+  addRuntimePtyExitListener,
+  configureRuntimePtyEventExit,
+  ensureRuntimePtyEventDelivery
+} from './tauri-runtime-pty-events'
 
 type PtyApi = PreloadApi['pty']
 type PtySpawnOptions = Parameters<PtyApi['spawn']>[0]
 type PtySpawnResult = Awaited<ReturnType<PtyApi['spawn']>>
-type PtyData = Parameters<Parameters<PtyApi['onData']>[0]>[0]
-type PtyExit = Parameters<Parameters<PtyApi['onExit']>[0]>[0]
 
 type RuntimeSession = TauriRuntimeAgentSession & {
   id: string
@@ -37,24 +38,19 @@ type RuntimeOutputChunk = {
   content: string
 }
 
-type RuntimeEvent = {
-  topic: string
-  payload?: unknown
-}
-
-const ptyDataListeners = new Set<(data: PtyData) => void>()
-const ptyExitListeners = new Set<(data: PtyExit) => void>()
 const activeRuntimePtyIds = new Set<string>()
-const exitedRuntimePtyIds = new Set<string>()
-const runtimePtySeqById = new Map<string, number>()
 const runtimePtySizeById = new Map<string, { cols: number; rows: number }>()
-let runtimePtyOutputPumpStarted = false
-let runtimePtyStatusPumpStarted = false
 
 export function installTauriRuntimePtyApi(): void {
   if (!hasTauriInternals()) {
     return
   }
+
+  // Push delivery lives in tauri-runtime-pty-events.ts; it calls back on exit so
+  // this module can drop the session's cached size/active state.
+  configureRuntimePtyEventExit((sessionId) => {
+    forgetRuntimePtyState(sessionId)
+  })
 
   const base = window.api.pty
   window.api.pty = {
@@ -84,20 +80,8 @@ export function installTauriRuntimePtyApi(): void {
         title: session.command.join(' ') || 'Terminal'
       })),
     getMainBufferSnapshot: getRuntimePtyBufferSnapshot,
-    onData: (callback) => {
-      ptyDataListeners.add(callback)
-      ensureRuntimePtyEventPumps()
-      return () => {
-        ptyDataListeners.delete(callback)
-      }
-    },
-    onExit: (callback) => {
-      ptyExitListeners.add(callback)
-      ensureRuntimePtyEventPumps()
-      return () => {
-        ptyExitListeners.delete(callback)
-      }
-    }
+    onData: addRuntimePtyDataListener,
+    onExit: addRuntimePtyExitListener
   } satisfies PreloadApi['pty']
 }
 
@@ -123,7 +107,7 @@ async function spawnRuntimePty(opts: PtySpawnOptions): Promise<PtySpawnResult> {
   activeRuntimePtyIds.add(session.id)
   rememberRuntimePtySize(session.id, opts.cols, opts.rows)
   recordRuntimeAgentSessionSpawn({ session, spawnOptions: opts })
-  ensureRuntimePtyEventPumps()
+  ensureRuntimePtyEventDelivery()
   return {
     id: session.id,
     ...(opts.launchConfig ? { launchConfig: opts.launchConfig } : {})
@@ -235,98 +219,7 @@ function rememberRuntimePtySize(
 
 function forgetRuntimePtyState(id: string): void {
   activeRuntimePtyIds.delete(id)
-  runtimePtySeqById.delete(id)
   runtimePtySizeById.delete(id)
-}
-
-function ensureRuntimePtyEventPumps(): void {
-  if (!runtimePtyOutputPumpStarted) {
-    runtimePtyOutputPumpStarted = true
-    void pumpRuntimePtyOutput()
-  }
-  if (!runtimePtyStatusPumpStarted) {
-    runtimePtyStatusPumpStarted = true
-    void pumpRuntimePtyStatus()
-  }
-}
-
-async function pumpRuntimePtyOutput(): Promise<void> {
-  for (;;) {
-    const events = await readRuntimeEvents('session.output')
-    if (events.length === 0) {
-      await delay(1000)
-    }
-    for (const event of events) {
-      const payload = parseRuntimeEventPayload(event)
-      if (!payload) {
-        continue
-      }
-      const payloadBody = readObject(payload.payload)
-      const session = payloadBody.session as RuntimeSession | undefined
-      const chunk = payloadBody.chunk as RuntimeOutputChunk | undefined
-      if (!session?.id || !chunk?.content) {
-        continue
-      }
-      emitRuntimePtyData(session.id, chunk.content)
-    }
-  }
-}
-
-async function pumpRuntimePtyStatus(): Promise<void> {
-  for (;;) {
-    const events = await readRuntimeEvents('session.status')
-    if (events.length === 0) {
-      await delay(1000)
-    }
-    for (const event of events) {
-      const payload = parseRuntimeEventPayload(event)
-      if (!payload) {
-        continue
-      }
-      const payloadBody = readObject(payload.payload)
-      const session = (payloadBody.session ?? payload.payload) as RuntimeSession | undefined
-      if (!session?.id) {
-        continue
-      }
-      emitRuntimeAgentSessionStatus(session)
-      if (
-        session.status === 'exited' ||
-        session.status === 'failed' ||
-        session.status === 'stopped'
-      ) {
-        emitRuntimePtyExit(session)
-      }
-    }
-  }
-}
-
-async function readRuntimeEvents(topic: string): Promise<RuntimeEventStreamEntry[]> {
-  const result = await readRuntimeEventStream(
-    // Why: long blocking SSE reads can starve Tauri's WebKit IPC on macOS; the
-    // Rust side runs off-thread, but short polls still bound event-pump pressure.
-    createRuntimeEventStreamCommand({ topic, limit: 20 })
-  ).catch(() => null)
-  return result?.transport === 'connected' ? result.events : []
-}
-
-function emitRuntimePtyData(id: string, data: string): void {
-  const seq = (runtimePtySeqById.get(id) ?? 0) + data.length
-  runtimePtySeqById.set(id, seq)
-  for (const listener of ptyDataListeners) {
-    listener({ id, data, seq, rawLength: data.length })
-  }
-}
-
-function emitRuntimePtyExit(session: RuntimeSession): void {
-  if (exitedRuntimePtyIds.has(session.id)) {
-    return
-  }
-  exitedRuntimePtyIds.add(session.id)
-  emitRuntimeAgentSessionStatus(session)
-  forgetRuntimePtyState(session.id)
-  for (const listener of ptyExitListeners) {
-    listener({ id: session.id, code: session.exitCode ?? 0 })
-  }
 }
 
 async function listRuntimeSessions(): Promise<RuntimeSession[]> {
@@ -365,20 +258,4 @@ function parseRuntimeResourceResult<T>(result: RuntimeResourceGetResult): T {
     throw new Error(result.body ?? `Runtime request failed with HTTP ${result.httpStatus}`)
   }
   return result.body ? (JSON.parse(result.body) as T) : ({} as T)
-}
-
-function parseRuntimeEventPayload(event: RuntimeEventStreamEntry): RuntimeEvent | null {
-  try {
-    return JSON.parse(event.data) as RuntimeEvent
-  } catch {
-    return null
-  }
-}
-
-function readObject(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms))
 }

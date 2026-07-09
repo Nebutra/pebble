@@ -152,6 +152,60 @@ func TestEventsEndpointStreamsRuntimeEvents(t *testing.T) {
 	}
 }
 
+func TestEventsEndpointEmitsHeartbeatWhenIdle(t *testing.T) {
+	previous := eventStreamHeartbeatInterval
+	eventStreamHeartbeatInterval = 20 * time.Millisecond
+	defer func() { eventStreamHeartbeatInterval = previous }()
+
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testServer := httptest.NewServer(NewServer(manager))
+	defer testServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, testServer.URL+"/v1/events", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	// No events are appended, so only the heartbeat comment should arrive.
+	heartbeats := make(chan string, 1)
+	errs := make(chan error, 1)
+	go func() {
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			if line := scanner.Text(); strings.HasPrefix(line, ":") {
+				heartbeats <- line
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			errs <- err
+			return
+		}
+		errs <- io.EOF
+	}()
+
+	select {
+	case line := <-heartbeats:
+		if !strings.Contains(line, "heartbeat") {
+			t.Fatalf("unexpected heartbeat comment: %q", line)
+		}
+	case err := <-errs:
+		t.Fatalf("event stream failed: %v", err)
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for heartbeat")
+	}
+}
+
 func TestEventsEndpointFiltersByTopic(t *testing.T) {
 	manager, err := runtimecore.NewManager(t.TempDir(), nil)
 	if err != nil {
@@ -1526,6 +1580,102 @@ func TestGitDiffEndpoint(t *testing.T) {
 	}
 	if diff.FilePath != "README.md" || !strings.Contains(diff.Patch, "+two") {
 		t.Fatalf("unexpected diff: %#v", diff)
+	}
+}
+
+func TestGitRepositoryIdentityEndpoint(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git executable is not available")
+	}
+	repo := t.TempDir()
+	runHTTPGitCommand(t, repo, "init")
+	runHTTPGitCommand(t, repo, "remote", "add", "origin", "git@github.com:fork/pebble.git")
+	runHTTPGitCommand(t, repo, "remote", "add", "upstream", "https://github.com/nebutra/pebble.git")
+
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(runtimecore.CreateProjectRequest{Name: "repo", Path: repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := NewServer(manager)
+	body := strings.NewReader(`{"projectId":"` + project.ID + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/source-control/repository-identity", body)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var identity runtimecore.GitRepositoryIdentityResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &identity); err != nil {
+		t.Fatal(err)
+	}
+	if identity.Slug == nil || identity.Slug.Owner != "fork" || identity.Slug.Repo != "pebble" {
+		t.Fatalf("unexpected slug: %#v", identity.Slug)
+	}
+	if identity.Upstream == nil || identity.Upstream.Owner != "nebutra" || identity.Upstream.Repo != "pebble" {
+		t.Fatalf("unexpected upstream: %#v", identity.Upstream)
+	}
+}
+
+func TestGitLocalBranchesAndCheckoutEndpoints(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git executable is not available")
+	}
+	repo := t.TempDir()
+	runHTTPGitCommand(t, repo, "init")
+	runHTTPGitCommand(t, repo, "config", "user.email", "dev@example.test")
+	runHTTPGitCommand(t, repo, "config", "user.name", "Dev")
+	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("one\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runHTTPGitCommand(t, repo, "add", "README.md")
+	runHTTPGitCommand(t, repo, "commit", "-m", "init")
+	runHTTPGitCommand(t, repo, "branch", "-M", "main")
+	runHTTPGitCommand(t, repo, "checkout", "-b", "feature/x")
+
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(runtimecore.CreateProjectRequest{Name: "repo", Path: repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := NewServer(manager)
+	body := strings.NewReader(`{"projectId":"` + project.ID + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/source-control/local-branches", body)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var branches runtimecore.GitLocalBranchesResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &branches); err != nil {
+		t.Fatal(err)
+	}
+	if branches.Current == nil || *branches.Current != "feature/x" {
+		t.Fatalf("unexpected current branch: %#v", branches.Current)
+	}
+	if len(branches.Branches) < 2 || branches.Branches[0] != "feature/x" {
+		t.Fatalf("expected current branch first, got %#v", branches.Branches)
+	}
+
+	checkoutBody := strings.NewReader(`{"projectId":"` + project.ID + `","branch":"main"}`)
+	req = httptest.NewRequest(http.MethodPost, "/v1/source-control/checkout", checkoutBody)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var checkout runtimecore.GitCheckoutResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &checkout); err != nil {
+		t.Fatal(err)
+	}
+	if !checkout.OK || checkout.Branch != "main" {
+		t.Fatalf("unexpected checkout result: %#v", checkout)
 	}
 }
 

@@ -1,6 +1,7 @@
 import type { BrowserApi } from '../../../src/preload/api-types'
 import { createRuntimeEventStreamCommand, readRuntimeEventStream } from './runtime-bridge'
 import type { RuntimeEventStreamEntry } from './runtime-command-shapes'
+import { subscribeRuntimeEventPush } from './tauri-runtime-event-push'
 
 type RuntimeBrowserTab = {
   id: string
@@ -47,6 +48,8 @@ const downloadRequestedListeners = new Set<DownloadRequestedListener>()
 const downloadProgressListeners = new Set<DownloadProgressListener>()
 const downloadFinishedListeners = new Set<DownloadFinishedListener>()
 let browserEventPumpStarted = false
+let browserPollingActive = false
+let browserPollingGeneration = 0
 
 export function registerTauriBrowserGuest(args: Parameters<BrowserApi['registerGuest']>[0]): void {
   guestRegistrations.set(args.browserPageId, {
@@ -102,7 +105,7 @@ export function ensureTauriBrowserRuntimeEventPump(): void {
     return
   }
   browserEventPumpStarted = true
-  void pumpBrowserEvents()
+  void startBrowserEventDelivery()
 }
 
 function subscribe<Callback>(listeners: Set<Callback>, callback: Callback): () => void {
@@ -113,8 +116,45 @@ function subscribe<Callback>(listeners: Set<Callback>, callback: Callback): () =
   }
 }
 
-async function pumpBrowserEvents(): Promise<void> {
-  for (;;) {
+// Prefer the native push pipeline; only fall back to polling when push is unavailable
+// (older runtime, remote/SSH transport that can't stream), so idle sessions do no round trips.
+async function startBrowserEventDelivery(): Promise<void> {
+  const { supported } = await subscribeRuntimeEventPush(
+    (entry) => {
+      if (entry.topic && entry.topic !== 'browser.changed') {
+        return
+      }
+      handleBrowserChangedEvent(entry)
+    },
+    // Push disconnected (or never connected) -> poll; reconnected -> stop polling so a live
+    // stream isn't shadowed by a poller delivering the same browser.changed events twice.
+    (pushActive) => setBrowserPolling(!pushActive)
+  )
+  if (!supported) {
+    setBrowserPolling(true)
+  }
+}
+
+// A generation counter fences the poll loop: enabling bumps it and starts a fresh loop; the
+// old loop sees a stale generation and exits, so a reconnect never leaves a duplicate poller.
+function setBrowserPolling(active: boolean): void {
+  if (active === browserPollingActive) {
+    return
+  }
+  browserPollingActive = active
+  if (!active) {
+    browserPollingGeneration += 1
+    return
+  }
+  void pumpBrowserEvents(browserPollingGeneration)
+}
+
+function isBrowserPollGenerationCurrent(generation: number): boolean {
+  return browserPollingActive && generation === browserPollingGeneration
+}
+
+async function pumpBrowserEvents(generation: number): Promise<void> {
+  while (isBrowserPollGenerationCurrent(generation)) {
     const events = await readRuntimeEvents()
     if (events.length === 0) {
       await delay(1000)

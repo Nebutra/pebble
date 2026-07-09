@@ -3,6 +3,8 @@
 mod commands;
 mod window_chrome;
 
+#[cfg(target_os = "macos")]
+use tauri::ActivationPolicy;
 use tauri::Manager;
 
 fn main() {
@@ -18,11 +20,13 @@ pub fn run() {
         .manage(commands::filesystem_watch::FsWatcherState::default())
         .manage(commands::terminal_artifacts::TerminalArtifactsState::default())
         .manage(commands::runtime_environments::RuntimeEnvironmentSubscriptionsState::default())
+        .manage(commands::runtime_event_stream::RuntimeEventStreamState::default())
         .setup(|app| {
-            // Anti-flash background + macOS traffic-light parity with the
-            // Electron shell; runs before the webview first paints.
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(ActivationPolicy::Regular);
+
             if let Some(window) = app.get_webview_window("main") {
-                window_chrome::apply_window_chrome(&window);
+                apply_main_window_launch_parity(&window);
             }
             Ok(())
         })
@@ -77,6 +81,8 @@ pub fn run() {
             commands::runtime_status::get_runtime_resource_json,
             commands::runtime_status::request_runtime_resource_json,
             commands::runtime_status::read_runtime_event_stream,
+            commands::runtime_event_stream::start_runtime_event_stream,
+            commands::runtime_event_stream::stop_runtime_event_stream,
             commands::runtime_status::poll_native_actions,
             commands::runtime_status::update_native_action,
             commands::runtime_status::poll_browser_actions,
@@ -112,13 +118,37 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("failed to build Pebble Tauri desktop shell");
 
-    app.run(|app_handle, event| {
+    app.run(|app_handle, event| match event {
+        tauri::RunEvent::Ready => {
+            #[cfg(target_os = "macos")]
+            {
+                let _ = app_handle.set_activation_policy(ActivationPolicy::Regular);
+                let _ = app_handle.show();
+            }
+
+            if let Some(window) = app_handle.get_webview_window("main") {
+                apply_main_window_launch_parity(&window);
+            }
+        }
         #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
-        if let tauri::RunEvent::Opened { urls } = event {
+        tauri::RunEvent::Opened { urls } => {
             commands::deep_link::emit_deep_links(
                 app_handle,
                 urls.into_iter().map(|url| url.to_string()),
             );
         }
+        _ => {}
     });
+}
+
+fn apply_main_window_launch_parity(window: &tauri::WebviewWindow) {
+    // Anti-flash background + macOS traffic-light parity with the Electron
+    // shell; setup applies it before first paint, Ready reapplies after AppKit.
+    window_chrome::apply_window_chrome(window);
+    window_chrome::promote_launch_window(window);
+
+    // Dev runs the Tauri binary directly, so explicitly promote the main
+    // window instead of relying on app-bundle activation.
+    let _ = window.show();
+    let _ = window.set_focus();
 }
