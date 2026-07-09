@@ -232,194 +232,243 @@ pub struct NativeProviderRegistrationInput {
 }
 
 #[tauri::command]
-pub fn probe_runtime_status(input: RuntimeStatusProbeCommand) -> RuntimeStatusProbeResult {
-    let timeout_ms = input.timeout_ms.max(1);
+pub async fn probe_runtime_status(
+    input: RuntimeStatusProbeCommand,
+) -> Result<RuntimeStatusProbeResult, String> {
+    run_runtime_boundary(move || {
+        let timeout_ms = input.timeout_ms.max(1);
 
-    let result = probe_runtime_status_boundary(RuntimeStatusProbeRequest::new(
-        input.runtime_url,
-        input.bearer_token,
-        Duration::from_millis(timeout_ms),
-    ));
+        let result = probe_runtime_status_boundary(RuntimeStatusProbeRequest::new(
+            input.runtime_url,
+            input.bearer_token,
+            Duration::from_millis(timeout_ms),
+        ));
 
-    result.into()
+        result.into()
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn get_runtime_resource_json(input: RuntimeResourceGetCommand) -> RuntimeResourceGetResult {
-    let timeout_ms = input.timeout_ms.max(1);
-    let result = get_runtime_resource(RuntimeResourceGetRequest::new(
-        input.runtime_url,
-        input.path,
-        input.bearer_token,
-        Duration::from_millis(timeout_ms),
-    ));
-
-    result.into()
-}
-
-#[tauri::command]
-pub fn request_runtime_resource_json(
-    input: RuntimeResourceRequestCommand,
+pub async fn get_runtime_resource_json(
+    input: RuntimeResourceGetCommand,
 ) -> Result<RuntimeResourceGetResult, String> {
-    let timeout = Duration::from_millis(input.timeout_ms.max(1));
-    let method = input.method.trim().to_ascii_uppercase();
-    let result = match method.as_str() {
-        "GET" => get_runtime_resource(RuntimeResourceGetRequest::new(
+    run_runtime_boundary(move || {
+        let timeout_ms = input.timeout_ms.max(1);
+        let result = get_runtime_resource(RuntimeResourceGetRequest::new(
             input.runtime_url,
             input.path,
             input.bearer_token,
-            timeout,
-        )),
-        "DELETE" | "POST" | "PATCH" => {
-            let write_method = match method.as_str() {
-                "DELETE" => RuntimeResourceWriteMethod::Delete,
-                "POST" => RuntimeResourceWriteMethod::Post,
-                "PATCH" => RuntimeResourceWriteMethod::Patch,
-                _ => unreachable!("method is matched above"),
-            };
-            write_runtime_resource(RuntimeResourceWriteRequest::new(
+            Duration::from_millis(timeout_ms),
+        ));
+
+        result.into()
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn request_runtime_resource_json(
+    input: RuntimeResourceRequestCommand,
+) -> Result<RuntimeResourceGetResult, String> {
+    run_runtime_boundary(move || {
+        let timeout = Duration::from_millis(input.timeout_ms.max(1));
+        let method = input.method.trim().to_ascii_uppercase();
+        let result = match method.as_str() {
+            "GET" => get_runtime_resource(RuntimeResourceGetRequest::new(
                 input.runtime_url,
                 input.path,
-                write_method,
-                input.body_json.unwrap_or_else(|| "{}".to_string()),
                 input.bearer_token,
                 timeout,
-            ))
+            )),
+            "DELETE" | "POST" | "PATCH" => {
+                let write_method = match method.as_str() {
+                    "DELETE" => RuntimeResourceWriteMethod::Delete,
+                    "POST" => RuntimeResourceWriteMethod::Post,
+                    "PATCH" => RuntimeResourceWriteMethod::Patch,
+                    _ => unreachable!("method is matched above"),
+                };
+                write_runtime_resource(RuntimeResourceWriteRequest::new(
+                    input.runtime_url,
+                    input.path,
+                    write_method,
+                    input.body_json.unwrap_or_else(|| "{}".to_string()),
+                    input.bearer_token,
+                    timeout,
+                ))
+            }
+            _ => {
+                return Err(
+                    "runtime resource method must be GET, POST, PATCH, or DELETE".to_string(),
+                )
+            }
+        };
+
+        Ok(result.into())
+    })
+    .await?
+}
+
+#[tauri::command]
+pub async fn read_runtime_event_stream(
+    input: RuntimeEventStreamCommand,
+) -> Result<RuntimeEventStreamResult, String> {
+    run_runtime_boundary(move || {
+        let mut request = RuntimeEventStreamRequest::new(
+            input.runtime_url,
+            input.bearer_token,
+            Duration::from_millis(input.timeout_ms.max(1)),
+            input.limit.clamp(1, 20),
+        );
+        if let Some(topic) = input.topic {
+            request = request.with_topic(topic);
         }
-        _ => return Err("runtime resource method must be GET, POST, PATCH, or DELETE".to_string()),
-    };
+        let result = read_runtime_events_boundary(request);
 
-    Ok(result.into())
+        result.into()
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn read_runtime_event_stream(input: RuntimeEventStreamCommand) -> RuntimeEventStreamResult {
-    let mut request = RuntimeEventStreamRequest::new(
-        input.runtime_url,
-        input.bearer_token,
-        Duration::from_millis(input.timeout_ms.max(1)),
-        input.limit.clamp(1, 20),
-    );
-    if let Some(topic) = input.topic {
-        request = request.with_topic(topic);
-    }
-    let result = read_runtime_events_boundary(request);
+pub async fn poll_native_actions(
+    input: NativeActionPollInput,
+) -> Result<RuntimeResourceGetResult, String> {
+    run_runtime_boundary(move || {
+        let result = poll_native_actions_boundary(NativeActionPollCommand {
+            runtime_url: input.runtime_url,
+            bearer_token: input.bearer_token,
+            timeout_ms: input.timeout_ms.max(1),
+            kind_prefix: input.kind_prefix,
+            limit: input.limit,
+        });
 
-    result.into()
+        result.into()
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn poll_native_actions(input: NativeActionPollInput) -> RuntimeResourceGetResult {
-    let result = poll_native_actions_boundary(NativeActionPollCommand {
-        runtime_url: input.runtime_url,
-        bearer_token: input.bearer_token,
-        timeout_ms: input.timeout_ms.max(1),
-        kind_prefix: input.kind_prefix,
-        limit: input.limit,
-    });
-
-    result.into()
-}
-
-#[tauri::command]
-pub fn update_native_action(
+pub async fn update_native_action(
     input: NativeActionUpdateInput,
 ) -> Result<RuntimeResourceGetResult, String> {
-    let status = match input.status.as_str() {
-        "completed" => NativeActionCompletionStatus::Completed,
-        "failed" => NativeActionCompletionStatus::Failed,
-        _ => return Err("native action status must be completed or failed".to_string()),
-    };
-    let result = pebble_rust_host::update_native_action(NativeActionUpdateCommand {
-        runtime_url: input.runtime_url,
-        bearer_token: input.bearer_token,
-        timeout_ms: input.timeout_ms.max(1),
-        action_id: input.action_id,
-        status,
-        result_json: input.result_json,
-        error_message: input.error_message,
-    });
+    run_runtime_boundary(move || {
+        let status = match input.status.as_str() {
+            "completed" => NativeActionCompletionStatus::Completed,
+            "failed" => NativeActionCompletionStatus::Failed,
+            _ => return Err("native action status must be completed or failed".to_string()),
+        };
+        let result = pebble_rust_host::update_native_action(NativeActionUpdateCommand {
+            runtime_url: input.runtime_url,
+            bearer_token: input.bearer_token,
+            timeout_ms: input.timeout_ms.max(1),
+            action_id: input.action_id,
+            status,
+            result_json: input.result_json,
+            error_message: input.error_message,
+        });
 
-    Ok(result.into())
+        Ok(result.into())
+    })
+    .await?
 }
 
 #[tauri::command]
-pub fn poll_browser_actions(input: BrowserActionPollInput) -> RuntimeResourceGetResult {
-    let result = poll_browser_actions_boundary(BrowserActionPollCommand {
-        runtime_url: input.runtime_url,
-        bearer_token: input.bearer_token,
-        timeout_ms: input.timeout_ms.max(1),
-        limit: input.limit,
-    });
+pub async fn poll_browser_actions(
+    input: BrowserActionPollInput,
+) -> Result<RuntimeResourceGetResult, String> {
+    run_runtime_boundary(move || {
+        let result = poll_browser_actions_boundary(BrowserActionPollCommand {
+            runtime_url: input.runtime_url,
+            bearer_token: input.bearer_token,
+            timeout_ms: input.timeout_ms.max(1),
+            limit: input.limit,
+        });
 
-    result.into()
+        result.into()
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn update_browser_action(
+pub async fn update_browser_action(
     input: BrowserActionUpdateInput,
 ) -> Result<RuntimeResourceGetResult, String> {
-    let status = parse_native_action_status(&input.status)?;
-    let result = update_browser_action_boundary(BrowserActionUpdateCommand {
-        runtime_url: input.runtime_url,
-        bearer_token: input.bearer_token,
-        timeout_ms: input.timeout_ms.max(1),
-        action_id: input.action_id,
-        status,
-        result_json: input.result_json,
-        error_message: input.error_message,
-    });
+    run_runtime_boundary(move || {
+        let status = parse_native_action_status(&input.status)?;
+        let result = update_browser_action_boundary(BrowserActionUpdateCommand {
+            runtime_url: input.runtime_url,
+            bearer_token: input.bearer_token,
+            timeout_ms: input.timeout_ms.max(1),
+            action_id: input.action_id,
+            status,
+            result_json: input.result_json,
+            error_message: input.error_message,
+        });
 
-    Ok(result.into())
+        Ok(result.into())
+    })
+    .await?
 }
 
 #[tauri::command]
-pub fn poll_emulator_actions(input: EmulatorActionPollInput) -> RuntimeResourceGetResult {
-    let result = poll_emulator_actions_boundary(EmulatorActionPollCommand {
-        runtime_url: input.runtime_url,
-        bearer_token: input.bearer_token,
-        timeout_ms: input.timeout_ms.max(1),
-        limit: input.limit,
-    });
+pub async fn poll_emulator_actions(
+    input: EmulatorActionPollInput,
+) -> Result<RuntimeResourceGetResult, String> {
+    run_runtime_boundary(move || {
+        let result = poll_emulator_actions_boundary(EmulatorActionPollCommand {
+            runtime_url: input.runtime_url,
+            bearer_token: input.bearer_token,
+            timeout_ms: input.timeout_ms.max(1),
+            limit: input.limit,
+        });
 
-    result.into()
+        result.into()
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn update_emulator_action(
+pub async fn update_emulator_action(
     input: EmulatorActionUpdateInput,
 ) -> Result<RuntimeResourceGetResult, String> {
-    let status = parse_native_action_status(&input.status)?;
-    let result = update_emulator_action_boundary(EmulatorActionUpdateCommand {
-        runtime_url: input.runtime_url,
-        bearer_token: input.bearer_token,
-        timeout_ms: input.timeout_ms.max(1),
-        action_id: input.action_id,
-        status,
-        result_json: input.result_json,
-        error_message: input.error_message,
-    });
+    run_runtime_boundary(move || {
+        let status = parse_native_action_status(&input.status)?;
+        let result = update_emulator_action_boundary(EmulatorActionUpdateCommand {
+            runtime_url: input.runtime_url,
+            bearer_token: input.bearer_token,
+            timeout_ms: input.timeout_ms.max(1),
+            action_id: input.action_id,
+            status,
+            result_json: input.result_json,
+            error_message: input.error_message,
+        });
 
-    Ok(result.into())
+        Ok(result.into())
+    })
+    .await?
 }
 
 #[tauri::command]
-pub fn register_native_provider(
+pub async fn register_native_provider(
     input: NativeProviderRegistrationInput,
-) -> RuntimeResourceGetResult {
-    let result = register_native_provider_boundary(NativeProviderRegistrationCommand {
-        runtime_url: input.runtime_url,
-        bearer_token: input.bearer_token,
-        timeout_ms: input.timeout_ms.max(1),
-        id: input.id,
-        subsystem: input.subsystem,
-        name: input.name,
-        status: input.status,
-        capabilities: input.capabilities,
-        message: input.message,
-    });
+) -> Result<RuntimeResourceGetResult, String> {
+    run_runtime_boundary(move || {
+        let result = register_native_provider_boundary(NativeProviderRegistrationCommand {
+            runtime_url: input.runtime_url,
+            bearer_token: input.bearer_token,
+            timeout_ms: input.timeout_ms.max(1),
+            id: input.id,
+            subsystem: input.subsystem,
+            name: input.name,
+            status: input.status,
+            capabilities: input.capabilities,
+            message: input.message,
+        });
 
-    result.into()
+        result.into()
+    })
+    .await
 }
 
 impl From<HostRuntimeStatusProbeResult> for RuntimeStatusProbeResult {
@@ -490,6 +539,18 @@ fn default_native_action_limit() -> usize {
 
 fn default_event_limit() -> usize {
     5
+}
+
+async fn run_runtime_boundary<T, F>(operation: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> T + Send + 'static,
+{
+    // Why: Tauri dispatches IPC through WebKit's main URL-scheme path on macOS;
+    // blocking runtime HTTP/SSE reads here freezes pointer and keyboard input.
+    tauri::async_runtime::spawn_blocking(operation)
+        .await
+        .map_err(|error| format!("runtime command worker failed: {}", error))
 }
 
 fn parse_native_action_status(status: &str) -> Result<NativeActionCompletionStatus, String> {

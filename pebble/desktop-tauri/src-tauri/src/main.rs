@@ -10,9 +10,13 @@ fn main() {
 pub fn run() {
     let app = tauri::Builder::default()
         .manage(commands::crash_reports::CrashReportsState::default())
+        .manage(commands::diagnostics::DiagnosticsState::default())
         .manage(commands::runtime_process::RuntimeProcessState::default())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
+            commands::browser_detection::browser_detect_installed_browsers,
             commands::crash_reports::crash_reports_dismiss,
             commands::crash_reports::crash_reports_format,
             commands::crash_reports::crash_reports_get_latest_pending,
@@ -21,6 +25,12 @@ pub fn run() {
             commands::crash_reports::crash_reports_record_renderer_error,
             commands::crash_reports::crash_reports_submit,
             commands::deep_link::deep_link_initial_urls,
+            commands::diagnostics::diagnostics_collect_bundle,
+            commands::diagnostics::diagnostics_delete_bundle,
+            commands::diagnostics::diagnostics_discard_bundle_preview,
+            commands::diagnostics::diagnostics_get_status,
+            commands::diagnostics::diagnostics_open_bundle_preview,
+            commands::diagnostics::diagnostics_upload_bundle,
             commands::file_picker::pick_directory,
             commands::file_picker::pick_directories,
             commands::git_refs::git_get_base_ref_default,
@@ -29,6 +39,7 @@ pub fn run() {
             commands::preflight::preflight_probe_auth,
             commands::preflight::preflight_hydrate_shell_path,
             commands::runtime_environments::runtime_environments_add_from_pairing_code,
+            commands::runtime_environments::runtime_environments_call,
             commands::runtime_environments::runtime_environments_disconnect,
             commands::runtime_environments::runtime_environments_list,
             commands::runtime_environments::runtime_environments_remove,

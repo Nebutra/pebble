@@ -41,6 +41,12 @@
       "desktop": {
         "schemes": ["pebble"]
       }
+    },
+    "updater": {
+      "endpoints": [
+        "https://github.com/nebutra/pebble/releases/latest/download/latest.json"
+      ],
+      "pubkey": "UlNJRzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
     }
   }
 }

@@ -1,8 +1,11 @@
+pub mod browser_detection;
 pub mod crash_reports;
 pub mod deep_link;
+pub mod diagnostics;
 pub mod file_picker;
 pub mod git_refs;
 pub mod preflight;
+pub mod remote_runtime_rpc;
 pub mod runtime_environments;
 pub mod runtime_process;
 pub mod runtime_status;

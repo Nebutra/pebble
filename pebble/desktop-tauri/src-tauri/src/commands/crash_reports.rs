@@ -14,6 +14,12 @@ use serde_json::{json, Map, Value};
 use tauri::Manager;
 use uuid::Uuid;
 
+use super::diagnostics::{
+    collect_crash_diagnostic_bundle_attachment, create_feedback_multipart_form,
+    CrashFeedbackIdentity, CrashReportDiagnosticBundle, DiagnosticsState,
+    FeedbackDiagnosticBundleAttachment,
+};
+
 const CRASH_REPORTS_FILE: &str = "crash-reports.json";
 const FEEDBACK_API_URL: &str = "https://www.nebutra.com/pebble/v1/feedback";
 const MAX_REPORTS: usize = 5;
@@ -27,8 +33,6 @@ const MAX_RENDERER_ERROR_KEY_AGE_MS: u128 = RENDERER_ERROR_DEDUPE_MS * 2;
 const RELATED_CRASH_WINDOW_MS: i128 = 5_000;
 const FEEDBACK_REQUEST_TIMEOUT_SECONDS: u64 = 10;
 const TAURI_ELECTRON_VERSION_SENTINEL: &str = "tauri";
-const DIAGNOSTIC_NOT_UPLOADED_REASON: &str =
-    "diagnostic bundle collection is not wired in Tauri yet";
 const FORMATTED_REPORT_TRUNCATION_SUFFIX: &str =
     "\n\n[Crash report truncated to fit feedback endpoint limits.]";
 
@@ -132,13 +136,6 @@ pub struct CrashReportSubmitInput {
     github_email: Option<String>,
     app_version: String,
     chrome_version: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CrashReportDiagnosticBundle {
-    status: String,
-    reason: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -311,10 +308,16 @@ pub fn crash_reports_format(
 pub async fn crash_reports_submit(
     app: tauri::AppHandle,
     state: tauri::State<'_, CrashReportsState>,
+    _diagnostics_state: tauri::State<'_, DiagnosticsState>,
     input: CrashReportSubmitInput,
 ) -> Result<CrashReportSubmitResult, String> {
     let report = get_requested_report_locked(&app, &state, input.report_id.as_deref())?;
-    let diagnostic_bundle = skipped_diagnostic_bundle(input.include_diagnostic_logs);
+    let diagnostic_upload = collect_crash_diagnostic_bundle_attachment(
+        &app,
+        input.include_diagnostic_logs,
+        &input.app_version,
+    );
+    let diagnostic_bundle = diagnostic_upload.diagnostic_bundle.clone();
     let feedback = match &report {
         Some(report) => {
             format_crash_report_text(report, input.notes.as_deref(), Some(&diagnostic_bundle))
@@ -334,7 +337,7 @@ pub async fn crash_reports_submit(
                 status: None,
                 error: None,
                 report: Some(report.clone()),
-                diagnostic_bundle: Some(diagnostic_bundle),
+                diagnostic_bundle: Some(diagnostic_bundle.clone()),
             });
         }
         if lock_state(&state.submitted_report_ids)?.contains(&report.id) {
@@ -346,7 +349,7 @@ pub async fn crash_reports_submit(
                     status: "sent".to_string(),
                     ..report.clone()
                 }),
-                diagnostic_bundle: Some(diagnostic_bundle),
+                diagnostic_bundle: Some(diagnostic_bundle.clone()),
             });
         }
         if !mark_submission_started(&state, &report.id)? {
@@ -355,12 +358,17 @@ pub async fn crash_reports_submit(
                 status: None,
                 error: Some("Crash report submission already in progress.".to_string()),
                 report: Some(report.clone()),
-                diagnostic_bundle: Some(diagnostic_bundle),
+                diagnostic_bundle: Some(diagnostic_bundle.clone()),
             });
         }
     }
 
-    let result = post_crash_feedback(&input, feedback).await;
+    let result = post_crash_feedback(
+        &input,
+        feedback,
+        diagnostic_upload.feedback_diagnostic_bundle,
+    )
+    .await;
     if let Some(report) = &report {
         mark_submission_finished(&state, &report.id)?;
     }
@@ -388,7 +396,7 @@ pub async fn crash_reports_submit(
                 status: None,
                 error: None,
                 report: sent_report,
-                diagnostic_bundle: Some(diagnostic_bundle),
+                diagnostic_bundle: Some(diagnostic_bundle.clone()),
             })
         }
         Err((status, error)) => Ok(CrashReportSubmitResult {
@@ -396,7 +404,7 @@ pub async fn crash_reports_submit(
             status,
             error: Some(error),
             report,
-            diagnostic_bundle: Some(diagnostic_bundle),
+            diagnostic_bundle: Some(diagnostic_bundle.clone()),
         }),
     }
 }
@@ -615,28 +623,48 @@ fn write_reports(path: &Path, reports: &[CrashReportRecord]) -> Result<(), Strin
 async fn post_crash_feedback(
     input: &CrashReportSubmitInput,
     feedback: String,
+    diagnostic_bundle: Option<FeedbackDiagnosticBundleAttachment>,
 ) -> Result<(), (Option<u16>, String)> {
     let anonymous = input.submit_anonymously.unwrap_or(false);
-    let body = json!({
-        "feedback": feedback,
-        "submissionType": "crash",
-        "githubLogin": if anonymous { None } else { input.github_login.clone() },
-        "githubEmail": if anonymous { None } else { input.github_email.clone() },
-        "appVersion": input.app_version,
-        "platform": current_node_platform(),
-        "osRelease": current_os_release(),
-        "arch": current_node_arch(),
-    });
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(FEEDBACK_REQUEST_TIMEOUT_SECONDS))
         .build()
         .map_err(|error| (None, error.to_string()))?;
-    let response = client
-        .post(FEEDBACK_API_URL)
-        .json(&body)
-        .send()
-        .await
-        .map_err(|error| (None, error.to_string()))?;
+    let request = client.post(FEEDBACK_API_URL);
+    let response = if let Some(diagnostic_bundle) = diagnostic_bundle {
+        let form = create_feedback_multipart_form(
+            feedback,
+            CrashFeedbackIdentity {
+                app_version: &input.app_version,
+                github_login: input.github_login.as_deref(),
+                github_email: input.github_email.as_deref(),
+                submit_anonymously: anonymous,
+            },
+            diagnostic_bundle,
+        )
+        .map_err(|error| (None, error))?;
+        request
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|error| (None, error.to_string()))?
+    } else {
+        let body = json!({
+            "feedback": feedback,
+            "submissionType": "crash",
+            "githubLogin": if anonymous { None } else { input.github_login.clone() },
+            "githubEmail": if anonymous { None } else { input.github_email.clone() },
+            "appVersion": input.app_version,
+            "platform": current_node_platform(),
+            "osRelease": current_os_release(),
+            "arch": current_node_arch(),
+        });
+        request
+            .json(&body)
+            .send()
+            .await
+            .map_err(|error| (None, error.to_string()))?
+    };
     if response.status().is_success() {
         Ok(())
     } else {
@@ -944,11 +972,53 @@ fn append_diagnostic_bundle_lines(
     if let Some(diagnostic_bundle) = diagnostic_bundle {
         lines.push(String::new());
         lines.push("Diagnostic log:".to_string());
-        lines.push("- Status: not uploaded".to_string());
-        lines.push(format!(
-            "- Reason: {}",
-            sanitize_crash_report_string(&diagnostic_bundle.reason, MAX_STRING_DETAIL_LENGTH)
-        ));
+        match diagnostic_bundle.status() {
+            "attached" => {
+                lines.push("- Status: attached".to_string());
+                if let Some(bundle_submission_id) = diagnostic_bundle.bundle_submission_id() {
+                    lines.push(format!(
+                        "- Bundle submission ID: {}",
+                        sanitize_crash_report_string(
+                            bundle_submission_id,
+                            MAX_STRING_DETAIL_LENGTH
+                        )
+                    ));
+                }
+            }
+            "uploaded" => {
+                lines.push("- Status: uploaded".to_string());
+                if let Some(ticket_id) = diagnostic_bundle.ticket_id() {
+                    lines.push(format!(
+                        "- Ticket ID: {}",
+                        sanitize_crash_report_string(ticket_id, MAX_STRING_DETAIL_LENGTH)
+                    ));
+                }
+                if let Some(bundle_submission_id) = diagnostic_bundle.bundle_submission_id() {
+                    lines.push(format!(
+                        "- Bundle submission ID: {}",
+                        sanitize_crash_report_string(
+                            bundle_submission_id,
+                            MAX_STRING_DETAIL_LENGTH
+                        )
+                    ));
+                }
+            }
+            _ => {
+                lines.push("- Status: not uploaded".to_string());
+                if let Some(reason) = diagnostic_bundle.reason() {
+                    lines.push(format!(
+                        "- Reason: {}",
+                        sanitize_crash_report_string(reason, MAX_STRING_DETAIL_LENGTH)
+                    ));
+                }
+            }
+        }
+        if let Some(span_count) = diagnostic_bundle.span_count() {
+            lines.push(format!("- Spans: {span_count}"));
+        }
+        if let Some(bytes) = diagnostic_bundle.bytes() {
+            lines.push(format!("- Bytes: {bytes}"));
+        }
     }
 }
 
@@ -987,18 +1057,6 @@ fn detail_value_to_string(value: &Value) -> String {
         Value::Bool(value) => value.to_string(),
         Value::Null => "null".to_string(),
         _ => String::new(),
-    }
-}
-
-fn skipped_diagnostic_bundle(include_diagnostic_logs: Option<bool>) -> CrashReportDiagnosticBundle {
-    let reason = if include_diagnostic_logs == Some(false) {
-        "diagnostic log upload skipped by user"
-    } else {
-        DIAGNOSTIC_NOT_UPLOADED_REASON
-    };
-    CrashReportDiagnosticBundle {
-        status: "not_uploaded".to_string(),
-        reason: reason.to_string(),
     }
 }
 

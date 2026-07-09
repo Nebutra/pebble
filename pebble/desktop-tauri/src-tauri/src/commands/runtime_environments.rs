@@ -12,7 +12,10 @@ use base64::{
     Engine as _,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tauri::Manager;
+
+use super::remote_runtime_rpc::{call_remote_runtime, RemoteRuntimePairing};
 
 const ENVIRONMENTS_FILE: &str = "pebble-environments.json";
 const PAIRING_OFFER_VERSION: u8 = 2;
@@ -28,6 +31,17 @@ pub struct RuntimeEnvironmentAddInput {
 #[serde(rename_all = "camelCase")]
 pub struct RuntimeEnvironmentSelectorInput {
     selector: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeEnvironmentCallInput {
+    selector: String,
+    method: String,
+    #[serde(default)]
+    params: Option<Value>,
+    #[serde(default)]
+    timeout_ms: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -195,6 +209,25 @@ pub fn runtime_environments_disconnect(
     Ok(RuntimeEnvironmentDisconnectedResult {
         disconnected: redact_environment(environment),
     })
+}
+
+#[tauri::command]
+pub async fn runtime_environments_call(
+    app: tauri::AppHandle,
+    input: RuntimeEnvironmentCallInput,
+) -> Result<Value, String> {
+    let method = input.method.trim();
+    if method.is_empty() {
+        return Err("Runtime method is required.".to_string());
+    }
+    let pairing = runtime_environment_pairing_for_selector(&app, input.selector.trim())?;
+    call_remote_runtime(
+        pairing,
+        method.to_string(),
+        input.params,
+        input.timeout_ms.unwrap_or(15_000),
+    )
+    .await
 }
 
 fn environment_store_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -402,6 +435,30 @@ fn resolve_environment<'a>(
             "Environment name \"{selector}\" is ambiguous; use the environment id."
         )),
     }
+}
+
+fn runtime_environment_pairing_for_selector(
+    app: &tauri::AppHandle,
+    selector: &str,
+) -> Result<RemoteRuntimePairing, String> {
+    let store = read_store(&environment_store_path(app)?)?;
+    let environment = resolve_environment(&store, selector)?;
+    let endpoint = environment
+        .endpoints
+        .iter()
+        .find(|endpoint| endpoint.id == environment.preferred_endpoint_id)
+        .or_else(|| {
+            environment
+                .endpoints
+                .iter()
+                .find(|endpoint| endpoint.kind == "websocket")
+        })
+        .ok_or_else(|| "Runtime environment has no WebSocket endpoint.".to_string())?;
+    Ok(RemoteRuntimePairing {
+        endpoint: endpoint.endpoint.clone(),
+        device_token: endpoint.device_token.clone(),
+        public_key_b64: endpoint.public_key_b64.clone(),
+    })
 }
 
 fn redact_environment(environment: &KnownRuntimeEnvironment) -> PublicKnownRuntimeEnvironment {
