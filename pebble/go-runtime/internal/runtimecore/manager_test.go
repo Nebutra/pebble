@@ -826,6 +826,46 @@ func TestFileServiceReadsWritesAndBlocksEscapes(t *testing.T) {
 	if read.Content != "hello files\n" {
 		t.Fatalf("unexpected read content: %#v", read)
 	}
+	if err := manager.CreateFile(FileMutationRequest{ProjectID: project.ID, Path: "docs/new.txt"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.CreateDirectory(FileMutationRequest{ProjectID: project.ID, Path: "docs/nested"}); err != nil {
+		t.Fatal(err)
+	}
+	if stat, err := manager.StatFile(ReadFileRequest{ProjectID: project.ID, Path: "docs"}); err != nil || !stat.IsDirectory {
+		t.Fatalf("expected docs directory stat, got %#v err=%v", stat, err)
+	}
+	if err := manager.RenamePath(FileRenameRequest{
+		ProjectID: project.ID,
+		OldPath:   "docs/new.txt",
+		NewPath:   "docs/renamed.txt",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.CopyPath(FileRenameRequest{
+		ProjectID:       project.ID,
+		SourcePath:      "docs/renamed.txt",
+		DestinationPath: "docs/copied.txt",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	listed, err := manager.ListAllFiles(ListAllFilesRequest{ProjectID: project.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if listed.TotalCount < 3 {
+		t.Fatalf("expected created files in list-all result: %#v", listed)
+	}
+	search, err := manager.SearchFiles(FileSearchRequest{ProjectID: project.ID, Query: "hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if search.TotalMatches != 1 || len(search.Files) != 1 {
+		t.Fatalf("unexpected search result: %#v", search)
+	}
+	if err := manager.DeletePath(FileMutationRequest{ProjectID: project.ID, Path: "docs/copied.txt"}); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := manager.WriteFile(WriteFileRequest{
 		ProjectID: project.ID,
 		Path:      "large.txt",
@@ -2403,6 +2443,107 @@ func TestGitDiffReadsUnstagedPatch(t *testing.T) {
 	}
 	if !strings.Contains(diff.Patch, "-one") || !strings.Contains(diff.Patch, "+two") {
 		t.Fatalf("diff patch did not contain file changes:\n%s", diff.Patch)
+	}
+	contentDiff, err := manager.GitFileDiff(context.Background(), GitFileDiffRequest{
+		ProjectID: project.ID,
+		FilePath:  "README.md",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contentDiff.Kind != "text" ||
+		contentDiff.OriginalContent != "one\n" ||
+		contentDiff.ModifiedContent != "two\n" {
+		t.Fatalf("unexpected content diff: %#v", contentDiff)
+	}
+	if _, err := manager.MutateGit(context.Background(), GitMutationRequest{
+		ProjectID: project.ID,
+		Operation: "stage",
+		FilePath:  "README.md",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	commit, err := manager.MutateGit(context.Background(), GitMutationRequest{
+		ProjectID: project.ID,
+		Operation: "commit",
+		Message:   "update readme",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !commit.Success {
+		t.Fatalf("expected commit to succeed: %#v", commit)
+	}
+	compare, err := manager.GitBranchCompare(context.Background(), GitBranchCompareRequest{
+		ProjectID: project.ID,
+		BaseRef:   "HEAD~1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if compare.Summary.Status != "ready" ||
+		compare.Summary.ChangedFiles != 1 ||
+		len(compare.Entries) != 1 ||
+		compare.Entries[0].Path != "README.md" {
+		t.Fatalf("unexpected branch compare: %#v", compare)
+	}
+	refDiff, err := manager.GitRefFileDiff(context.Background(), GitRefFileDiffRequest{
+		ProjectID: project.ID,
+		LeftRef:   "HEAD~1",
+		RightRef:  "HEAD",
+		FilePath:  "README.md",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refDiff.Kind != "text" ||
+		refDiff.OriginalContent != "one\n" ||
+		refDiff.ModifiedContent != "two\n" {
+		t.Fatalf("unexpected ref file diff: %#v", refDiff)
+	}
+	commitCompare, err := manager.GitCommitCompare(context.Background(), GitCommitCompareRequest{
+		ProjectID: project.ID,
+		CommitID:  "HEAD",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if commitCompare.Summary.Status != "ready" ||
+		commitCompare.Summary.ChangedFiles != 1 ||
+		len(commitCompare.Entries) != 1 ||
+		commitCompare.Entries[0].Path != "README.md" {
+		t.Fatalf("unexpected commit compare: %#v", commitCompare)
+	}
+	history, err := manager.GitHistory(context.Background(), GitHistoryRequest{
+		ProjectID: project.ID,
+		Limit:     10,
+		BaseRef:   "HEAD~1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history.Items) != 2 ||
+		history.CurrentRef == nil ||
+		history.BaseRef == nil ||
+		!history.HasOutgoingChanges {
+		t.Fatalf("unexpected history: %#v", history)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("three\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.MutateGit(context.Background(), GitMutationRequest{
+		ProjectID: project.ID,
+		Operation: "discard",
+		FilePath:  "README.md",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	afterDiscard, err := os.ReadFile(filepath.Join(repo, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(afterDiscard) != "two\n" {
+		t.Fatalf("discard did not restore committed content: %q", string(afterDiscard))
 	}
 }
 

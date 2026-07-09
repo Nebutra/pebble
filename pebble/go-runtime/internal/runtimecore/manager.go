@@ -3,9 +3,11 @@ package runtimecore
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -258,6 +260,59 @@ func (m *Manager) CreateProject(req CreateProjectRequest) (Project, error) {
 	return project, nil
 }
 
+func (m *Manager) CloneProject(ctx context.Context, req CloneProjectRequest) (Project, error) {
+	remoteURL := strings.TrimSpace(req.URL)
+	destination := strings.TrimSpace(req.Destination)
+	if remoteURL == "" || destination == "" {
+		return Project{}, errors.New("clone url and destination are required")
+	}
+	destination, err := normalizeLocalPath(destination)
+	if err != nil {
+		return Project{}, err
+	}
+	if err := os.MkdirAll(destination, 0o755); err != nil {
+		return Project{}, err
+	}
+	repoName, err := cloneProjectNameFromURL(remoteURL)
+	if err != nil {
+		return Project{}, err
+	}
+	clonePath := filepath.Join(destination, repoName)
+	ownedTarget := false
+	if err := os.Mkdir(clonePath, 0o755); err == nil {
+		ownedTarget = true
+	} else if !os.IsExist(err) {
+		return Project{}, err
+	}
+	cloneCtx, cancel := context.WithTimeout(ctx, gitWorktreeCommandLimit)
+	defer cancel()
+	output, err := exec.CommandContext(
+		cloneCtx,
+		"git",
+		"clone",
+		"--progress",
+		"--",
+		remoteURL,
+		clonePath,
+	).CombinedOutput()
+	if err != nil {
+		if ownedTarget {
+			_ = os.RemoveAll(clonePath)
+		}
+		message := strings.TrimSpace(string(output))
+		if message == "" {
+			message = err.Error()
+		}
+		return Project{}, errors.New("Clone failed: " + message)
+	}
+	return m.CreateProject(CreateProjectRequest{
+		Name:         pathBase(clonePath),
+		Path:         clonePath,
+		LocationKind: "local",
+		Provider:     "git",
+	})
+}
+
 func (m *Manager) ListProjects() []Project {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -424,6 +479,7 @@ func (m *Manager) CreateWorktree(ctx context.Context, req CreateWorktreeRequest)
 		if project.LocationKind != "local" {
 			return Worktree{}, ErrRemoteNeedsRelay
 		}
+		createdBaseSHA := resolveGitCommitQuiet(ctx, project.Path, req.Base)
 		args := []string{"-C", project.Path, "worktree", "add"}
 		if req.SkipCheckout {
 			args = append(args, "--no-checkout")
@@ -440,19 +496,21 @@ func (m *Manager) CreateWorktree(ctx context.Context, req CreateWorktreeRequest)
 		if output, err := exec.CommandContext(gitCtx, "git", args...).CombinedOutput(); err != nil {
 			return Worktree{}, errors.New(strings.TrimSpace(string(output)) + ": " + err.Error())
 		}
+		req.CreatedBaseSHA = createdBaseSHA
 	}
 	now := time.Now().UTC()
 	worktree := Worktree{
-		ID:         newID("wt"),
-		InstanceID: newID("wti"),
-		ProjectID:  project.ID,
-		Path:       path,
-		Branch:     strings.TrimSpace(req.Branch),
-		Base:       strings.TrimSpace(req.Base),
-		ReviewKind: strings.TrimSpace(req.ReviewKind),
-		ReviewID:   strings.TrimSpace(req.ReviewID),
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ID:             newID("wt"),
+		InstanceID:     newID("wti"),
+		ProjectID:      project.ID,
+		Path:           path,
+		Branch:         strings.TrimSpace(req.Branch),
+		Base:           strings.TrimSpace(req.Base),
+		CreatedBaseSHA: strings.TrimSpace(req.CreatedBaseSHA),
+		ReviewKind:     strings.TrimSpace(req.ReviewKind),
+		ReviewID:       strings.TrimSpace(req.ReviewID),
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 	m.mu.Lock()
 	m.worktrees[worktree.ID] = worktree
@@ -2376,6 +2434,971 @@ func (m *Manager) GitDiff(ctx context.Context, projectID string, filePath string
 	}, nil
 }
 
+func (m *Manager) GitFileDiff(ctx context.Context, req GitFileDiffRequest) (GitFileDiffResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitFileDiffResult{}, err
+	}
+	cleanFilePath, err := cleanRequiredWorkspaceRelativePath(req.FilePath)
+	if err != nil {
+		return GitFileDiffResult{}, err
+	}
+	cleanFilePath = filepath.ToSlash(cleanFilePath)
+	originalRef := ":" + cleanFilePath
+	if req.Staged || req.CompareAgainstHead {
+		originalRef = "HEAD:" + cleanFilePath
+	}
+	original, _ := readGitBlob(ctx, base, originalRef)
+	if len(original) == 0 && !req.Staged {
+		original, _ = readGitBlob(ctx, base, "HEAD:"+cleanFilePath)
+	}
+	var modified []byte
+	if req.Staged {
+		modified, _ = readGitBlob(ctx, base, ":"+cleanFilePath)
+	} else {
+		if readPath, info, err := resolveExistingWorkspaceFilePath(base, filepath.Join(base, filepath.FromSlash(cleanFilePath))); err == nil && !info.IsDir() {
+			modified, _ = os.ReadFile(readPath)
+		}
+	}
+	originalBinary := isLikelyBinary(original)
+	modifiedBinary := isLikelyBinary(modified)
+	if originalBinary || modifiedBinary {
+		return GitFileDiffResult{
+			Kind:             "binary",
+			OriginalContent:  base64.StdEncoding.EncodeToString(original),
+			ModifiedContent:  base64.StdEncoding.EncodeToString(modified),
+			OriginalIsBinary: originalBinary,
+			ModifiedIsBinary: modifiedBinary,
+		}, nil
+	}
+	return GitFileDiffResult{
+		Kind:             "text",
+		OriginalContent:  string(original),
+		ModifiedContent:  string(modified),
+		OriginalIsBinary: false,
+		ModifiedIsBinary: false,
+	}, nil
+}
+
+func readGitBlob(ctx context.Context, repoPath string, spec string) ([]byte, error) {
+	gitCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
+	defer cancel()
+	output, err := exec.CommandContext(gitCtx, "git", "-C", repoPath, "show", spec).CombinedOutput()
+	if err != nil {
+		return nil, errors.New(strings.TrimSpace(string(output)) + ": " + err.Error())
+	}
+	return output, nil
+}
+
+func (m *Manager) MutateGit(ctx context.Context, req GitMutationRequest) (GitCommitResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitCommitResult{}, err
+	}
+	switch strings.TrimSpace(req.Operation) {
+	case "stage":
+		return GitCommitResult{Success: true}, runGitPathCommand(ctx, base, []string{"add", "--"}, []string{req.FilePath})
+	case "bulkStage":
+		return GitCommitResult{Success: true}, runGitPathCommand(ctx, base, []string{"add", "--"}, req.FilePaths)
+	case "unstage":
+		return GitCommitResult{Success: true}, runGitPathCommand(ctx, base, []string{"restore", "--staged", "--"}, []string{req.FilePath})
+	case "bulkUnstage":
+		return GitCommitResult{Success: true}, runGitPathCommand(ctx, base, []string{"restore", "--staged", "--"}, req.FilePaths)
+	case "discard":
+		return GitCommitResult{Success: true}, discardGitPaths(ctx, base, []string{req.FilePath})
+	case "bulkDiscard":
+		return GitCommitResult{Success: true}, discardGitPaths(ctx, base, req.FilePaths)
+	case "commit":
+		return commitGit(ctx, base, req.Message), nil
+	case "fetch":
+		return GitCommitResult{Success: true}, fetchGit(ctx, base, req)
+	case "pull":
+		return GitCommitResult{Success: true}, pullGit(ctx, base, req)
+	case "push":
+		return GitCommitResult{Success: true}, pushGit(ctx, base, req)
+	case "fastForward":
+		return GitCommitResult{Success: true}, fastForwardGit(ctx, base, req)
+	case "rebaseFromBase":
+		return GitCommitResult{Success: true}, rebaseGitFromBase(ctx, base, req.BaseRef)
+	case "abortMerge":
+		return GitCommitResult{Success: true}, runBoundedGitCommand(ctx, []string{"-C", base, "merge", "--abort"})
+	case "abortRebase":
+		return GitCommitResult{Success: true}, runBoundedGitCommand(ctx, []string{"-C", base, "rebase", "--abort"})
+	default:
+		return GitCommitResult{}, errors.New("unsupported git operation")
+	}
+}
+
+func (m *Manager) GitBaseStatus(ctx context.Context, req GitBaseStatusRequest) (GitBaseStatusResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitBaseStatusResult{}, err
+	}
+	baseRef := strings.TrimSpace(req.BaseRef)
+	createdBaseSHA := strings.TrimSpace(req.CreatedBaseSHA)
+	remote, branch := parseRemoteTrackingBaseRef(ctx, base, baseRef)
+	result := GitBaseStatusResult{
+		Status: "unknown",
+		Base:   baseRef,
+		Remote: remote,
+	}
+	if baseRef == "" || createdBaseSHA == "" {
+		return result, nil
+	}
+	if remote != "" && branch != "" {
+		if err := fetchGit(ctx, base, GitMutationRequest{RemoteName: remote, BranchName: branch}); err != nil {
+			return result, nil
+		}
+	}
+	postFetchSHA, err := readGitOutput(ctx, base, "rev-parse", "--verify", baseRef+"^{commit}")
+	if err != nil {
+		return result, nil
+	}
+	conflict := checkGitRemoteBranchConflict(ctx, base, remote, strings.TrimSpace(req.BranchName))
+	result.Conflict = conflict
+	if postFetchSHA == createdBaseSHA {
+		result.Status = "current"
+		return result, nil
+	}
+	if _, err := readGitOutput(ctx, base, "merge-base", "--is-ancestor", createdBaseSHA, postFetchSHA); err != nil {
+		result.Status = "base_changed"
+		return result, nil
+	}
+	count, err := readGitOutput(ctx, base, "rev-list", "--count", createdBaseSHA+".."+postFetchSHA)
+	if err != nil {
+		return result, nil
+	}
+	behind := parsePositiveInt(count)
+	if behind <= 0 {
+		result.Status = "current"
+		return result, nil
+	}
+	result.Status = "drift"
+	result.Behind = behind
+	if subjects, err := readGitOutput(ctx, base, "log", "--format=%s", "-n", "5", createdBaseSHA+".."+postFetchSHA); err == nil {
+		for _, line := range strings.Split(subjects, "\n") {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				result.RecentSubjects = append(result.RecentSubjects, trimmed)
+			}
+		}
+	}
+	return result, nil
+}
+
+func (m *Manager) GitCheckIgnored(ctx context.Context, req GitCheckIgnoredRequest) ([]string, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return nil, err
+	}
+	cleanPaths, err := cleanGitPathspecs(req.Paths)
+	if err != nil {
+		return nil, err
+	}
+	gitCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
+	defer cancel()
+	command := exec.CommandContext(gitCtx, "git", "-C", base, "check-ignore", "--stdin")
+	command.Stdin = strings.NewReader(strings.Join(cleanPaths, "\n") + "\n")
+	output, err := command.CombinedOutput()
+	text := strings.TrimSpace(string(output))
+	if err != nil {
+		if text == "" {
+			return []string{}, nil
+		}
+		return nil, errors.New(text + ": " + err.Error())
+	}
+	if text == "" {
+		return []string{}, nil
+	}
+	return strings.Split(text, "\n"), nil
+}
+
+func (m *Manager) GitSubmoduleStatus(ctx context.Context, req GitSubmoduleStatusRequest) (GitStatusResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitStatusResult{}, err
+	}
+	submodulePath, err := cleanRequiredWorkspaceRelativePath(req.SubmodulePath)
+	if err != nil {
+		return GitStatusResult{}, err
+	}
+	submoduleRepo, info, err := resolveExistingWorkspaceFilePath(base, filepath.Join(base, submodulePath))
+	if err != nil {
+		return GitStatusResult{}, err
+	}
+	if !info.IsDir() {
+		return GitStatusResult{}, errors.New("submodule path is not a directory")
+	}
+	output, err := readGitOutputRaw(ctx, submoduleRepo, "status", "--short")
+	if err != nil {
+		return GitStatusResult{}, err
+	}
+	return GitStatusResult{
+		Entries:           parseGitStatusEntries(output, strings.TrimSpace(req.Area)),
+		ConflictOperation: "unknown",
+	}, nil
+}
+
+func (m *Manager) GitRemoteFileURL(ctx context.Context, req GitRemoteFileURLRequest) (GitRemoteURLResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitRemoteURLResult{}, err
+	}
+	relativePath, err := cleanRequiredWorkspaceRelativePath(req.RelativePath)
+	if err != nil {
+		return GitRemoteURLResult{}, err
+	}
+	line := req.Line
+	if line <= 0 {
+		line = 1
+	}
+	remoteURL, err := readPrimaryGitRemoteURL(ctx, base)
+	if err != nil {
+		return GitRemoteURLResult{}, nil
+	}
+	branch, err := readGitOutput(ctx, base, "symbolic-ref", "--quiet", "--short", "HEAD")
+	if err != nil || branch == "" {
+		branch, err = readGitOutput(ctx, base, "rev-parse", "--verify", "HEAD")
+		if err != nil {
+			return GitRemoteURLResult{}, nil
+		}
+	}
+	url := buildHostedRemoteFileURL(remoteURL, filepath.ToSlash(relativePath), branch, line)
+	return nullableGitURL(url), nil
+}
+
+func (m *Manager) GitRemoteCommitURL(ctx context.Context, req GitRemoteCommitURLRequest) (GitRemoteURLResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitRemoteURLResult{}, err
+	}
+	sha := strings.TrimSpace(req.SHA)
+	if !isFullGitObjectID(sha) {
+		return GitRemoteURLResult{}, errors.New("sha must be a full git object id")
+	}
+	remoteURL, err := readPrimaryGitRemoteURL(ctx, base)
+	if err != nil {
+		return GitRemoteURLResult{}, nil
+	}
+	url := buildHostedRemoteCommitURL(remoteURL, sha)
+	return nullableGitURL(url), nil
+}
+
+func (m *Manager) GitForkSync(ctx context.Context, req GitForkSyncRequest) (GitForkSyncResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitForkSyncResult{}, err
+	}
+	const originRemote = "origin"
+	const upstreamRemote = "upstream"
+	result := GitForkSyncResult{Status: "blocked", OriginRemote: originRemote, UpstreamRemote: upstreamRemote}
+	if !gitRemoteExists(ctx, base, originRemote) {
+		result.Reason = "missing-origin"
+		return result, nil
+	}
+	if !gitRemoteExists(ctx, base, upstreamRemote) {
+		result.Reason = "missing-upstream"
+		return result, nil
+	}
+	if !gitRemoteMatchesExpectedUpstream(ctx, base, upstreamRemote, req.ExpectedUpstream) {
+		result.Reason = "upstream-mismatch"
+		return result, nil
+	}
+	branchName := resolveGitRemoteDefaultBranch(ctx, base, upstreamRemote)
+	if branchName == "" {
+		result.Reason = "missing-upstream-default-branch"
+		return result, nil
+	}
+	result.BranchName = branchName
+	if !fetchGitRemoteBranch(ctx, base, upstreamRemote, branchName) {
+		result.Reason = "missing-upstream-default-branch"
+		return result, nil
+	}
+	if !fetchGitRemoteBranch(ctx, base, originRemote, branchName) {
+		result.Reason = "missing-origin-branch"
+		return result, nil
+	}
+	upstreamOid, err := readGitOutput(ctx, base, "rev-parse", "--verify", "refs/remotes/"+upstreamRemote+"/"+branchName+"^{commit}")
+	if err != nil {
+		result.Reason = "missing-upstream-default-branch"
+		return result, nil
+	}
+	originOid, err := readGitOutput(ctx, base, "rev-parse", "--verify", "refs/remotes/"+originRemote+"/"+branchName+"^{commit}")
+	if err != nil {
+		result.Reason = "missing-origin-branch"
+		return result, nil
+	}
+	result.Ahead, result.Behind = readGitAheadBehind(ctx, base, originOid+"..."+upstreamOid)
+	if result.Ahead > 0 || !gitIsAncestor(ctx, base, originOid, upstreamOid) {
+		result.Reason = "diverged"
+		return result, nil
+	}
+	if result.Behind == 0 {
+		result.Status = "up-to-date"
+		result.Reason = ""
+		return result, nil
+	}
+	if err := runBoundedGitCommand(ctx, []string{"-C", base, "push", originRemote, upstreamOid + ":refs/heads/" + branchName}); err != nil {
+		return GitForkSyncResult{}, err
+	}
+	_ = fetchGitRemoteBranch(ctx, base, originRemote, branchName)
+	result.Status = "synced"
+	result.Reason = ""
+	return result, nil
+}
+
+func runGitPathCommand(ctx context.Context, repoPath string, prefix []string, paths []string) error {
+	cleanPaths, err := cleanGitPathspecs(paths)
+	if err != nil {
+		return err
+	}
+	args := append([]string{"-C", repoPath}, prefix...)
+	args = append(args, cleanPaths...)
+	return runBoundedGitCommand(ctx, args)
+}
+
+func discardGitPaths(ctx context.Context, repoPath string, paths []string) error {
+	cleanPaths, err := cleanGitPathspecs(paths)
+	if err != nil {
+		return err
+	}
+	restoreArgs := append([]string{"-C", repoPath, "restore", "--worktree", "--"}, cleanPaths...)
+	if err := runBoundedGitCommand(ctx, restoreArgs); err == nil {
+		return nil
+	}
+	cleanArgs := append([]string{"-C", repoPath, "clean", "-fd", "--"}, cleanPaths...)
+	return runBoundedGitCommand(ctx, cleanArgs)
+}
+
+func commitGit(ctx context.Context, repoPath string, message string) GitCommitResult {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return GitCommitResult{Success: false, Error: "commit message is required"}
+	}
+	err := runBoundedGitCommand(ctx, []string{"-C", repoPath, "commit", "-m", message})
+	if err != nil {
+		return GitCommitResult{Success: false, Error: err.Error()}
+	}
+	return GitCommitResult{Success: true}
+}
+
+func fetchGit(ctx context.Context, repoPath string, req GitMutationRequest) error {
+	remoteName := strings.TrimSpace(req.RemoteName)
+	branchName := strings.TrimSpace(req.BranchName)
+	if remoteName != "" && branchName != "" {
+		return runBoundedGitCommand(ctx, []string{"-C", repoPath, "fetch", "--prune", remoteName, branchName})
+	}
+	return runBoundedGitCommand(ctx, []string{"-C", repoPath, "fetch", "--all", "--prune"})
+}
+
+func resolveGitCommitQuiet(ctx context.Context, repoPath string, ref string) string {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return ""
+	}
+	commit, err := readGitOutput(ctx, repoPath, "rev-parse", "--verify", ref+"^{commit}")
+	if err != nil {
+		return ""
+	}
+	return commit
+}
+
+func parseRemoteTrackingBaseRef(ctx context.Context, repoPath string, baseRef string) (string, string) {
+	normalized := strings.TrimPrefix(strings.TrimSpace(baseRef), "refs/remotes/")
+	if normalized == "" || strings.HasPrefix(normalized, "refs/") {
+		return "", ""
+	}
+	remotesOutput, err := readGitOutputRaw(ctx, repoPath, "remote")
+	if err != nil {
+		return "", ""
+	}
+	bestRemote := ""
+	for _, line := range strings.Split(remotesOutput, "\n") {
+		remote := strings.TrimSpace(line)
+		if remote == "" {
+			continue
+		}
+		if (normalized == remote || strings.HasPrefix(normalized, remote+"/")) && len(remote) > len(bestRemote) {
+			bestRemote = remote
+		}
+	}
+	if bestRemote == "" || normalized == bestRemote {
+		return "", ""
+	}
+	return bestRemote, strings.TrimPrefix(normalized, bestRemote+"/")
+}
+
+func checkGitRemoteBranchConflict(ctx context.Context, repoPath string, baseRemote string, branchName string) *GitRemoteBranchConflict {
+	branchName = normalizeLocalBranchRef(branchName)
+	if branchName == "" {
+		return nil
+	}
+	publishRemote := resolveGitPublishRemote(ctx, repoPath, branchName, baseRemote)
+	if publishRemote == "" {
+		return nil
+	}
+	if publishRemote != baseRemote {
+		_ = fetchGit(ctx, repoPath, GitMutationRequest{RemoteName: publishRemote, BranchName: branchName})
+	}
+	if _, err := readGitOutput(ctx, repoPath, "rev-parse", "--verify", "refs/remotes/"+publishRemote+"/"+branchName+"^{commit}"); err != nil {
+		return nil
+	}
+	return &GitRemoteBranchConflict{Remote: publishRemote, BranchName: branchName}
+}
+
+func resolveGitPublishRemote(ctx context.Context, repoPath string, branchName string, baseRemote string) string {
+	for _, key := range []string{"branch." + branchName + ".pushRemote", "remote.pushDefault", "branch." + branchName + ".remote"} {
+		if value, err := readGitOutput(ctx, repoPath, "config", "--get", key); err == nil && strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	if strings.TrimSpace(baseRemote) != "" {
+		return strings.TrimSpace(baseRemote)
+	}
+	return "origin"
+}
+
+func pullGit(ctx context.Context, repoPath string, req GitMutationRequest) error {
+	remoteName := strings.TrimSpace(req.RemoteName)
+	branchName := strings.TrimSpace(req.BranchName)
+	if remoteName != "" && branchName != "" {
+		return runBoundedGitCommand(ctx, []string{"-C", repoPath, "pull", "--ff-only", remoteName, branchName})
+	}
+	return runBoundedGitCommand(ctx, []string{"-C", repoPath, "pull", "--ff-only"})
+}
+
+func pushGit(ctx context.Context, repoPath string, req GitMutationRequest) error {
+	args := []string{"-C", repoPath, "push"}
+	if req.ForceWithLease {
+		args = append(args, "--force-with-lease")
+	}
+	remoteName := strings.TrimSpace(req.RemoteName)
+	branchName := strings.TrimSpace(req.BranchName)
+	if remoteName != "" && branchName != "" {
+		if req.Publish {
+			args = append(args, "-u")
+		}
+		args = append(args, remoteName, "HEAD:"+branchName)
+	}
+	return runBoundedGitCommand(ctx, args)
+}
+
+func fastForwardGit(ctx context.Context, repoPath string, req GitMutationRequest) error {
+	remoteName := strings.TrimSpace(req.RemoteName)
+	branchName := strings.TrimSpace(req.BranchName)
+	if remoteName != "" && branchName != "" {
+		if err := runBoundedGitCommand(ctx, []string{"-C", repoPath, "fetch", "--prune", remoteName, branchName}); err != nil {
+			return err
+		}
+		return runBoundedGitCommand(ctx, []string{"-C", repoPath, "merge", "--ff-only", "FETCH_HEAD"})
+	}
+	return runBoundedGitCommand(ctx, []string{"-C", repoPath, "pull", "--ff-only"})
+}
+
+func rebaseGitFromBase(ctx context.Context, repoPath string, baseRef string) error {
+	baseRef = strings.TrimSpace(baseRef)
+	if baseRef == "" {
+		return errors.New("base ref is required")
+	}
+	return runBoundedGitCommand(ctx, []string{"-C", repoPath, "rebase", baseRef})
+}
+
+func cleanGitPathspecs(paths []string) ([]string, error) {
+	cleanPaths := make([]string, 0, len(paths))
+	for _, path := range paths {
+		cleanPath, err := cleanRequiredWorkspaceRelativePath(path)
+		if err != nil {
+			return nil, err
+		}
+		cleanPaths = append(cleanPaths, filepath.ToSlash(cleanPath))
+	}
+	if len(cleanPaths) == 0 {
+		return nil, errors.New("at least one git path is required")
+	}
+	return cleanPaths, nil
+}
+
+func runBoundedGitCommand(ctx context.Context, args []string) error {
+	gitCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
+	defer cancel()
+	output, err := exec.CommandContext(gitCtx, "git", args...).CombinedOutput()
+	if err != nil {
+		return errors.New(strings.TrimSpace(string(output)) + ": " + err.Error())
+	}
+	return nil
+}
+
+func (m *Manager) GitBranchCompare(ctx context.Context, req GitBranchCompareRequest) (GitBranchCompareResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitBranchCompareResult{}, err
+	}
+	baseRef := strings.TrimSpace(req.BaseRef)
+	result := GitBranchCompareResult{
+		Summary: GitBranchCompareSummary{
+			BaseRef:    baseRef,
+			CompareRef: "HEAD",
+			Status:     "loading",
+		},
+		Entries: []GitBranchChangeEntry{},
+	}
+	headOid, err := readGitOutput(ctx, base, "rev-parse", "--verify", "HEAD^{commit}")
+	if err != nil {
+		result.Summary.Status = "unborn-head"
+		result.Summary.ErrorMessage = "This branch does not have a committed HEAD yet, so compare-to-base is unavailable."
+		return result, nil
+	}
+	result.Summary.HeadOid = headOid
+	baseOid, err := readGitOutput(ctx, base, "rev-parse", "--verify", baseRef+"^{commit}")
+	if err != nil {
+		result.Summary.Status = "invalid-base"
+		result.Summary.ErrorMessage = "Base ref " + baseRef + " could not be resolved in this repository."
+		return result, nil
+	}
+	result.Summary.BaseOid = baseOid
+	mergeBase, err := readGitOutput(ctx, base, "merge-base", baseOid, headOid)
+	if err != nil {
+		result.Summary.Status = "no-merge-base"
+		result.Summary.ErrorMessage = "This branch and " + baseRef + " do not share a merge base, so compare-to-base is unavailable."
+		return result, nil
+	}
+	result.Summary.MergeBase = mergeBase
+	entries, err := readBranchCompareEntries(ctx, base, mergeBase, headOid)
+	if err != nil {
+		result.Summary.Status = "error"
+		result.Summary.ErrorMessage = err.Error()
+		return result, nil
+	}
+	result.Entries = entries
+	result.Summary.ChangedFiles = len(entries)
+	if count, err := readGitOutput(ctx, base, "rev-list", "--count", baseOid+".."+headOid); err == nil {
+		result.Summary.CommitsAhead = parsePositiveInt(count)
+	}
+	result.Summary.Status = "ready"
+	return result, nil
+}
+
+func (m *Manager) GitRefFileDiff(ctx context.Context, req GitRefFileDiffRequest) (GitFileDiffResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitFileDiffResult{}, err
+	}
+	filePath, err := cleanRequiredWorkspaceRelativePath(req.FilePath)
+	if err != nil {
+		return GitFileDiffResult{}, err
+	}
+	leftRef := strings.TrimSpace(req.LeftRef)
+	rightRef := strings.TrimSpace(req.RightRef)
+	if leftRef == "" || rightRef == "" {
+		return GitFileDiffResult{}, errors.New("git diff refs are required")
+	}
+	leftPath := filePath
+	if strings.TrimSpace(req.OldPath) != "" {
+		leftPath, err = cleanRequiredWorkspaceRelativePath(req.OldPath)
+		if err != nil {
+			return GitFileDiffResult{}, err
+		}
+	}
+	left, _ := readGitBlob(ctx, base, leftRef+":"+filepath.ToSlash(leftPath))
+	right, _ := readGitBlob(ctx, base, rightRef+":"+filepath.ToSlash(filePath))
+	originalBinary := isLikelyBinary(left)
+	modifiedBinary := isLikelyBinary(right)
+	if originalBinary || modifiedBinary {
+		return GitFileDiffResult{
+			Kind:             "binary",
+			OriginalContent:  base64.StdEncoding.EncodeToString(left),
+			ModifiedContent:  base64.StdEncoding.EncodeToString(right),
+			OriginalIsBinary: originalBinary,
+			ModifiedIsBinary: modifiedBinary,
+		}, nil
+	}
+	return GitFileDiffResult{
+		Kind:             "text",
+		OriginalContent:  string(left),
+		ModifiedContent:  string(right),
+		OriginalIsBinary: false,
+		ModifiedIsBinary: false,
+	}, nil
+}
+
+func (m *Manager) GitCommitCompare(ctx context.Context, req GitCommitCompareRequest) (GitCommitCompareResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitCommitCompareResult{}, err
+	}
+	commitID := strings.TrimSpace(req.CommitID)
+	result := GitCommitCompareResult{
+		Summary: GitCommitCompareSummary{
+			CompareRef: commitID,
+			BaseRef:    "empty tree",
+			Status:     "ready",
+		},
+		Entries: []GitBranchChangeEntry{},
+	}
+	commitOid, err := readGitOutput(ctx, base, "rev-parse", "--verify", commitID+"^{commit}")
+	if err != nil {
+		result.Summary.Status = "invalid-commit"
+		result.Summary.ErrorMessage = "Commit " + commitID + " could not be resolved in this repository."
+		return result, nil
+	}
+	result.Summary.CommitOid = commitOid
+	result.Summary.CompareRef = shortOid(commitOid)
+	parentOid := ""
+	if line, err := readGitOutput(ctx, base, "rev-list", "--parents", "-n", "1", commitOid); err == nil {
+		parts := strings.Fields(line)
+		if len(parts) > 1 {
+			parentOid = parts[1]
+			result.Summary.ParentOid = parentOid
+			result.Summary.BaseRef = shortOid(parentOid)
+		}
+	}
+	entries, err := readCommitCompareEntries(ctx, base, parentOid, commitOid)
+	if err != nil {
+		result.Summary.Status = "error"
+		result.Summary.ErrorMessage = err.Error()
+		return result, nil
+	}
+	result.Entries = entries
+	result.Summary.ChangedFiles = len(entries)
+	return result, nil
+}
+
+func (m *Manager) GitHistory(ctx context.Context, req GitHistoryRequest) (GitHistoryResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitHistoryResult{}, err
+	}
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	result := GitHistoryResult{Items: []GitHistoryItem{}, Limit: limit}
+	output, err := readGitOutputRaw(
+		ctx,
+		base,
+		"log",
+		"--date=unix",
+		"--pretty=format:%H%x00%P%x00%an%x00%ae%x00%at%x00%s%x1e",
+		"-n",
+		stringFromPositiveInt(limit),
+	)
+	if err != nil {
+		return result, nil
+	}
+	result.Items = parseGitHistoryItems(output)
+	result.HasMore = len(result.Items) >= limit
+	if headOid, err := readGitOutput(ctx, base, "rev-parse", "--verify", "HEAD^{commit}"); err == nil {
+		result.CurrentRef = readCurrentHistoryRef(ctx, base, headOid)
+	}
+	baseRef := strings.TrimSpace(req.BaseRef)
+	if baseRef != "" {
+		if baseOid, err := readGitOutput(ctx, base, "rev-parse", "--verify", baseRef+"^{commit}"); err == nil {
+			result.BaseRef = &GitHistoryItemRef{
+				ID:       baseRef,
+				Name:     baseRef,
+				Revision: baseOid,
+				Category: "branches",
+			}
+			if result.CurrentRef != nil {
+				if mergeBase, err := readGitOutput(ctx, base, "merge-base", baseOid, result.CurrentRef.Revision); err == nil {
+					result.MergeBase = mergeBase
+				}
+				result.HasOutgoingChanges = readGitCommitCount(ctx, base, baseOid+".."+result.CurrentRef.Revision) > 0
+				result.HasIncomingChanges = readGitCommitCount(ctx, base, result.CurrentRef.Revision+".."+baseOid) > 0
+			}
+		}
+	}
+	return result, nil
+}
+
+func parseGitHistoryItems(output string) []GitHistoryItem {
+	records := strings.Split(output, "\x1e")
+	items := make([]GitHistoryItem, 0, len(records))
+	for _, record := range records {
+		record = strings.Trim(record, "\r\n")
+		if record == "" {
+			continue
+		}
+		parts := strings.Split(record, "\x00")
+		if len(parts) < 6 {
+			continue
+		}
+		id := strings.TrimSpace(parts[0])
+		if id == "" {
+			continue
+		}
+		items = append(items, GitHistoryItem{
+			ID:          id,
+			ParentIDs:   strings.Fields(parts[1]),
+			Subject:     parts[5],
+			Message:     parts[5],
+			DisplayID:   shortOid(id),
+			Author:      parts[2],
+			AuthorEmail: parts[3],
+			Timestamp:   int64(parsePositiveInt(parts[4])) * 1000,
+		})
+	}
+	return items
+}
+
+func readCurrentHistoryRef(ctx context.Context, repoPath string, headOid string) *GitHistoryItemRef {
+	branchName, err := readGitOutput(ctx, repoPath, "symbolic-ref", "--quiet", "--short", "HEAD")
+	if err == nil && branchName != "" {
+		return &GitHistoryItemRef{
+			ID:       "refs/heads/" + branchName,
+			Name:     branchName,
+			Revision: headOid,
+			Category: "branches",
+		}
+	}
+	return &GitHistoryItemRef{ID: headOid, Name: shortOid(headOid), Revision: headOid, Category: "commits"}
+}
+
+func readGitCommitCount(ctx context.Context, repoPath string, rangeSpec string) int {
+	count, err := readGitOutput(ctx, repoPath, "rev-list", "--count", rangeSpec)
+	if err != nil {
+		return 0
+	}
+	return parsePositiveInt(count)
+}
+
+func gitRemoteExists(ctx context.Context, repoPath string, remoteName string) bool {
+	output, err := readGitOutputRaw(ctx, repoPath, "remote")
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(output, "\n") {
+		if strings.TrimSpace(line) == remoteName {
+			return true
+		}
+	}
+	return false
+}
+
+func gitRemoteMatchesExpectedUpstream(ctx context.Context, repoPath string, remoteName string, expected GitForkSyncExpectedUpstream) bool {
+	owner := strings.ToLower(strings.TrimSpace(expected.Owner))
+	repo := strings.ToLower(strings.TrimSpace(expected.Repo))
+	if owner == "" || repo == "" {
+		return false
+	}
+	remoteURL, err := readGitOutput(ctx, repoPath, "remote", "get-url", remoteName)
+	if err != nil {
+		return false
+	}
+	remote, ok := parseHostedRemote(remoteURL)
+	if !ok {
+		return false
+	}
+	return strings.ToLower(remote.Path) == owner+"/"+repo
+}
+
+func resolveGitRemoteDefaultBranch(ctx context.Context, repoPath string, remoteName string) string {
+	output, err := readGitOutputRaw(ctx, repoPath, "ls-remote", "--symref", remoteName, "HEAD")
+	if err == nil {
+		for _, line := range strings.Split(output, "\n") {
+			line = strings.TrimSpace(line)
+			const prefix = "ref: refs/heads/"
+			const suffix = " HEAD"
+			if strings.HasPrefix(line, prefix) && strings.HasSuffix(line, suffix) {
+				return strings.TrimSuffix(strings.TrimPrefix(line, prefix), suffix)
+			}
+		}
+	}
+	for _, branch := range []string{"main", "master"} {
+		if fetchGitRemoteBranch(ctx, repoPath, remoteName, branch) {
+			return branch
+		}
+	}
+	return ""
+}
+
+func fetchGitRemoteBranch(ctx context.Context, repoPath string, remoteName string, branchName string) bool {
+	err := runBoundedGitCommand(ctx, []string{"-C", repoPath, "fetch", remoteName, branchName})
+	return err == nil
+}
+
+func readGitAheadBehind(ctx context.Context, repoPath string, rangeSpec string) (int, int) {
+	output, err := readGitOutput(ctx, repoPath, "rev-list", "--left-right", "--count", rangeSpec)
+	if err != nil {
+		return 0, 0
+	}
+	fields := strings.Fields(output)
+	if len(fields) < 2 {
+		return 0, 0
+	}
+	return parsePositiveInt(fields[0]), parsePositiveInt(fields[1])
+}
+
+func gitIsAncestor(ctx context.Context, repoPath string, ancestorOid string, descendantOid string) bool {
+	err := runBoundedGitCommand(ctx, []string{"-C", repoPath, "merge-base", "--is-ancestor", ancestorOid, descendantOid})
+	return err == nil
+}
+
+func stringFromPositiveInt(value int) string {
+	if value <= 0 {
+		return "0"
+	}
+	var digits [20]byte
+	index := len(digits)
+	for value > 0 {
+		index--
+		digits[index] = byte('0' + value%10)
+		value /= 10
+	}
+	return string(digits[index:])
+}
+
+func readCommitCompareEntries(ctx context.Context, repoPath string, parentOid string, commitOid string) ([]GitBranchChangeEntry, error) {
+	if parentOid == "" {
+		output, err := readGitOutputRaw(ctx, repoPath, "diff-tree", "--root", "--name-status", "-r", commitOid)
+		if err != nil {
+			return nil, err
+		}
+		return parseNameStatusEntries(output), nil
+	}
+	return readBranchCompareEntries(ctx, repoPath, parentOid, commitOid)
+}
+
+func readBranchCompareEntries(ctx context.Context, repoPath string, mergeBase string, headOid string) ([]GitBranchChangeEntry, error) {
+	output, err := readGitOutputRaw(ctx, repoPath, "diff", "--name-status", "--find-renames", mergeBase, headOid, "--")
+	if err != nil {
+		return nil, err
+	}
+	return parseNameStatusEntries(output), nil
+}
+
+func parseNameStatusEntries(output string) []GitBranchChangeEntry {
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	entries := make([]GitBranchChangeEntry, 0, len(lines))
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 2 {
+			continue
+		}
+		status := branchChangeStatus(fields[0])
+		if status == "" {
+			continue
+		}
+		entry := GitBranchChangeEntry{Path: fields[len(fields)-1], Status: status}
+		if len(fields) >= 3 && strings.HasPrefix(fields[0], "R") {
+			entry.OldPath = fields[1]
+		}
+		entries = append(entries, entry)
+	}
+	return entries
+}
+
+func parseGitStatusEntries(output string, requestedArea string) []GitStatusEntry {
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	entries := make([]GitStatusEntry, 0, len(lines))
+	for _, line := range lines {
+		if len(line) < 3 {
+			continue
+		}
+		code := line[:2]
+		rawPath := strings.TrimSpace(line[3:])
+		if rawPath == "" {
+			continue
+		}
+		area := "unstaged"
+		statusCode := code[1]
+		if code == "??" {
+			area = "untracked"
+			statusCode = '?'
+		} else if code[0] != ' ' {
+			area = "staged"
+			statusCode = code[0]
+		}
+		if requestedArea != "" && requestedArea != area {
+			continue
+		}
+		path := rawPath
+		oldPath := ""
+		if strings.Contains(rawPath, " -> ") {
+			parts := strings.SplitN(rawPath, " -> ", 2)
+			oldPath = strings.TrimSpace(parts[0])
+			path = strings.TrimSpace(parts[1])
+		}
+		status := gitStatusCodeToStatus(statusCode)
+		if status == "" {
+			continue
+		}
+		entry := GitStatusEntry{Path: path, Status: status, Area: area}
+		if oldPath != "" {
+			entry.OldPath = oldPath
+		}
+		entries = append(entries, entry)
+	}
+	return entries
+}
+
+func gitStatusCodeToStatus(code byte) string {
+	switch code {
+	case '?':
+		return "untracked"
+	case 'A':
+		return "added"
+	case 'D':
+		return "deleted"
+	case 'R':
+		return "renamed"
+	case 'C':
+		return "copied"
+	case 'M', 'T':
+		return "modified"
+	default:
+		return ""
+	}
+}
+
+func branchChangeStatus(status string) string {
+	switch {
+	case strings.HasPrefix(status, "A"):
+		return "added"
+	case strings.HasPrefix(status, "D"):
+		return "deleted"
+	case strings.HasPrefix(status, "R"):
+		return "renamed"
+	case strings.HasPrefix(status, "C"):
+		return "copied"
+	case strings.HasPrefix(status, "M"):
+		return "modified"
+	default:
+		return ""
+	}
+}
+
+func readGitOutput(ctx context.Context, repoPath string, args ...string) (string, error) {
+	output, err := readGitOutputRaw(ctx, repoPath, args...)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(output), nil
+}
+
+func readGitOutputRaw(ctx context.Context, repoPath string, args ...string) (string, error) {
+	gitCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
+	defer cancel()
+	commandArgs := append([]string{"-C", repoPath}, args...)
+	output, err := exec.CommandContext(gitCtx, "git", commandArgs...).CombinedOutput()
+	if err != nil {
+		return "", errors.New(strings.TrimSpace(string(output)) + ": " + err.Error())
+	}
+	return string(output), nil
+}
+
+func shortOid(oid string) string {
+	if len(oid) <= 7 {
+		return oid
+	}
+	return oid[:7]
+}
+
 func (m *Manager) SubsystemStatus(name string) SubsystemStatus {
 	switch name {
 	case "browser":
@@ -2773,6 +3796,19 @@ func pathBase(path string) string {
 		}
 	}
 	return cleaned
+}
+
+func cloneProjectNameFromURL(remoteURL string) (string, error) {
+	source := strings.TrimRight(strings.TrimSpace(remoteURL), `/\`)
+	source = strings.TrimSuffix(source, ".git")
+	name := pathBase(source)
+	if name == "" || name == "." || name == ".." {
+		return "", errors.New("invalid repository name derived from URL")
+	}
+	if strings.ContainsAny(name, `/\`) {
+		return "", errors.New("invalid repository name derived from URL")
+	}
+	return name, nil
 }
 
 func isTaskStatus(status TaskStatus) bool {

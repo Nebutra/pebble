@@ -542,6 +542,27 @@ func (m *Manager) ListMobileRelayPairings() []MobileRelayPairingRecord {
 	return pairings
 }
 
+func (m *Manager) DeleteMobileRelayPairing(deviceID string) (bool, error) {
+	deviceID = strings.TrimSpace(deviceID)
+	if deviceID == "" {
+		return false, errors.New("device id is required")
+	}
+	m.mu.Lock()
+	record, ok := m.mobilePairings[deviceID]
+	if !ok {
+		m.mu.Unlock()
+		return false, nil
+	}
+	delete(m.mobilePairings, deviceID)
+	err := m.saveLocked()
+	m.mu.Unlock()
+	if err != nil {
+		return false, err
+	}
+	m.emit("mobile-relay.changed", map[string]interface{}{"revokedPairing": record})
+	return true, nil
+}
+
 func (m *Manager) MobileRelaySnapshot(kinds []ProjectionKind, outputLimit int) MobileRelayProjectionSnapshot {
 	kinds = NormalizeMobileProjectionKinds(kinds)
 	snapshot := MobileRelayProjectionSnapshot{

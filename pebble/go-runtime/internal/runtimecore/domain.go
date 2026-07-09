@@ -60,6 +60,11 @@ type CreateProjectRequest struct {
 	Provider     string `json:"provider,omitempty"`
 }
 
+type CloneProjectRequest struct {
+	URL         string `json:"url"`
+	Destination string `json:"destination"`
+}
+
 type UpdateProjectRequest struct {
 	Name         string `json:"name,omitempty"`
 	Path         string `json:"path,omitempty"`
@@ -73,16 +78,17 @@ type PersistProjectSortOrderRequest struct {
 }
 
 type Worktree struct {
-	ID          string `json:"id"`
-	InstanceID  string `json:"instanceId,omitempty"`
-	ProjectID   string `json:"projectId"`
-	Path        string `json:"path"`
-	Branch      string `json:"branch,omitempty"`
-	Base        string `json:"base,omitempty"`
-	ReviewKind  string `json:"reviewKind,omitempty"`
-	ReviewID    string `json:"reviewId,omitempty"`
-	DisplayName string `json:"displayName,omitempty"`
-	Comment     string `json:"comment,omitempty"`
+	ID             string `json:"id"`
+	InstanceID     string `json:"instanceId,omitempty"`
+	ProjectID      string `json:"projectId"`
+	Path           string `json:"path"`
+	Branch         string `json:"branch,omitempty"`
+	Base           string `json:"base,omitempty"`
+	CreatedBaseSHA string `json:"createdBaseSha,omitempty"`
+	ReviewKind     string `json:"reviewKind,omitempty"`
+	ReviewID       string `json:"reviewId,omitempty"`
+	DisplayName    string `json:"displayName,omitempty"`
+	Comment        string `json:"comment,omitempty"`
 	// Linked work-item references round-trip losslessly for the desktop renderer.
 	// Pointers preserve the null-vs-unset distinction the renderer relies on.
 	LinkedIssue       *int64            `json:"linkedIssue,omitempty"`
@@ -102,14 +108,15 @@ type Worktree struct {
 }
 
 type CreateWorktreeRequest struct {
-	ProjectID    string `json:"projectId"`
-	Path         string `json:"path"`
-	Branch       string `json:"branch,omitempty"`
-	Base         string `json:"base,omitempty"`
-	ReviewKind   string `json:"reviewKind,omitempty"`
-	ReviewID     string `json:"reviewId,omitempty"`
-	ExecuteGit   bool   `json:"executeGit,omitempty"`
-	SkipCheckout bool   `json:"skipCheckout,omitempty"`
+	ProjectID      string `json:"projectId"`
+	Path           string `json:"path"`
+	Branch         string `json:"branch,omitempty"`
+	Base           string `json:"base,omitempty"`
+	CreatedBaseSHA string `json:"createdBaseSha,omitempty"`
+	ReviewKind     string `json:"reviewKind,omitempty"`
+	ReviewID       string `json:"reviewId,omitempty"`
+	ExecuteGit     bool   `json:"executeGit,omitempty"`
+	SkipCheckout   bool   `json:"skipCheckout,omitempty"`
 }
 
 type UpdateWorktreeRequest struct {
@@ -672,6 +679,224 @@ type GitDiff struct {
 	FilePath  string `json:"filePath,omitempty"`
 	Cached    bool   `json:"cached"`
 	Patch     string `json:"patch"`
+}
+
+type GitFileDiffRequest struct {
+	ProjectID          string `json:"projectId"`
+	WorktreeID         string `json:"worktreeId,omitempty"`
+	FilePath           string `json:"filePath"`
+	Staged             bool   `json:"staged,omitempty"`
+	CompareAgainstHead bool   `json:"compareAgainstHead,omitempty"`
+}
+
+type GitFileDiffResult struct {
+	Kind             string `json:"kind"`
+	OriginalContent  string `json:"originalContent"`
+	ModifiedContent  string `json:"modifiedContent"`
+	OriginalIsBinary bool   `json:"originalIsBinary"`
+	ModifiedIsBinary bool   `json:"modifiedIsBinary"`
+}
+
+type GitMutationRequest struct {
+	ProjectID      string   `json:"projectId"`
+	WorktreeID     string   `json:"worktreeId,omitempty"`
+	Operation      string   `json:"operation"`
+	FilePath       string   `json:"filePath,omitempty"`
+	FilePaths      []string `json:"filePaths,omitempty"`
+	Message        string   `json:"message,omitempty"`
+	RemoteName     string   `json:"remoteName,omitempty"`
+	BranchName     string   `json:"branchName,omitempty"`
+	Publish        bool     `json:"publish,omitempty"`
+	ForceWithLease bool     `json:"forceWithLease,omitempty"`
+	BaseRef        string   `json:"baseRef,omitempty"`
+}
+
+type GitBaseStatusRequest struct {
+	ProjectID      string `json:"projectId"`
+	WorktreeID     string `json:"worktreeId,omitempty"`
+	BaseRef        string `json:"baseRef"`
+	CreatedBaseSHA string `json:"createdBaseSha"`
+	BranchName     string `json:"branchName,omitempty"`
+}
+
+type GitBaseStatusResult struct {
+	Status         string                   `json:"status"`
+	Base           string                   `json:"base"`
+	Remote         string                   `json:"remote,omitempty"`
+	Behind         int                      `json:"behind,omitempty"`
+	RecentSubjects []string                 `json:"recentSubjects,omitempty"`
+	Conflict       *GitRemoteBranchConflict `json:"conflict,omitempty"`
+}
+
+type GitRemoteBranchConflict struct {
+	Remote     string `json:"remote"`
+	BranchName string `json:"branchName"`
+}
+
+type GitCheckIgnoredRequest struct {
+	ProjectID  string   `json:"projectId"`
+	WorktreeID string   `json:"worktreeId,omitempty"`
+	Paths      []string `json:"paths"`
+}
+
+type GitCommitResult struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+type GitStatusEntry struct {
+	Path    string `json:"path"`
+	Status  string `json:"status"`
+	Area    string `json:"area"`
+	Added   int    `json:"added,omitempty"`
+	Removed int    `json:"removed,omitempty"`
+	OldPath string `json:"oldPath,omitempty"`
+}
+
+type GitStatusResult struct {
+	Entries           []GitStatusEntry `json:"entries"`
+	ConflictOperation string           `json:"conflictOperation"`
+}
+
+type GitSubmoduleStatusRequest struct {
+	ProjectID     string `json:"projectId"`
+	WorktreeID    string `json:"worktreeId,omitempty"`
+	SubmodulePath string `json:"submodulePath"`
+	Area          string `json:"area,omitempty"`
+}
+
+type GitRemoteFileURLRequest struct {
+	ProjectID    string `json:"projectId"`
+	WorktreeID   string `json:"worktreeId,omitempty"`
+	RelativePath string `json:"relativePath"`
+	Line         int    `json:"line"`
+}
+
+type GitRemoteCommitURLRequest struct {
+	ProjectID  string `json:"projectId"`
+	WorktreeID string `json:"worktreeId,omitempty"`
+	SHA        string `json:"sha"`
+}
+
+type GitRemoteURLResult struct {
+	URL *string `json:"url"`
+}
+
+type GitForkSyncExpectedUpstream struct {
+	Owner string `json:"owner"`
+	Repo  string `json:"repo"`
+}
+
+type GitForkSyncRequest struct {
+	ProjectID        string                      `json:"projectId"`
+	WorktreeID       string                      `json:"worktreeId,omitempty"`
+	ExpectedUpstream GitForkSyncExpectedUpstream `json:"expectedUpstream"`
+}
+
+type GitForkSyncResult struct {
+	Status         string `json:"status"`
+	Reason         string `json:"reason,omitempty"`
+	OriginRemote   string `json:"originRemote"`
+	UpstreamRemote string `json:"upstreamRemote"`
+	BranchName     string `json:"branchName,omitempty"`
+	Ahead          int    `json:"ahead"`
+	Behind         int    `json:"behind"`
+}
+
+type GitBranchCompareRequest struct {
+	ProjectID  string `json:"projectId"`
+	WorktreeID string `json:"worktreeId,omitempty"`
+	BaseRef    string `json:"baseRef"`
+}
+
+type GitBranchChangeEntry struct {
+	Path    string `json:"path"`
+	Status  string `json:"status"`
+	OldPath string `json:"oldPath,omitempty"`
+}
+
+type GitBranchCompareSummary struct {
+	BaseRef      string `json:"baseRef"`
+	BaseOid      string `json:"baseOid,omitempty"`
+	CompareRef   string `json:"compareRef"`
+	HeadOid      string `json:"headOid,omitempty"`
+	MergeBase    string `json:"mergeBase,omitempty"`
+	ChangedFiles int    `json:"changedFiles"`
+	CommitsAhead int    `json:"commitsAhead,omitempty"`
+	Status       string `json:"status"`
+	ErrorMessage string `json:"errorMessage,omitempty"`
+}
+
+type GitBranchCompareResult struct {
+	Summary GitBranchCompareSummary `json:"summary"`
+	Entries []GitBranchChangeEntry  `json:"entries"`
+}
+
+type GitCommitCompareRequest struct {
+	ProjectID  string `json:"projectId"`
+	WorktreeID string `json:"worktreeId,omitempty"`
+	CommitID   string `json:"commitId"`
+}
+
+type GitCommitCompareSummary struct {
+	CommitOid    string `json:"commitOid"`
+	ParentOid    string `json:"parentOid,omitempty"`
+	CompareRef   string `json:"compareRef"`
+	BaseRef      string `json:"baseRef"`
+	ChangedFiles int    `json:"changedFiles"`
+	Status       string `json:"status"`
+	ErrorMessage string `json:"errorMessage,omitempty"`
+}
+
+type GitCommitCompareResult struct {
+	Summary GitCommitCompareSummary `json:"summary"`
+	Entries []GitBranchChangeEntry  `json:"entries"`
+}
+
+type GitRefFileDiffRequest struct {
+	ProjectID  string `json:"projectId"`
+	WorktreeID string `json:"worktreeId,omitempty"`
+	LeftRef    string `json:"leftRef"`
+	RightRef   string `json:"rightRef"`
+	FilePath   string `json:"filePath"`
+	OldPath    string `json:"oldPath,omitempty"`
+}
+
+type GitHistoryRequest struct {
+	ProjectID  string `json:"projectId"`
+	WorktreeID string `json:"worktreeId,omitempty"`
+	Limit      int    `json:"limit,omitempty"`
+	BaseRef    string `json:"baseRef,omitempty"`
+}
+
+type GitHistoryItemRef struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Revision string `json:"revision,omitempty"`
+	Category string `json:"category,omitempty"`
+}
+
+type GitHistoryItem struct {
+	ID          string              `json:"id"`
+	ParentIDs   []string            `json:"parentIds"`
+	Subject     string              `json:"subject"`
+	Message     string              `json:"message"`
+	DisplayID   string              `json:"displayId,omitempty"`
+	Author      string              `json:"author,omitempty"`
+	AuthorEmail string              `json:"authorEmail,omitempty"`
+	Timestamp   int64               `json:"timestamp,omitempty"`
+	References  []GitHistoryItemRef `json:"references,omitempty"`
+}
+
+type GitHistoryResult struct {
+	Items              []GitHistoryItem   `json:"items"`
+	CurrentRef         *GitHistoryItemRef `json:"currentRef,omitempty"`
+	BaseRef            *GitHistoryItemRef `json:"baseRef,omitempty"`
+	MergeBase          string             `json:"mergeBase,omitempty"`
+	HasIncomingChanges bool               `json:"hasIncomingChanges"`
+	HasOutgoingChanges bool               `json:"hasOutgoingChanges"`
+	HasMore            bool               `json:"hasMore"`
+	Limit              int                `json:"limit"`
 }
 
 type RuntimeEvent struct {

@@ -53,6 +53,24 @@ func (s *Server) handleMobileRelayPairings(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, s.manager.ListMobileRelayPairings())
 }
 
+func (s *Server) handleMobileRelayPairingByDeviceID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	deviceID := strings.TrimPrefix(r.URL.Path, "/v1/mobile-relay/pairings/")
+	if deviceID == "" || strings.Contains(deviceID, "/") {
+		writeError(w, http.StatusBadRequest, "device id is required")
+		return
+	}
+	revoked, err := s.manager.DeleteMobileRelayPairing(deviceID)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"revoked": revoked})
+}
+
 func (s *Server) handleMobileRelayProjection(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")

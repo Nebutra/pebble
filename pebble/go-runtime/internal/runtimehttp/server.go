@@ -65,6 +65,7 @@ func (s *Server) authorize(r *http.Request) bool {
 func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/status", s.handleStatus)
 	s.mux.HandleFunc("/v1/projects", s.handleProjects)
+	s.mux.HandleFunc("/v1/projects/clone", s.handleProjectClone)
 	s.mux.HandleFunc("/v1/projects/", s.handleProjectByID)
 	s.mux.HandleFunc("/v1/worktrees", s.handleWorktrees)
 	s.mux.HandleFunc("/v1/worktrees/branches/force-delete", s.handleForceDeletePreservedBranch)
@@ -90,7 +91,19 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/external-tasks/", s.handleExternalTaskByID)
 	s.mux.HandleFunc("/v1/files/tree", s.handleFileTree)
 	s.mux.HandleFunc("/v1/files/read", s.handleFileRead)
+	s.mux.HandleFunc("/v1/files/read-chunk", s.handleFileReadChunk)
 	s.mux.HandleFunc("/v1/files/write", s.handleFileWrite)
+	s.mux.HandleFunc("/v1/files/write-base64", s.handleFileWriteBase64)
+	s.mux.HandleFunc("/v1/files/create-file", s.handleFileCreate)
+	s.mux.HandleFunc("/v1/files/create-dir", s.handleFileCreateDir)
+	s.mux.HandleFunc("/v1/files/rename", s.handleFileRename)
+	s.mux.HandleFunc("/v1/files/copy", s.handleFileCopy)
+	s.mux.HandleFunc("/v1/files/delete", s.handleFileDelete)
+	s.mux.HandleFunc("/v1/files/stat", s.handleFileStat)
+	s.mux.HandleFunc("/v1/files/list", s.handleFileListAll)
+	s.mux.HandleFunc("/v1/files/search", s.handleFileSearch)
+	s.mux.HandleFunc("/v1/files/markdown", s.handleFileMarkdownDocuments)
+	s.mux.HandleFunc("/v1/files/browse-dir", s.handleFileBrowseServerDir)
 	s.mux.HandleFunc("/v1/files/tree-snapshots", s.handleFileTreeSnapshots)
 	s.mux.HandleFunc("/v1/files/content-snapshots", s.handleFileContentSnapshots)
 	s.mux.HandleFunc("/v1/releases", s.handleReleases)
@@ -100,6 +113,18 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/source-control", s.handleSourceControl)
 	s.mux.HandleFunc("/v1/source-control/projections", s.handleSourceControlProjectionUpdates)
 	s.mux.HandleFunc("/v1/source-control/diff", s.handleGitDiff)
+	s.mux.HandleFunc("/v1/source-control/file-diff", s.handleGitFileDiff)
+	s.mux.HandleFunc("/v1/source-control/ref-file-diff", s.handleGitRefFileDiff)
+	s.mux.HandleFunc("/v1/source-control/mutate", s.handleGitMutation)
+	s.mux.HandleFunc("/v1/source-control/check-ignored", s.handleGitCheckIgnored)
+	s.mux.HandleFunc("/v1/source-control/submodule-status", s.handleGitSubmoduleStatus)
+	s.mux.HandleFunc("/v1/source-control/remote-file-url", s.handleGitRemoteFileURL)
+	s.mux.HandleFunc("/v1/source-control/remote-commit-url", s.handleGitRemoteCommitURL)
+	s.mux.HandleFunc("/v1/source-control/fork-sync", s.handleGitForkSync)
+	s.mux.HandleFunc("/v1/source-control/branch-compare", s.handleGitBranchCompare)
+	s.mux.HandleFunc("/v1/source-control/commit-compare", s.handleGitCommitCompare)
+	s.mux.HandleFunc("/v1/source-control/history", s.handleGitHistory)
+	s.mux.HandleFunc("/v1/source-control/base-status", s.handleGitBaseStatus)
 	s.mux.HandleFunc("/v1/source-control/status", s.handleGitStatus)
 	s.mux.HandleFunc("/v1/browser/tabs", s.handleBrowserTabs)
 	s.mux.HandleFunc("/v1/browser/tabs/", s.handleBrowserTabByID)
@@ -122,6 +147,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/mobile-relay/status", s.handleMobileRelayStatus)
 	s.mux.HandleFunc("/v1/mobile-relay/pairing-codes", s.handleMobileRelayPairingCodes)
 	s.mux.HandleFunc("/v1/mobile-relay/pairings", s.handleMobileRelayPairings)
+	s.mux.HandleFunc("/v1/mobile-relay/pairings/", s.handleMobileRelayPairingByDeviceID)
 	s.mux.HandleFunc("/v1/mobile-relay/projection", s.handleMobileRelayProjection)
 	s.mux.HandleFunc("/v1/mobile-relay", s.handleMobileRelay)
 	s.mux.HandleFunc("/v1/events", s.handleEvents)
@@ -153,6 +179,23 @@ func (s *Server) handleProjects(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+func (s *Server) handleProjectClone(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.CloneProjectRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	project, err := s.manager.CloneProject(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, project)
 }
 
 func (s *Server) handleProjectByID(w http.ResponseWriter, r *http.Request) {
@@ -666,6 +709,210 @@ func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, diff)
+}
+
+func (s *Server) handleGitFileDiff(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitFileDiffRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	diff, err := s.manager.GitFileDiff(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, diff)
+}
+
+func (s *Server) handleGitRefFileDiff(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitRefFileDiffRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	diff, err := s.manager.GitRefFileDiff(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, diff)
+}
+
+func (s *Server) handleGitMutation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitMutationRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.MutateGit(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitBaseStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitBaseStatusRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitBaseStatus(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitCheckIgnored(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitCheckIgnoredRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitCheckIgnored(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitSubmoduleStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitSubmoduleStatusRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitSubmoduleStatus(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitRemoteFileURL(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitRemoteFileURLRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitRemoteFileURL(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitRemoteCommitURL(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitRemoteCommitURLRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitRemoteCommitURL(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitForkSync(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitForkSyncRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitForkSync(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitBranchCompare(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitBranchCompareRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitBranchCompare(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitCommitCompare(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitCommitCompareRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitCommitCompare(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitHistoryRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitHistory(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) handleBrowserTabs(w http.ResponseWriter, r *http.Request) {
