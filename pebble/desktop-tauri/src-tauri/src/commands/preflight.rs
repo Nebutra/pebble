@@ -4,9 +4,8 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::mpsc,
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use serde::{Deserialize, Serialize};
@@ -172,7 +171,7 @@ fn probe_command_auth(command: String) -> PreflightAuthStatus {
 }
 
 fn run_auth_status(command: &str) -> bool {
-    let Some(output) = run_command_with_timeout(command, &["auth", "status"]) else {
+    let Ok(output) = run_command_with_timeout(command, &["auth", "status"]) else {
         return false;
     };
     if output.success {
@@ -193,18 +192,23 @@ struct CommandOutput {
     stderr: String,
 }
 
+enum ProbeFailure {
+    Spawn,
+    Timeout,
+}
+
 /// Spawn a child process and wait at most `PREFLIGHT_COMMAND_TIMEOUT` for it.
-/// Returns `None` when the binary cannot be spawned or the wait times out (the
-/// child is killed). Uses a worker thread + channel because std has no native
-/// bounded `wait`, and we avoid adding a tokio process dependency.
-fn run_command_with_timeout(command: &str, args: &[&str]) -> Option<CommandOutput> {
+/// Polls `try_wait` instead of a blocking `wait` on a helper thread so a hung
+/// probe (e.g. `gh auth status` stuck on a prompt) can be killed and reaped —
+/// no leaked child or zombie — without a tokio process dependency.
+fn run_command_with_timeout(command: &str, args: &[&str]) -> Result<CommandOutput, ProbeFailure> {
     let mut child = Command::new(command)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .ok()?;
+        .map_err(|_| ProbeFailure::Spawn)?;
 
     // Why: drain stdout/stderr on dedicated threads *before* waiting. A verbose
     // rc-file banner or long `auth status` output can otherwise fill a pipe
@@ -212,27 +216,32 @@ fn run_command_with_timeout(command: &str, args: &[&str]) -> Option<CommandOutpu
     let stdout_reader = spawn_pipe_reader(child.stdout.take());
     let stderr_reader = spawn_pipe_reader(child.stderr.take());
 
-    let (tx, rx) = mpsc::channel();
-    let waiter = thread::spawn(move || {
-        let status = child.wait();
-        let stdout = stdout_reader.join().unwrap_or_default();
-        let stderr = stderr_reader.join().unwrap_or_default();
-        let _ = tx.send(status.map(|status| CommandOutput {
-            success: status.success(),
-            stdout,
-            stderr,
-        }));
-    });
-
-    match rx.recv_timeout(PREFLIGHT_COMMAND_TIMEOUT) {
-        Ok(result) => {
-            let _ = waiter.join();
-            result.ok()
+    let deadline = Instant::now() + PREFLIGHT_COMMAND_TIMEOUT;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let stdout = stdout_reader.join().unwrap_or_default();
+                let stderr = stderr_reader.join().unwrap_or_default();
+                return Ok(CommandOutput {
+                    success: status.success(),
+                    stdout,
+                    stderr,
+                });
+            }
+            Ok(None) => {
+                if Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(ProbeFailure::Timeout);
+                }
+                thread::sleep(Duration::from_millis(25));
+            }
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(ProbeFailure::Spawn);
+            }
         }
-        // Why: on timeout the waiter thread still owns the child. It is detached
-        // and will reap the process once the OS eventually terminates it; we
-        // simply report failure rather than block the caller.
-        Err(_) => None,
     }
 }
 
@@ -274,14 +283,15 @@ pub fn preflight_hydrate_shell_path() -> PreflightShellPath {
         return shell_path_failure("no_shell");
     };
     match spawn_shell_and_read_path(&shell) {
-        Some(segments) if !segments.is_empty() => PreflightShellPath {
+        Ok(segments) if !segments.is_empty() => PreflightShellPath {
             segments,
             ok: true,
             path_source: "shell_hydrate",
             path_failure_reason: "none",
         },
-        Some(_) => shell_path_failure("empty_path"),
-        None => shell_path_failure("spawn_error"),
+        Ok(_) => shell_path_failure("empty_path"),
+        Err(ProbeFailure::Timeout) => shell_path_failure("timeout"),
+        Err(ProbeFailure::Spawn) => shell_path_failure("spawn_error"),
     }
 }
 
@@ -310,7 +320,7 @@ fn pick_login_shell() -> Option<String> {
     }
 }
 
-fn spawn_shell_and_read_path(shell: &str) -> Option<Vec<String>> {
+fn spawn_shell_and_read_path(shell: &str) -> Result<Vec<String>, ProbeFailure> {
     // Why: bracketing PATH between delimiters and printing via printf is
     // resilient to rc-file banners/MOTDs; `-ilc` sources login + interactive
     // rc files so we see the same PATH as `which` in a terminal.
@@ -319,7 +329,7 @@ fn spawn_shell_and_read_path(shell: &str) -> Option<Vec<String>> {
         delim = SHELL_PATH_DELIMITER
     );
     let output = run_command_with_timeout(shell, &["-ilc", &script])?;
-    Some(parse_captured_path(&output.stdout))
+    Ok(parse_captured_path(&output.stdout))
 }
 
 fn parse_captured_path(stdout: &str) -> Vec<String> {
