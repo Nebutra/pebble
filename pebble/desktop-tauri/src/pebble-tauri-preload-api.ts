@@ -1,5 +1,7 @@
 import { installWebPreloadApi } from '@/web/web-preload-api'
 
+import { installNativeSettingsStore } from './native-settings-store-bridge'
+
 import type { PreflightStatus, PreloadApi } from '../../../src/preload/api-types'
 import { sanitizeCrashReportDetails } from '../../../src/shared/crash-reporting'
 import type { RuntimeRpcResponse } from '../../../src/shared/runtime-rpc-envelope'
@@ -84,6 +86,9 @@ const nodePlatforms = new Set([
 
 export function installPebbleTauriPreloadApi(): void {
   installWebPreloadApi()
+  // Why: register the native file-backed store before any settings read so the
+  // renderer never persists settings/onboarding/keybindings to localStorage.
+  installNativeSettingsStore()
   void ensurePebbleRuntimeProcess()
 
   const api = window.api

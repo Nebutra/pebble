@@ -83,6 +83,8 @@ pub fn run() {
             commands::runtime_status::poll_emulator_actions,
             commands::runtime_status::update_emulator_action,
             commands::runtime_status::register_native_provider,
+            commands::settings_store::read_settings_document,
+            commands::settings_store::write_settings_document,
             commands::shell::shell_path_exists,
             commands::shell::shell_open_in_file_manager,
             commands::shell::shell_open_in_external_editor,
@@ -97,7 +99,8 @@ pub fn run() {
             commands::terminal_artifacts::terminal_artifact_preview,
             commands::terminal_artifacts::terminal_artifact_read,
             commands::terminal_artifacts::terminal_artifact_write,
-            commands::updater::updater_check_latest_release
+            commands::updater::updater_check_latest_release,
+            commands::updater::updater_fetch_changelog_entries
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Pebble Tauri desktop shell");

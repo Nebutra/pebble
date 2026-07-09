@@ -12,6 +12,7 @@ pub mod remote_runtime_rpc;
 pub mod runtime_environments;
 pub mod runtime_process;
 pub mod runtime_status;
+pub mod settings_store;
 pub mod shell;
 pub mod terminal_artifacts;
 pub mod updater;
