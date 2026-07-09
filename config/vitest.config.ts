@@ -18,6 +18,7 @@ export default defineConfig({
     include: [
       'src/**/*.test.ts',
       'src/**/*.test.tsx',
+      'pebble/desktop-tauri/src/**/*.test.ts',
       'config/scripts/**/*.test.mjs',
       'tests/e2e/**/*.unit.test.ts'
     ],

@@ -101,6 +101,11 @@ import {
 } from '../../../shared/clipboard-image'
 import { sanitizeWebRuntimeWorkspaceSession } from './web-workspace-session'
 import {
+  readPersistentSettingsRaw,
+  subscribePersistentSettings,
+  writePersistentSettingsRaw
+} from './persistent-settings-backend'
+import {
   normalizeFeatureInteractions,
   type FeatureInteractionId,
   type FeatureInteractionState
@@ -895,7 +900,7 @@ function getWebKeybindingSnapshot(): KeybindingFileSnapshot {
   return {
     path: 'Browser local storage',
     platform,
-    exists: window.localStorage.getItem(KEYBINDINGS_STORAGE_KEY) !== null,
+    exists: readPersistentSettingsRaw(KEYBINDINGS_STORAGE_KEY) !== null,
     overrides,
     commonOverrides,
     platformOverrides,
@@ -977,15 +982,12 @@ function createWebKeybindingsApi(): WebKeybindingsApi {
     revealFile: () => Promise.resolve(getWebKeybindingSnapshot()),
     onChanged: (callback) => {
       webKeybindingListeners.add(callback)
-      const onStorage = (event: StorageEvent): void => {
-        if (event.key === KEYBINDINGS_STORAGE_KEY) {
-          callback(getWebKeybindingSnapshot())
-        }
-      }
-      window.addEventListener('storage', onStorage)
+      const unsubscribe = subscribePersistentSettings(KEYBINDINGS_STORAGE_KEY, () => {
+        callback(getWebKeybindingSnapshot())
+      })
       return () => {
         webKeybindingListeners.delete(callback)
-        window.removeEventListener('storage', onStorage)
+        unsubscribe()
       }
     }
   }
@@ -2805,7 +2807,7 @@ function updateEnvironmentFromResponse(
 function getStoredSettings(): GlobalSettings {
   const environment = (activeEnvironment = activeEnvironment ?? readStoredWebRuntimeEnvironment())
   const defaults = getDefaultSettings('~')
-  const rawStoredSettings = window.localStorage.getItem(SETTINGS_STORAGE_KEY)
+  const rawStoredSettings = readPersistentSettingsRaw(SETTINGS_STORAGE_KEY)
   const stored = readJson<Partial<GlobalSettings>>(SETTINGS_STORAGE_KEY, {})
   const migratedStored = {
     ...stored,
@@ -2918,7 +2920,7 @@ async function syncRuntimeBackedSettings(
 }
 
 function getStoredOnboarding(): OnboardingState {
-  const storedRaw = window.localStorage.getItem(ONBOARDING_STORAGE_KEY)
+  const storedRaw = readPersistentSettingsRaw(ONBOARDING_STORAGE_KEY)
   if (storedRaw) {
     const stored = readJson(ONBOARDING_STORAGE_KEY, getDefaultOnboardingState())
     if (stored.checklist.dismissed) {
@@ -3280,7 +3282,7 @@ function getBrowserPlatform(): NodeJS.Platform {
 }
 
 function readJson<T>(key: string, fallback: T): T {
-  const raw = window.localStorage.getItem(key)
+  const raw = readPersistentSettingsRaw(key)
   if (!raw) {
     return cloneJson(fallback)
   }
@@ -3292,7 +3294,7 @@ function readJson<T>(key: string, fallback: T): T {
 }
 
 function writeJson<T>(key: string, value: T): void {
-  window.localStorage.setItem(key, JSON.stringify(value))
+  writePersistentSettingsRaw(key, JSON.stringify(value))
 }
 
 function cloneJson<T>(value: T): T {
