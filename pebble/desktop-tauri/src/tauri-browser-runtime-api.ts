@@ -22,6 +22,7 @@ import {
   TAURI_BROWSER_GUEST_UNAVAILABLE
 } from './tauri-browser-runtime-profiles'
 import { ensureTauriBrowserActionConsumer } from './tauri-browser-action-consumer'
+import { setTauriBrowserViewportOverride } from './tauri-browser-viewport-state'
 
 export function installTauriBrowserRuntimeApi(): void {
   if (!hasTauriInternals()) {
@@ -38,7 +39,10 @@ export function installTauriBrowserRuntimeApi(): void {
       unregisterTauriBrowserGuest(browserPageId)
     },
     openDevTools: () => Promise.resolve(false),
-    setViewportOverride: () => Promise.resolve(false),
+    setViewportOverride: async ({ browserPageId, override }) => {
+      setTauriBrowserViewportOverride({ browserPageId, override })
+      return true
+    },
     setAnnotationViewportBridge: () => Promise.resolve(false),
     onNavigationUpdate: onTauriBrowserNavigationUpdate,
     onActivateView: onTauriBrowserActivateView,

@@ -14,9 +14,14 @@ vi.mock('./tauri-browser-runtime-profiles', () => ({
 }))
 
 import { callTauriBrowserRuntimeRpc } from './tauri-browser-runtime-rpc'
+import {
+  clearTauriBrowserViewportOverrides,
+  setTauriBrowserViewportOverride
+} from './tauri-browser-viewport-state'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  clearTauriBrowserViewportOverrides()
 })
 
 describe('callTauriBrowserRuntimeRpc', () => {
@@ -115,6 +120,30 @@ describe('callTauriBrowserRuntimeRpc', () => {
         width: 390,
         height: 844,
         deviceScaleFactor: 3,
+        mobile: true
+      }
+    })
+  })
+
+  it('reads stored Tauri browser viewport overrides when no explicit size is passed', async () => {
+    setTauriBrowserViewportOverride({
+      browserPageId: 'page-2',
+      override: {
+        width: 425,
+        height: 812,
+        deviceScaleFactor: 2,
+        mobile: true
+      }
+    })
+
+    await expect(
+      callTauriBrowserRuntimeRpc('browser.viewport', { page: 'page-2' })
+    ).resolves.toEqual({
+      handled: true,
+      result: {
+        width: 425,
+        height: 812,
+        deviceScaleFactor: 2,
         mobile: true
       }
     })

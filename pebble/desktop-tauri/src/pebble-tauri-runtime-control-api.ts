@@ -25,6 +25,7 @@ import type {
 import type { PebbleHooks } from '../../../src/shared/types'
 import { PRODUCT_NAME } from './product-brand'
 import { warnUnmappedRuntimeMethod } from './runtime-unmapped-method-warning'
+import { callTauriAutomationRuntimeRpc } from './tauri-automations-api'
 import {
   getErrorMessage,
   getHostPlatform,
@@ -197,6 +198,10 @@ async function callPebbleRuntimeMethod(
     const gitResult = await callTauriGitRuntimeRpc(method, params)
     if (gitResult.handled) {
       return okRuntimeRpc(gitResult.result)
+    }
+    const automationResult = await callTauriAutomationRuntimeRpc(method, params)
+    if (automationResult.handled) {
+      return okRuntimeRpc(automationResult.result)
     }
     switch (method) {
       case 'status.get':

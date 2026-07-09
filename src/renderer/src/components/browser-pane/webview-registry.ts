@@ -14,6 +14,11 @@ export type BrowserWebviewMemoryProfile = {
   registeredBrowserGuestCount: number
 }
 
+type NativeManagedBrowserWebview = Electron.WebviewTag & {
+  __pebbleDestroyNativeWebview?: () => void
+  __pebbleSetNativeBrowserInputLocked?: (locked: boolean) => void
+}
+
 const DRAG_LISTENER_KEY = '__pebbleBrowserPaneDragListeners'
 let dragListenersAttached = false
 let nativeDragPassthroughRelease: (() => void) | null = null
@@ -81,6 +86,7 @@ export function getBrowserWebviewMemoryProfile(): BrowserWebviewMemoryProfile {
 function applyWebviewsDragPassthrough(): void {
   const passthrough = dragPassthroughTokens.size > 0
   for (const webview of webviewRegistry.values()) {
+    ;(webview as NativeManagedBrowserWebview).__pebbleSetNativeBrowserInputLocked?.(passthrough)
     if (passthrough) {
       if (!dragPassthroughPreviousPointerEvents.has(webview)) {
         dragPassthroughPreviousPointerEvents.set(webview, webview.style.pointerEvents)
@@ -132,6 +138,7 @@ function applyCurrentDragPassthroughToWebview(webview: Electron.WebviewTag): voi
   if (dragPassthroughTokens.size === 0) {
     return
   }
+  ;(webview as NativeManagedBrowserWebview).__pebbleSetNativeBrowserInputLocked?.(true)
   if (!dragPassthroughPreviousPointerEvents.has(webview)) {
     dragPassthroughPreviousPointerEvents.set(webview, webview.style.pointerEvents)
   }
@@ -200,6 +207,7 @@ export function destroyPersistentWebview(browserTabId: string): void {
   }
   void window.api.browser.unregisterGuest({ browserPageId: browserTabId })
   moveFocusToRendererBeforeWebviewDetach(webview)
+  ;(webview as NativeManagedBrowserWebview).__pebbleDestroyNativeWebview?.()
   webview.remove()
   unregisterPersistentWebview(browserTabId)
   removeBrowserPageViewport(browserTabId)

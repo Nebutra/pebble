@@ -4,6 +4,7 @@ import {
   registerPersistentWebview,
   webviewRegistry
 } from './webview-registry'
+import { ensureTauriBrowserPageWebview, isTauriBrowserHost } from './tauri-browser-page-webview'
 
 export function ensureBrowserPageWebview({
   browserTabId,
@@ -18,6 +19,38 @@ export function ensureBrowserPageWebview({
   webviewPartition: string
   resolveContainer: () => HTMLDivElement | null
 }): { container: HTMLDivElement; created: boolean; webview: Electron.WebviewTag } | null {
+  if (isTauriBrowserHost()) {
+    let webview = webviewRegistry.get(browserTabId)
+    let activeContainer = container
+    if (
+      webview &&
+      (webview.parentElement !== container || webview.getAttribute('partition') !== webviewPartition)
+    ) {
+      destroyPersistentWebview(browserTabId)
+      webview = undefined
+      const refreshedContainer = resolveContainer()
+      if (!refreshedContainer) {
+        return null
+      }
+      activeContainer = refreshedContainer
+    }
+    if (webview) {
+      webview.style.pointerEvents = inputLocked ? 'none' : 'auto'
+      ;(
+        webview as Electron.WebviewTag & {
+          __pebbleSetNativeBrowserInputLocked?: (locked: boolean) => void
+        }
+      ).__pebbleSetNativeBrowserInputLocked?.(inputLocked)
+      return { container: activeContainer, created: false, webview }
+    }
+    return ensureTauriBrowserPageWebview({
+      browserTabId,
+      container: activeContainer,
+      inputLocked,
+      webviewPartition
+    })
+  }
+
   let webview = webviewRegistry.get(browserTabId)
   let created = false
   let activeContainer = container

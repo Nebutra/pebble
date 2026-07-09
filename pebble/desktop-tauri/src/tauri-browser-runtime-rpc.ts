@@ -1,9 +1,9 @@
 import type { DetectedBrowserInfo } from '../../../src/preload/api-types'
 import { PEBBLE_BROWSER_PARTITION } from '../../../src/shared/constants'
-import type { BrowserViewportResult } from '../../../src/shared/runtime-types'
 import type { BrowserSessionProfile, BrowserSessionProfileScope } from '../../../src/shared/types'
 import { requestRuntimeJson } from './pebble-tauri-runtime-transport'
 import { detectTauriBrowserSessionBrowsers } from './tauri-browser-runtime-profiles'
+import { readTauriBrowserViewport } from './tauri-browser-viewport-state'
 
 type RuntimeBrowserProfile = {
   id: string
@@ -72,7 +72,7 @@ export async function callTauriBrowserRuntimeRpc(
     case 'browser.reload':
       return handled(await queueBrowserNavigation('reload', params))
     case 'browser.viewport':
-      return handled(readBrowserViewport(params))
+      return handled(readTauriBrowserViewport(params))
     default:
       return { handled: false }
   }
@@ -240,18 +240,6 @@ function handled(result: unknown): RuntimeBrowserRpcResult {
   return { handled: true, result }
 }
 
-// Why: until native WebView/CDP exists, echo the requested viewport so renderer
-// input-scaling paths stay deterministic instead of failing before fallback.
-function readBrowserViewport(params: unknown): BrowserViewportResult {
-  const input = readObject(params)
-  return {
-    width: readPositiveNumber(input.width) ?? 1280,
-    height: readPositiveNumber(input.height) ?? 720,
-    deviceScaleFactor: readPositiveNumber(input.deviceScaleFactor) ?? 1,
-    mobile: input.mobile === true
-  }
-}
-
 function readBrowserPageId(params: unknown): string {
   const input = readObject(params)
   return readRequiredString(input.page ?? input.browserPageId ?? input.tabId, 'browser page id')
@@ -277,10 +265,6 @@ function readObject(value: unknown): Record<string, unknown> {
 
 function readString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
-}
-
-function readPositiveNumber(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null
 }
 
 function readRequiredString(value: unknown, label: string): string {

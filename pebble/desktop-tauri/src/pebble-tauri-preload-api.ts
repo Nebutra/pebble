@@ -17,6 +17,7 @@ import {
   createPebbleRuntimeApi,
   createPebbleRuntimeEnvironmentsApi
 } from './pebble-tauri-runtime-control-api'
+import { createPebbleAutomationsApi } from './tauri-automations-api'
 import { createPebbleCrashReportsApi } from './tauri-crash-reports-api'
 import { createPebbleComputerUsePermissionsApi } from './tauri-computer-use-permissions-api'
 import { createPebbleDiagnosticsApi } from './tauri-diagnostics-api'
@@ -95,6 +96,7 @@ export function installPebbleTauriPreloadApi(): void {
   api.worktrees = createPebbleWorktreesApi(api.worktrees)
   api.runtime = createPebbleRuntimeApi(api.runtime)
   api.runtimeEnvironments = createPebbleRuntimeEnvironmentsApi(api.runtimeEnvironments)
+  api.automations = createPebbleAutomationsApi(api.automations)
   api.crashReports = createPebbleCrashReportsApi(api.crashReports)
   api.computerUsePermissions = createPebbleComputerUsePermissionsApi(api.computerUsePermissions)
   api.diagnostics = createPebbleDiagnosticsApi(api.diagnostics)
