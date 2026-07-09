@@ -1,6 +1,7 @@
 package runtimecore
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -36,6 +37,7 @@ type processSession struct {
 	resizePty   func(cols int, rows int) error
 	output      []OutputChunk
 	emit        func(topic string, payload interface{})
+	altScreen   altScreenScanner
 }
 
 func startProcessSession(ctx context.Context, req StartSessionRequest, emit func(topic string, payload interface{})) (*processSession, error) {
@@ -80,25 +82,7 @@ func startProcessSession(ctx context.Context, req StartSessionRequest, emit func
 func (s *processSession) snapshot() Session {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return Session{
-		ID:           s.id,
-		ProjectID:    s.projectID,
-		WorktreeID:   s.worktreeID,
-		Cwd:          s.cwd,
-		Command:      append([]string(nil), s.command...),
-		AgentKind:    s.agentKind,
-		TabID:        s.tabID,
-		LeafID:       s.leafID,
-		LaunchToken:  s.launchToken,
-		Prompt:       s.prompt,
-		Status:       s.status,
-		ExitCode:     cloneExitCode(s.exitCode),
-		StartedAt:    s.startedAt,
-		UpdatedAt:    s.updatedAt,
-		OutputChunks: len(s.output),
-		Cols:         s.cols,
-		Rows:         s.rows,
-	}
+	return s.buildSnapshotLocked()
 }
 
 func (s *processSession) write(req SessionInputRequest) error {
@@ -184,18 +168,48 @@ func (s *processSession) stop() (Session, error) {
 }
 
 func (s *processSession) readStream(stream string, reader io.Reader) {
-	buffer := make([]byte, 8192)
+	// Why: alt-screen smcup/rmcup sequences (e.g. ESC[?1049h) carry no newline,
+	// so a line scanner would not observe them until the next newline — which a
+	// full-screen TUI may never emit. Feed the raw bytes to the alt-screen
+	// scanner as they arrive, then split into newline-delimited output chunks.
+	buf := make([]byte, 4096)
+	var pending []byte
 	for {
-		n, err := reader.Read(buffer)
+		n, readErr := reader.Read(buf)
 		if n > 0 {
-			s.appendOutput(stream, string(buffer[:n]))
+			raw := buf[:n]
+			if stream == "stdout" {
+				s.mu.Lock()
+				s.altScreen.Feed(raw)
+				s.mu.Unlock()
+			}
+			pending = append(pending, raw...)
+			pending = s.flushCompleteLines(stream, pending)
 		}
-		if err != nil {
-			if !errors.Is(err, io.EOF) && !errors.Is(err, os.ErrClosed) {
-				s.appendOutput("stderr", err.Error()+"\n")
+		if readErr != nil {
+			if len(pending) > 0 {
+				s.appendOutput(stream, string(pending))
+			}
+			// A closed PTY surfaces as EOF or os.ErrClosed on the master fd; both
+			// are normal session teardown, not stream errors worth surfacing.
+			if !errors.Is(readErr, io.EOF) && !errors.Is(readErr, os.ErrClosed) {
+				s.appendOutput("stderr", readErr.Error()+"\n")
 			}
 			return
 		}
+	}
+}
+
+// flushCompleteLines emits each newline-terminated line as its own output chunk
+// (preserving the trailing newline) and returns the unterminated remainder.
+func (s *processSession) flushCompleteLines(stream string, pending []byte) []byte {
+	for {
+		idx := bytes.IndexByte(pending, '\n')
+		if idx < 0 {
+			return pending
+		}
+		s.appendOutput(stream, string(pending[:idx+1]))
+		pending = pending[idx+1:]
 	}
 }
 
@@ -253,24 +267,32 @@ func (s *processSession) setStatus(status SessionStatus) {
 }
 
 func (s *processSession) snapshotLocked() Session {
+	return s.buildSnapshotLocked()
+}
+
+// buildSnapshotLocked builds the Session view under the caller-held lock. It
+// includes altScreenActive but not the foreground process, which is resolved
+// lazily on status reads via statusSnapshot to avoid a hot polling loop.
+func (s *processSession) buildSnapshotLocked() Session {
 	return Session{
-		ID:           s.id,
-		ProjectID:    s.projectID,
-		WorktreeID:   s.worktreeID,
-		Cwd:          s.cwd,
-		Command:      append([]string(nil), s.command...),
-		AgentKind:    s.agentKind,
-		TabID:        s.tabID,
-		LeafID:       s.leafID,
-		LaunchToken:  s.launchToken,
-		Prompt:       s.prompt,
-		Status:       s.status,
-		ExitCode:     cloneExitCode(s.exitCode),
-		StartedAt:    s.startedAt,
-		UpdatedAt:    s.updatedAt,
-		OutputChunks: len(s.output),
-		Cols:         s.cols,
-		Rows:         s.rows,
+		ID:              s.id,
+		ProjectID:       s.projectID,
+		WorktreeID:      s.worktreeID,
+		Cwd:             s.cwd,
+		Command:         append([]string(nil), s.command...),
+		AgentKind:       s.agentKind,
+		TabID:           s.tabID,
+		LeafID:          s.leafID,
+		LaunchToken:     s.launchToken,
+		Prompt:          s.prompt,
+		Status:          s.status,
+		ExitCode:        cloneExitCode(s.exitCode),
+		StartedAt:       s.startedAt,
+		UpdatedAt:       s.updatedAt,
+		OutputChunks:    len(s.output),
+		Cols:            s.cols,
+		Rows:            s.rows,
+		AltScreenActive: s.altScreen.Active(),
 	}
 }
 
@@ -288,6 +310,31 @@ func normalizeSessionSize(cols int, rows int) (int, int) {
 		rows = 1000
 	}
 	return cols, rows
+}
+
+// statusSnapshot returns a snapshot enriched with the terminal foreground
+// process. Foreground resolution runs one bounded ps probe here — on status
+// reads only — rather than in a hot loop, per the runtime's polling budget.
+func (s *processSession) statusSnapshot() Session {
+	s.mu.RLock()
+	snapshot := s.buildSnapshotLocked()
+	pid := 0
+	if s.cmd != nil && s.cmd.Process != nil {
+		pid = s.cmd.Process.Pid
+	}
+	running := s.status == SessionRunning
+	s.mu.RUnlock()
+
+	if !foregroundProcessSupported {
+		snapshot.ForegroundProcessUnsupportedReason = foregroundProcessUnsupportedReason
+		return snapshot
+	}
+	if running {
+		if name, ok := resolveForegroundProcessName(pid); ok {
+			snapshot.ForegroundProcess = &name
+		}
+	}
+	return snapshot
 }
 
 func defaultShellCommand() []string {

@@ -124,10 +124,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/source-control/file-diff", s.handleGitFileDiff)
 	s.mux.HandleFunc("/v1/source-control/ref-file-diff", s.handleGitRefFileDiff)
 	s.mux.HandleFunc("/v1/source-control/mutate", s.handleGitMutation)
+	s.mux.HandleFunc("/v1/source-control/local-branches", s.handleGitLocalBranches)
+	s.mux.HandleFunc("/v1/source-control/checkout", s.handleGitCheckout)
 	s.mux.HandleFunc("/v1/source-control/check-ignored", s.handleGitCheckIgnored)
 	s.mux.HandleFunc("/v1/source-control/submodule-status", s.handleGitSubmoduleStatus)
 	s.mux.HandleFunc("/v1/source-control/remote-file-url", s.handleGitRemoteFileURL)
 	s.mux.HandleFunc("/v1/source-control/remote-commit-url", s.handleGitRemoteCommitURL)
+	s.mux.HandleFunc("/v1/source-control/repository-identity", s.handleGitRepositoryIdentity)
 	s.mux.HandleFunc("/v1/source-control/fork-sync", s.handleGitForkSync)
 	s.mux.HandleFunc("/v1/source-control/branch-compare", s.handleGitBranchCompare)
 	s.mux.HandleFunc("/v1/source-control/commit-compare", s.handleGitCommitCompare)
@@ -166,6 +169,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/mobile-relay/projection", s.handleMobileRelayProjection)
 	s.mux.HandleFunc("/v1/mobile-relay", s.handleMobileRelay)
 	s.mux.HandleFunc("/v1/events", s.handleEvents)
+	s.mux.HandleFunc("/v1/host/terminal-capabilities", s.handleHostTerminalCapabilities)
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -400,6 +404,15 @@ func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		session, err := s.manager.ResizeSession(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, session)
+	case r.Method == http.MethodGet && action == "status":
+		// Dedicated status read: resolves the terminal foreground process via a
+		// single bounded ps probe, kept off the cheap list-poll path.
+		session, err := s.manager.SessionStatus(id)
 		if err != nil {
 			writeRuntimeError(w, err)
 			return
@@ -777,6 +790,40 @@ func (s *Server) handleGitMutation(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+func (s *Server) handleGitLocalBranches(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitLocalBranchesRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitLocalBranches(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitCheckout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitCheckoutRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitCheckoutBranch(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (s *Server) handleGitBaseStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -855,6 +902,23 @@ func (s *Server) handleGitRemoteCommitURL(w http.ResponseWriter, r *http.Request
 		return
 	}
 	result, err := s.manager.GitRemoteCommitURL(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitRepositoryIdentity(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitRepositoryIdentityRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitRepositoryIdentity(r.Context(), req)
 	if err != nil {
 		writeRuntimeError(w, err)
 		return

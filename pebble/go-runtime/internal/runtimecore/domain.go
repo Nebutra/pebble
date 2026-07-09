@@ -408,6 +408,18 @@ type Session struct {
 	OutputChunks int           `json:"outputChunks"`
 	Cols         int           `json:"cols,omitempty"`
 	Rows         int           `json:"rows,omitempty"`
+	// AltScreenActive mirrors the Electron terminal's isAlternateScreen flag
+	// (buffer.active.type === 'alternate'); true while the child is in the
+	// alternate screen buffer (a full-screen TUI like vim/htop is running).
+	AltScreenActive bool `json:"altScreenActive"`
+	// ForegroundProcess is the resolved name of the terminal foreground process,
+	// mirroring the renderer's pty.getForegroundProcess contract. nil when it
+	// cannot be determined or the platform does not support it.
+	ForegroundProcess *string `json:"foregroundProcess,omitempty"`
+	// ForegroundProcessUnsupportedReason is set only on platforms where
+	// foreground detection is not implemented, so the renderer can distinguish
+	// "unsupported" from "no foreground detected".
+	ForegroundProcessUnsupportedReason string `json:"foregroundProcessUnsupportedReason,omitempty"`
 }
 
 type StartSessionRequest struct {
@@ -879,6 +891,27 @@ type GitMutationRequest struct {
 	BaseRef        string   `json:"baseRef,omitempty"`
 }
 
+type GitCheckoutRequest struct {
+	ProjectID  string `json:"projectId"`
+	WorktreeID string `json:"worktreeId,omitempty"`
+	Branch     string `json:"branch"`
+}
+
+type GitCheckoutResult struct {
+	OK     bool   `json:"ok"`
+	Branch string `json:"branch"`
+}
+
+type GitLocalBranchesRequest struct {
+	ProjectID  string `json:"projectId"`
+	WorktreeID string `json:"worktreeId,omitempty"`
+}
+
+type GitLocalBranchesResult struct {
+	Current  *string  `json:"current"`
+	Branches []string `json:"branches"`
+}
+
 type GitBaseStatusRequest struct {
 	ProjectID      string `json:"projectId"`
 	WorktreeID     string `json:"worktreeId,omitempty"`
@@ -948,6 +981,21 @@ type GitRemoteCommitURLRequest struct {
 
 type GitRemoteURLResult struct {
 	URL *string `json:"url"`
+}
+
+type GitRepositoryIdentityRequest struct {
+	ProjectID  string `json:"projectId"`
+	WorktreeID string `json:"worktreeId,omitempty"`
+}
+
+type GitHubRepositoryIdentity struct {
+	Owner string `json:"owner"`
+	Repo  string `json:"repo"`
+}
+
+type GitRepositoryIdentityResult struct {
+	Slug     *GitHubRepositoryIdentity `json:"slug"`
+	Upstream *GitHubRepositoryIdentity `json:"upstream"`
 }
 
 type GitForkSyncExpectedUpstream struct {

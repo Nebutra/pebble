@@ -8,7 +8,8 @@ import type { RuntimeRpcResponse } from '../../../src/shared/runtime-rpc-envelop
 import { PRODUCT_NAME } from './product-brand'
 import {
   ensurePebbleRuntimeProcess,
-  readPebbleStatusOrNull
+  readPebbleStatusOrNull,
+  requestRuntimeJson
 } from './pebble-tauri-runtime-transport'
 import {
   createPebbleProjectsApi,
@@ -31,6 +32,7 @@ import {
 import { createPebbleHooksApi } from './tauri-hooks-api'
 import { createPebbleMobileApi } from './tauri-mobile-runtime-api'
 import { createPebbleSpeechApi } from './tauri-speech-api'
+import { readHostTerminalCapabilities } from './host-terminal-capabilities'
 import {
   detectTauriAgents,
   readTauriPreflightStatus,
@@ -39,10 +41,6 @@ import {
 import { createPebbleSshApi } from './tauri-ssh-targets-api'
 import { createPebbleNotificationsApi } from './tauri-notifications-api'
 import { createPebbleCliApi } from './tauri-cli-api'
-
-type RemoteWindowsTerminalCapabilities = Awaited<
-  ReturnType<PreloadApi['preflight']['detectRemoteWindowsTerminalCapabilities']>
->
 
 const fallbackPreflightStatus: PreflightStatus = {
   git: { installed: true },
@@ -64,28 +62,6 @@ const fallbackPreflightStatus: PreflightStatus = {
     tokenConfigured: false
   }
 }
-
-const fallbackRemoteWindowsTerminalCapabilities = {
-  wslAvailable: false,
-  wslDistros: [],
-  pwshAvailable: false,
-  gitBashAvailable: false,
-  hostPlatform: null
-} satisfies RemoteWindowsTerminalCapabilities
-
-const nodePlatforms = new Set([
-  'aix',
-  'android',
-  'darwin',
-  'freebsd',
-  'haiku',
-  'linux',
-  'openbsd',
-  'sunos',
-  'win32',
-  'cygwin',
-  'netbsd'
-])
 
 export function installPebbleTauriPreloadApi(): void {
   installWebPreloadApi()
@@ -177,20 +153,10 @@ function createPebblePreflightApi(base: PreloadApi['preflight']): PreloadApi['pr
         return []
       }
     },
-    detectRemoteWindowsTerminalCapabilities: async ({ connectionId }) => {
-      try {
-        return readRemoteWindowsTerminalCapabilities(
-          await callRuntimeEnvironmentResult(
-            connectionId,
-            'preflight.detectRemoteWindowsTerminalCapabilities',
-            { connectionId },
-            15_000
-          )
-        )
-      } catch {
-        return fallbackRemoteWindowsTerminalCapabilities
-      }
-    }
+    // The Go runtime probes whichever host it runs on (local or the SSH-remote
+    // runtime), so its host-capability route already answers for the target
+    // machine — no need to forward through a runtime-environment RPC hop.
+    detectRemoteWindowsTerminalCapabilities: () => readHostTerminalCapabilities(requestRuntimeJson)
   }
 }
 
@@ -217,27 +183,4 @@ function readRemoteAgentIds(value: unknown): string[] {
     return []
   }
   return [...new Set(value.filter((entry): entry is string => typeof entry === 'string'))]
-}
-
-function readRemoteWindowsTerminalCapabilities(value: unknown): RemoteWindowsTerminalCapabilities {
-  if (typeof value !== 'object' || value === null) {
-    return fallbackRemoteWindowsTerminalCapabilities
-  }
-  const record = value as Record<string, unknown>
-  return {
-    wslAvailable: record.wslAvailable === true,
-    wslDistros: Array.isArray(record.wslDistros)
-      ? record.wslDistros.filter((entry): entry is string => typeof entry === 'string')
-      : [],
-    pwshAvailable: record.pwshAvailable === true,
-    gitBashAvailable: record.gitBashAvailable === true,
-    hostPlatform: readNodePlatform(record.hostPlatform)
-  }
-}
-
-function readNodePlatform(value: unknown): NodeJS.Platform | null {
-  if (typeof value !== 'string' || !nodePlatforms.has(value)) {
-    return null
-  }
-  return value as NodeJS.Platform
 }

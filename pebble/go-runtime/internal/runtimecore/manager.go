@@ -1150,6 +1150,19 @@ func (m *Manager) ListSessions() []Session {
 	return result
 }
 
+// SessionStatus returns a single session's snapshot enriched with the terminal
+// foreground process. Kept separate from ListSessions so the per-session ps
+// probe only runs on explicit status reads, not on every list poll.
+func (m *Manager) SessionStatus(id string) (Session, error) {
+	m.mu.RLock()
+	session, ok := m.sessions[id]
+	m.mu.RUnlock()
+	if !ok {
+		return Session{}, ErrSessionNotFound
+	}
+	return session.statusSnapshot(), nil
+}
+
 func (m *Manager) WriteSession(id string, req SessionInputRequest) error {
 	m.mu.RLock()
 	session, ok := m.sessions[id]
@@ -2544,6 +2557,68 @@ func (m *Manager) MutateGit(ctx context.Context, req GitMutationRequest) (GitCom
 	}
 }
 
+func (m *Manager) GitCheckoutBranch(ctx context.Context, req GitCheckoutRequest) (GitCheckoutResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitCheckoutResult{}, err
+	}
+	branch := strings.TrimSpace(req.Branch)
+	if err := assertValidGitBranchName(branch); err != nil {
+		return GitCheckoutResult{}, err
+	}
+	if err := runBoundedGitCommand(ctx, []string{"-C", base, "checkout", branch, "--"}); err != nil {
+		return GitCheckoutResult{}, err
+	}
+	return GitCheckoutResult{OK: true, Branch: branch}, nil
+}
+
+func (m *Manager) GitLocalBranches(ctx context.Context, req GitLocalBranchesRequest) (GitLocalBranchesResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitLocalBranchesResult{}, err
+	}
+	output, err := readGitOutputRaw(
+		ctx,
+		base,
+		"for-each-ref",
+		"--format=%(HEAD)%09%(refname:short)",
+		"refs/heads/",
+	)
+	if err != nil {
+		return GitLocalBranchesResult{}, err
+	}
+	var current *string
+	branches := make([]string, 0)
+	for _, line := range strings.Split(output, "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "\t", 2)
+		if len(parts) != 2 || strings.TrimSpace(parts[1]) == "" {
+			continue
+		}
+		name := strings.TrimSpace(parts[1])
+		if parts[0] == "*" {
+			value := name
+			current = &value
+		}
+		branches = append(branches, name)
+	}
+	sort.SliceStable(branches, func(i, j int) bool {
+		if current == nil {
+			return false
+		}
+		if branches[i] == *current {
+			return true
+		}
+		if branches[j] == *current {
+			return false
+		}
+		return false
+	})
+	return GitLocalBranchesResult{Current: current, Branches: branches}, nil
+}
+
 func (m *Manager) GitBaseStatus(ctx context.Context, req GitBaseStatusRequest) (GitBaseStatusResult, error) {
 	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
 	if err != nil {
@@ -2696,6 +2771,19 @@ func (m *Manager) GitRemoteCommitURL(ctx context.Context, req GitRemoteCommitURL
 	}
 	url := buildHostedRemoteCommitURL(remoteURL, sha)
 	return nullableGitURL(url), nil
+}
+
+func (m *Manager) GitRepositoryIdentity(ctx context.Context, req GitRepositoryIdentityRequest) (GitRepositoryIdentityResult, error) {
+	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
+	if err != nil {
+		return GitRepositoryIdentityResult{}, err
+	}
+	slug := readGitHubRemoteIdentity(ctx, base, "origin")
+	upstream := readGitHubRemoteIdentity(ctx, base, "upstream")
+	if sameGitHubRepositoryIdentity(slug, upstream) {
+		upstream = nil
+	}
+	return GitRepositoryIdentityResult{Slug: slug, Upstream: upstream}, nil
 }
 
 func (m *Manager) GitForkSync(ctx context.Context, req GitForkSyncRequest) (GitForkSyncResult, error) {
@@ -3190,6 +3278,13 @@ func gitRemoteExists(ctx context.Context, repoPath string, remoteName string) bo
 		}
 	}
 	return false
+}
+
+func assertValidGitBranchName(branch string) error {
+	if branch == "" || strings.HasPrefix(branch, "-") {
+		return errors.New("invalid_branch_name")
+	}
+	return nil
 }
 
 func gitRemoteMatchesExpectedUpstream(ctx context.Context, repoPath string, remoteName string, expected GitForkSyncExpectedUpstream) bool {
