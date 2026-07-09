@@ -26,6 +26,8 @@ pub fn run() {
             commands::git_refs::git_get_base_ref_default,
             commands::git_refs::git_search_base_ref_details,
             commands::preflight::preflight_detect_commands,
+            commands::preflight::preflight_probe_auth,
+            commands::preflight::preflight_hydrate_shell_path,
             commands::runtime_environments::runtime_environments_add_from_pairing_code,
             commands::runtime_environments::runtime_environments_disconnect,
             commands::runtime_environments::runtime_environments_list,
