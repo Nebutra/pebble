@@ -43,6 +43,7 @@ type Manager struct {
 	releases                 map[string]ReleasePlan
 	remoteFileTrees          map[string]RemoteFileTreeSnapshot
 	remoteFileContents       map[string]RemoteFileContentSnapshot
+	remoteAgentDetections    map[string]RemoteAgentDetection
 	settings                 map[string]RuntimeSetting
 	keybindings              map[string]Keybinding
 	browserTabs              map[string]BrowserTab
@@ -92,6 +93,7 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 		releases:                 make(map[string]ReleasePlan),
 		remoteFileTrees:          make(map[string]RemoteFileTreeSnapshot),
 		remoteFileContents:       make(map[string]RemoteFileContentSnapshot),
+		remoteAgentDetections:    make(map[string]RemoteAgentDetection),
 		settings:                 make(map[string]RuntimeSetting),
 		keybindings:              make(map[string]Keybinding),
 		browserTabs:              make(map[string]BrowserTab),
@@ -166,6 +168,9 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 	}
 	for _, snapshot := range state.RemoteFileContents {
 		manager.remoteFileContents[remoteFileSnapshotKey(snapshot.ProjectID, snapshot.WorktreeID, snapshot.Path)] = snapshot
+	}
+	for _, detection := range state.RemoteAgentDetections {
+		manager.remoteAgentDetections[detection.HostID] = detection
 	}
 	for _, setting := range state.Settings {
 		manager.settings[settingKey(setting.Scope, setting.ProjectID, setting.WorkspaceID, setting.Key)] = setting
@@ -847,17 +852,10 @@ func (m *Manager) DeleteWorktree(ctx context.Context, id string, req DeleteWorkt
 	return DeleteWorktreeResponse{Worktree: worktree, PreservedBranch: preserved}, nil
 }
 
-// removeLocalGitWorktree detaches the worktree directory, then cleans up its
-// local branch. It mirrors the Electron main-process semantics: `git branch -d`
-// (safe delete) refuses to drop a branch with commits not merged into its
-// upstream or HEAD, so unpublished work is preserved and returned instead of
-// discarded. forceBranchDelete opts into `-D` for failed-creation rollback.
-//
-// Why the git-local subset only: Electron additionally recovers squash-merged
-// branches by diffing against provider base refs (remote/PR merge status). That
-// machinery is not available in the Go runtime, so a branch whose changes only
-// landed via squash merge is preserved here rather than auto-deleted; the caller
-// can still force-delete it explicitly.
+// removeLocalGitWorktree validates that the project is desktop-local, then
+// runs the shared host-side removal (see host_git_worktree_removal.go). SSH
+// projects surface ErrRemoteNeedsRelay: a relay worker runs the same removal
+// on the remote host and completes it via CompleteRemoteWorktreeRemoval.
 func removeLocalGitWorktree(
 	ctx context.Context,
 	project Project,
@@ -876,97 +874,7 @@ func removeLocalGitWorktree(
 	if err != nil {
 		return nil, err
 	}
-	if repoPath == worktreePath {
-		return nil, errors.New("refusing to remove the project root as a worktree")
-	}
-	branchName := normalizeLocalBranchRef(worktree.Branch)
-	// Capture the branch head before removal so a later force-delete can compare
-	// against the exact commit that Git preserved.
-	branchHead := gitBranchHead(ctx, repoPath, branchName)
-
-	args := []string{"-C", repoPath, "worktree", "remove"}
-	if force {
-		args = append(args, "--force")
-	}
-	args = append(args, worktreePath)
-	gitCtx, cancel := context.WithTimeout(ctx, gitWorktreeCommandLimit)
-	defer cancel()
-	if output, err := exec.CommandContext(gitCtx, "git", args...).CombinedOutput(); err != nil {
-		message := strings.TrimSpace(string(output))
-		if message == "" {
-			message = err.Error()
-		} else {
-			message += ": " + err.Error()
-		}
-		return nil, errors.New(message)
-	}
-
-	if branchName == "" {
-		return nil, nil
-	}
-	return deleteLocalBranchAfterWorktreeRemoval(ctx, repoPath, branchName, branchHead, forceBranchDelete), nil
-}
-
-// deleteLocalBranchAfterWorktreeRemoval drops the worktree's local branch with
-// the safe `-d` flag (or `-D` when forceBranchDelete). If Git refuses because the
-// branch still holds unmerged commits, the branch is preserved and returned so
-// the renderer can offer an explicit force-delete follow-up.
-func deleteLocalBranchAfterWorktreeRemoval(
-	ctx context.Context,
-	repoPath string,
-	branchName string,
-	branchHead string,
-	forceBranchDelete bool,
-) *PreservedWorktreeBranch {
-	deleteFlag := "-d"
-	if forceBranchDelete {
-		deleteFlag = "-D"
-	}
-	if runGitBranchDelete(ctx, repoPath, deleteFlag, branchName) == nil {
-		return nil
-	}
-	// Why: `branch -d` is the cheap live-checkout guard. Only pay for
-	// `worktree prune` when a stale admin record may still be blocking it.
-	pruneCtx, cancelPrune := context.WithTimeout(ctx, gitCommandTimeout)
-	_, _ = exec.CommandContext(pruneCtx, "git", "-C", repoPath, "worktree", "prune").CombinedOutput()
-	cancelPrune()
-	if runGitBranchDelete(ctx, repoPath, deleteFlag, branchName) == nil {
-		return nil
-	}
-	// The branch still refuses safe deletion (unmerged/unpublished commits) or is
-	// checked out elsewhere: keep it. Deleting a worktree must never silently
-	// discard commits.
-	preserved := &PreservedWorktreeBranch{BranchName: branchName}
-	if branchHead != "" {
-		preserved.Head = branchHead
-	}
-	return preserved
-}
-
-func runGitBranchDelete(ctx context.Context, repoPath, deleteFlag, branchName string) error {
-	cmdCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
-	defer cancel()
-	_, err := exec.CommandContext(cmdCtx, "git", "-C", repoPath, "branch", deleteFlag, "--", branchName).CombinedOutput()
-	return err
-}
-
-// gitBranchHead resolves a local branch to its commit sha, or "" when the branch
-// is missing or git errors.
-func gitBranchHead(ctx context.Context, repoPath, branchName string) string {
-	if branchName == "" {
-		return ""
-	}
-	cmdCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
-	defer cancel()
-	output, err := exec.CommandContext(cmdCtx, "git", "-C", repoPath, "rev-parse", "--verify", "--quiet", "refs/heads/"+branchName).Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(output))
-}
-
-func normalizeLocalBranchRef(branch string) string {
-	return strings.TrimPrefix(strings.TrimSpace(branch), "refs/heads/")
+	return RemoveGitWorktreeOnHost(ctx, repoPath, worktreePath, worktree.Branch, force, forceBranchDelete)
 }
 
 // ForceDeletePreservedBranch force-deletes a local branch that a prior worktree
@@ -999,50 +907,7 @@ func (m *Manager) ForceDeletePreservedBranch(
 	if err != nil {
 		return ForceDeletePreservedBranchResponse{}, err
 	}
-	if gitBranchHead(ctx, repoPath, branchName) == "" {
-		return ForceDeletePreservedBranchResponse{}, ErrBranchNotFound
-	}
-	if gitBranchIsCheckedOut(ctx, repoPath, branchName) {
-		return ForceDeletePreservedBranchResponse{}, errors.New("local branch is checked out in another worktree")
-	}
-	expectedHead := strings.TrimSpace(req.ExpectedHead)
-	if expectedHead != "" {
-		// Compare-and-swap: delete only if the ref still points at expectedHead so
-		// a stale action cannot discard commits added after preservation.
-		cmdCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
-		_, err := exec.CommandContext(cmdCtx, "git", "-C", repoPath, "update-ref", "-d", "refs/heads/"+branchName, expectedHead).CombinedOutput()
-		cancel()
-		if err != nil {
-			return ForceDeletePreservedBranchResponse{}, errors.New("local branch changed after it was preserved; review it before deleting")
-		}
-		return ForceDeletePreservedBranchResponse{Deleted: true}, nil
-	}
-	cmdCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
-	defer cancel()
-	if output, err := exec.CommandContext(cmdCtx, "git", "-C", repoPath, "branch", "-D", "--", branchName).CombinedOutput(); err != nil {
-		message := strings.TrimSpace(string(output))
-		if message == "" {
-			message = err.Error()
-		}
-		return ForceDeletePreservedBranchResponse{}, errors.New(message)
-	}
-	return ForceDeletePreservedBranchResponse{Deleted: true}, nil
-}
-
-func gitBranchIsCheckedOut(ctx context.Context, repoPath, branchName string) bool {
-	cmdCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
-	defer cancel()
-	output, err := exec.CommandContext(cmdCtx, "git", "-C", repoPath, "worktree", "list", "--porcelain").Output()
-	if err != nil {
-		return false
-	}
-	target := "branch refs/heads/" + branchName
-	for _, line := range strings.Split(string(output), "\n") {
-		if strings.TrimSpace(line) == target {
-			return true
-		}
-	}
-	return false
+	return ForceDeleteGitBranchOnHost(ctx, repoPath, branchName, req.ExpectedHead)
 }
 
 func wouldCreateWorktreeLineageCycleLocked(
@@ -3741,36 +3606,37 @@ func (m *Manager) Shutdown() {
 
 func (m *Manager) saveLocked() error {
 	state := persistedState{
-		RelayID:            m.relayID,
-		Projects:           make([]Project, 0, len(m.projects)),
-		ProjectGroups:      make([]ProjectGroup, 0, len(m.projectGroups)),
-		FolderWorkspaces:   make([]FolderWorkspace, 0, len(m.folderWorkspaces)),
-		Worktrees:          make([]Worktree, 0, len(m.worktrees)),
-		Agents:             make([]AgentProfile, 0, len(m.agents)),
-		AgentRuns:          make([]AgentRun, 0, len(m.agentRuns)),
-		Tasks:              make([]Task, 0, len(m.tasks)),
-		Messages:           make([]Message, 0, len(m.messages)),
-		Dispatches:         make([]Dispatch, 0, len(m.dispatches)),
-		Automations:        make([]Automation, 0, len(m.automations)),
-		AutomationRuns:     make([]AutomationRun, 0, len(m.automationRuns)),
-		ExternalWorkItems:  make([]ExternalWorkItem, 0, len(m.externalWorkItems)),
-		SourceControl:      make([]SourceControlProjection, 0, len(m.sourceControlProjections)),
-		Releases:           make([]ReleasePlan, 0, len(m.releases)),
-		RemoteFileTrees:    make([]RemoteFileTreeSnapshot, 0, len(m.remoteFileTrees)),
-		RemoteFileContents: make([]RemoteFileContentSnapshot, 0, len(m.remoteFileContents)),
-		Settings:           make([]RuntimeSetting, 0, len(m.settings)),
-		Keybindings:        make([]Keybinding, 0, len(m.keybindings)),
-		BrowserTabs:        make([]BrowserTab, 0, len(m.browserTabs)),
-		BrowserProfiles:    make([]BrowserProfile, 0, len(m.browserProfiles)),
-		BrowserPerms:       make([]BrowserPermission, 0, len(m.browserPermissions)),
-		BrowserDownloads:   make([]BrowserDownload, 0, len(m.browserDownloads)),
-		ComputerActions:    make([]ComputerAction, 0, len(m.computerActions)),
-		EmulatorDevices:    make([]EmulatorDevice, 0, len(m.emulatorDevices)),
-		EmulatorSessions:   make([]EmulatorSession, 0, len(m.emulatorSessions)),
-		NativeProviders:    make([]NativeProviderRegistration, 0, len(m.nativeProviders)),
-		MobilePairings:     make([]MobileRelayPairingRecord, 0, len(m.mobilePairings)),
-		SshTargets:         make([]SshTarget, 0, len(m.sshTargets)),
-		SessionTabLayouts:  make([]SessionTabLayout, 0, len(m.sessionTabLayouts)),
+		RelayID:               m.relayID,
+		Projects:              make([]Project, 0, len(m.projects)),
+		ProjectGroups:         make([]ProjectGroup, 0, len(m.projectGroups)),
+		FolderWorkspaces:      make([]FolderWorkspace, 0, len(m.folderWorkspaces)),
+		Worktrees:             make([]Worktree, 0, len(m.worktrees)),
+		Agents:                make([]AgentProfile, 0, len(m.agents)),
+		AgentRuns:             make([]AgentRun, 0, len(m.agentRuns)),
+		Tasks:                 make([]Task, 0, len(m.tasks)),
+		Messages:              make([]Message, 0, len(m.messages)),
+		Dispatches:            make([]Dispatch, 0, len(m.dispatches)),
+		Automations:           make([]Automation, 0, len(m.automations)),
+		AutomationRuns:        make([]AutomationRun, 0, len(m.automationRuns)),
+		ExternalWorkItems:     make([]ExternalWorkItem, 0, len(m.externalWorkItems)),
+		SourceControl:         make([]SourceControlProjection, 0, len(m.sourceControlProjections)),
+		Releases:              make([]ReleasePlan, 0, len(m.releases)),
+		RemoteFileTrees:       make([]RemoteFileTreeSnapshot, 0, len(m.remoteFileTrees)),
+		RemoteFileContents:    make([]RemoteFileContentSnapshot, 0, len(m.remoteFileContents)),
+		RemoteAgentDetections: make([]RemoteAgentDetection, 0, len(m.remoteAgentDetections)),
+		Settings:              make([]RuntimeSetting, 0, len(m.settings)),
+		Keybindings:           make([]Keybinding, 0, len(m.keybindings)),
+		BrowserTabs:           make([]BrowserTab, 0, len(m.browserTabs)),
+		BrowserProfiles:       make([]BrowserProfile, 0, len(m.browserProfiles)),
+		BrowserPerms:          make([]BrowserPermission, 0, len(m.browserPermissions)),
+		BrowserDownloads:      make([]BrowserDownload, 0, len(m.browserDownloads)),
+		ComputerActions:       make([]ComputerAction, 0, len(m.computerActions)),
+		EmulatorDevices:       make([]EmulatorDevice, 0, len(m.emulatorDevices)),
+		EmulatorSessions:      make([]EmulatorSession, 0, len(m.emulatorSessions)),
+		NativeProviders:       make([]NativeProviderRegistration, 0, len(m.nativeProviders)),
+		MobilePairings:        make([]MobileRelayPairingRecord, 0, len(m.mobilePairings)),
+		SshTargets:            make([]SshTarget, 0, len(m.sshTargets)),
+		SessionTabLayouts:     make([]SessionTabLayout, 0, len(m.sessionTabLayouts)),
 	}
 	for _, project := range m.projects {
 		state.Projects = append(state.Projects, project)
@@ -3819,6 +3685,9 @@ func (m *Manager) saveLocked() error {
 	}
 	for _, snapshot := range m.remoteFileContents {
 		state.RemoteFileContents = append(state.RemoteFileContents, snapshot)
+	}
+	for _, detection := range m.remoteAgentDetections {
+		state.RemoteAgentDetections = append(state.RemoteAgentDetections, detection)
 	}
 	for _, setting := range m.settings {
 		state.Settings = append(state.Settings, setting)

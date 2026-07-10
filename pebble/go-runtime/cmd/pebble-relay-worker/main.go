@@ -38,6 +38,12 @@ func run(args []string, client *http.Client, output io.Writer) error {
 		return runFileRead(args[1:], client, output)
 	case "git-status":
 		return runGitStatus(args[1:], client, output)
+	case "worktree-remove":
+		return runWorktreeRemove(args[1:], client, output)
+	case "branch-delete":
+		return runBranchDelete(args[1:], client, output)
+	case "agent-detect":
+		return runAgentDetect(args[1:], client, output)
 	default:
 		usage()
 		return fmt.Errorf("unknown relay worker command %q", args[0])
@@ -424,5 +430,5 @@ func postJSON(client *http.Client, output io.Writer, endpoint string, token stri
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: pebble-relay-worker <file-tree|file-read|git-status> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: pebble-relay-worker <file-tree|file-read|git-status|worktree-remove|branch-delete|agent-detect> [flags]")
 }

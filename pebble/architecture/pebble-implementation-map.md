@@ -62,8 +62,13 @@ Current implementation:
 
 - Go persists projects and worktrees, supports project metadata updates/deletes, persists project
   order, and can run bounded local `git worktree remove` before deleting Tauri-created worktree
-  records. Metadata-only deletion remains available for legacy/runtime bookkeeping paths; SSH
-  worktree deletion, preserved-branch cleanup, and hook-aware archival remain parity gaps.
+  records. Metadata-only deletion remains available for legacy/runtime bookkeeping paths. SSH
+  worktree deletion and preserved-branch cleanup now run through `pebble-relay-worker
+  worktree-remove`/`branch-delete`: the worker executes the shared host-side removal
+  (`RemoveGitWorktreeOnHost`/`ForceDeleteGitBranchOnHost`) on the remote host and posts completions
+  to `/v1/worktrees/remote-removals` and `/v1/worktrees/branches/remote-removals`, which retire the
+  metadata record with the same preserved-branch contract as local deletions. Hook-aware archival
+  remains a parity gap.
 - Go persists worktree instance identity plus worktree/folder workspace lineage records, and Tauri
   bridges lineage list/set/create runtime calls into the existing renderer and CLI contracts.
 - Go persists display/comment/archive/pin/read status, workspace status, manual order, and smart-sort
@@ -267,13 +272,17 @@ Current implementation:
   `window.api.browser.openDevTools` to the active child WebView label, so the browser toolbar and
   context-menu inspection controls have real behavior in the Tauri shell instead of returning
   a dead false.
-- Tauri routes `sessionClearDefaultCookies` to live default-partition child WebViews and calls
-  their browsing-data clearer. The adapter is deliberately scoped because Tauri does not expose
-  Electron's cookies-only storage filter.
+- Tauri routes `sessionClearDefaultCookies` to live default-partition child WebViews and uses the
+  native cookie store to enumerate and delete cookies only. Cache, local storage, and other browsing
+  data are preserved, matching the renderer contract instead of over-clearing the session.
 - Tauri maps the renderer's `findInPage` and `stopFindInPage` compatibility calls to bounded Rust
   commands for the active child WebView. Rust validates the browser-only child label, evaluates the
   native `window.find` request with a timeout, and returns Electron-shaped match events so the
   existing find UI remains functional without exposing arbitrary WebView evaluation to the renderer.
+- Persisted browser annotation markers now render inside Tauri child WebViews through a structured
+  Rust command. The host validates marker count, IDs, and finite non-negative geometry before
+  injecting a closed-shadow visual overlay that follows page scroll; this does not enable element
+  selection or claim the still-missing grab/CDP boundary.
 - Renderer browser feature availability gates local grab/annotation buttons and shortcut handling
   under the Tauri child WebView host, because the native guest script/CDP adapter is not available
   yet and the UI must not enter a `not-ready` IPC path after looking actionable.
@@ -290,6 +299,8 @@ Current implementation:
 - Rust/Tauri can register the desktop browser action bridge with `/v1/providers`, so runtime,
   desktop, and mobile projections show whether the native bridge is online; the desktop shell
   refreshes registration while connected so stale persisted providers do not claim readiness.
+  Its degraded capability report now distinguishes working native WebView/find/annotation-overlay/
+  cookie-clear paths from the remaining guest-script, screenshot, import, and CDP gaps.
 - Tauri runtime RPC now exposes provider list/status/register through the same Go routes, so
   UI, mobile, and runtime diagnostics read the same TTL-bound provider truth instead of a preload
   stub.
@@ -515,8 +526,12 @@ subscribe/unsubscribe` snapshots and mutations from Go session records plus a Ta
 - Tauri remote runtime environments now use the stored pairing material only inside Rust commands:
   one-shot `runtimeEnvironments.call` and subscription calls open the WebSocket, perform the same
   E2EE hello/auth flow as the Electron shared client, and return or stream the remote RPC envelope
-  plus binary frames instead of falling back to local runtime results. Shared-control ingestion and
-  SSH relay detection remain separate parity gates.
+  plus binary frames instead of falling back to local runtime results. Shared-control ingestion
+  remains a separate parity gate. Relay-only SSH agent detection now works: `pebble-relay-worker
+  agent-detect` probes the remote PATH against the desktop-passed TUI agent catalog (so the Go
+  side never drifts from `src/shared/tui-agent-config.ts`), posts detections to
+  `/v1/remote-hosts/agent-detections`, and Tauri `detectRemoteAgents` falls back to that cached
+  per-host detection when no paired runtime environment answers.
 - Tauri file watching now uses native `notify` for local worktrees and resolves `connectionId`
   worktree watches to runtime `files.watch` subscriptions, fanning both paths back into the same
   Electron-compatible `FsChangedPayload` consumed by Explorer, Source Control, and editor reloads.

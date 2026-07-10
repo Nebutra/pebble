@@ -78,6 +78,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/folder-workspaces/", s.handleFolderWorkspaceByID)
 	s.mux.HandleFunc("/v1/worktrees", s.handleWorktrees)
 	s.mux.HandleFunc("/v1/worktrees/branches/force-delete", s.handleForceDeletePreservedBranch)
+	s.mux.HandleFunc("/v1/worktrees/branches/remote-removals", s.handleRemotePreservedBranchRemovals)
+	s.mux.HandleFunc("/v1/worktrees/remote-removals", s.handleRemoteWorktreeRemovals)
 	s.mux.HandleFunc("/v1/worktrees/", s.handleWorktreeByID)
 	s.mux.HandleFunc("/v1/sessions", s.handleSessions)
 	s.mux.HandleFunc("/v1/sessions/", s.handleSessionByID)
@@ -174,6 +176,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/mobile-relay", s.handleMobileRelay)
 	s.mux.HandleFunc("/v1/events", s.handleEvents)
 	s.mux.HandleFunc("/v1/host/terminal-capabilities", s.handleHostTerminalCapabilities)
+	s.mux.HandleFunc("/v1/remote-hosts/agent-detections", s.handleRemoteAgentDetections)
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
