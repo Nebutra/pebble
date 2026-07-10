@@ -1560,6 +1560,17 @@ func writeJSON(w http.ResponseWriter, status int, value interface{}) {
 }
 
 func writeRuntimeError(w http.ResponseWriter, err error) {
+	// Archive-hook vetoes are a distinct, renderer-visible condition: surface a
+	// stable code plus the captured hook output instead of a bare message.
+	var archiveHookErr *runtimecore.ArchiveHookError
+	if errors.As(err, &archiveHookErr) {
+		writeJSON(w, http.StatusConflict, map[string]string{
+			"error":      archiveHookErr.Error(),
+			"code":       "archive-hook-failed",
+			"hookOutput": archiveHookErr.Output,
+		})
+		return
+	}
 	status := http.StatusBadRequest
 	if errors.Is(err, runtimecore.ErrNotFound) ||
 		errors.Is(err, runtimecore.ErrSessionNotFound) ||

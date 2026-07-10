@@ -829,7 +829,7 @@ func (m *Manager) DeleteWorktree(ctx context.Context, id string, req DeleteWorkt
 	m.mu.RUnlock()
 	var preserved *PreservedWorktreeBranch
 	if req.ExecuteGit {
-		result, err := removeLocalGitWorktree(ctx, project, worktree, req.Force, req.ForceBranchDelete)
+		result, err := removeLocalGitWorktree(ctx, project, worktree, req)
 		if err != nil {
 			return DeleteWorktreeResponse{}, err
 		}
@@ -859,8 +859,7 @@ func removeLocalGitWorktree(
 	ctx context.Context,
 	project Project,
 	worktree Worktree,
-	force bool,
-	forceBranchDelete bool,
+	req DeleteWorktreeRequest,
 ) (*PreservedWorktreeBranch, error) {
 	if project.LocationKind != "local" {
 		return nil, ErrRemoteNeedsRelay
@@ -873,7 +872,14 @@ func removeLocalGitWorktree(
 	if err != nil {
 		return nil, err
 	}
-	return RemoveGitWorktreeOnHost(ctx, repoPath, worktreePath, worktree.Branch, force, forceBranchDelete)
+	// Run the archive hook while the worktree directory is intact; a failing
+	// hook vetoes the removal (see worktree_archive_hook.go).
+	if !req.SkipArchiveHook {
+		if err := RunWorktreeArchiveHookOnHost(ctx, repoPath, worktreePath); err != nil {
+			return nil, err
+		}
+	}
+	return RemoveGitWorktreeOnHost(ctx, repoPath, worktreePath, worktree.Branch, req.Force, req.ForceBranchDelete)
 }
 
 // ForceDeletePreservedBranch force-deletes a local branch that a prior worktree

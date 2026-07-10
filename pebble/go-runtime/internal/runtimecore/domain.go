@@ -315,6 +315,10 @@ type DeleteWorktreeRequest struct {
 	// where the fresh branch has no user work to protect. User-initiated deletes
 	// leave it false so unmerged commits are preserved instead of discarded.
 	ForceBranchDelete bool `json:"forceBranchDelete,omitempty"`
+	// SkipArchiveHook mirrors Electron's skipArchive removal option: bypass the
+	// pebble.yaml `scripts.archive` teardown hook that otherwise runs (and can
+	// veto the deletion) before `git worktree remove`.
+	SkipArchiveHook bool `json:"skipArchiveHook,omitempty"`
 }
 
 // PreservedWorktreeBranch names a local branch that a worktree removal kept
@@ -430,6 +434,7 @@ type Session struct {
 type StartSessionRequest struct {
 	ProjectID   string   `json:"projectId"`
 	WorktreeID  string   `json:"worktreeId,omitempty"`
+	Ephemeral   bool     `json:"ephemeral,omitempty"`
 	Cwd         string   `json:"cwd,omitempty"`
 	Command     []string `json:"command,omitempty"`
 	AgentKind   string   `json:"agentKind,omitempty"`

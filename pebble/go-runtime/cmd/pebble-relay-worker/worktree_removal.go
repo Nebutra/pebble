@@ -14,10 +14,11 @@ import (
 	"github.com/tsekaluk/pebble/go-runtime/internal/runtimecore"
 )
 
-// worktreeRemoveTimeout bounds the remote `git worktree remove` plus branch
-// cleanup; matches the runtime's gitWorktreeCommandLimit ceiling with headroom
-// for the follow-up branch delete/prune calls.
-const worktreeRemoveTimeout = 3 * time.Minute
+// worktreeRemoveTimeout bounds the remote archive hook (2 min, its own
+// internal limit) plus `git worktree remove` and branch cleanup; matches the
+// runtime's gitWorktreeCommandLimit ceiling with headroom for the hook and the
+// follow-up branch delete/prune calls.
+const worktreeRemoveTimeout = 5 * time.Minute
 
 // runWorktreeRemove executes the shared host-side worktree removal on the
 // remote host, then posts the completion to the runtime gateway so the
@@ -34,6 +35,7 @@ func runWorktreeRemove(args []string, client *http.Client, output io.Writer) err
 	branch := fs.String("branch", "", "worktree branch to clean up")
 	force := fs.Bool("force", false, "pass --force to git worktree remove")
 	forceBranchDelete := fs.Bool("force-branch-delete", false, "delete the branch with -D instead of the safe -d")
+	skipArchiveHook := fs.Bool("skip-archive-hook", false, "skip the pebble.yaml archive hook before removal")
 	_ = fs.Parse(args)
 	repoPath, worktreePath, err := normalizeRemovalPaths(*repo, *path)
 	if err != nil {
@@ -44,6 +46,14 @@ func runWorktreeRemove(args []string, client *http.Client, output io.Writer) err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), worktreeRemoveTimeout)
 	defer cancel()
+	// Electron parity: the archive teardown hook runs on the host that owns the
+	// worktree while the directory is intact, and a failure vetoes the removal
+	// (the worker exits non-zero without posting a completion).
+	if !*skipArchiveHook {
+		if err := runtimecore.RunWorktreeArchiveHookOnHost(ctx, repoPath, worktreePath); err != nil {
+			return err
+		}
+	}
 	preserved, err := runtimecore.RemoveGitWorktreeOnHost(ctx, repoPath, worktreePath, *branch, *force, *forceBranchDelete)
 	if err != nil {
 		return err
