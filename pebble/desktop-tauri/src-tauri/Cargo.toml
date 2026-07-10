@@ -36,5 +36,12 @@ objc2 = "0.6"
 objc2-app-kit = "0.3"
 objc2-foundation = "0.3"
 
+[target.'cfg(target_os = "windows")'.dependencies]
+# CLI registration reads/writes HKCU\Environment\Path (winreg) and broadcasts
+# WM_SETTINGCHANGE so open shells pick it up without a logout (windows-sys).
+# Both are already in the dependency tree via tauri's Windows runtime.
+winreg = "0.55"
+windows-sys = { version = "0.60", features = ["Win32_UI_WindowsAndMessaging"] }
+
 [dev-dependencies]
 tempfile = "3.27.0"

@@ -58,12 +58,14 @@ fn unsupported(reason: &str, detail: &str) -> CliInstallStatus {
     }
 }
 
-// Why: Windows CLI registration owns a user-PATH registry edit that the Electron
-// installer performs via PowerShell; that elevation/registry flow is not
-// reimplemented here, so it stays explicitly unsupported with a clear reason.
-#[cfg(not(unix))]
-const WINDOWS_UNSUPPORTED_DETAIL: &str =
-    "Windows CLI registration is not available in the Tauri shell yet.";
+// Why: any non-Unix, non-Windows target (none currently shipped) has no CLI
+// registration story; keep it explicitly unsupported rather than guessing.
+#[cfg(not(any(unix, target_os = "windows")))]
+const OTHER_UNSUPPORTED_DETAIL: &str =
+    "CLI registration is not available on this platform.";
+
+#[cfg(target_os = "windows")]
+mod cli_registration_windows;
 
 #[cfg(unix)]
 mod unix_cli {
@@ -247,9 +249,14 @@ pub fn cli_install_status() -> CliInstallStatus {
     {
         unix_cli::status()
     }
-    #[cfg(not(unix))]
+    #[cfg(target_os = "windows")]
     {
-        unsupported("platform_not_supported", WINDOWS_UNSUPPORTED_DETAIL)
+        let registry = cli_registration_windows::win32::Win32UserPathRegistry;
+        cli_registration_windows::status(&cli_registration_windows::win32::env_lookup, &registry)
+    }
+    #[cfg(not(any(unix, target_os = "windows")))]
+    {
+        unsupported("platform_not_supported", OTHER_UNSUPPORTED_DETAIL)
     }
 }
 
@@ -259,9 +266,14 @@ pub fn cli_install() -> CliInstallStatus {
     {
         unix_cli::install()
     }
-    #[cfg(not(unix))]
+    #[cfg(target_os = "windows")]
     {
-        unsupported("platform_not_supported", WINDOWS_UNSUPPORTED_DETAIL)
+        let mut registry = cli_registration_windows::win32::Win32UserPathRegistry;
+        cli_registration_windows::install(&cli_registration_windows::win32::env_lookup, &mut registry)
+    }
+    #[cfg(not(any(unix, target_os = "windows")))]
+    {
+        unsupported("platform_not_supported", OTHER_UNSUPPORTED_DETAIL)
     }
 }
 
@@ -271,9 +283,14 @@ pub fn cli_remove() -> CliInstallStatus {
     {
         unix_cli::remove()
     }
-    #[cfg(not(unix))]
+    #[cfg(target_os = "windows")]
     {
-        unsupported("platform_not_supported", WINDOWS_UNSUPPORTED_DETAIL)
+        let mut registry = cli_registration_windows::win32::Win32UserPathRegistry;
+        cli_registration_windows::remove(&cli_registration_windows::win32::env_lookup, &mut registry)
+    }
+    #[cfg(not(any(unix, target_os = "windows")))]
+    {
+        unsupported("platform_not_supported", OTHER_UNSUPPORTED_DETAIL)
     }
 }
 
