@@ -86,8 +86,10 @@ Current implementation:
   and local worktree target normalization. Paired remote `connectionId` nested scan/import uses
   the same runtime environment RPC names, so the desktop host does not inspect SSH paths. Tauri
   now emits final scan progress events, lets the existing UI cancel active scan IDs into a stopped
-  result, and gives scan/import calls renderer-aligned bounded timeouts. Go HTTP context-level
-  cancellation/streaming plus legacy SSH relay-only nested import paths remain explicit gaps.
+  result, and gives scan/import calls renderer-aligned bounded timeouts. Go nested scan/import now
+  threads the HTTP request context through the walk, so a dropped or cancelled request aborts the
+  traversal and yields the same partial `stopped` result as the UI cancel flow. Streaming scan
+  progress plus legacy SSH relay-only nested import paths remain explicit gaps.
 
 ### Terminal Service
 
@@ -128,7 +130,7 @@ Current implementation:
   builder actually emits; other frequencies (e.g. YEARLY) are rejected at create/update time.
 - HTTP and CLI expose automation create/update/delete/list, run listing, manual triggering, and
   interval/RRULE evaluation endpoints (`pebble-control automation add/update --schedule rrule
-  --rrule <RFC5545> --dtstart <RFC3339>`).
+--rrule <RFC5545> --dtstart <RFC3339>`).
 - Tauri maps local `window.api.automations` and `automation.*` runtime RPC calls onto the Go
   automation HTTP routes, preserving the renderer's rich automation fields inside runtime payloads
   so list/create/update/delete, run listing, and manual Run Now are backed by real runtime storage.
@@ -170,14 +172,18 @@ Current implementation:
   and exposes base-status reconciliation, so Tauri can emit the existing renderer `worktree:baseStatus` and
   `worktree:remoteBranchConflict` subscription payloads without Electron IPC. The Go projection
   parser now preserves staged/unstaged/untracked areas and rename `oldPath` through the Tauri
-  status mapper. Tauri maps local `hostedReview.*` runtime calls to typed unsupported-provider
-  review states/results instead of unmapped runtime errors, keeping Source Control on its normal
-  blocked-review UI while provider backends move out of Electron. Renderer Source Control gates
-  commit-message and hosted-review text-generation affordances under Tauri before they call the
-  explicit-unavailable git RPCs. Full parity still needs conflict metadata, rich submodule/binary
-  diff metadata, remote/SSH base-status parity, GitHub API fork-parent fallback without an
-  `upstream` remote, provider review actions, and native AI text-generation host wiring for commit
-  and pull-request field generation.
+  status mapper. Tauri maps GitHub PR checks, GitLab MR listing, and existing hosted-review
+  branch lookup through local Go provider routes; Tauri also maps GitHub/GitLab hosted-review
+  capabilities and creation onto Go provider routes, including worktree selector resolution,
+  so local Create PR/MR no longer falls through to an unsupported-provider placeholder.
+  Tauri preload now overrides the web fallback git generation API with native local commit-message
+  and pull-request field generation: Rust reads staged/base diff context and runs bounded,
+  cancelable agent plans while shared prompt/parser code keeps renderer output parity. Hosted-review
+  update/mutation actions for providers beyond GitHub/GitLab remain explicit gaps while provider
+  mutations move out of Electron. Full parity still needs conflict metadata, rich submodule/binary
+  diff metadata, remote/SSH base-status parity, remote/SSH text-generation relay parity, PR
+  template body hydration, GitHub API fork-parent fallback without an `upstream` remote, provider
+  review update actions, and non-GitHub/GitLab review creation.
 - SSH/remote source-control projections can be updated by relay workers through the runtime
   gateway; direct git status/diff execution still returns relay-required errors without a worker.
   The runtime normalizes external changed-file status values, drops invalid workspace paths, and
@@ -264,6 +270,10 @@ Current implementation:
 - Tauri routes `sessionClearDefaultCookies` to live default-partition child WebViews and calls
   their browsing-data clearer. The adapter is deliberately scoped because Tauri does not expose
   Electron's cookies-only storage filter.
+- Tauri maps the renderer's `findInPage` and `stopFindInPage` compatibility calls to bounded Rust
+  commands for the active child WebView. Rust validates the browser-only child label, evaluates the
+  native `window.find` request with a timeout, and returns Electron-shaped match events so the
+  existing find UI remains functional without exposing arbitrary WebView evaluation to the renderer.
 - Renderer browser feature availability gates local grab/annotation buttons and shortcut handling
   under the Tauri child WebView host, because the native guest script/CDP adapter is not available
   yet and the UI must not enter a `not-ready` IPC path after looking actionable.
@@ -440,9 +450,15 @@ Current implementation:
   flows do not fall through to unmapped Electron-only methods. Tauri also exposes local
   `session.tabs.list/listAll/createTerminal/activate/close/move/updatePaneLayout/setTabProps/
 subscribe/unsubscribe` snapshots and mutations from Go session records plus a Tauri-side tab
-  state mirror instead of empty tab mocks. Go still needs durable session tab move/layout/
-  subscription persistence, true streaming, plus hook-level idle/permission state before those
-  flows can match Electron's full layout and TUI readiness model.
+  state mirror instead of empty tab mocks. Go now persists tab moves on the live session record
+  (`PATCH /v1/sessions/{id}` tab/leaf placement) and stores durable per-worktree tab/group/pane
+  layout snapshots (`/v1/session-tab-layouts/{worktreeId}`) that survive runtime restarts, and
+  tracks hook-reported idle/permission state per session (`POST /v1/sessions/{id}/hook-status`,
+  accepting session id or launch token) with a blocking Go-side `POST /v1/sessions/{id}/wait`
+  for `exit`/`tui-idle` that only hook-reported idle (never permission) satisfies, matching
+  Electron's TUI readiness model. Remaining gaps: tab subscription persistence and true
+  streaming, plus desktop-shell wiring that relays agent-hook events into `hook-status` and
+  points `terminal.wait`/`terminal.agentStatus` at the runtime wait/hook state.
 - Tauri local runtime RPC maps mobile/CLI files.list/open/openDiff plus file explorer
   read/readChunk/readPreview/write/writeBase64, create/rename/copy/delete/stat/list/search,
   upload chunk, and server directory browse calls to Go file endpoints and renderer file-open

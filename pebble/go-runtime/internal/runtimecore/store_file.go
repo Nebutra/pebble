@@ -40,6 +40,7 @@ type persistedState struct {
 	NativeProviders    []NativeProviderRegistration `json:"nativeProviders"`
 	MobilePairings     []MobileRelayPairingRecord   `json:"mobilePairings"`
 	SshTargets         []SshTarget                  `json:"sshTargets"`
+	SessionTabLayouts  []SessionTabLayout           `json:"sessionTabLayouts,omitempty"`
 }
 
 type fileStore struct {

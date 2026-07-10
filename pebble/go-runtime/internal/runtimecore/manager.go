@@ -56,6 +56,7 @@ type Manager struct {
 	mobilePairings           map[string]MobileRelayPairingRecord
 	mobilePairingCodes       map[string]MobileRelayPairingCode
 	sshTargets               map[string]SshTarget
+	sessionTabLayouts        map[string]SessionTabLayout
 	sessions                 map[string]*processSession
 	subscribers              map[uint64]chan RuntimeEvent
 	nextSubscriber           uint64
@@ -104,6 +105,7 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 		mobilePairings:           make(map[string]MobileRelayPairingRecord),
 		mobilePairingCodes:       make(map[string]MobileRelayPairingCode),
 		sshTargets:               make(map[string]SshTarget),
+		sessionTabLayouts:        make(map[string]SessionTabLayout),
 		sessions:                 make(map[string]*processSession),
 		subscribers:              make(map[uint64]chan RuntimeEvent),
 		unavailableTool:          append([]string(nil), unavailableTools...),
@@ -203,6 +205,9 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 	}
 	for _, target := range state.SshTargets {
 		manager.sshTargets[target.ID] = target
+	}
+	for _, layout := range state.SessionTabLayouts {
+		manager.sessionTabLayouts[layout.WorktreeID] = layout
 	}
 	if migratedWorktreeInstances {
 		if err := manager.saveLocked(); err != nil {
@@ -3765,6 +3770,7 @@ func (m *Manager) saveLocked() error {
 		NativeProviders:    make([]NativeProviderRegistration, 0, len(m.nativeProviders)),
 		MobilePairings:     make([]MobileRelayPairingRecord, 0, len(m.mobilePairings)),
 		SshTargets:         make([]SshTarget, 0, len(m.sshTargets)),
+		SessionTabLayouts:  make([]SessionTabLayout, 0, len(m.sessionTabLayouts)),
 	}
 	for _, project := range m.projects {
 		state.Projects = append(state.Projects, project)
@@ -3853,6 +3859,9 @@ func (m *Manager) saveLocked() error {
 	}
 	for _, target := range m.sshTargets {
 		state.SshTargets = append(state.SshTargets, target)
+	}
+	for _, layout := range m.sessionTabLayouts {
+		state.SessionTabLayouts = append(state.SessionTabLayouts, layout)
 	}
 	return m.store.save(state)
 }

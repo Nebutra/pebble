@@ -142,7 +142,7 @@ func TestNestedRepoScanAndImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scan, err := manager.ScanNestedRepos(NestedRepoScanRequest{
+	scan, err := manager.ScanNestedRepos(context.Background(), NestedRepoScanRequest{
 		Path:    parentPath,
 		Options: NestedRepoScanOptions{MaxDepth: floatPointer(4)},
 	})
@@ -163,7 +163,7 @@ func TestNestedRepoScanAndImport(t *testing.T) {
 			t.Fatalf("expected scan to skip %s, got %#v", path, scan.Repos)
 		}
 	}
-	result, err := manager.ImportNestedRepos(ProjectGroupImportNestedRequest{
+	result, err := manager.ImportNestedRepos(context.Background(), ProjectGroupImportNestedRequest{
 		ParentPath:   parentPath,
 		GroupName:    "Platform",
 		ProjectPaths: []string{apiPath, webPath, cliPath},
@@ -195,7 +195,7 @@ func TestNestedRepoScanAndImport(t *testing.T) {
 	if len(projects) != 3 {
 		t.Fatalf("expected imported projects, got %#v", projects)
 	}
-	secondResult, err := manager.ImportNestedRepos(ProjectGroupImportNestedRequest{
+	secondResult, err := manager.ImportNestedRepos(context.Background(), ProjectGroupImportNestedRequest{
 		ParentPath:   parentPath,
 		ProjectPaths: []string{apiPath, webPath, cliPath},
 		Mode:         "separate",

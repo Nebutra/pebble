@@ -81,6 +81,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/worktrees/", s.handleWorktreeByID)
 	s.mux.HandleFunc("/v1/sessions", s.handleSessions)
 	s.mux.HandleFunc("/v1/sessions/", s.handleSessionByID)
+	s.mux.HandleFunc("/v1/session-tab-layouts/", s.handleSessionTabLayoutByWorktree)
 	s.mux.HandleFunc("/v1/agents", s.handleAgents)
 	s.mux.HandleFunc("/v1/agents/profiles", s.handleAgentProfiles)
 	s.mux.HandleFunc("/v1/agents/profiles/", s.handleAgentProfileByID)
@@ -163,6 +164,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/providers/github/pulls/detail", s.handleProviderGitHubPRDetail)
 	s.mux.HandleFunc("/v1/providers/github/pulls/checks", s.handleProviderGitHubPRChecks)
 	s.mux.HandleFunc("/v1/providers/gitlab/merge-requests", s.handleProviderGitLabMRs)
+	s.mux.HandleFunc("/v1/providers/reviews", s.handleProviderReviewCreate)
+	s.mux.HandleFunc("/v1/providers/review-capabilities", s.handleProviderReviewCapabilities)
 	s.mux.HandleFunc("/v1/mobile-relay/status", s.handleMobileRelayStatus)
 	s.mux.HandleFunc("/v1/mobile-relay/pairing-codes", s.handleMobileRelayPairingCodes)
 	s.mux.HandleFunc("/v1/mobile-relay/pairings", s.handleMobileRelayPairings)
@@ -432,6 +435,40 @@ func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, tail)
+	case r.Method == http.MethodPatch && action == "":
+		var req runtimecore.UpdateSessionPlacementRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		session, err := s.manager.UpdateSessionPlacement(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, session)
+	case r.Method == http.MethodPost && action == "hook-status":
+		var req runtimecore.SessionHookStatusRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		session, err := s.manager.ReportSessionHookStatus(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, session)
+	case r.Method == http.MethodPost && action == "wait":
+		var req runtimecore.SessionWaitRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		// r.Context() aborts the long-poll when the caller disconnects.
+		wait, err := s.manager.WaitSession(r.Context(), id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, wait)
 	case r.Method == http.MethodPost && action == "clear-buffer":
 		session, err := s.manager.ClearSessionBuffer(id)
 		if err != nil {
@@ -1523,6 +1560,7 @@ func writeRuntimeError(w http.ResponseWriter, err error) {
 	status := http.StatusBadRequest
 	if errors.Is(err, runtimecore.ErrNotFound) ||
 		errors.Is(err, runtimecore.ErrSessionNotFound) ||
+		errors.Is(err, runtimecore.ErrSessionTabLayoutNotFound) ||
 		errors.Is(err, runtimecore.ErrBranchNotFound) {
 		status = http.StatusNotFound
 	}

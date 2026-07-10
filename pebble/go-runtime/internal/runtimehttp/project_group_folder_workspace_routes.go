@@ -53,7 +53,7 @@ func (s *Server) handleProjectGroupScanNested(w http.ResponseWriter, r *http.Req
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	scan, err := s.manager.ScanNestedRepos(req)
+	scan, err := s.manager.ScanNestedRepos(r.Context(), req)
 	if err != nil {
 		writeRuntimeError(w, err)
 		return
@@ -70,7 +70,7 @@ func (s *Server) handleProjectGroupImportNested(w http.ResponseWriter, r *http.R
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	result, err := s.manager.ImportNestedRepos(req)
+	result, err := s.manager.ImportNestedRepos(r.Context(), req)
 	if err != nil {
 		writeRuntimeError(w, err)
 		return

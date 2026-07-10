@@ -1,6 +1,7 @@
 package runtimecore
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -256,7 +257,7 @@ func (m *Manager) MoveProjectToGroup(req MoveProjectToGroupRequest) (Project, er
 	return project, nil
 }
 
-func (m *Manager) ScanNestedRepos(req NestedRepoScanRequest) (NestedRepoScanResult, error) {
+func (m *Manager) ScanNestedRepos(ctx context.Context, req NestedRepoScanRequest) (NestedRepoScanResult, error) {
 	startedAt := time.Now()
 	options := normalizeNestedRepoScanOptions(req.Options)
 	selectedPath, err := normalizeLocalPath(req.Path)
@@ -284,6 +285,12 @@ func (m *Manager) ScanNestedRepos(req NestedRepoScanRequest) (NestedRepoScanResu
 		ignoreRules: []nestedIgnoreRule{},
 	}}
 	for len(pending) > 0 {
+		// Why: a dropped/cancelled HTTP request must abort the walk with the same
+		// partial "stopped" result Electron's AbortSignal cancel path produces.
+		if ctx.Err() != nil {
+			result.Stopped = true
+			break
+		}
 		if len(result.Repos) >= options.maxRepos {
 			result.Truncated = true
 			break
@@ -309,6 +316,10 @@ func (m *Manager) ScanNestedRepos(req NestedRepoScanRequest) (NestedRepoScanResu
 			return entries[i].Name() < entries[j].Name()
 		})
 		for _, entry := range entries {
+			if ctx.Err() != nil {
+				result.Stopped = true
+				break
+			}
 			if len(result.Repos) >= options.maxRepos {
 				result.Truncated = true
 				break
@@ -353,12 +364,12 @@ func (m *Manager) ScanNestedRepos(req NestedRepoScanRequest) (NestedRepoScanResu
 	return result, nil
 }
 
-func (m *Manager) ImportNestedRepos(req ProjectGroupImportNestedRequest) (ProjectGroupImportResult, error) {
+func (m *Manager) ImportNestedRepos(ctx context.Context, req ProjectGroupImportNestedRequest) (ProjectGroupImportResult, error) {
 	parentPath, err := normalizeLocalPath(req.ParentPath)
 	if err != nil {
 		return ProjectGroupImportResult{}, err
 	}
-	scan, err := m.ScanNestedRepos(NestedRepoScanRequest{
+	scan, err := m.ScanNestedRepos(ctx, NestedRepoScanRequest{
 		Path: parentPath,
 		Options: NestedRepoScanOptions{
 			TimeoutMs: floatPointer(15_000),
@@ -382,6 +393,16 @@ func (m *Manager) ImportNestedRepos(req ProjectGroupImportNestedRequest) (Projec
 	importedByPath := map[string]string{}
 	targetCache := map[string]string{}
 	for order, repoPath := range selected.paths {
+		// Why: cancellation between repos mirrors the scan's cancel-to-stopped flow;
+		// remaining paths report failed instead of pretending they were imported.
+		if ctx.Err() != nil {
+			result.Projects = append(result.Projects, ProjectGroupImportProjectResult{
+				Path:   repoPath,
+				Status: "failed",
+				Error:  "Import was cancelled",
+			})
+			continue
+		}
 		group, err := groupResolver.getGroupForRepo(repoPath)
 		if err != nil {
 			result.Projects = append(result.Projects, ProjectGroupImportProjectResult{

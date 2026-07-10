@@ -38,6 +38,12 @@ type processSession struct {
 	output      []OutputChunk
 	emit        func(topic string, payload interface{})
 	altScreen   altScreenScanner
+	// hookAgentState holds the latest agent-hook-reported readiness (working/
+	// idle/permission); stateChanged is closed-and-replaced on every status or
+	// hook transition so waiters can block without polling.
+	hookAgentState   SessionHookState
+	hookAgentStateAt time.Time
+	stateChanged     chan struct{}
 }
 
 func startProcessSession(ctx context.Context, req StartSessionRequest, emit func(topic string, payload interface{})) (*processSession, error) {
@@ -51,23 +57,24 @@ func startProcessSession(ctx context.Context, req StartSessionRequest, emit func
 	cols, rows := normalizeSessionSize(req.Cols, req.Rows)
 	startedAt := time.Now().UTC()
 	session := &processSession{
-		id:          newID("sess"),
-		projectID:   req.ProjectID,
-		worktreeID:  req.WorktreeID,
-		cwd:         req.Cwd,
-		command:     append([]string(nil), command...),
-		agentKind:   req.AgentKind,
-		tabID:       req.TabID,
-		leafID:      req.LeafID,
-		launchToken: req.LaunchToken,
-		prompt:      req.Prompt,
-		status:      SessionStarting,
-		startedAt:   startedAt,
-		updatedAt:   startedAt,
-		cols:        cols,
-		rows:        rows,
-		output:      make([]OutputChunk, 0, 256),
-		emit:        emit,
+		id:           newID("sess"),
+		projectID:    req.ProjectID,
+		worktreeID:   req.WorktreeID,
+		cwd:          req.Cwd,
+		command:      append([]string(nil), command...),
+		agentKind:    req.AgentKind,
+		tabID:        req.TabID,
+		leafID:       req.LeafID,
+		launchToken:  req.LaunchToken,
+		prompt:       req.Prompt,
+		status:       SessionStarting,
+		startedAt:    startedAt,
+		updatedAt:    startedAt,
+		cols:         cols,
+		rows:         rows,
+		output:       make([]OutputChunk, 0, 256),
+		emit:         emit,
+		stateChanged: make(chan struct{}),
 	}
 	if err := startPlatformProcessSession(ctx, session, req); err != nil {
 		return nil, err
@@ -155,6 +162,7 @@ func (s *processSession) stop() (Session, error) {
 	stdin := s.stdin
 	s.status = SessionStopped
 	s.updatedAt = time.Now().UTC()
+	s.notifyStateChangedLocked()
 	s.mu.Unlock()
 	if stdin != nil {
 		_ = stdin.Close()
@@ -252,6 +260,7 @@ func (s *processSession) wait() {
 		s.status = SessionFailed
 	}
 	s.updatedAt = time.Now().UTC()
+	s.notifyStateChangedLocked()
 	snapshot := s.snapshotLocked()
 	s.mu.Unlock()
 	if s.emit != nil {
@@ -263,7 +272,23 @@ func (s *processSession) setStatus(status SessionStatus) {
 	s.mu.Lock()
 	s.status = status
 	s.updatedAt = time.Now().UTC()
+	s.notifyStateChangedLocked()
 	s.mu.Unlock()
+}
+
+// notifyStateChangedLocked wakes wait callers after a status or hook-state
+// transition. Close-and-replace broadcasts to every waiter at once.
+func (s *processSession) notifyStateChangedLocked() {
+	if s.stateChanged != nil {
+		close(s.stateChanged)
+	}
+	s.stateChanged = make(chan struct{})
+}
+
+func (s *processSession) stateChangeChannel() <-chan struct{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.stateChanged
 }
 
 func (s *processSession) snapshotLocked() Session {
@@ -275,24 +300,26 @@ func (s *processSession) snapshotLocked() Session {
 // lazily on status reads via statusSnapshot to avoid a hot polling loop.
 func (s *processSession) buildSnapshotLocked() Session {
 	return Session{
-		ID:              s.id,
-		ProjectID:       s.projectID,
-		WorktreeID:      s.worktreeID,
-		Cwd:             s.cwd,
-		Command:         append([]string(nil), s.command...),
-		AgentKind:       s.agentKind,
-		TabID:           s.tabID,
-		LeafID:          s.leafID,
-		LaunchToken:     s.launchToken,
-		Prompt:          s.prompt,
-		Status:          s.status,
-		ExitCode:        cloneExitCode(s.exitCode),
-		StartedAt:       s.startedAt,
-		UpdatedAt:       s.updatedAt,
-		OutputChunks:    len(s.output),
-		Cols:            s.cols,
-		Rows:            s.rows,
-		AltScreenActive: s.altScreen.Active(),
+		ID:               s.id,
+		ProjectID:        s.projectID,
+		WorktreeID:       s.worktreeID,
+		Cwd:              s.cwd,
+		Command:          append([]string(nil), s.command...),
+		AgentKind:        s.agentKind,
+		TabID:            s.tabID,
+		LeafID:           s.leafID,
+		LaunchToken:      s.launchToken,
+		Prompt:           s.prompt,
+		Status:           s.status,
+		ExitCode:         cloneExitCode(s.exitCode),
+		StartedAt:        s.startedAt,
+		UpdatedAt:        s.updatedAt,
+		OutputChunks:     len(s.output),
+		Cols:             s.cols,
+		Rows:             s.rows,
+		AltScreenActive:  s.altScreen.Active(),
+		HookAgentState:   s.hookAgentState,
+		HookAgentStateAt: cloneHookStateAt(s.hookAgentStateAt),
 	}
 }
 
@@ -345,6 +372,14 @@ func defaultShellCommand() []string {
 		return []string{shell}
 	}
 	return []string{"/bin/sh"}
+}
+
+func cloneHookStateAt(value time.Time) *time.Time {
+	if value.IsZero() {
+		return nil
+	}
+	copied := value
+	return &copied
 }
 
 func cloneExitCode(value *int) *int {

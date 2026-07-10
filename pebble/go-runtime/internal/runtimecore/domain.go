@@ -420,6 +420,11 @@ type Session struct {
 	// foreground detection is not implemented, so the renderer can distinguish
 	// "unsupported" from "no foreground detected".
 	ForegroundProcessUnsupportedReason string `json:"foregroundProcessUnsupportedReason,omitempty"`
+	// HookAgentState mirrors Electron's hook-reported agent readiness
+	// (working/idle/permission) so terminal wait/inspect flows can gate on TUI
+	// readiness instead of raw process liveness. Empty until a hook reports.
+	HookAgentState   SessionHookState `json:"hookAgentState,omitempty"`
+	HookAgentStateAt *time.Time       `json:"hookAgentStateAt,omitempty"`
 }
 
 type StartSessionRequest struct {
