@@ -30,6 +30,9 @@ import {
   createPebbleProjectGroupsApi
 } from './tauri-folder-workspace-api'
 import { createPebbleHooksApi } from './tauri-hooks-api'
+import { createPebbleAgentHooksApi } from './tauri-agent-hooks-api'
+import { createPebbleClaudeAccountsApi, createPebbleCodexAccountsApi } from './tauri-accounts-api'
+import { createPebbleRateLimitsApi } from './tauri-rate-limits-api'
 import { createPebbleMobileApi } from './tauri-mobile-runtime-api'
 import { createPebbleSpeechApi } from './tauri-speech-api'
 import { readHostTerminalCapabilities } from './host-terminal-capabilities'
@@ -41,6 +44,7 @@ import {
 import { createPebbleSshApi } from './tauri-ssh-targets-api'
 import { createPebbleNotificationsApi } from './tauri-notifications-api'
 import { createPebbleCliApi } from './tauri-cli-api'
+import { waitForTauriStartupServices } from './tauri-startup-services'
 
 const fallbackPreflightStatus: PreflightStatus = {
   git: { installed: true },
@@ -91,6 +95,10 @@ export function installPebbleTauriPreloadApi(): void {
   api.ssh = createPebbleSshApi(api.ssh)
   api.notifications = createPebbleNotificationsApi(api.notifications)
   api.cli = createPebbleCliApi(api.cli)
+  api.agentHooks = createPebbleAgentHooksApi(api.agentHooks)
+  api.codexAccounts = createPebbleCodexAccountsApi(api.codexAccounts)
+  api.claudeAccounts = createPebbleClaudeAccountsApi(api.claudeAccounts)
+  api.rateLimits = createPebbleRateLimitsApi(api.rateLimits)
 }
 
 function createPebbleAppApi(base: PreloadApi['app']): PreloadApi['app'] {
@@ -109,11 +117,6 @@ function createPebbleAppApi(base: PreloadApi['app']): PreloadApi['app'] {
     awaitFirstWindowStartupServices: waitForTauriStartupServices,
     startupDiagnostic: recordTauriStartupDiagnostic
   }
-}
-
-async function waitForTauriStartupServices(): Promise<void> {
-  await ensurePebbleRuntimeProcess()
-  await Promise.allSettled([readPebbleStatusOrNull(), refreshTauriAgents()])
 }
 
 async function recordTauriStartupDiagnostic(
@@ -145,13 +148,9 @@ function createPebblePreflightApi(base: PreloadApi['preflight']): PreloadApi['pr
     detectAgents: () => detectTauriAgents(),
     refreshAgents: () => refreshTauriAgents(),
     detectRemoteAgents: async ({ connectionId }) => {
-      try {
-        return readRemoteAgentIds(
-          await callRuntimeEnvironmentResult(connectionId, 'preflight.detectAgents')
-        )
-      } catch {
-        return []
-      }
+      return readRemoteAgentIds(
+        await callRuntimeEnvironmentResult(connectionId, 'preflight.detectAgents')
+      )
     },
     // The Go runtime probes whichever host it runs on (local or the SSH-remote
     // runtime), so its host-capability route already answers for the target

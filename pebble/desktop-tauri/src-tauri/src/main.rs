@@ -35,6 +35,20 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
+            commands::agent_hooks::agent_hooks_claude_status,
+            commands::agent_hooks::agent_hooks_openclaude_status,
+            commands::agent_hooks::agent_hooks_codex_status,
+            commands::agent_hooks::agent_hooks_gemini_status,
+            commands::agent_hooks::agent_hooks_antigravity_status,
+            commands::agent_hooks::agent_hooks_amp_status,
+            commands::agent_hooks::agent_hooks_cursor_status,
+            commands::agent_hooks::agent_hooks_droid_status,
+            commands::agent_hooks::agent_hooks_command_code_status,
+            commands::agent_hooks::agent_hooks_grok_status,
+            commands::agent_hooks::agent_hooks_copilot_status,
+            commands::agent_hooks::agent_hooks_hermes_status,
+            commands::agent_hooks::agent_hooks_devin_status,
+            commands::agent_hooks::agent_hooks_kimi_status,
             commands::browser_detection::browser_detect_installed_browsers,
             commands::computer_permissions::computer_permissions_open,
             commands::computer_permissions::computer_permissions_reset,

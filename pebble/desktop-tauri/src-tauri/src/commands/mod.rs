@@ -1,3 +1,4 @@
+pub mod agent_hooks;
 pub mod browser_detection;
 pub mod cli_registration;
 pub mod computer_permissions;
