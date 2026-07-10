@@ -40,6 +40,10 @@ func TestListGitLabMRsHappyPath(t *testing.T) {
 	if len(first.Labels) != 2 || first.Labels[0] != "backend" {
 		t.Fatalf("unexpected labels: %+v", first.Labels)
 	}
+	// First item's source/target project ids match (5==5): same-repo MR.
+	if first.IsCrossRepository == nil || *first.IsCrossRepository {
+		t.Fatalf("expected same-repo MR to report isCrossRepository=false, got %+v", first.IsCrossRepository)
+	}
 	// Second item's title carries a Draft:/WIP: prefix, which maps to draft
 	// state even though the draft boolean is false (mirrors mapMRState).
 	if items[1].State != "draft" {
@@ -47,6 +51,26 @@ func TestListGitLabMRsHappyPath(t *testing.T) {
 	}
 	if len(items[1].Labels) != 1 || items[1].Labels[0] != "chore" {
 		t.Fatalf("expected object-form label to coerce to name: %+v", items[1].Labels)
+	}
+	// Second item's source (9) and target (5) project ids differ: fork MR.
+	if items[1].IsCrossRepository == nil || !*items[1].IsCrossRepository {
+		t.Fatalf("expected fork MR to report isCrossRepository=true, got %+v", items[1].IsCrossRepository)
+	}
+}
+
+func TestListGitLabMRsIsCrossRepositoryUnknownWhenProjectIDsMissing(t *testing.T) {
+	json := `[{"id":2001,"iid":3,"title":"No project ids","state":"opened","web_url":"https://gitlab.com/g/p/-/merge_requests/3","updated_at":"2024-02-03T04:05:06Z","author":{"username":"tanuki"},"labels":[],"draft":false,"source_branch":"topic","target_branch":"main"}]`
+	dir := fakeCLIStub(t, "glab", json, 0)
+	withPath(t, dir)
+	items, err := ListGitLabMRs(context.Background(), "", "opened", 20, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if items[0].IsCrossRepository != nil {
+		t.Fatalf("expected nil isCrossRepository when project ids are absent, got %+v", items[0].IsCrossRepository)
 	}
 }
 
