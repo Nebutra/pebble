@@ -38,7 +38,16 @@ const (
 	AutomationRunQueued    AutomationRunStatus = "queued"
 	AutomationRunCompleted AutomationRunStatus = "completed"
 	AutomationRunFailed    AutomationRunStatus = "failed"
+	// AutomationRunSkippedPrecheck mirrors Electron's skipped_precheck status:
+	// the schedule fired but the precheck gate did not pass, so no action ran.
+	AutomationRunSkippedPrecheck AutomationRunStatus = "skipped_precheck"
 )
+
+// AutomationRendererPayloadKey is the reserved action-payload envelope the
+// desktop shell uses to round-trip renderer-only automation fields (prompt,
+// agent, workspace mode). The runtime strips it before decoding native action
+// requests and forwards it untouched on dispatch events.
+const AutomationRendererPayloadKey = "pebbleAutomation"
 
 type AutomationRunReason string
 
@@ -69,24 +78,28 @@ type AutomationAction struct {
 }
 
 type Automation struct {
-	ID              string             `json:"id"`
-	Name            string             `json:"name"`
-	Description     string             `json:"description,omitempty"`
-	Enabled         bool               `json:"enabled"`
-	Schedule        AutomationSchedule `json:"schedule"`
-	Action          AutomationAction   `json:"action"`
-	LastTriggeredAt *time.Time         `json:"lastTriggeredAt,omitempty"`
-	NextRunAt       *time.Time         `json:"nextRunAt,omitempty"`
-	CreatedAt       time.Time          `json:"createdAt"`
-	UpdatedAt       time.Time          `json:"updatedAt"`
+	ID          string             `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description,omitempty"`
+	Enabled     bool               `json:"enabled"`
+	Schedule    AutomationSchedule `json:"schedule"`
+	Action      AutomationAction   `json:"action"`
+	// Precheck gates scheduled runs only; manual/event triggers bypass it,
+	// matching the Electron automation service.
+	Precheck        *AutomationPrecheck `json:"precheck,omitempty"`
+	LastTriggeredAt *time.Time          `json:"lastTriggeredAt,omitempty"`
+	NextRunAt       *time.Time          `json:"nextRunAt,omitempty"`
+	CreatedAt       time.Time           `json:"createdAt"`
+	UpdatedAt       time.Time           `json:"updatedAt"`
 }
 
 type CreateAutomationRequest struct {
-	Name        string             `json:"name"`
-	Description string             `json:"description,omitempty"`
-	Enabled     bool               `json:"enabled,omitempty"`
-	Schedule    AutomationSchedule `json:"schedule"`
-	Action      AutomationAction   `json:"action"`
+	Name        string              `json:"name"`
+	Description string              `json:"description,omitempty"`
+	Enabled     bool                `json:"enabled,omitempty"`
+	Schedule    AutomationSchedule  `json:"schedule"`
+	Action      AutomationAction    `json:"action"`
+	Precheck    *AutomationPrecheck `json:"precheck,omitempty"`
 }
 
 type UpdateAutomationRequest struct {
@@ -95,6 +108,9 @@ type UpdateAutomationRequest struct {
 	Enabled     *bool               `json:"enabled,omitempty"`
 	Schedule    *AutomationSchedule `json:"schedule,omitempty"`
 	Action      *AutomationAction   `json:"action,omitempty"`
+	// Precheck with an empty command clears the stored precheck; nil leaves it
+	// unchanged.
+	Precheck *AutomationPrecheck `json:"precheck,omitempty"`
 }
 
 type TriggerAutomationRequest struct {
@@ -117,9 +133,12 @@ type AutomationRun struct {
 	DispatchID       string                 `json:"dispatchId,omitempty"`
 	AgentRunID       string                 `json:"agentRunId,omitempty"`
 	ComputerActionID string                 `json:"computerActionId,omitempty"`
-	Error            string                 `json:"error,omitempty"`
-	CreatedAt        time.Time              `json:"createdAt"`
-	UpdatedAt        time.Time              `json:"updatedAt"`
+	// PrecheckResult records whether a scheduled run's precheck passed (run
+	// proceeded) or failed (run recorded as skipped_precheck).
+	PrecheckResult *AutomationPrecheckResult `json:"precheckResult,omitempty"`
+	Error          string                    `json:"error,omitempty"`
+	CreatedAt      time.Time                 `json:"createdAt"`
+	UpdatedAt      time.Time                 `json:"updatedAt"`
 }
 
 func (m *Manager) CreateAutomation(req CreateAutomationRequest) (Automation, error) {
@@ -143,6 +162,7 @@ func (m *Manager) CreateAutomation(req CreateAutomationRequest) (Automation, err
 		Enabled:     req.Enabled,
 		Schedule:    schedule,
 		Action:      action,
+		Precheck:    normalizeAutomationPrecheck(req.Precheck),
 		NextRunAt:   nextAutomationRunAt(schedule, now, req.Enabled),
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -191,6 +211,9 @@ func (m *Manager) UpdateAutomation(id string, req UpdateAutomationRequest) (Auto
 			return Automation{}, err
 		}
 		automation.Action = action
+	}
+	if req.Precheck != nil {
+		automation.Precheck = normalizeAutomationPrecheck(req.Precheck)
 	}
 	now := time.Now().UTC()
 	if req.Enabled != nil || scheduleChanged {
@@ -285,7 +308,36 @@ func (m *Manager) triggerAutomationAt(ctx context.Context, id string, req Trigge
 		"automation": automation,
 		"run":        run,
 	})
+	// Precheck gates scheduled triggers only, mirroring Electron: manual runs
+	// were requested explicitly by a person and must not be gated.
+	if reason == AutomationRunSchedule && automation.Precheck != nil {
+		result := m.evaluateAutomationPrecheck(ctx, automation)
+		run.PrecheckResult = &result
+		if !automationPrecheckPassed(result) {
+			run.Status = AutomationRunSkippedPrecheck
+			run.Error = formatAutomationPrecheckFailure(result)
+			run.UpdatedAt = time.Now().UTC()
+			return m.saveAutomationRun(run)
+		}
+	}
+	// Tell any connected desktop shell that an automation wants workspace work
+	// (renderer dispatch). Native action execution below is the headless path.
+	m.emit("automation.dispatch.requested", map[string]interface{}{
+		"automation": automation,
+		"run":        run,
+	})
 	return m.executeAutomationRun(ctx, automation, run)
+}
+
+// evaluateAutomationPrecheck resolves the precheck cwd and runs the bounded
+// shell command; an unresolvable cwd is a precheck failure, not a crash.
+func (m *Manager) evaluateAutomationPrecheck(ctx context.Context, automation Automation) AutomationPrecheckResult {
+	precheck := *automation.Precheck
+	cwd, err := m.resolveAutomationPrecheckCwd(automation)
+	if err != nil {
+		return failedAutomationPrecheckResult(precheck, time.Now().UTC(), err.Error())
+	}
+	return runAutomationPrecheck(ctx, precheck, cwd)
 }
 
 func (m *Manager) EvaluateScheduledAutomations(ctx context.Context, now time.Time) ([]AutomationRun, error) {
@@ -299,6 +351,30 @@ func (m *Manager) EvaluateScheduledAutomations(ctx context.Context, now time.Tim
 		runs = append(runs, run)
 	}
 	return runs, nil
+}
+
+// RunAutomationScheduler evaluates due scheduled automations every interval
+// until ctx is canceled. Why: headless runtimes have no desktop shell polling
+// the evaluate endpoint, so the runtime itself must tick — the native
+// equivalent of Electron's AutomationService interval timer.
+func (m *Manager) RunAutomationScheduler(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = time.Minute
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if _, err := m.EvaluateScheduledAutomations(ctx, time.Now().UTC()); err != nil {
+				// Run-level failures are already recorded on the run; this
+				// surfaces storage-level evaluation errors without crashing.
+				m.emit("automation.scheduler.error", map[string]interface{}{"error": err.Error()})
+			}
+		}
+	}
 }
 
 func (m *Manager) ListAutomationRuns(automationID string) []AutomationRun {
@@ -570,6 +646,17 @@ func mergedAutomationPayload(base map[string]interface{}, override map[string]in
 }
 
 func decodeAutomationPayload(payload map[string]interface{}, target interface{}) error {
+	// The renderer envelope is metadata for dispatch events, not action input;
+	// stripping it keeps DisallowUnknownFields strict for real payload keys.
+	if _, ok := payload[AutomationRendererPayloadKey]; ok {
+		stripped := make(map[string]interface{}, len(payload))
+		for key, value := range payload {
+			if key != AutomationRendererPayloadKey {
+				stripped[key] = value
+			}
+		}
+		payload = stripped
+	}
 	content, err := json.Marshal(payload)
 	if err != nil {
 		return err

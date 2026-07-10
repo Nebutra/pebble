@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/tsekaluk/pebble/go-runtime/internal/runtimecore"
 	"github.com/tsekaluk/pebble/go-runtime/internal/runtimehttp"
@@ -29,6 +30,9 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Due automations must fire without a desktop shell polling /evaluate.
+	go manager.RunAutomationScheduler(ctx, time.Minute)
 
 	fmt.Fprintf(os.Stderr, "pebble runtime listening on http://%s\n", *listen)
 	if err := runtimehttp.StartWithOptions(ctx, *listen, manager, runtimehttp.ServerOptions{

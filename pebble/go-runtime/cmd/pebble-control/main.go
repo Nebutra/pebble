@@ -452,6 +452,9 @@ func runAutomation(client controlClient, args []string) error {
 		dtstart := fs.String("dtstart", "", "RFC3339 recurrence start for rrule schedules")
 		action := fs.String("action", "", "createTask, sendMessage, dispatchTask, startAgentRun, or computerAction")
 		payloadJSON := fs.String("payload", "", "action payload JSON object")
+		precheckCommand := fs.String("precheck-command", "", "shell command gating scheduled runs (exit 0 = run)")
+		precheckTimeout := fs.Int64("precheck-timeout-seconds", 0, "precheck timeout seconds (default 60, max 600)")
+		precheckWorkdir := fs.String("precheck-workdir", "", "working directory for the precheck command")
 		_ = fs.Parse(args[1:])
 		payload, err := parseJSONMap(*payloadJSON)
 		if err != nil {
@@ -471,6 +474,9 @@ func runAutomation(client controlClient, args []string) error {
 				"payload": payload,
 			},
 		}
+		if *precheckCommand != "" {
+			body["precheck"] = automationPrecheckPayload(*precheckCommand, *precheckTimeout, *precheckWorkdir)
+		}
 		return client.printJSON(http.MethodPost, "/v1/automations", body)
 	case "update":
 		fs := flag.NewFlagSet("automation update", flag.ExitOnError)
@@ -487,6 +493,9 @@ func runAutomation(client controlClient, args []string) error {
 		dtstart := fs.String("dtstart", "", "RFC3339 recurrence start for rrule schedules")
 		action := fs.String("action", "", "createTask, sendMessage, dispatchTask, startAgentRun, or computerAction")
 		payloadJSON := fs.String("payload", "", "action payload JSON object")
+		precheckCommand := fs.String("precheck-command", "", "shell command gating scheduled runs (empty clears the precheck)")
+		precheckTimeout := fs.Int64("precheck-timeout-seconds", 0, "precheck timeout seconds (default 60, max 600)")
+		precheckWorkdir := fs.String("precheck-workdir", "", "working directory for the precheck command")
 		_ = fs.Parse(args[1:])
 		body := map[string]interface{}{
 			"name":        *name,
@@ -515,6 +524,10 @@ func runAutomation(client controlClient, args []string) error {
 				"kind":    *action,
 				"payload": payload,
 			}
+		}
+		if flagWasSet(fs, "precheck-command") {
+			// An explicitly empty command clears the stored precheck server-side.
+			body["precheck"] = automationPrecheckPayload(*precheckCommand, *precheckTimeout, *precheckWorkdir)
 		}
 		return client.printJSON(http.MethodPatch, "/v1/automations/"+url.PathEscape(*id), body)
 	case "delete":
@@ -548,6 +561,17 @@ func runAutomation(client controlClient, args []string) error {
 	default:
 		return fmt.Errorf("unknown automation command %q", args[0])
 	}
+}
+
+func automationPrecheckPayload(command string, timeoutSeconds int64, workdir string) map[string]interface{} {
+	precheck := map[string]interface{}{"command": command}
+	if timeoutSeconds > 0 {
+		precheck["timeoutSeconds"] = timeoutSeconds
+	}
+	if workdir != "" {
+		precheck["workingDir"] = workdir
+	}
+	return precheck
 }
 
 func runExternalTask(client controlClient, args []string) error {

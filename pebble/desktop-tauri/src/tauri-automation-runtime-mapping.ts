@@ -4,6 +4,7 @@ import type {
   AutomationCreateInput,
   AutomationExecutionTargetType,
   AutomationPrecheck,
+  AutomationPrecheckResult,
   AutomationRun,
   AutomationRunStatus,
   AutomationSchedulerOwner,
@@ -41,17 +42,32 @@ export type RuntimeAutomation = {
   updatedAt?: string
 }
 
+export type RuntimeAutomationPrecheckResult = {
+  command?: string
+  exitCode?: number | null
+  timedOut?: boolean
+  durationMs?: number
+  stdout?: string
+  stderr?: string
+  stdoutTruncated?: boolean
+  stderrTruncated?: boolean
+  error?: string
+  startedAt?: string
+  completedAt?: string
+}
+
 export type RuntimeAutomationRun = {
   id: string
   automationId: string
   reason?: 'manual' | 'schedule' | 'event'
-  status?: 'queued' | 'completed' | 'failed'
+  status?: 'queued' | 'completed' | 'failed' | 'skipped_precheck'
   payload?: Record<string, unknown>
   taskId?: string
   messageId?: string
   dispatchId?: string
   agentRunId?: string
   computerActionId?: string
+  precheckResult?: RuntimeAutomationPrecheckResult | null
   error?: string
   createdAt?: string
   updatedAt?: string
@@ -167,7 +183,7 @@ export function mapRuntimeAutomationRun(
     terminalPaneKey: null,
     terminalPtyId: null,
     outputSnapshot: createRunOutputSnapshot(run, updatedAt),
-    precheckResult: null,
+    precheckResult: mapRuntimePrecheckResult(run.precheckResult),
     usage: null,
     error: stringValue(run.error) || null,
     startedAt: createdAt,
@@ -360,7 +376,43 @@ function mapRuntimeRunStatus(status: RuntimeAutomationRun['status']): Automation
   if (status === 'failed') {
     return 'dispatch_failed'
   }
+  if (status === 'skipped_precheck') {
+    return 'skipped_precheck'
+  }
   return 'pending'
+}
+
+// Converts the Go runtime's RFC3339 precheck timestamps into the renderer's
+// millisecond-epoch AutomationPrecheckResult shape.
+export function mapRuntimePrecheckResult(
+  result: RuntimeAutomationPrecheckResult | null | undefined
+): AutomationPrecheckResult | null {
+  if (!result) {
+    return null
+  }
+  const startedAt = dateMs(result.startedAt, Date.now())
+  return {
+    command: stringValue(result.command),
+    exitCode: typeof result.exitCode === 'number' ? result.exitCode : null,
+    timedOut: result.timedOut === true,
+    durationMs: numberValue(result.durationMs, 0),
+    stdout: typeof result.stdout === 'string' ? result.stdout : '',
+    stderr: typeof result.stderr === 'string' ? result.stderr : '',
+    stdoutTruncated: result.stdoutTruncated === true,
+    stderrTruncated: result.stderrTruncated === true,
+    error: stringValue(result.error) || null,
+    startedAt,
+    completedAt: dateMs(result.completedAt, startedAt)
+  }
+}
+
+// True when the runtime payload carries the desktop shell's automation
+// envelope, i.e. the automation was authored in the renderer and its real
+// work (agent terminal session) must be performed by a renderer dispatch.
+export function hasRendererAutomationSnapshot(
+  payload: Record<string, unknown> | undefined
+): boolean {
+  return Boolean(payload && objectValue(payload[AUTOMATION_PAYLOAD_KEY]))
 }
 
 function objectValue(value: unknown): Record<string, unknown> | null {

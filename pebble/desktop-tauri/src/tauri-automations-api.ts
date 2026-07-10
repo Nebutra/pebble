@@ -2,13 +2,15 @@ import type { PreloadApi } from '../../../src/preload/api-types'
 import type {
   Automation,
   AutomationCreateInput,
-  AutomationDispatchRequest,
   AutomationDispatchResult,
+  AutomationPrecheckResult,
+  ExternalAutomationManager,
   AutomationRun,
   AutomationUpdateInput,
   ExternalAutomationRunsPage
 } from '../../../src/shared/automations-types'
 import { requestRuntimeJson } from './pebble-tauri-runtime-transport'
+import { onTauriAutomationDispatchRequested } from './tauri-automation-dispatch-events'
 import {
   applyAutomationUpdates,
   mapRuntimeAutomation,
@@ -24,6 +26,9 @@ type TauriAutomationRpcResult =
   | { handled: false }
   | { handled: true; result: unknown }
 
+const TAURI_EXTERNAL_AUTOMATION_UNAVAILABLE =
+  'External automation managers require the Tauri external automation adapter.'
+
 export function createPebbleAutomationsApi(
   base: PreloadApi['automations']
 ): PreloadApi['automations'] {
@@ -31,7 +36,7 @@ export function createPebbleAutomationsApi(
     ...base,
     list: () => listTauriAutomations(),
     listRuns: ({ automationId } = {}) => listTauriAutomationRuns(automationId),
-    listExternalManagers: async () => [],
+    listExternalManagers: () => Promise.resolve(getTauriExternalAutomationManagers()),
     listExternalRuns: async (input) => createEmptyExternalRunsPage(input),
     createExternal: rejectExternalAutomationOperation,
     updateExternal: rejectExternalAutomationOperation,
@@ -42,13 +47,44 @@ export function createPebbleAutomationsApi(
       await deleteTauriAutomation(id)
     },
     runNow: ({ id }) => runTauriAutomationNow(id),
-    runPrecheck: async () => null,
+    // Why: the Go runtime already executed the precheck when the schedule
+    // fired; returning the recorded result keeps the renderer's dispatch gate
+    // consistent with the native gate instead of re-running the command.
+    runPrecheck: ({ automationId, runId }) => readTauriAutomationPrecheckResult(automationId, runId),
     markDispatchResult: (result) => readTauriAutomationRunResult(result),
     snapshotWorkspaceName: async () => 0,
     rendererReady: async () => undefined,
-    onDispatchRequested: (_callback: (request: AutomationDispatchRequest) => void) =>
-      noopUnsubscribe
+    onDispatchRequested: (callback) => onTauriAutomationDispatchRequested(callback)
   }
+}
+
+function getTauriExternalAutomationManagers(): ExternalAutomationManager[] {
+  // Why: returning [] makes a missing adapter look like a clean empty state.
+  // Surface an unavailable source so the renderer disables actions explicitly.
+  return [
+    {
+      id: 'tauri-hermes-local-unavailable',
+      provider: 'hermes',
+      label: 'Hermes',
+      targetLabel: 'Local',
+      target: { type: 'local' },
+      status: 'unavailable',
+      error: TAURI_EXTERNAL_AUTOMATION_UNAVAILABLE,
+      canManage: false,
+      jobs: []
+    },
+    {
+      id: 'tauri-openclaw-local-unavailable',
+      provider: 'openclaw',
+      label: 'OpenClaw',
+      targetLabel: 'Local',
+      target: { type: 'local' },
+      status: 'unavailable',
+      error: TAURI_EXTERNAL_AUTOMATION_UNAVAILABLE,
+      canManage: false,
+      jobs: []
+    }
+  ]
 }
 
 export async function callTauriAutomationRuntimeRpc(
@@ -157,6 +193,14 @@ async function runTauriAutomationNow(id: string): Promise<AutomationRun> {
   return mapRuntimeAutomationRun(run, automation)
 }
 
+async function readTauriAutomationPrecheckResult(
+  automationId: string,
+  runId: string
+): Promise<AutomationPrecheckResult | null> {
+  const runs = await listTauriAutomationRuns(automationId)
+  return runs.find((entry) => entry.id === runId)?.precheckResult ?? null
+}
+
 async function readTauriAutomationRunResult(
   result: AutomationDispatchResult
 ): Promise<AutomationRun> {
@@ -194,7 +238,7 @@ function createEmptyExternalRunsPage(
 }
 
 function rejectExternalAutomationOperation(): Promise<void> {
-  return Promise.reject(new Error('External automation managers are not wired in Tauri yet.'))
+  return Promise.reject(new Error(TAURI_EXTERNAL_AUTOMATION_UNAVAILABLE))
 }
 
 function toCreateInput(params: unknown): AutomationCreateInput {
@@ -230,5 +274,3 @@ function recordValue(value: unknown): Record<string, unknown> | null {
 function stringValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
-
-function noopUnsubscribe(): void {}

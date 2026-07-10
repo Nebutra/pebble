@@ -139,10 +139,26 @@ Current implementation:
 - Tauri maps local `window.api.automations` and `automation.*` runtime RPC calls onto the Go
   automation HTTP routes, preserving the renderer's rich automation fields inside runtime payloads
   so list/create/update/delete, run listing, and manual Run Now are backed by real runtime storage.
+- Go executes automation prechecks natively: a bounded shell command (default 60s, max 600s
+  timeout, exit 0 = pass) gates scheduled triggers in the automation's working directory (explicit
+  `workingDir`, payload `cwd`, or the targeted worktree/project path), records the full
+  Electron-shaped result (`precheckResult`) on the run, and marks failed gates `skipped_precheck`
+  without executing the action. Manual triggers bypass the precheck, matching Electron.
+- The runtime runs its own scheduler tick (`RunAutomationScheduler`, one-minute interval in
+  `pebble-runtime`) so due automations fire headlessly without a desktop shell polling
+  `/v1/automations/evaluate`, and it strips the reserved `pebbleAutomation` renderer envelope from
+  action payloads before decoding native action requests so renderer-authored automations execute
+  instead of failing strict decode.
+- Renderer dispatch flows over the runtime event push channel: passing (or precheck-free) triggers
+  emit `automation.dispatch.requested`, and the Tauri bridge
+  (`tauri-automation-dispatch-events.ts`) maps runs carrying the renderer envelope onto
+  `window.api.automations.onDispatchRequested`, so the renderer's existing dispatch lifecycle
+  (workspace create/reuse, agent terminal launch, completion bookkeeping) runs against the Go
+  runtime. `runPrecheck` returns the natively recorded result rather than re-running the command.
 - Tauri projects local Hermes/OpenClaw sources as explicit unavailable external managers instead of
-  returning an empty fake state. Renderer/headless dispatch, native precheck execution, and
-  external automation manager execution are still explicit migration gaps, not fake-success
-  fallbacks.
+  returning an empty fake state. External automation manager execution (Hermes/OpenClaw) and
+  persisting renderer dispatch status updates back onto Go run records are still explicit
+  migration gaps, not fake-success fallbacks.
 
 ### External Task Service
 
@@ -268,6 +284,10 @@ Current implementation:
 - Tauri WebView shims register page-scoped action executors with the browser action consumer, so
   queued `browser.goto`, reload, back, forward, and stop actions now complete against the active
   native WebView and report results back to the shared runtime action endpoint.
+- Rust now owns child WebView creation for the Tauri browser surface. Isolated profiles receive a
+  shared native data directory on Windows/Linux and a stable WebKit data-store identifier on
+  macOS 14+, so tabs in one profile share cookies/storage while different profiles stay separated;
+  the renderer only reacquires the created WebView handle for layout and compatibility events.
 - Tauri WebView shims enable native child WebView devtools and route
   `window.api.browser.openDevTools` to the active child WebView label, so the browser toolbar and
   context-menu inspection controls have real behavior in the Tauri shell instead of returning
@@ -283,9 +303,10 @@ Current implementation:
   Rust command. The host validates marker count, IDs, and finite non-negative geometry before
   injecting a closed-shadow visual overlay that follows page scroll; this does not enable element
   selection or claim the still-missing grab/CDP boundary.
-- Renderer browser feature availability gates local grab/annotation buttons and shortcut handling
-  under the Tauri child WebView host, because the native guest script/CDP adapter is not available
-  yet and the UI must not enter a `not-ready` IPC path after looking actionable.
+- Tauri reuses the canonical Electron guest grab runtime through a browser-child-scoped Rust eval
+  command with script-size and timeout bounds. Arm, click/right-click selection, hover extraction,
+  cancellation, payload clamping, and annotation creation now keep the existing renderer UX and
+  safety budgets; screenshot capture remains a separate native adapter gap.
 - The same renderer availability gate hides the always-visible cookie import hint and keeps the
   overflow Import Cookies submenu read-only under Tauri until the native cookie import adapter
   exists, while leaving default-profile data clearing wired separately.
