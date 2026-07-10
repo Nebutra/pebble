@@ -83,6 +83,55 @@ func (s *Server) handleProviderGitLabMRs(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]interface{}{"items": items})
 }
 
+func (s *Server) handleProviderReviewCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req struct {
+		ProjectID   string `json:"projectId"`
+		WorktreeID  string `json:"worktreeId"`
+		Provider    string `json:"provider"`
+		Base        string `json:"base"`
+		Head        string `json:"head"`
+		Title       string `json:"title"`
+		Body        string `json:"body"`
+		Draft       bool   `json:"draft"`
+		UseTemplate bool   `json:"useTemplate"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.CreateHostedReview(
+		r.Context(),
+		req.ProjectID,
+		req.WorktreeID,
+		providercli.CreateReviewRequest{
+			Provider: req.Provider, Base: req.Base, Head: req.Head, Title: req.Title,
+			Body: req.Body, Draft: req.Draft, UseTemplate: req.UseTemplate,
+		},
+	)
+	if err != nil {
+		writeProviderError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleProviderReviewCapabilities(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	projectID, worktreeID := providerSelector(r)
+	capabilities, err := s.manager.HostedReviewCapabilities(r.Context(), projectID, worktreeID)
+	if err != nil {
+		writeProviderError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, capabilities)
+}
+
 func providerSelector(r *http.Request) (string, string) {
 	return r.URL.Query().Get("projectId"), r.URL.Query().Get("worktreeId")
 }

@@ -46,6 +46,9 @@ func runCLI(ctx context.Context, bin string, workdir string, args ...string) ([]
 	if err == nil {
 		return stdout.Bytes(), nil
 	}
+	if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+		return nil, fmt.Errorf("%w: %s", context.DeadlineExceeded, bin)
+	}
 	combined := strings.TrimSpace(stderr.String() + "\n" + stdout.String())
 	if isUnauthenticated(combined) {
 		return nil, fmt.Errorf("%w: %s", ErrCLIUnauthenticated, bin)

@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/tsekaluk/pebble/go-runtime/internal/providercli"
@@ -123,6 +125,83 @@ func TestProviderGitLabMRsRoute(t *testing.T) {
 	}
 	if len(body.Items) != 1 || body.Items[0].Number != 3 || body.Items[0].ID != "gitlab-mr-10" {
 		t.Fatalf("unexpected items: %+v", body.Items)
+	}
+}
+
+func TestProviderReviewCreateRoute(t *testing.T) {
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectID := localProject(t, manager)
+	fakeProviderCLI(t, "gh", `https://github.com/nebutra/pebble/pull/42`, 0)
+	server := NewServer(manager)
+
+	body := strings.NewReader(`{
+		"projectId":"` + projectID + `",
+		"provider":"github",
+		"base":"main",
+		"head":"feature/review",
+		"title":"Open PR",
+		"body":"Body"
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/providers/reviews", body)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var result providercli.CreateReviewResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK || result.Number != 42 || result.URL != "https://github.com/nebutra/pebble/pull/42" {
+		t.Fatalf("unexpected create result: %+v", result)
+	}
+}
+
+func TestProviderReviewCapabilitiesRoute(t *testing.T) {
+	repo := t.TempDir()
+	for _, args := range [][]string{
+		{"init"},
+		{"remote", "add", "origin", "git@github.com:nebutra/pebble.git"},
+		{"symbolic-ref", "HEAD", "refs/heads/feature/review"},
+		{"symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"},
+	} {
+		command := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v failed: %v: %s", args, err, output)
+		}
+	}
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(runtimecore.CreateProjectRequest{
+		Name: "repo", Path: repo, LocationKind: "local",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fakeProviderCLI(t, "gh", "", 0)
+	server := NewServer(manager)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/v1/providers/review-capabilities?projectId="+project.ID,
+		nil,
+	)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var result runtimecore.HostedReviewCapabilities
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Provider != "github" || !result.Authenticated || result.CurrentBranch != "feature/review" || result.DefaultBaseRef != "main" {
+		t.Fatalf("unexpected capabilities: %+v", result)
 	}
 }
 
