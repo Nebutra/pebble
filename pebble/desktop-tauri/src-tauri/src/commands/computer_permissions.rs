@@ -82,16 +82,22 @@ struct HelperStatusFile {
     screenshots: Option<ComputerUsePermissionStatus>,
 }
 
+// Why: sync commands run on the Tauri main thread; the helper-app launches and
+// status-file polling below block for seconds, so bodies run in spawn_blocking.
 #[tauri::command]
-pub fn computer_permissions_status(
+pub async fn computer_permissions_status(
     app: tauri::AppHandle,
 ) -> Result<ComputerUsePermissionStatusResult, String> {
-    resolve_computer_permissions_status(&app)
+    tauri::async_runtime::spawn_blocking(move || resolve_computer_permissions_status(&app))
+        .await
+        .map_err(|error| format!("Permission status task failed: {error}"))?
 }
 
 fn resolve_computer_permissions_status(
     app: &tauri::AppHandle,
 ) -> Result<ComputerUsePermissionStatusResult, String> {
+    // Why: parity with Electron, which reports both permissions as unsupported
+    // on every non-macOS platform (src/main/computer/macos-computer-use-permission-status.ts).
     if !cfg!(target_os = "macos") {
         return Ok(unsupported_permission_status());
     }
@@ -126,11 +132,22 @@ fn resolve_computer_permissions_status(
 }
 
 #[tauri::command]
-pub fn computer_permissions_open(
+pub async fn computer_permissions_open(
     app: tauri::AppHandle,
     input: Option<ComputerUsePermissionSetupInput>,
 ) -> Result<ComputerUsePermissionSetupResult, String> {
+    tauri::async_runtime::spawn_blocking(move || open_computer_permissions_blocking(&app, input))
+        .await
+        .map_err(|error| format!("Permission setup task failed: {error}"))?
+}
+
+fn open_computer_permissions_blocking(
+    app: &tauri::AppHandle,
+    input: Option<ComputerUsePermissionSetupInput>,
+) -> Result<ComputerUsePermissionSetupResult, String> {
     let permission_id = input.and_then(|value| value.id);
+    // Why: parity with Electron's non-macOS response — unsupported permissions,
+    // no settings opened (src/main/computer/macos-computer-use-permissions.ts).
     if !cfg!(target_os = "macos") {
         return Ok(ComputerUsePermissionSetupResult {
             platform: current_platform(),
@@ -177,8 +194,16 @@ pub fn computer_permissions_open(
 }
 
 #[tauri::command]
-pub fn computer_permissions_reset(
+pub async fn computer_permissions_reset(
     app: tauri::AppHandle,
+) -> Result<ComputerUsePermissionResetResult, String> {
+    tauri::async_runtime::spawn_blocking(move || reset_computer_permissions_blocking(&app))
+        .await
+        .map_err(|error| format!("Permission reset task failed: {error}"))?
+}
+
+fn reset_computer_permissions_blocking(
+    app: &tauri::AppHandle,
 ) -> Result<ComputerUsePermissionResetResult, String> {
     if !cfg!(target_os = "macos") {
         return Ok(ComputerUsePermissionResetResult {

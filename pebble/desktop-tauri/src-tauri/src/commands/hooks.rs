@@ -22,8 +22,18 @@ pub struct IssueCommandRunnerResult {
     env_vars: HashMap<String, String>,
 }
 
+// Why: sync commands run on the Tauri main thread; the git subprocess and file
+// writes below would freeze the UI, so the body runs in spawn_blocking.
 #[tauri::command]
-pub fn hooks_create_issue_command_runner(
+pub async fn hooks_create_issue_command_runner(
+    input: IssueCommandRunnerInput,
+) -> Result<IssueCommandRunnerResult, String> {
+    tauri::async_runtime::spawn_blocking(move || create_issue_command_runner_blocking(input))
+        .await
+        .map_err(|error| format!("Issue command runner task failed: {error}"))?
+}
+
+fn create_issue_command_runner_blocking(
     input: IssueCommandRunnerInput,
 ) -> Result<IssueCommandRunnerResult, String> {
     let repo_path = non_empty_path(&input.repo_path, "repo path")?;
@@ -188,7 +198,7 @@ mod tests {
 
     #[test]
     fn rejects_blank_runner_inputs() {
-        let result = hooks_create_issue_command_runner(IssueCommandRunnerInput {
+        let result = create_issue_command_runner_blocking(IssueCommandRunnerInput {
             repo_path: "   ".to_string(),
             worktree_path: "/tmp/worktree".to_string(),
             command: "echo hi".to_string(),
@@ -196,7 +206,7 @@ mod tests {
 
         assert_eq!(result.unwrap_err(), "repo path is required.");
 
-        let result = hooks_create_issue_command_runner(IssueCommandRunnerInput {
+        let result = create_issue_command_runner_blocking(IssueCommandRunnerInput {
             repo_path: "/tmp/repo".to_string(),
             worktree_path: "/tmp/worktree".to_string(),
             command: " \n\t ".to_string(),
@@ -268,7 +278,7 @@ mod tests {
         )
         .expect("git worktree add");
 
-        let result = hooks_create_issue_command_runner(IssueCommandRunnerInput {
+        let result = create_issue_command_runner_blocking(IssueCommandRunnerInput {
             repo_path: repo_path.to_string_lossy().to_string(),
             worktree_path: worktree_path.to_string_lossy().to_string(),
             command: "codex exec \"ship it\"\r\npnpm test".to_string(),

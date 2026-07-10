@@ -345,9 +345,10 @@ Current implementation:
   provider, and the desktop UI can poll native/browser/emulator queues and mark actions completed
   or failed.
 - Tauri routes macOS computer-use permission status, setup, and reset through the bundled
-  `Pebble Computer Use.app` helper using the same TCC identity checks as Electron. Linux and
-  Windows still return explicit unsupported permission states instead of pretending setup
-  succeeded.
+  `Pebble Computer Use.app` helper using the same TCC identity checks as Electron. On Linux and
+  Windows, Tauri returns explicit unsupported permission states — this matches Electron exactly
+  (`src/main/computer/macos-computer-use-permissions.ts` reports unsupported on every non-darwin
+  platform), so it is full parity rather than a Tauri gap.
 - Mobile projections expose computer action queue status so paired devices can inspect native
   provider work without polling provider-specific endpoints.
 - `pebble/zig-system/` defines a candidate C ABI for process/PTY/signal primitives but is not

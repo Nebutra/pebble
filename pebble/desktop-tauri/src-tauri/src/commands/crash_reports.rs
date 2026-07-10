@@ -200,51 +200,64 @@ struct CrashReportCreateInput {
     breadcrumbs: Option<Vec<CrashReportBreadcrumb>>,
 }
 
+// Why: sync commands run on the Tauri main thread; the crash-report store does
+// snapshot/journal file I/O (and spawns `uname`), so bodies run in spawn_blocking
+// and re-fetch managed state from the app handle inside the blocking task.
 #[tauri::command]
-pub fn crash_reports_get_latest_pending(
+pub async fn crash_reports_get_latest_pending(
     app: tauri::AppHandle,
-    state: tauri::State<CrashReportsState>,
 ) -> Result<Option<CrashReportRecord>, String> {
-    let reports = read_reports_locked(&app, &state)?;
-    let submitted = lock_state(&state.submitted_report_ids)?;
-    Ok(reports
-        .into_iter()
-        .find(|report| report.status == "pending" && !submitted.contains(&report.id)))
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<CrashReportsState>();
+        let reports = read_reports_locked(&app, &state)?;
+        let submitted = lock_state(&state.submitted_report_ids)?;
+        Ok(reports
+            .into_iter()
+            .find(|report| report.status == "pending" && !submitted.contains(&report.id)))
+    })
+    .await
+    .map_err(|error| format!("Crash report task failed: {error}"))?
 }
 
 #[tauri::command]
-pub fn crash_reports_get_latest_report(
+pub async fn crash_reports_get_latest_report(
     app: tauri::AppHandle,
-    state: tauri::State<CrashReportsState>,
 ) -> Result<Option<CrashReportRecord>, String> {
-    let reports = read_reports_locked(&app, &state)?;
-    let submitted = lock_state(&state.submitted_report_ids)?;
-    Ok(reports.into_iter().find(|report| {
-        (report.status == "pending" || report.status == "dismissed")
-            && !submitted.contains(&report.id)
-    }))
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<CrashReportsState>();
+        let reports = read_reports_locked(&app, &state)?;
+        let submitted = lock_state(&state.submitted_report_ids)?;
+        Ok(reports.into_iter().find(|report| {
+            (report.status == "pending" || report.status == "dismissed")
+                && !submitted.contains(&report.id)
+        }))
+    })
+    .await
+    .map_err(|error| format!("Crash report task failed: {error}"))?
 }
 
 #[tauri::command]
-pub fn crash_reports_dismiss(
+pub async fn crash_reports_dismiss(
     app: tauri::AppHandle,
-    state: tauri::State<CrashReportsState>,
     input: CrashReportIdInput,
 ) -> Result<Option<CrashReportRecord>, String> {
-    if lock_state(&state.in_flight_submissions)?.contains(&input.report_id) {
-        return get_report_by_id_locked(&app, &state, &input.report_id);
-    }
-    if lock_state(&state.submitted_report_ids)?.contains(&input.report_id) {
-        return Ok(
-            get_report_by_id_locked(&app, &state, &input.report_id)?.map(|report| {
-                CrashReportRecord {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<CrashReportsState>();
+        if lock_state(&state.in_flight_submissions)?.contains(&input.report_id) {
+            return get_report_by_id_locked(&app, &state, &input.report_id);
+        }
+        if lock_state(&state.submitted_report_ids)?.contains(&input.report_id) {
+            return Ok(get_report_by_id_locked(&app, &state, &input.report_id)?.map(
+                |report| CrashReportRecord {
                     status: "sent".to_string(),
                     ..report
-                }
-            }),
-        );
-    }
-    transition_report_status(&app, &state, &input.report_id, "pending", "dismissed")
+                },
+            ));
+        }
+        transition_report_status(&app, &state, &input.report_id, "pending", "dismissed")
+    })
+    .await
+    .map_err(|error| format!("Crash report task failed: {error}"))?
 }
 
 #[tauri::command]
@@ -264,11 +277,20 @@ pub fn crash_reports_record_breadcrumb(
 }
 
 #[tauri::command]
-pub fn crash_reports_record_renderer_error(
+pub async fn crash_reports_record_renderer_error(
     app: tauri::AppHandle,
-    state: tauri::State<CrashReportsState>,
     input: CrashReportRendererErrorInput,
 ) -> Result<CrashReportRendererErrorResult, String> {
+    tauri::async_runtime::spawn_blocking(move || record_renderer_error_blocking(&app, input))
+        .await
+        .map_err(|error| format!("Crash report task failed: {error}"))?
+}
+
+fn record_renderer_error_blocking(
+    app: &tauri::AppHandle,
+    input: CrashReportRendererErrorInput,
+) -> Result<CrashReportRendererErrorResult, String> {
+    let state = app.state::<CrashReportsState>();
     let normalized = normalize_renderer_error_input(input)?;
     let key = renderer_error_report_key(&normalized);
     if is_recent_renderer_error_duplicate(&state, &key)? {
@@ -282,7 +304,7 @@ pub fn crash_reports_record_renderer_error(
 
     let breadcrumbs = lock_state(&state.breadcrumbs)?.clone();
     let report = record_report(
-        &app,
+        app,
         &state,
         CrashReportCreateInput {
             source: "renderer".to_string(),
@@ -313,21 +335,25 @@ pub fn crash_reports_record_renderer_error(
 }
 
 #[tauri::command]
-pub fn crash_reports_format(
+pub async fn crash_reports_format(
     app: tauri::AppHandle,
-    state: tauri::State<CrashReportsState>,
     input: CrashReportTextInput,
 ) -> Result<String, String> {
-    let report = get_requested_report_locked(&app, &state, input.report_id.as_deref())?;
-    Ok(match report {
-        Some(report) => format_crash_report_text(&report, input.notes.as_deref(), None),
-        None => format_uncaptured_crash_report_text(
-            input.notes.as_deref(),
-            &input.app_version,
-            input.chrome_version.as_deref(),
-            None,
-        ),
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<CrashReportsState>();
+        let report = get_requested_report_locked(&app, &state, input.report_id.as_deref())?;
+        Ok(match report {
+            Some(report) => format_crash_report_text(&report, input.notes.as_deref(), None),
+            None => format_uncaptured_crash_report_text(
+                input.notes.as_deref(),
+                &input.app_version,
+                input.chrome_version.as_deref(),
+                None,
+            ),
+        })
     })
+    .await
+    .map_err(|error| format!("Crash report task failed: {error}"))?
 }
 
 #[tauri::command]
