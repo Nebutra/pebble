@@ -124,17 +124,20 @@ func TestReadWorkspaceFileBlocksSymlinkEscape(t *testing.T) {
 }
 
 func TestParseGitStatusOutput(t *testing.T) {
-	branch, ahead, behind, changes := parseGitStatusOutput("## feature...origin/feature [ahead 2, behind 1]\n M README.md\n?? docs/new.md\nR  old.go -> new.go\n")
+	branch, ahead, behind, changes := parseGitStatusOutput("## feature...origin/feature [ahead 2, behind 1]\n M README.md\n?? docs/new.md\nR  old.go -> new.go\nUU conflicted.txt\n", "")
 	if branch != "feature" || ahead != 2 || behind != 1 {
 		t.Fatalf("unexpected branch data: %s ahead=%d behind=%d", branch, ahead, behind)
 	}
-	if len(changes) != 3 ||
+	if len(changes) != 4 ||
 		changes[0].Path != "README.md" ||
 		changes[0].Status != "modified" ||
 		changes[1].Status != "untracked" ||
 		changes[2].Path != "new.go" ||
 		changes[2].Status != "renamed" {
 		t.Fatalf("unexpected changes: %#v", changes)
+	}
+	if changes[3].ConflictKind != "both_modified" || changes[3].ConflictStatus != "unresolved" || changes[3].Area != "unstaged" {
+		t.Fatalf("unexpected conflict change: %#v", changes[3])
 	}
 }
 

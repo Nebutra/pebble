@@ -880,6 +880,21 @@ type GitFileDiffResult struct {
 	ModifiedContent  string `json:"modifiedContent"`
 	OriginalIsBinary bool   `json:"originalIsBinary"`
 	ModifiedIsBinary bool   `json:"modifiedIsBinary"`
+	// Why: binary previews in the renderer are gated on the legacy isImage flag
+	// plus a MIME type; byte sizes stand in for text hunks on binary rows.
+	IsImage          bool                    `json:"isImage,omitempty"`
+	MimeType         string                  `json:"mimeType,omitempty"`
+	OriginalByteSize int                     `json:"originalByteSize,omitempty"`
+	ModifiedByteSize int                     `json:"modifiedByteSize,omitempty"`
+	Submodule        *GitSubmoduleDiffChange `json:"submodule,omitempty"`
+}
+
+// GitSubmoduleDiffChange carries structured gitlink metadata alongside the
+// synthesized "Subproject commit" text diff so consumers don't re-parse it.
+type GitSubmoduleDiffChange struct {
+	OldSHA string `json:"oldSha"`
+	NewSHA string `json:"newSha"`
+	Dirty  bool   `json:"dirty"`
 }
 
 type GitMutationRequest struct {
@@ -957,6 +972,10 @@ type GitStatusEntry struct {
 	Added   int    `json:"added,omitempty"`
 	Removed int    `json:"removed,omitempty"`
 	OldPath string `json:"oldPath,omitempty"`
+	// Why: unmerged rows keep `status` as a rendering fallback; the conflict
+	// kind/status pair carries the real semantics for the conflict UI.
+	ConflictKind   string `json:"conflictKind,omitempty"`
+	ConflictStatus string `json:"conflictStatus,omitempty"`
 }
 
 type GitStatusResult struct {

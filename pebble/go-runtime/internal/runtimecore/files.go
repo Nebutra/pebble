@@ -1185,13 +1185,17 @@ func isWordRune(char rune) bool {
 	return char == '_' || unicode.IsLetter(char) || unicode.IsDigit(char)
 }
 
+// binaryScanWindowBytes bounds the NUL scan; callers seeing longer payloads
+// should corroborate with git's numstat markers (see gitNumstatReportsBinary).
+const binaryScanWindowBytes = 8000
+
 func isLikelyBinary(content []byte) bool {
 	if len(content) == 0 {
 		return false
 	}
 	limit := len(content)
-	if limit > 8000 {
-		limit = 8000
+	if limit > binaryScanWindowBytes {
+		limit = binaryScanWindowBytes
 	}
 	for _, b := range content[:limit] {
 		if b == 0 {

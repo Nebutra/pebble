@@ -109,12 +109,38 @@ func runGitStatus(args []string, client *http.Client, output io.Writer) error {
 	provider := fs.String("provider", "", "git provider")
 	reviewKind := fs.String("review-kind", "", "review kind")
 	baseBranch := fs.String("base", "", "base branch")
+	baseRef := fs.String("base-ref", "", "base ref for base-status drift probing")
+	createdBaseSHA := fs.String("created-base-sha", "", "base SHA recorded at workspace creation")
+	branchName := fs.String("branch", "", "workspace branch name for remote-conflict probing")
 	_ = fs.Parse(args)
 	projection, err := buildGitProjection(*repositoryID, *workspaceID, *root, *provider, *reviewKind, *baseBranch)
 	if err != nil {
 		return err
 	}
+	// Why: base drift needs the base SHA recorded at workspace creation, which
+	// only the caller knows — without it the runtime keeps an honest "unknown".
+	if strings.TrimSpace(*baseRef) != "" && strings.TrimSpace(*createdBaseSHA) != "" {
+		projection.BaseStatus = probeGitBaseStatus(*root, *baseRef, *createdBaseSHA, *branchName)
+	}
 	return postJSON(client, output, *endpoint, *token, "/v1/source-control/projections", projection)
+}
+
+func probeGitBaseStatus(root string, baseRef string, createdBaseSHA string, branchName string) *runtimecore.SourceControlBaseStatus {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	result := runtimecore.ComputeGitBaseStatus(ctx, strings.TrimSpace(root), runtimecore.GitBaseStatusRequest{
+		BaseRef:        strings.TrimSpace(baseRef),
+		CreatedBaseSHA: strings.TrimSpace(createdBaseSHA),
+		BranchName:     strings.TrimSpace(branchName),
+	})
+	return &runtimecore.SourceControlBaseStatus{
+		Status:         result.Status,
+		Base:           result.Base,
+		Remote:         result.Remote,
+		Behind:         result.Behind,
+		RecentSubjects: result.RecentSubjects,
+		Conflict:       result.Conflict,
+	}
 }
 
 func buildFileEntries(projectID string, worktreeID string, root string, relPath string, maxDepth int) ([]runtimecore.FileEntry, error) {
@@ -171,26 +197,27 @@ func buildGitProjection(repositoryID string, workspaceID string, root string, pr
 	if err != nil {
 		return runtimecore.UpdateSourceControlProjectionRequest{}, errors.New(strings.TrimSpace(string(output)) + ": " + err.Error())
 	}
-	branch, ahead, behind, changes := parseGitStatusOutput(string(output))
+	branch, ahead, behind, changes := parseGitStatusOutput(string(output), root)
 	syncStatus := "clean"
 	if len(changes) > 0 {
 		syncStatus = "dirty"
 	}
 	return runtimecore.UpdateSourceControlProjectionRequest{
-		RepositoryID: repositoryID,
-		WorkspaceID:  workspaceID,
-		Provider:     strings.TrimSpace(provider),
-		ReviewKind:   strings.TrimSpace(reviewKind),
-		Branch:       branch,
-		BaseBranch:   strings.TrimSpace(baseBranch),
-		Ahead:        ahead,
-		Behind:       behind,
-		SyncStatus:   syncStatus,
-		Changes:      changes,
+		RepositoryID:      repositoryID,
+		WorkspaceID:       workspaceID,
+		Provider:          strings.TrimSpace(provider),
+		ReviewKind:        strings.TrimSpace(reviewKind),
+		Branch:            branch,
+		BaseBranch:        strings.TrimSpace(baseBranch),
+		Ahead:             ahead,
+		Behind:            behind,
+		SyncStatus:        syncStatus,
+		Changes:           changes,
+		ConflictOperation: runtimecore.DetectGitConflictOperation(root),
 	}, nil
 }
 
-func parseGitStatusOutput(output string) (string, int, int, []runtimecore.SourceControlChange) {
+func parseGitStatusOutput(output string, root string) (string, int, int, []runtimecore.SourceControlChange) {
 	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
 	branch := ""
 	ahead := 0
@@ -207,12 +234,27 @@ func parseGitStatusOutput(output string) (string, int, int, []runtimecore.Source
 		if len(line) < 4 {
 			continue
 		}
-		status := gitChangeStatus(line[:2])
 		path := strings.TrimSpace(line[3:])
 		if _, renamedTo, ok := strings.Cut(path, " -> "); ok {
 			path = strings.TrimSpace(renamedTo)
 		}
-		if status == "" || path == "" {
+		if path == "" {
+			continue
+		}
+		// Why: unmerged XY pairs are one conflict row; the Contains-based status
+		// mapping below would misread them (e.g. "AA" as a plain add).
+		if conflictKind := runtimecore.ParseGitConflictKind(line[:2]); conflictKind != "" {
+			changes = append(changes, runtimecore.SourceControlChange{
+				Path:           path,
+				Status:         runtimecore.ConflictCompatibilityStatus(root, path, conflictKind),
+				Area:           "unstaged",
+				ConflictKind:   conflictKind,
+				ConflictStatus: "unresolved",
+			})
+			continue
+		}
+		status := gitChangeStatus(line[:2])
+		if status == "" {
 			continue
 		}
 		changes = append(changes, runtimecore.SourceControlChange{Path: path, Status: status})

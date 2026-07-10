@@ -16,6 +16,10 @@ type SourceControlChange struct {
 	OldPath   string `json:"oldPath,omitempty"`
 	Additions int    `json:"additions,omitempty"`
 	Deletions int    `json:"deletions,omitempty"`
+	// Why: unmerged rows keep `status` as a rendering fallback while the
+	// kind/status pair drives the renderer's conflict UI (badges, gating).
+	ConflictKind   string `json:"conflictKind,omitempty"`
+	ConflictStatus string `json:"conflictStatus,omitempty"`
 }
 
 type SourceControlProjection struct {
@@ -30,7 +34,24 @@ type SourceControlProjection struct {
 	Behind       int                   `json:"behind"`
 	SyncStatus   string                `json:"syncStatus"`
 	Changes      []SourceControlChange `json:"changes"`
-	UpdatedAt    time.Time             `json:"updatedAt"`
+	// ConflictOperation labels an in-progress merge/rebase/cherry-pick so the
+	// renderer can title the conflict summary without a second RPC.
+	ConflictOperation string `json:"conflictOperation,omitempty"`
+	// BaseStatus is relay-reported base-SHA drift for remote/SSH workspaces,
+	// served through the same base-status endpoint used locally.
+	BaseStatus *SourceControlBaseStatus `json:"baseStatus,omitempty"`
+	UpdatedAt  time.Time                `json:"updatedAt"`
+}
+
+// SourceControlBaseStatus mirrors GitBaseStatusResult so relay workers can
+// project base drift for workspaces the runtime cannot read git from directly.
+type SourceControlBaseStatus struct {
+	Status         string                   `json:"status"`
+	Base           string                   `json:"base,omitempty"`
+	Remote         string                   `json:"remote,omitempty"`
+	Behind         int                      `json:"behind,omitempty"`
+	RecentSubjects []string                 `json:"recentSubjects,omitempty"`
+	Conflict       *GitRemoteBranchConflict `json:"conflict,omitempty"`
 }
 
 type SourceControlProjectionFilter struct {
@@ -39,16 +60,18 @@ type SourceControlProjectionFilter struct {
 }
 
 type UpdateSourceControlProjectionRequest struct {
-	RepositoryID string                `json:"repositoryId"`
-	WorkspaceID  string                `json:"workspaceId"`
-	Provider     string                `json:"provider,omitempty"`
-	ReviewKind   string                `json:"reviewKind,omitempty"`
-	Branch       string                `json:"branch,omitempty"`
-	BaseBranch   string                `json:"baseBranch,omitempty"`
-	Ahead        int                   `json:"ahead,omitempty"`
-	Behind       int                   `json:"behind,omitempty"`
-	SyncStatus   string                `json:"syncStatus"`
-	Changes      []SourceControlChange `json:"changes,omitempty"`
+	RepositoryID      string                   `json:"repositoryId"`
+	WorkspaceID       string                   `json:"workspaceId"`
+	Provider          string                   `json:"provider,omitempty"`
+	ReviewKind        string                   `json:"reviewKind,omitempty"`
+	Branch            string                   `json:"branch,omitempty"`
+	BaseBranch        string                   `json:"baseBranch,omitempty"`
+	Ahead             int                      `json:"ahead,omitempty"`
+	Behind            int                      `json:"behind,omitempty"`
+	SyncStatus        string                   `json:"syncStatus"`
+	Changes           []SourceControlChange    `json:"changes,omitempty"`
+	ConflictOperation string                   `json:"conflictOperation,omitempty"`
+	BaseStatus        *SourceControlBaseStatus `json:"baseStatus,omitempty"`
 }
 
 func (m *Manager) mobileSourceControlProjections() []SourceControlProjection {
@@ -156,18 +179,20 @@ func (m *Manager) UpdateSourceControlProjection(req UpdateSourceControlProjectio
 		branch = "unknown"
 	}
 	projection := SourceControlProjection{
-		Kind:         "source-control",
-		RepositoryID: repositoryID,
-		WorkspaceID:  workspaceID,
-		Provider:     gitProviderKind(provider),
-		ReviewKind:   reviewKind(review),
-		Branch:       branch,
-		BaseBranch:   strings.TrimSpace(req.BaseBranch),
-		Ahead:        req.Ahead,
-		Behind:       req.Behind,
-		SyncStatus:   syncStatus,
-		Changes:      changes,
-		UpdatedAt:    now,
+		Kind:              "source-control",
+		RepositoryID:      repositoryID,
+		WorkspaceID:       workspaceID,
+		Provider:          gitProviderKind(provider),
+		ReviewKind:        reviewKind(review),
+		Branch:            branch,
+		BaseBranch:        strings.TrimSpace(req.BaseBranch),
+		Ahead:             req.Ahead,
+		Behind:            req.Behind,
+		SyncStatus:        syncStatus,
+		Changes:           changes,
+		ConflictOperation: normalizeGitConflictOperation(req.ConflictOperation),
+		BaseStatus:        normalizeSourceControlBaseStatus(req.BaseStatus),
+		UpdatedAt:         now,
 	}
 	m.sourceControlProjections[sourceControlProjectionKey(repositoryID, workspaceID)] = projection
 	err := m.saveLocked()
@@ -216,7 +241,10 @@ func sourceProjectionFromGitStatus(provider string, repositoryID string, workspa
 	if err != nil {
 		return projection
 	}
-	applyGitStatusLines(&projection, lines)
+	applyGitStatusLines(&projection, lines, path)
+	// Why: the operation label is read from gitdir state files (cheap stats),
+	// so it stays fresh even when no conflict rows survived parsing.
+	projection.ConflictOperation = DetectGitConflictOperation(path)
 	return projection
 }
 
@@ -234,14 +262,14 @@ func readGitShortStatus(path string) ([]string, error) {
 	return strings.Split(content, "\n"), nil
 }
 
-func applyGitStatusLines(projection *SourceControlProjection, lines []string) {
+func applyGitStatusLines(projection *SourceControlProjection, lines []string, worktreePath string) {
 	changes := make([]SourceControlChange, 0, len(lines))
 	for _, line := range lines {
 		if strings.HasPrefix(line, "## ") {
 			parseGitBranchLine(projection, strings.TrimSpace(strings.TrimPrefix(line, "## ")))
 			continue
 		}
-		if parsedChanges := parseGitChangeLine(line); len(parsedChanges) > 0 {
+		if parsedChanges := parseGitChangeLine(line, worktreePath); len(parsedChanges) > 0 {
 			changes = append(changes, parsedChanges...)
 		}
 	}
@@ -284,7 +312,7 @@ func parseGitBranchLine(projection *SourceControlProjection, line string) {
 	}
 }
 
-func parseGitChangeLine(line string) []SourceControlChange {
+func parseGitChangeLine(line string, worktreePath string) []SourceControlChange {
 	if len(line) < 4 {
 		return nil
 	}
@@ -292,6 +320,17 @@ func parseGitChangeLine(line string) []SourceControlChange {
 	oldPath, path := parseGitStatusPath(strings.TrimSpace(line[3:]))
 	if path == "" {
 		return nil
+	}
+	// Why: unmerged XY pairs (DD/AU/UD/UA/DU/AA/UU) are a single conflict row,
+	// not a staged+unstaged split — check them before the per-column parse.
+	if conflictKind := ParseGitConflictKind(statusCode); conflictKind != "" {
+		return []SourceControlChange{{
+			Path:           path,
+			Status:         ConflictCompatibilityStatus(worktreePath, path, conflictKind),
+			Area:           "unstaged",
+			ConflictKind:   conflictKind,
+			ConflictStatus: "unresolved",
+		}}
 	}
 	if statusCode == "??" {
 		return []SourceControlChange{{Path: path, Status: "untracked", Area: "untracked"}}
@@ -358,12 +397,14 @@ func normalizeSourceControlChanges(changes []SourceControlChange) []SourceContro
 			}
 		}
 		normalized = append(normalized, SourceControlChange{
-			Path:      path,
-			Status:    status,
-			Area:      area,
-			OldPath:   oldPath,
-			Additions: change.Additions,
-			Deletions: change.Deletions,
+			Path:           path,
+			Status:         status,
+			Area:           area,
+			OldPath:        oldPath,
+			Additions:      change.Additions,
+			Deletions:      change.Deletions,
+			ConflictKind:   parseGitConflictKindName(change.ConflictKind),
+			ConflictStatus: normalizeSourceControlConflictStatus(change.ConflictStatus),
 		})
 	}
 	return normalized
@@ -404,6 +445,64 @@ func normalizeSourceControlChangeArea(area string, status string) string {
 		}
 		return "unstaged"
 	}
+}
+
+// parseGitConflictKindName validates a relay-supplied conflict kind name,
+// dropping anything outside the renderer's known set.
+func parseGitConflictKindName(kind string) string {
+	switch strings.TrimSpace(kind) {
+	case "both_modified", "both_added", "both_deleted",
+		"added_by_us", "added_by_them", "deleted_by_us", "deleted_by_them":
+		return strings.TrimSpace(kind)
+	default:
+		return ""
+	}
+}
+
+func normalizeSourceControlConflictStatus(status string) string {
+	switch strings.TrimSpace(status) {
+	case "unresolved", "resolved_locally":
+		return strings.TrimSpace(status)
+	default:
+		return ""
+	}
+}
+
+// normalizeSourceControlBaseStatus keeps relay-reported base drift inside the
+// value set GitBaseStatus produces locally; unknown inputs degrade to
+// "unknown" rather than being trusted verbatim.
+func normalizeSourceControlBaseStatus(baseStatus *SourceControlBaseStatus) *SourceControlBaseStatus {
+	if baseStatus == nil {
+		return nil
+	}
+	normalized := *baseStatus
+	switch strings.TrimSpace(normalized.Status) {
+	case "current", "drift", "base_changed":
+		normalized.Status = strings.TrimSpace(normalized.Status)
+	default:
+		normalized.Status = "unknown"
+	}
+	if normalized.Behind < 0 {
+		normalized.Behind = 0
+	}
+	subjects := make([]string, 0, len(normalized.RecentSubjects))
+	for _, subject := range normalized.RecentSubjects {
+		if trimmed := strings.TrimSpace(subject); trimmed != "" {
+			subjects = append(subjects, trimmed)
+		}
+	}
+	normalized.RecentSubjects = subjects
+	if normalized.Conflict != nil {
+		conflict := *normalized.Conflict
+		conflict.Remote = strings.TrimSpace(conflict.Remote)
+		conflict.BranchName = strings.TrimSpace(conflict.BranchName)
+		if conflict.Remote == "" || conflict.BranchName == "" {
+			normalized.Conflict = nil
+		} else {
+			normalized.Conflict = &conflict
+		}
+	}
+	return &normalized
 }
 
 func isSourceControlSyncStatus(status string) bool {

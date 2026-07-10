@@ -1,14 +1,19 @@
 import type {
   GitBranchCompareResult,
   GitCommitCompareResult,
+  GitConflictKind,
+  GitConflictOperation,
+  GitConflictResolutionStatus,
   GitDiffResult,
   GitFileStatus,
+  GitHubRepositoryIdentity,
   GitStatusEntry,
   GitStatusResult,
   GitUpstreamStatus
 } from '../../../src/shared/types'
 import type { GitHistoryResult } from '../../../src/shared/git-history'
 import { requestRuntimeJson } from './pebble-tauri-runtime-transport'
+import { getRuntimeRepoId } from './pebble-tauri-workspace-runtime-api'
 
 type SourceControlProjection = {
   repositoryId: string
@@ -19,6 +24,7 @@ type SourceControlProjection = {
   behind: number
   syncStatus: string
   changes: SourceControlChange[]
+  conflictOperation?: string
 }
 
 type SourceControlChange = {
@@ -28,6 +34,8 @@ type SourceControlChange = {
   oldPath?: string
   additions?: number
   deletions?: number
+  conflictKind?: string
+  conflictStatus?: string
 }
 
 type RuntimeGitRpcResult = {
@@ -39,11 +47,20 @@ type RuntimeRemoteUrlResult = {
   url: string | null
 }
 
+type RuntimeRepositoryIdentityResult = {
+  slug: GitHubRepositoryIdentity | null
+  upstream: GitHubRepositoryIdentity | null
+}
+
 export async function callTauriGitRuntimeRpc(
   method: string,
   params: unknown
 ): Promise<RuntimeGitRpcResult> {
   switch (method) {
+    case 'github.repoSlug':
+      return handled((await readRepositoryIdentity(params)).slug)
+    case 'github.repoUpstream':
+      return handled((await readRepositoryIdentity(params)).upstream)
     case 'git.status':
       return handled(await readGitStatus(params))
     case 'git.checkIgnored':
@@ -65,11 +82,15 @@ export async function callTauriGitRuntimeRpc(
     case 'git.upstreamStatus':
       return handled(await readGitUpstreamStatus(params))
     case 'git.conflictOperation':
-      return handled('unknown')
+      return handled(await readGitConflictOperation(params))
     case 'git.abortMerge':
       return handled(await mutateGit('abortMerge', params))
     case 'git.abortRebase':
       return handled(await mutateGit('abortRebase', params))
+    case 'git.checkout':
+      return handled(await checkoutBranch(params))
+    case 'git.localBranches':
+      return handled(await readLocalBranches(params))
     case 'git.stage':
       return handled(await mutateGit('stage', params))
     case 'git.bulkStage':
@@ -87,19 +108,22 @@ export async function callTauriGitRuntimeRpc(
     case 'git.generateCommitMessage':
       return handled({
         success: false,
-        error: 'Commit message generation is unavailable in the Tauri shell until the native text-generation host is wired.'
+        error:
+          'Commit message generation for remote worktrees is not yet wired through the Tauri SSH relay.'
       })
     case 'git.discoverCommitMessageModels':
       return handled({
         success: false,
-        error: 'Commit message model discovery is unavailable in the Tauri shell until the native text-generation host is wired.'
+        error:
+          'Commit message model discovery for remote worktrees is not yet wired through the Tauri SSH relay.'
       })
     case 'git.cancelGenerateCommitMessage':
       return handled({ ok: true })
     case 'git.generatePullRequestFields':
       return handled({
         success: false,
-        error: 'Pull request detail generation is unavailable in the Tauri shell until the native text-generation host is wired.'
+        error:
+          'Pull request detail generation for remote worktrees is not yet wired through the Tauri SSH relay.'
       })
     case 'git.cancelGeneratePullRequestFields':
       return handled({ ok: true })
@@ -129,14 +153,22 @@ async function readGitStatus(params: unknown): Promise<GitStatusResult> {
   const upstreamStatus = mapSourceControlProjectionToUpstreamStatus(projection, params)
   return {
     entries: projection.changes.map(mapSourceControlChangeToStatusEntry),
-    conflictOperation: 'unknown',
+    conflictOperation: mapGitConflictOperation(projection.conflictOperation),
     branch: readGitBranch(projection.branch),
     upstreamStatus
   }
 }
 
+async function readGitConflictOperation(params: unknown): Promise<GitConflictOperation> {
+  const projection = await readSourceControlProjection(params)
+  return mapGitConflictOperation(projection.conflictOperation)
+}
+
 async function readGitUpstreamStatus(params: unknown): Promise<GitUpstreamStatus> {
-  return mapSourceControlProjectionToUpstreamStatus(await readSourceControlProjection(params), params)
+  return mapSourceControlProjectionToUpstreamStatus(
+    await readSourceControlProjection(params),
+    params
+  )
 }
 
 async function checkIgnored(params: unknown): Promise<string[]> {
@@ -147,7 +179,9 @@ async function checkIgnored(params: unknown): Promise<string[]> {
     timeoutMs: 5000,
     body: {
       projectId: projection.repositoryId,
-      ...(projection.workspaceId !== projection.repositoryId ? { worktreeId: projection.workspaceId } : {}),
+      ...(projection.workspaceId !== projection.repositoryId
+        ? { worktreeId: projection.workspaceId }
+        : {}),
       paths: readStringList(input.paths)
     }
   })
@@ -161,7 +195,9 @@ async function readSubmoduleStatus(params: unknown): Promise<GitStatusResult> {
     timeoutMs: 5000,
     body: {
       projectId: projection.repositoryId,
-      ...(projection.workspaceId !== projection.repositoryId ? { worktreeId: projection.workspaceId } : {}),
+      ...(projection.workspaceId !== projection.repositoryId
+        ? { worktreeId: projection.workspaceId }
+        : {}),
       submodulePath: readRequiredString(input.submodulePath, 'submodule path'),
       area: readString(input.area) ?? ''
     }
@@ -176,7 +212,9 @@ async function readGitDiff(params: unknown): Promise<GitDiffResult> {
     timeoutMs: 5000,
     body: {
       projectId: projection.repositoryId,
-      ...(projection.workspaceId !== projection.repositoryId ? { worktreeId: projection.workspaceId } : {}),
+      ...(projection.workspaceId !== projection.repositoryId
+        ? { worktreeId: projection.workspaceId }
+        : {}),
       filePath: readRequiredString(input.filePath, 'git diff file path'),
       staged: input.staged === true,
       compareAgainstHead: input.compareAgainstHead === true
@@ -193,7 +231,9 @@ async function mutateGit(operation: string, params: unknown): Promise<unknown> {
     timeoutMs: operation === 'commit' ? 30_000 : 10_000,
     body: {
       projectId: projection.repositoryId,
-      ...(projection.workspaceId !== projection.repositoryId ? { worktreeId: projection.workspaceId } : {}),
+      ...(projection.workspaceId !== projection.repositoryId
+        ? { worktreeId: projection.workspaceId }
+        : {}),
       operation,
       filePath: readString(input.filePath) ?? '',
       filePaths: readStringList(input.filePaths),
@@ -207,6 +247,40 @@ async function mutateGit(operation: string, params: unknown): Promise<unknown> {
   })
 }
 
+async function checkoutBranch(params: unknown): Promise<unknown> {
+  const input = readObject(params)
+  const branch = readRequiredString(input.branch, 'checkout branch')
+  if (branch.startsWith('-')) {
+    throw new Error('invalid_branch_name')
+  }
+  const projection = await readSourceControlProjection(params)
+  return requestRuntimeJson('/v1/source-control/checkout', {
+    method: 'POST',
+    timeoutMs: 10_000,
+    body: {
+      projectId: projection.repositoryId,
+      ...(projection.workspaceId !== projection.repositoryId
+        ? { worktreeId: projection.workspaceId }
+        : {}),
+      branch
+    }
+  })
+}
+
+async function readLocalBranches(params: unknown): Promise<unknown> {
+  const projection = await readSourceControlProjection(params)
+  return requestRuntimeJson('/v1/source-control/local-branches', {
+    method: 'POST',
+    timeoutMs: 5000,
+    body: {
+      projectId: projection.repositoryId,
+      ...(projection.workspaceId !== projection.repositoryId
+        ? { worktreeId: projection.workspaceId }
+        : {})
+    }
+  })
+}
+
 async function readBranchCompare(params: unknown): Promise<GitBranchCompareResult> {
   const input = readObject(params)
   const projection = await readSourceControlProjection(params)
@@ -215,7 +289,9 @@ async function readBranchCompare(params: unknown): Promise<GitBranchCompareResul
     timeoutMs: 10_000,
     body: {
       projectId: projection.repositoryId,
-      ...(projection.workspaceId !== projection.repositoryId ? { worktreeId: projection.workspaceId } : {}),
+      ...(projection.workspaceId !== projection.repositoryId
+        ? { worktreeId: projection.workspaceId }
+        : {}),
       baseRef: readRequiredString(input.baseRef, 'base ref')
     }
   })
@@ -229,7 +305,9 @@ async function readCommitCompare(params: unknown): Promise<GitCommitCompareResul
     timeoutMs: 10_000,
     body: {
       projectId: projection.repositoryId,
-      ...(projection.workspaceId !== projection.repositoryId ? { worktreeId: projection.workspaceId } : {}),
+      ...(projection.workspaceId !== projection.repositoryId
+        ? { worktreeId: projection.workspaceId }
+        : {}),
       commitId: readRequiredString(input.commitId, 'commit id')
     }
   })
@@ -243,7 +321,9 @@ async function readGitHistory(params: unknown): Promise<GitHistoryResult> {
     timeoutMs: 10_000,
     body: {
       projectId: projection.repositoryId,
-      ...(projection.workspaceId !== projection.repositoryId ? { worktreeId: projection.workspaceId } : {}),
+      ...(projection.workspaceId !== projection.repositoryId
+        ? { worktreeId: projection.workspaceId }
+        : {}),
       limit: readNumber(input.limit),
       baseRef: readString(input.baseRef) ?? ''
     }
@@ -282,7 +362,9 @@ async function readRefFileDiff(
     timeoutMs: 5000,
     body: {
       projectId: projection.repositoryId,
-      ...(projection.workspaceId !== projection.repositoryId ? { worktreeId: projection.workspaceId } : {}),
+      ...(projection.workspaceId !== projection.repositoryId
+        ? { worktreeId: projection.workspaceId }
+        : {}),
       ...refs
     }
   })
@@ -291,16 +373,21 @@ async function readRefFileDiff(
 async function readRemoteFileUrl(params: unknown): Promise<string | null> {
   const input = readObject(params)
   const projection = await readSourceControlProjection(params)
-  const result = await requestRuntimeJson<RuntimeRemoteUrlResult>('/v1/source-control/remote-file-url', {
-    method: 'POST',
-    timeoutMs: 5000,
-    body: {
-      projectId: projection.repositoryId,
-      ...(projection.workspaceId !== projection.repositoryId ? { worktreeId: projection.workspaceId } : {}),
-      relativePath: readRequiredString(input.relativePath, 'remote file path'),
-      line: readNumber(input.line) ?? 1
+  const result = await requestRuntimeJson<RuntimeRemoteUrlResult>(
+    '/v1/source-control/remote-file-url',
+    {
+      method: 'POST',
+      timeoutMs: 5000,
+      body: {
+        projectId: projection.repositoryId,
+        ...(projection.workspaceId !== projection.repositoryId
+          ? { worktreeId: projection.workspaceId }
+          : {}),
+        relativePath: readRequiredString(input.relativePath, 'remote file path'),
+        line: readNumber(input.line) ?? 1
+      }
     }
-  })
+  )
   return result.url ?? null
 }
 
@@ -337,13 +424,43 @@ async function syncFork(params: unknown): Promise<unknown> {
     timeoutMs: 60_000,
     body: {
       projectId: projection.repositoryId,
-      ...(projection.workspaceId !== projection.repositoryId ? { worktreeId: projection.workspaceId } : {}),
+      ...(projection.workspaceId !== projection.repositoryId
+        ? { worktreeId: projection.workspaceId }
+        : {}),
       expectedUpstream: {
         owner: readRequiredString(expectedUpstream.owner, 'expected upstream owner'),
         repo: readRequiredString(expectedUpstream.repo, 'expected upstream repo')
       }
     }
   })
+}
+
+async function readRepositoryIdentity(params: unknown): Promise<RuntimeRepositoryIdentityResult> {
+  const body = await readRepositoryIdentityRequest(params)
+  return requestRuntimeJson<RuntimeRepositoryIdentityResult>(
+    '/v1/source-control/repository-identity',
+    {
+      method: 'POST',
+      timeoutMs: 5000,
+      body
+    }
+  )
+}
+
+async function readRepositoryIdentityRequest(
+  params: unknown
+): Promise<{ projectId: string; worktreeId?: string }> {
+  const repoId = getRuntimeRepoId(params)
+  if (repoId) {
+    return { projectId: repoId }
+  }
+  const projection = await readSourceControlProjection(params)
+  return {
+    projectId: projection.repositoryId,
+    ...(projection.workspaceId !== projection.repositoryId
+      ? { worktreeId: projection.workspaceId }
+      : {})
+  }
 }
 
 async function readSourceControlProjection(params: unknown): Promise<SourceControlProjection> {
@@ -378,7 +495,45 @@ function mapSourceControlChangeToStatusEntry(change: SourceControlChange): GitSt
   if (change.deletions !== undefined) {
     entry.removed = change.deletions
   }
+  const conflictKind = mapGitConflictKind(change.conflictKind)
+  if (conflictKind) {
+    entry.conflictKind = conflictKind
+    entry.conflictStatus = mapGitConflictStatus(change.conflictStatus)
+  }
   return entry
+}
+
+function mapGitConflictKind(kind: string | undefined): GitConflictKind | undefined {
+  switch (kind) {
+    case 'both_modified':
+    case 'both_added':
+    case 'both_deleted':
+    case 'added_by_us':
+    case 'added_by_them':
+    case 'deleted_by_us':
+    case 'deleted_by_them':
+      return kind
+    default:
+      return undefined
+  }
+}
+
+// Why: the renderer stamps conflictStatusSource itself; the runtime only ever
+// reports git-observed resolution state, defaulting unknown values to
+// unresolved so conflict gating stays conservative.
+function mapGitConflictStatus(status: string | undefined): GitConflictResolutionStatus {
+  return status === 'resolved_locally' ? 'resolved_locally' : 'unresolved'
+}
+
+function mapGitConflictOperation(operation: string | undefined): GitConflictOperation {
+  switch (operation) {
+    case 'merge':
+    case 'rebase':
+    case 'cherry-pick':
+      return operation
+    default:
+      return 'unknown'
+  }
 }
 
 function mapSourceControlProjectionToUpstreamStatus(
@@ -387,9 +542,14 @@ function mapSourceControlProjectionToUpstreamStatus(
 ): GitUpstreamStatus {
   const pushTarget = readObject(readObject(params).pushTarget)
   const upstreamName =
-    readString(pushTarget.branch) ?? readString(pushTarget.baseBranch) ?? readString(projection.baseBranch)
+    readString(pushTarget.branch) ??
+    readString(pushTarget.baseBranch) ??
+    readString(projection.baseBranch)
   const hasUpstream =
-    Boolean(upstreamName) || projection.ahead > 0 || projection.behind > 0 || Boolean(pushTarget.branch)
+    Boolean(upstreamName) ||
+    projection.ahead > 0 ||
+    projection.behind > 0 ||
+    Boolean(pushTarget.branch)
   return {
     hasUpstream,
     upstreamName: upstreamName ?? undefined,
@@ -444,7 +604,9 @@ function readString(value: unknown): string | null {
 }
 
 function readStringList(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string')
+    : []
 }
 
 function readNumber(value: unknown): number | undefined {

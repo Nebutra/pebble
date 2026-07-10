@@ -3,7 +3,6 @@ package runtimecore
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -2342,6 +2341,11 @@ func (m *Manager) GitFileDiff(ctx context.Context, req GitFileDiffRequest) (GitF
 		return GitFileDiffResult{}, err
 	}
 	cleanFilePath = filepath.ToSlash(cleanFilePath)
+	// Why: gitlinks have no blob ("HEAD:sub" fails) and the submodule dir reads
+	// as empty, so route them to the synthesized "Subproject commit" diff first.
+	if pointerDiff, ok := buildSubmodulePointerDiff(ctx, base, cleanFilePath, req.Staged, req.CompareAgainstHead); ok {
+		return pointerDiff, nil
+	}
 	originalRef := ":" + cleanFilePath
 	if req.Staged || req.CompareAgainstHead {
 		originalRef = "HEAD:" + cleanFilePath
@@ -2360,14 +2364,17 @@ func (m *Manager) GitFileDiff(ctx context.Context, req GitFileDiffRequest) (GitF
 	}
 	originalBinary := isLikelyBinary(original)
 	modifiedBinary := isLikelyBinary(modified)
+	// Why: the content heuristic only scans the leading bytes; for payloads
+	// beyond that window, trust git's own numstat dash markers instead of
+	// rendering binary bytes as a text diff.
+	if !originalBinary && !modifiedBinary &&
+		(len(original) > binaryScanWindowBytes || len(modified) > binaryScanWindowBytes) &&
+		gitNumstatReportsBinary(ctx, base, cleanFilePath, req.Staged) {
+		originalBinary = len(original) > 0
+		modifiedBinary = len(modified) > 0
+	}
 	if originalBinary || modifiedBinary {
-		return GitFileDiffResult{
-			Kind:             "binary",
-			OriginalContent:  base64.StdEncoding.EncodeToString(original),
-			ModifiedContent:  base64.StdEncoding.EncodeToString(modified),
-			OriginalIsBinary: originalBinary,
-			ModifiedIsBinary: modifiedBinary,
-		}, nil
+		return binaryGitFileDiffResult(original, modified, originalBinary, modifiedBinary, cleanFilePath), nil
 	}
 	return GitFileDiffResult{
 		Kind:             "text",
@@ -2492,8 +2499,21 @@ func (m *Manager) GitLocalBranches(ctx context.Context, req GitLocalBranchesRequ
 func (m *Manager) GitBaseStatus(ctx context.Context, req GitBaseStatusRequest) (GitBaseStatusResult, error) {
 	base, err := m.resolveWorkspacePath(req.ProjectID, req.WorktreeID)
 	if err != nil {
+		// Why: remote/SSH workspaces cannot run git here; serve the relay-
+		// reported base drift from the projection so the same endpoint works
+		// for both transports. No report yet is an honest "unknown".
+		if errors.Is(err, ErrRemoteNeedsRelay) {
+			return m.relayGitBaseStatus(req), nil
+		}
 		return GitBaseStatusResult{}, err
 	}
+	return ComputeGitBaseStatus(ctx, base, req), nil
+}
+
+// ComputeGitBaseStatus runs the base-drift probe against a git worktree path.
+// Exported so the relay worker can execute the same reconcile logic on remote
+// hosts and report the result through the projection update endpoint.
+func ComputeGitBaseStatus(ctx context.Context, base string, req GitBaseStatusRequest) GitBaseStatusResult {
 	baseRef := strings.TrimSpace(req.BaseRef)
 	createdBaseSHA := strings.TrimSpace(req.CreatedBaseSHA)
 	remote, branch := parseRemoteTrackingBaseRef(ctx, base, baseRef)
@@ -2503,35 +2523,35 @@ func (m *Manager) GitBaseStatus(ctx context.Context, req GitBaseStatusRequest) (
 		Remote: remote,
 	}
 	if baseRef == "" || createdBaseSHA == "" {
-		return result, nil
+		return result
 	}
 	if remote != "" && branch != "" {
 		if err := fetchGit(ctx, base, GitMutationRequest{RemoteName: remote, BranchName: branch}); err != nil {
-			return result, nil
+			return result
 		}
 	}
 	postFetchSHA, err := readGitOutput(ctx, base, "rev-parse", "--verify", baseRef+"^{commit}")
 	if err != nil {
-		return result, nil
+		return result
 	}
 	conflict := checkGitRemoteBranchConflict(ctx, base, remote, strings.TrimSpace(req.BranchName))
 	result.Conflict = conflict
 	if postFetchSHA == createdBaseSHA {
 		result.Status = "current"
-		return result, nil
+		return result
 	}
 	if _, err := readGitOutput(ctx, base, "merge-base", "--is-ancestor", createdBaseSHA, postFetchSHA); err != nil {
 		result.Status = "base_changed"
-		return result, nil
+		return result
 	}
 	count, err := readGitOutput(ctx, base, "rev-list", "--count", createdBaseSHA+".."+postFetchSHA)
 	if err != nil {
-		return result, nil
+		return result
 	}
 	behind := parsePositiveInt(count)
 	if behind <= 0 {
 		result.Status = "current"
-		return result, nil
+		return result
 	}
 	result.Status = "drift"
 	result.Behind = behind
@@ -2542,7 +2562,7 @@ func (m *Manager) GitBaseStatus(ctx context.Context, req GitBaseStatusRequest) (
 			}
 		}
 	}
-	return result, nil
+	return result
 }
 
 func (m *Manager) GitCheckIgnored(ctx context.Context, req GitCheckIgnoredRequest) ([]string, error) {
@@ -2593,9 +2613,36 @@ func (m *Manager) GitSubmoduleStatus(ctx context.Context, req GitSubmoduleStatus
 		return GitStatusResult{}, err
 	}
 	return GitStatusResult{
-		Entries:           parseGitStatusEntries(output, strings.TrimSpace(req.Area)),
-		ConflictOperation: "unknown",
+		Entries:           parseGitStatusEntries(output, strings.TrimSpace(req.Area), submoduleRepo),
+		ConflictOperation: DetectGitConflictOperation(submoduleRepo),
 	}, nil
+}
+
+// relayGitBaseStatus maps a relay-reported projection base status onto the
+// local base-status result shape.
+func (m *Manager) relayGitBaseStatus(req GitBaseStatusRequest) GitBaseStatusResult {
+	workspaceID := strings.TrimSpace(req.WorktreeID)
+	if workspaceID == "" {
+		workspaceID = strings.TrimSpace(req.ProjectID)
+	}
+	result := GitBaseStatusResult{Status: "unknown", Base: strings.TrimSpace(req.BaseRef)}
+	projection, ok := m.cachedSourceControlProjection(strings.TrimSpace(req.ProjectID), workspaceID)
+	if !ok || projection.BaseStatus == nil {
+		return result
+	}
+	reported := projection.BaseStatus
+	result.Status = reported.Status
+	if strings.TrimSpace(reported.Base) != "" {
+		result.Base = reported.Base
+	}
+	result.Remote = reported.Remote
+	result.Behind = reported.Behind
+	result.RecentSubjects = reported.RecentSubjects
+	if reported.Conflict != nil {
+		conflict := *reported.Conflict
+		result.Conflict = &conflict
+	}
+	return result
 }
 
 func (m *Manager) GitRemoteFileURL(ctx context.Context, req GitRemoteFileURLRequest) (GitRemoteURLResult, error) {
@@ -2976,13 +3023,7 @@ func (m *Manager) GitRefFileDiff(ctx context.Context, req GitRefFileDiffRequest)
 	originalBinary := isLikelyBinary(left)
 	modifiedBinary := isLikelyBinary(right)
 	if originalBinary || modifiedBinary {
-		return GitFileDiffResult{
-			Kind:             "binary",
-			OriginalContent:  base64.StdEncoding.EncodeToString(left),
-			ModifiedContent:  base64.StdEncoding.EncodeToString(right),
-			OriginalIsBinary: originalBinary,
-			ModifiedIsBinary: modifiedBinary,
-		}, nil
+		return binaryGitFileDiffResult(left, right, originalBinary, modifiedBinary, filepath.ToSlash(filePath)), nil
 	}
 	return GitFileDiffResult{
 		Kind:             "text",
@@ -3273,7 +3314,7 @@ func parseNameStatusEntries(output string) []GitBranchChangeEntry {
 	return entries
 }
 
-func parseGitStatusEntries(output string, requestedArea string) []GitStatusEntry {
+func parseGitStatusEntries(output string, requestedArea string, worktreePath string) []GitStatusEntry {
 	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
 	entries := make([]GitStatusEntry, 0, len(lines))
 	for _, line := range lines {
@@ -3283,6 +3324,21 @@ func parseGitStatusEntries(output string, requestedArea string) []GitStatusEntry
 		code := line[:2]
 		rawPath := strings.TrimSpace(line[3:])
 		if rawPath == "" {
+			continue
+		}
+		// Why: unmerged XY pairs are one conflict row (area "unstaged"), not a
+		// staged+unstaged split — handle them before the per-column parse.
+		if conflictKind := ParseGitConflictKind(code); conflictKind != "" {
+			if requestedArea != "" && requestedArea != "unstaged" {
+				continue
+			}
+			entries = append(entries, GitStatusEntry{
+				Path:           rawPath,
+				Status:         ConflictCompatibilityStatus(worktreePath, rawPath, conflictKind),
+				Area:           "unstaged",
+				ConflictKind:   conflictKind,
+				ConflictStatus: "unresolved",
+			})
 			continue
 		}
 		area := "unstaged"

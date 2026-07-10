@@ -23,7 +23,7 @@ func TestApplyGitStatusLinesParsesBranchAndChanges(t *testing.T) {
 		"M  staged.ts",
 		"MM both.ts",
 		"AM added-modified.ts",
-	})
+	}, "")
 	if projection.Branch != "feature" {
 		t.Fatalf("expected feature branch, got %q", projection.Branch)
 	}
@@ -56,7 +56,7 @@ func TestApplyGitStatusLinesParsesBranchAndChanges(t *testing.T) {
 
 func TestApplyGitStatusLinesParsesNoCommitsBranch(t *testing.T) {
 	projection := SourceControlProjection{Branch: "fallback"}
-	applyGitStatusLines(&projection, []string{"## No commits yet on main"})
+	applyGitStatusLines(&projection, []string{"## No commits yet on main"}, "")
 	if projection.Branch != "main" {
 		t.Fatalf("expected main branch, got %q", projection.Branch)
 	}
