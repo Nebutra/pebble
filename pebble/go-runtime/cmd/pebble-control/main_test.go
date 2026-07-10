@@ -428,6 +428,66 @@ func TestRunAutomationAddBuildsCreateRequest(t *testing.T) {
 	}
 }
 
+func TestRunAutomationAddBuildsRruleScheduleRequest(t *testing.T) {
+	var gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		_, _ = w.Write([]byte(`{"id":"auto_2"}`))
+	}))
+	defer server.Close()
+
+	err := run(controlClient{endpoint: server.URL, http: server.Client()}, []string{
+		"automation",
+		"add",
+		"--name",
+		"weekday standup",
+		"--schedule",
+		"rrule",
+		"--rrule",
+		"FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+		"--dtstart",
+		"2026-01-05T09:00:00Z",
+		"--action",
+		"createTask",
+		"--payload",
+		`{"title":"standup"}`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(gotBody, `"kind":"rrule"`) ||
+		!strings.Contains(gotBody, `"rrule":"FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"`) ||
+		!strings.Contains(gotBody, `"dtstart":"2026-01-05T09:00:00Z"`) {
+		t.Fatalf("unexpected body %q", gotBody)
+	}
+}
+
+func TestRunAutomationAddRejectsInvalidDtstart(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("server should not be called for an invalid --dtstart")
+	}))
+	defer server.Close()
+
+	err := run(controlClient{endpoint: server.URL, http: server.Client()}, []string{
+		"automation",
+		"add",
+		"--name",
+		"bad",
+		"--schedule",
+		"rrule",
+		"--rrule",
+		"FREQ=DAILY",
+		"--dtstart",
+		"not-a-date",
+		"--action",
+		"createTask",
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid --dtstart")
+	}
+}
+
 func TestRunAutomationTriggerBuildsRunRequest(t *testing.T) {
 	var gotMethod string
 	var gotPath string

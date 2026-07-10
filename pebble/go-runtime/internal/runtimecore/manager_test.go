@@ -885,6 +885,213 @@ func TestAutomationRejectsUnsupportedSchedules(t *testing.T) {
 	}
 }
 
+func TestAutomationRruleComputesDailyNextOccurrence(t *testing.T) {
+	manager, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// dtstart must be in the future: nextRunAt is computed relative to real time.Now() at
+	// creation, so a past dtstart would correctly roll forward past its first occurrence.
+	dtstart := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second)
+	automation, err := manager.CreateAutomation(CreateAutomationRequest{
+		Name:    "daily standup reminder",
+		Enabled: true,
+		Schedule: AutomationSchedule{
+			Kind:    AutomationScheduleRrule,
+			Rrule:   "FREQ=DAILY",
+			DtStart: &dtstart,
+		},
+		Action: AutomationAction{
+			Kind: AutomationActionCreateTask,
+			Payload: map[string]interface{}{
+				"title": "reminder",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if automation.NextRunAt == nil {
+		t.Fatal("rrule automation should set nextRunAt")
+	}
+	// First occurrence should be dtstart itself, since no run has fired yet.
+	if !automation.NextRunAt.Equal(dtstart) {
+		t.Fatalf("expected first occurrence to equal dtstart, got %v", automation.NextRunAt)
+	}
+}
+
+func TestAutomationRruleComputesWeeklyNextOccurrence(t *testing.T) {
+	manager, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Find the next future Monday 09:00 UTC so dtstart is guaranteed ahead of time.Now().
+	dtstart := nextWeekdayAt(t, time.Monday, 9, 0)
+	automation, err := manager.CreateAutomation(CreateAutomationRequest{
+		Name:    "MWF sync",
+		Enabled: true,
+		Schedule: AutomationSchedule{
+			Kind:    AutomationScheduleRrule,
+			Rrule:   "FREQ=WEEKLY;BYDAY=MO,WE,FR",
+			DtStart: &dtstart,
+		},
+		Action: AutomationAction{
+			Kind: AutomationActionCreateTask,
+			Payload: map[string]interface{}{
+				"title": "sync",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if automation.NextRunAt == nil || !automation.NextRunAt.Equal(dtstart) {
+		t.Fatalf("expected first occurrence to equal dtstart (Monday), got %v", automation.NextRunAt)
+	}
+
+	// Evaluate strictly before the Monday occurrence: it should not be due yet.
+	beforeMonday := dtstart.Add(-time.Minute)
+	runs, err := manager.EvaluateScheduledAutomations(context.Background(), beforeMonday)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 0 {
+		t.Fatalf("automation should not be due before Monday's occurrence: %#v", runs)
+	}
+	updated := manager.ListAutomations()[0]
+	if updated.NextRunAt == nil || !updated.NextRunAt.Equal(dtstart) {
+		t.Fatalf("nextRunAt should still be Monday's occurrence until it fires, got %v", updated.NextRunAt)
+	}
+
+	// Evaluating at/after Monday's occurrence fires it and advances to Wednesday.
+	runs, err = manager.EvaluateScheduledAutomations(context.Background(), dtstart)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 || runs[0].Status != AutomationRunCompleted {
+		t.Fatalf("expected Monday occurrence to dispatch, got %#v", runs)
+	}
+	updated = manager.ListAutomations()[0]
+	wednesday := dtstart.Add(48 * time.Hour)
+	if updated.NextRunAt == nil || !updated.NextRunAt.Equal(wednesday) {
+		t.Fatalf("expected next occurrence to advance to Wednesday, got %v", updated.NextRunAt)
+	}
+
+	// Evaluating at Wednesday's occurrence fires it and advances to Friday.
+	runs, err = manager.EvaluateScheduledAutomations(context.Background(), wednesday)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 || runs[0].Status != AutomationRunCompleted {
+		t.Fatalf("expected Wednesday occurrence to dispatch, got %#v", runs)
+	}
+	updated = manager.ListAutomations()[0]
+	friday := dtstart.Add(4 * 24 * time.Hour)
+	if updated.NextRunAt == nil || !updated.NextRunAt.Equal(friday) {
+		t.Fatalf("expected next occurrence to advance to Friday, got %v", updated.NextRunAt)
+	}
+}
+
+// nextWeekdayAt returns the next future occurrence of the given weekday/time so RRULE tests can
+// use a dtstart guaranteed ahead of time.Now(), since nextAutomationRunAt anchors to real time.
+func nextWeekdayAt(t *testing.T, weekday time.Weekday, hour, minute int) time.Time {
+	t.Helper()
+	now := time.Now().UTC()
+	candidate := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, time.UTC)
+	for candidate.Weekday() != weekday || !candidate.After(now) {
+		candidate = candidate.Add(24 * time.Hour)
+	}
+	return candidate
+}
+
+func TestAutomationRruleRejectsUnsupportedFrequency(t *testing.T) {
+	manager, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = manager.CreateAutomation(CreateAutomationRequest{
+		Name: "yearly task",
+		Schedule: AutomationSchedule{
+			Kind:  AutomationScheduleRrule,
+			Rrule: "FREQ=YEARLY",
+		},
+		Action: AutomationAction{
+			Kind: AutomationActionCreateTask,
+			Payload: map[string]interface{}{
+				"title": "yearly work",
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected unsupported rrule frequency to be rejected")
+	}
+}
+
+func TestAutomationRruleRespectsUntilAndCount(t *testing.T) {
+	manager, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dtstart := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second)
+	automation, err := manager.CreateAutomation(CreateAutomationRequest{
+		Name:    "two-day-only",
+		Enabled: true,
+		Schedule: AutomationSchedule{
+			Kind:    AutomationScheduleRrule,
+			Rrule:   "FREQ=DAILY;COUNT=2",
+			DtStart: &dtstart,
+		},
+		Action: AutomationAction{
+			Kind: AutomationActionCreateTask,
+			Payload: map[string]interface{}{
+				"title": "limited work",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Fire the first occurrence (dtstart).
+	runs, err := manager.EvaluateScheduledAutomations(context.Background(), dtstart)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("expected first occurrence to dispatch, got %#v", runs)
+	}
+	secondDay := dtstart.Add(24 * time.Hour)
+	updated := manager.ListAutomations()[0]
+	if updated.NextRunAt == nil || !updated.NextRunAt.Equal(secondDay) {
+		t.Fatalf("expected second occurrence to be scheduled, got %v", updated.NextRunAt)
+	}
+
+	// Fire the second (last, COUNT=2) occurrence.
+	runs, err = manager.EvaluateScheduledAutomations(context.Background(), secondDay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("expected second occurrence to dispatch, got %#v", runs)
+	}
+	updated = manager.ListAutomations()[0]
+	if updated.NextRunAt != nil {
+		t.Fatalf("expected no further occurrences after COUNT is exhausted, got %v", updated.NextRunAt)
+	}
+
+	// Evaluating well past the exhausted schedule should not error or produce runs.
+	runs, err = manager.EvaluateScheduledAutomations(context.Background(), secondDay.Add(48*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 0 {
+		t.Fatalf("expected no runs once rrule is exhausted, got %#v", runs)
+	}
+	if automation.ID != updated.ID {
+		t.Fatalf("automation identity changed unexpectedly")
+	}
+}
+
 func TestExternalWorkItemsUpsertLinkAndPersist(t *testing.T) {
 	dir := t.TempDir()
 	manager, err := NewManager(dir, nil)

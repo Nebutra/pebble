@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -442,11 +443,13 @@ func runAutomation(client controlClient, args []string) error {
 		name := fs.String("name", "", "automation name")
 		description := fs.String("description", "", "automation description")
 		enabled := fs.Bool("enabled", true, "enable automation")
-		schedule := fs.String("schedule", "manual", "manual or interval")
+		schedule := fs.String("schedule", "manual", "manual, interval, cron, event, or rrule")
 		interval := fs.Int64("interval-seconds", 0, "interval seconds for interval schedules")
 		cron := fs.String("cron", "", "cron expression for cron schedules")
 		eventTopic := fs.String("event-topic", "", "event topic for event schedules")
 		timezone := fs.String("timezone", "", "schedule timezone")
+		rrule := fs.String("rrule", "", "RFC 5545 recurrence rule for rrule schedules")
+		dtstart := fs.String("dtstart", "", "RFC3339 recurrence start for rrule schedules")
 		action := fs.String("action", "", "createTask, sendMessage, dispatchTask, startAgentRun, or computerAction")
 		payloadJSON := fs.String("payload", "", "action payload JSON object")
 		_ = fs.Parse(args[1:])
@@ -454,11 +457,15 @@ func runAutomation(client controlClient, args []string) error {
 		if err != nil {
 			return err
 		}
+		schedulePayload, err := automationSchedulePayload(*schedule, *interval, *cron, *eventTopic, *timezone, *rrule, *dtstart)
+		if err != nil {
+			return err
+		}
 		body := map[string]interface{}{
 			"name":        *name,
 			"description": *description,
 			"enabled":     *enabled,
-			"schedule":    automationSchedulePayload(*schedule, *interval, *cron, *eventTopic, *timezone),
+			"schedule":    schedulePayload,
 			"action": map[string]interface{}{
 				"kind":    *action,
 				"payload": payload,
@@ -471,11 +478,13 @@ func runAutomation(client controlClient, args []string) error {
 		name := fs.String("name", "", "automation name")
 		description := fs.String("description", "", "automation description")
 		enabled := fs.String("enabled", "", "true or false")
-		schedule := fs.String("schedule", "", "manual or interval")
+		schedule := fs.String("schedule", "", "manual, interval, cron, event, or rrule")
 		interval := fs.Int64("interval-seconds", 0, "interval seconds for interval schedules")
 		cron := fs.String("cron", "", "cron expression for cron schedules")
 		eventTopic := fs.String("event-topic", "", "event topic for event schedules")
 		timezone := fs.String("timezone", "", "schedule timezone")
+		rrule := fs.String("rrule", "", "RFC 5545 recurrence rule for rrule schedules")
+		dtstart := fs.String("dtstart", "", "RFC3339 recurrence start for rrule schedules")
 		action := fs.String("action", "", "createTask, sendMessage, dispatchTask, startAgentRun, or computerAction")
 		payloadJSON := fs.String("payload", "", "action payload JSON object")
 		_ = fs.Parse(args[1:])
@@ -491,7 +500,11 @@ func runAutomation(client controlClient, args []string) error {
 			body["enabled"] = parsed
 		}
 		if flagWasSet(fs, "schedule") {
-			body["schedule"] = automationSchedulePayload(*schedule, *interval, *cron, *eventTopic, *timezone)
+			schedulePayload, err := automationSchedulePayload(*schedule, *interval, *cron, *eventTopic, *timezone, *rrule, *dtstart)
+			if err != nil {
+				return err
+			}
+			body["schedule"] = schedulePayload
 		}
 		if flagWasSet(fs, "action") {
 			payload, err := parseJSONMap(*payloadJSON)
@@ -1596,14 +1609,23 @@ func normalizeSourceControlChangeStatus(value string) (string, bool) {
 	}
 }
 
-func automationSchedulePayload(kind string, intervalSeconds int64, cron string, eventTopic string, timezone string) map[string]interface{} {
-	return map[string]interface{}{
+func automationSchedulePayload(kind string, intervalSeconds int64, cron string, eventTopic string, timezone string, rrule string, dtstart string) (map[string]interface{}, error) {
+	payload := map[string]interface{}{
 		"kind":            kind,
 		"intervalSeconds": intervalSeconds,
 		"cron":            cron,
 		"eventTopic":      eventTopic,
 		"timezone":        timezone,
+		"rrule":           rrule,
 	}
+	if dtstart != "" {
+		parsed, err := time.Parse(time.RFC3339, dtstart)
+		if err != nil {
+			return nil, fmt.Errorf("invalid --dtstart, expected RFC3339: %w", err)
+		}
+		payload["dtstart"] = parsed.Format(time.RFC3339)
+	}
+	return payload, nil
 }
 
 func parseJSONMap(raw string) (map[string]interface{}, error) {

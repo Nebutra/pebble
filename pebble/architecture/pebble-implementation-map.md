@@ -7,19 +7,19 @@ removed.
 
 ## Language Ownership
 
-| Area | Primary language | Reason |
-| --- | --- | --- |
-| Runtime service graph | Go | Long-lived concurrent services, cancellation, RPC, orchestration. |
-| Repo/worktree/git providers | Go | Process orchestration, network API clients, portable filesystem handling. |
-| Agent lifecycle | Go | Many independent process sessions and supervised state machines. |
-| Terminal API | Go | Go owns sessions, routing, and PTY spawn/winsize (`creack/pty`); Zig is unlinked, reserved only for a future binary output channel. |
-| Browser bridge | Rust + Go | Rust owns desktop WebView/security boundary; Go owns runtime-facing session state. |
-| Computer-use providers | Rust (Zig reserved, not yet linked) | Platform APIs, capability gating, native binary surfaces; Zig is a candidate future home for low-level accessibility primitives only. |
-| Desktop app shell | Rust/Tauri | Window lifecycle, native menus, IPC boundary. |
-| Desktop UI | React in Tauri | Preserve rich workbench semantics while removing Electron. |
-| Mobile app | React Native | Native companion with shared runtime protocol. |
-| Relay | Go | Remote daemon, reconnects, local socket/websocket transport. |
-| Release/update | Rust + platform scripts | Tauri signing/updater and per-platform packaging. |
+| Area                        | Primary language                    | Reason                                                                                                                                |
+| --------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime service graph       | Go                                  | Long-lived concurrent services, cancellation, RPC, orchestration.                                                                     |
+| Repo/worktree/git providers | Go                                  | Process orchestration, network API clients, portable filesystem handling.                                                             |
+| Agent lifecycle             | Go                                  | Many independent process sessions and supervised state machines.                                                                      |
+| Terminal API                | Go                                  | Go owns sessions, routing, and PTY spawn/winsize (`creack/pty`); Zig is unlinked, reserved only for a future binary output channel.   |
+| Browser bridge              | Rust + Go                           | Rust owns desktop WebView/security boundary; Go owns runtime-facing session state.                                                    |
+| Computer-use providers      | Rust (Zig reserved, not yet linked) | Platform APIs, capability gating, native binary surfaces; Zig is a candidate future home for low-level accessibility primitives only. |
+| Desktop app shell           | Rust/Tauri                          | Window lifecycle, native menus, IPC boundary.                                                                                         |
+| Desktop UI                  | React in Tauri                      | Preserve rich workbench semantics while removing Electron.                                                                            |
+| Mobile app                  | React Native                        | Native companion with shared runtime protocol.                                                                                        |
+| Relay                       | Go                                  | Remote daemon, reconnects, local socket/websocket transport.                                                                          |
+| Release/update              | Rust + platform scripts             | Tauri signing/updater and per-platform packaging.                                                                                     |
 
 ## Service Boundaries
 
@@ -42,6 +42,16 @@ Current implementation:
 - Go exposes `/v1/events` as a server-sent event stream with event IDs; Rust/Tauri,
   desktop UI, and `pebble-control events` can read bounded, topic-filtered batches from that stream
   for runtime diagnostics.
+- Tauri starts a native event-push bridge for `/v1/events`, re-emits runtime events to the
+  renderer, and keeps the renderer polling fallback active until a connected status is observed.
+- Go exposes `/v1/host/terminal-capabilities`, and Tauri maps `host.platform`,
+  `host.wsl.*`, `host.pwsh.isAvailable`, and `host.gitBash.isAvailable` runtime calls onto that
+  endpoint instead of returning unmapped host capability errors.
+- Go persists SSH targets and runs bounded connectivity probes; Tauri maps target
+  list/import/CRUD plus connect/disconnect UI state onto those probe results without claiming the
+  SSH relay/PTY stack is complete. Auto-connect passphrase gating reads the persisted
+  `lastRequiredPassphrase` target flag instead of returning a fixed false; relay-side credential
+  cache parity remains a separate gate.
 
 ### Workspace Service
 
@@ -61,6 +71,9 @@ Current implementation:
   endpoints instead of renderer-only synthesis.
 - Tauri emits renderer-correlated `fetching`/`creating` progress events around runtime worktree
   creation and now fans out local base-status plus remote-branch-conflict source-control events.
+- Tauri maps local runtime `worktree.activate` to the existing renderer activation event path, so
+  CLI/mobile-style activation requests use the same workspace selection flow as Electron instead
+  of falling through to `method_not_available`.
 - Project `locationKind` is validated to `local` or `ssh`; SSH workspaces must use relay-backed
   file, source-control, and session flows instead of accidental local execution, and SSH projects
   require a `hostId` so relay-fed state is scoped to an explicit remote host.
@@ -108,16 +121,21 @@ runtime actions that create or dispatch work without assuming local-only executi
 
 Current implementation:
 
-- Go persists automation definitions and run records, supports manual and interval triggers, and
-  executes actions through existing task, message, dispatch, agent-run, and computer-action
-  services.
+- Go persists automation definitions and run records, supports manual, interval, and RRULE
+  triggers, and executes actions through existing task, message, dispatch, agent-run, and
+  computer-action services. RRULE evaluation uses `github.com/teambition/rrule-go` and supports the
+  DAILY/WEEKLY/MONTHLY subset (with INTERVAL/BYDAY/UNTIL/COUNT) that the Electron reference schedule
+  builder actually emits; other frequencies (e.g. YEARLY) are rejected at create/update time.
 - HTTP and CLI expose automation create/update/delete/list, run listing, manual triggering, and
-  interval evaluation endpoints.
+  interval/RRULE evaluation endpoints (`pebble-control automation add/update --schedule rrule
+  --rrule <RFC5545> --dtstart <RFC3339>`).
 - Tauri maps local `window.api.automations` and `automation.*` runtime RPC calls onto the Go
   automation HTTP routes, preserving the renderer's rich automation fields inside runtime payloads
   so list/create/update/delete, run listing, and manual Run Now are backed by real runtime storage.
-  RRULE schedule execution, renderer/headless dispatch, native precheck execution, and external
-  automation managers are still explicit migration gaps, not fake-success fallbacks.
+- Tauri projects local Hermes/OpenClaw sources as explicit unavailable external managers instead of
+  returning an empty fake state. Renderer/headless dispatch, native precheck execution, and
+  external automation manager execution are still explicit migration gaps, not fake-success
+  fallbacks.
 
 ### External Task Service
 
@@ -144,19 +162,22 @@ Current implementation:
   fallback calls onto Go source-control projections so the canonical Source Control UI can render
   real changed-file and branch/ahead/behind state without Electron IPC. Tauri also maps `git.diff`
   to a Go content-diff endpoint for basic file diff viewing, maps `git.branchCompare`,
-  `git.history`, `git.commitCompare`, `git.branchDiff`, and `git.commitDiff` to bounded
-  history/compare/ref-diff commands, and maps stage/unstage/discard/commit plus
-  fetch/pull/push/fast-forward/rebase, abort merge/rebase, fork sync, remote file/commit URL
-  building, ignore checks, and basic submodule status to bounded Go git commands. Go also stores
-  the created base SHA for local runtime-created worktrees and exposes base-status reconciliation,
-  so Tauri can emit the existing renderer `worktree:baseStatus` and
+  `git.history`, `git.localBranches`, `git.checkout`, `git.commitCompare`, `git.branchDiff`, and
+  `git.commitDiff` to bounded history/compare/ref-diff/branch commands, and maps
+  stage/unstage/discard/commit plus fetch/pull/push/fast-forward/rebase, abort merge/rebase, fork
+  sync, remote file/commit URL building, GitHub repo slug/upstream-remote identity, ignore checks,
+  and basic submodule status to bounded Go git commands. Go also stores the created base SHA for local runtime-created worktrees
+  and exposes base-status reconciliation, so Tauri can emit the existing renderer `worktree:baseStatus` and
   `worktree:remoteBranchConflict` subscription payloads without Electron IPC. The Go projection
   parser now preserves staged/unstaged/untracked areas and rename `oldPath` through the Tauri
   status mapper. Tauri maps local `hostedReview.*` runtime calls to typed unsupported-provider
   review states/results instead of unmapped runtime errors, keeping Source Control on its normal
-  blocked-review UI while provider backends move out of Electron. Full parity still needs conflict
-  metadata, rich submodule/binary diff metadata, remote/SSH base-status parity, provider review
-  actions, and native AI text-generation host wiring for commit and pull-request field generation.
+  blocked-review UI while provider backends move out of Electron. Renderer Source Control gates
+  commit-message and hosted-review text-generation affordances under Tauri before they call the
+  explicit-unavailable git RPCs. Full parity still needs conflict metadata, rich submodule/binary
+  diff metadata, remote/SSH base-status parity, GitHub API fork-parent fallback without an
+  `upstream` remote, provider review actions, and native AI text-generation host wiring for commit
+  and pull-request field generation.
 - SSH/remote source-control projections can be updated by relay workers through the runtime
   gateway; direct git status/diff execution still returns relay-required errors without a worker.
   The runtime normalizes external changed-file status values, drops invalid workspace paths, and
@@ -236,6 +257,19 @@ Current implementation:
 - Tauri WebView shims register page-scoped action executors with the browser action consumer, so
   queued `browser.goto`, reload, back, forward, and stop actions now complete against the active
   native WebView and report results back to the shared runtime action endpoint.
+- Tauri WebView shims enable native child WebView devtools and route
+  `window.api.browser.openDevTools` to the active child WebView label, so the browser toolbar and
+  context-menu inspection controls have real behavior in the Tauri shell instead of returning
+  a dead false.
+- Tauri routes `sessionClearDefaultCookies` to live default-partition child WebViews and calls
+  their browsing-data clearer. The adapter is deliberately scoped because Tauri does not expose
+  Electron's cookies-only storage filter.
+- Renderer browser feature availability gates local grab/annotation buttons and shortcut handling
+  under the Tauri child WebView host, because the native guest script/CDP adapter is not available
+  yet and the UI must not enter a `not-ready` IPC path after looking actionable.
+- The same renderer availability gate hides the always-visible cookie import hint and keeps the
+  overflow Import Cookies submenu read-only under Tauri until the native cookie import adapter
+  exists, while leaving default-profile data clearing wired separately.
 - Tauri runtime RPC queues `browser.screenshot` through the same provider action path and waits for
   the action result, so native adapters can return `{ data, format }` without another renderer
   contract change while the current WebView shim reports the native capture gap explicitly.
@@ -400,13 +434,19 @@ Current implementation:
   contract, stop maps to session delete, and renderer-side resize/reportGeometry state preserves
   Electron's restore semantics until native winsize propagation lands. This is a fallback bridge;
   the runtime-owned PTY it targets is Go-backed (`creack/pty`), not Zig.
-- Tauri local runtime RPC maps terminal list/show/read/send/wait/inspect/clear/stop/stopExact/agent-status
-  calls to Go process sessions so CLI, agent-note, sleep/restore, and runtime-probe flows do not
-  fall through to unmapped Electron-only methods. Go still needs hook-level idle/permission state
-  before those waits can match Electron's full TUI readiness model.
-- Tauri local runtime RPC maps file explorer read/readChunk/readPreview/write/writeBase64,
-  create/rename/copy/delete/stat/list/search, upload chunk, and server directory browse calls to
-  Go file endpoints. For SSH worktrees backed by paired runtime environments, Tauri proxies the
+- Tauri local runtime RPC maps terminal create/list/resolveActive/show/read/send/wait/inspect/clear/stop/
+  stopExact/focus/close/split/resolvePane/agent-status calls to Go process sessions so CLI,
+  agent-note, sleep/restore, terminal-handle copy, local session-tab creation, and runtime-probe
+  flows do not fall through to unmapped Electron-only methods. Tauri also exposes local
+  `session.tabs.list/listAll/createTerminal/activate/close/move/updatePaneLayout/setTabProps/
+subscribe/unsubscribe` snapshots and mutations from Go session records plus a Tauri-side tab
+  state mirror instead of empty tab mocks. Go still needs durable session tab move/layout/
+  subscription persistence, true streaming, plus hook-level idle/permission state before those
+  flows can match Electron's full layout and TUI readiness model.
+- Tauri local runtime RPC maps mobile/CLI files.list/open/openDiff plus file explorer
+  read/readChunk/readPreview/write/writeBase64, create/rename/copy/delete/stat/list/search,
+  upload chunk, and server directory browse calls to Go file endpoints and renderer file-open
+  events. For SSH worktrees backed by paired runtime environments, Tauri proxies the
   same file explorer read/preview/chunk/write/CRUD/search/document RPCs to the owning runtime
   instead of touching remote paths from the desktop host. Tauri file watching uses Rust `notify`
   for local worktrees and runtime-environment `files.watch` subscriptions for SSH/remote
@@ -419,7 +459,8 @@ Current implementation:
   gaps.
 - Tauri now maps runtime-backed agent sessions into the existing renderer `agentStatus` IPC
   contract instead of leaving the Activity/Agents page on the web mock: spawn records the real
-  `tabId`/`leafId` pane key, runtime `session.status` events emit `working`/`done`, kill maps to
+  `tabId`/`leafId` pane key, runtime `session.status` events emit `working`/`blocked`/`done`
+  semantics, failed runtime sessions stay visible as blocked work needing attention, kill maps to
   interrupted completion, and `/v1/sessions` snapshots carry tab/leaf/launch metadata so hot reload
   can rehydrate live agent rows.
 - Tauri exposes renderer-compatible mobile fit/driver snapshots, listener subscriptions, and
@@ -428,11 +469,15 @@ Current implementation:
   runtime RPC parity gate.
 - Tauri exposes the canonical speech model catalog and model states that explicitly mark the
   native STT adapter as unavailable, plus functional lifecycle listener registration. This keeps
-  Settings and dictation surfaces on the Electron renderer contract without pretending Tauri can
-  download models or transcribe audio before the native speech backend is migrated.
+  Settings and dictation surfaces on the Electron renderer contract; renderer feature gates now
+  disable Tauri dictation controls before they call mutating speech APIs that would reject, without
+  pretending Tauri can download models or transcribe audio before the native speech backend is
+  migrated.
 - Tauri detects installed local CLI agents by reusing the shared `TUI_AGENT_CONFIG` command catalog
   and a native Rust PATH/install-dir probe, so agent settings and launch surfaces are no longer fed
-  mock empty detection results.
+  mock empty detection results. Tauri CLI registration uses native Rust for the host command and
+  returns explicit WSL CLI unsupported status until the Rust WSL bridge is migrated, rather than
+  inheriting web browser-managed fallback copy.
 - Tauri maps local runtime preflight RPC calls for agent detection/refresh back onto the same
   native probe path, preserving renderer call sites that go through `callRuntimeRpc`.
 - Tauri maps passive remote preflight probes through `runtimeEnvironments.call` when the supplied
@@ -462,9 +507,11 @@ Current implementation:
 - Tauri exposes updater version/status events and menu-triggered check errors so updater surfaces no
   longer silently no-op, initializes the native updater/process plugins, and now maps the existing
   UpdateCard lifecycle onto signed updater package download, native install, and process relaunch.
-  The Nebutra/Pebble GitHub release feed remains a readiness fallback for release visibility, while
-  missing updater signing config or platform endpoints must surface as explicit errors with manual
-  release links instead of fake downloaded states.
+  The Nebutra/Pebble GitHub release feed remains a readiness fallback for release visibility, and
+  Tauri fetches Nebutra `whats-new/changelog.json` through Rust/reqwest before emitting available
+  statuses so the Electron release-popup content model stays shared. Missing updater signing config
+  or platform endpoints must surface as explicit errors with manual release links instead of fake
+  downloaded states.
 - Tauri replaces the web crash-report mock with native commands for renderer error-boundary
   reports, breadcrumbs, pending/latest lookup, dismiss/sent transitions, copyable crash text, and
   Nebutra crash feedback submission with native NDJSON diagnostic bundle attachment. The same

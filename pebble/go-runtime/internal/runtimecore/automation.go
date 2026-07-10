@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/teambition/rrule-go"
 )
 
 type AutomationScheduleKind string
@@ -17,6 +19,7 @@ const (
 	AutomationScheduleInterval AutomationScheduleKind = "interval"
 	AutomationScheduleCron     AutomationScheduleKind = "cron"
 	AutomationScheduleEvent    AutomationScheduleKind = "event"
+	AutomationScheduleRrule    AutomationScheduleKind = "rrule"
 )
 
 type AutomationActionKind string
@@ -51,6 +54,13 @@ type AutomationSchedule struct {
 	Cron            string                 `json:"cron,omitempty"`
 	EventTopic      string                 `json:"eventTopic,omitempty"`
 	Timezone        string                 `json:"timezone,omitempty"`
+	// Rrule is an RFC 5545 recurrence rule string (e.g. "FREQ=WEEKLY;BYDAY=MO,WE;INTERVAL=2").
+	// Supported subset mirrors the Electron reference path: DAILY/WEEKLY/MONTHLY frequencies with
+	// INTERVAL/BYDAY/UNTIL/COUNT — the practical range the product's schedule builder emits.
+	Rrule string `json:"rrule,omitempty"`
+	// DtStart anchors the recurrence; occurrences are computed relative to it, not to Timezone
+	// (rrule-go operates in the time.Time's own location, so DtStart must carry the intended zone).
+	DtStart *time.Time `json:"dtstart,omitempty"`
 }
 
 type AutomationAction struct {
@@ -426,21 +436,80 @@ func normalizeAutomationSchedule(schedule AutomationSchedule) (AutomationSchedul
 	schedule.Cron = strings.TrimSpace(schedule.Cron)
 	schedule.EventTopic = strings.TrimSpace(schedule.EventTopic)
 	schedule.Timezone = strings.TrimSpace(schedule.Timezone)
+	schedule.Rrule = strings.TrimSpace(schedule.Rrule)
 	switch schedule.Kind {
 	case AutomationScheduleManual:
 		schedule.IntervalSeconds = 0
 		schedule.Cron = ""
 		schedule.EventTopic = ""
+		schedule.Rrule = ""
+		schedule.DtStart = nil
 	case AutomationScheduleInterval:
 		if schedule.IntervalSeconds <= 0 {
 			return AutomationSchedule{}, errors.New("automation interval seconds must be positive")
 		}
 		schedule.Cron = ""
 		schedule.EventTopic = ""
+		schedule.Rrule = ""
+		schedule.DtStart = nil
+	case AutomationScheduleRrule:
+		if schedule.Rrule == "" {
+			return AutomationSchedule{}, errors.New("automation rrule is required")
+		}
+		dtStart, err := resolveAutomationDtStart(schedule)
+		if err != nil {
+			return AutomationSchedule{}, err
+		}
+		if _, err := buildAutomationRRule(schedule.Rrule, dtStart); err != nil {
+			return AutomationSchedule{}, err
+		}
+		schedule.DtStart = &dtStart
+		schedule.IntervalSeconds = 0
+		schedule.Cron = ""
+		schedule.EventTopic = ""
 	default:
 		return AutomationSchedule{}, errors.New("unsupported automation schedule kind")
 	}
 	return schedule, nil
+}
+
+// resolveAutomationDtStart defaults DtStart to now (in the schedule's timezone, if any) so
+// callers can omit it for "starts immediately" schedules, matching the interval trigger's
+// implicit start-from-creation behavior.
+func resolveAutomationDtStart(schedule AutomationSchedule) (time.Time, error) {
+	loc := time.UTC
+	if schedule.Timezone != "" {
+		resolved, err := time.LoadLocation(schedule.Timezone)
+		if err != nil {
+			return time.Time{}, errors.New("invalid automation schedule timezone")
+		}
+		loc = resolved
+	}
+	if schedule.DtStart != nil {
+		return schedule.DtStart.In(loc), nil
+	}
+	return time.Now().In(loc), nil
+}
+
+// buildAutomationRRule parses the RFC 5545 recurrence string and restricts it to the practical
+// subset the schedule builder emits (DAILY/WEEKLY/MONTHLY with INTERVAL/BYDAY/UNTIL/COUNT) so
+// obscure RFC corners (e.g. BYSETPOS, secondly frequencies) fail fast with a clear error.
+func buildAutomationRRule(rruleStr string, dtStart time.Time) (*rrule.RRule, error) {
+	option, err := rrule.StrToROptionInLocation(rruleStr, dtStart.Location())
+	if err != nil {
+		return nil, errors.New("invalid automation rrule: " + err.Error())
+	}
+	switch option.Freq {
+	case rrule.DAILY, rrule.WEEKLY, rrule.MONTHLY:
+	default:
+		return nil, errors.New("unsupported automation rrule frequency (supported: DAILY, WEEKLY, MONTHLY)")
+	}
+	option.Dtstart = dtStart
+	rule, err := rrule.NewRRule(*option)
+	if err != nil {
+		return nil, errors.New("invalid automation rrule: " + err.Error())
+	}
+	return rule, nil
 }
 
 func normalizeAutomationAction(action AutomationAction) (AutomationAction, error) {
@@ -453,11 +522,40 @@ func normalizeAutomationAction(action AutomationAction) (AutomationAction, error
 }
 
 func nextAutomationRunAt(schedule AutomationSchedule, from time.Time, enabled bool) *time.Time {
-	if !enabled || schedule.Kind != AutomationScheduleInterval || schedule.IntervalSeconds <= 0 {
+	if !enabled {
 		return nil
 	}
-	next := from.UTC().Add(time.Duration(schedule.IntervalSeconds) * time.Second)
-	return &next
+	switch schedule.Kind {
+	case AutomationScheduleInterval:
+		if schedule.IntervalSeconds <= 0 {
+			return nil
+		}
+		next := from.UTC().Add(time.Duration(schedule.IntervalSeconds) * time.Second)
+		return &next
+	case AutomationScheduleRrule:
+		return nextAutomationRruleOccurrence(schedule, from)
+	default:
+		return nil
+	}
+}
+
+// nextAutomationRruleOccurrence finds the earliest occurrence strictly after `from`, reusing the
+// dtstart resolved at schedule-normalization time so timezone handling stays consistent between
+// create/update and each re-evaluation after a run fires.
+func nextAutomationRruleOccurrence(schedule AutomationSchedule, from time.Time) *time.Time {
+	if schedule.Rrule == "" || schedule.DtStart == nil {
+		return nil
+	}
+	rule, err := buildAutomationRRule(schedule.Rrule, *schedule.DtStart)
+	if err != nil {
+		return nil
+	}
+	next := rule.After(from.In(schedule.DtStart.Location()), false)
+	if next.IsZero() {
+		return nil
+	}
+	utc := next.UTC()
+	return &utc
 }
 
 func mergedAutomationPayload(base map[string]interface{}, override map[string]interface{}) map[string]interface{} {
