@@ -21,8 +21,17 @@ pub struct PreflightDetectCommandsInput {
     commands: Vec<String>,
 }
 
+// Why: sync tauri commands run on the main thread; these probes spawn child
+// processes with multi-second budgets, which beachballs the whole window. All
+// three run as async commands with the blocking body on the blocking pool.
 #[tauri::command]
-pub fn preflight_detect_commands(input: PreflightDetectCommandsInput) -> Vec<String> {
+pub async fn preflight_detect_commands(input: PreflightDetectCommandsInput) -> Vec<String> {
+    tauri::async_runtime::spawn_blocking(move || detect_commands_blocking(input))
+        .await
+        .unwrap_or_default()
+}
+
+fn detect_commands_blocking(input: PreflightDetectCommandsInput) -> Vec<String> {
     let mut found = Vec::new();
     let mut seen = HashSet::new();
     for command in input.commands {
@@ -139,7 +148,13 @@ pub struct PreflightAuthStatus {
 /// whose output still carries success markers is treated as authenticated to
 /// avoid a false "not signed in" warning.
 #[tauri::command]
-pub fn preflight_probe_auth(input: PreflightProbeAuthInput) -> Vec<PreflightAuthStatus> {
+pub async fn preflight_probe_auth(input: PreflightProbeAuthInput) -> Vec<PreflightAuthStatus> {
+    tauri::async_runtime::spawn_blocking(move || probe_auth_blocking(input))
+        .await
+        .unwrap_or_default()
+}
+
+fn probe_auth_blocking(input: PreflightProbeAuthInput) -> Vec<PreflightAuthStatus> {
     let mut seen = HashSet::new();
     input
         .commands
@@ -278,7 +293,13 @@ const SHELL_PATH_DELIMITER: &str = "__PEBBLE_SHELL_PATH__";
 /// ask the shell itself. Windows has no POSIX login shell, so it reports
 /// `no_shell` and the caller falls back to the existing process PATH.
 #[tauri::command]
-pub fn preflight_hydrate_shell_path() -> PreflightShellPath {
+pub async fn preflight_hydrate_shell_path() -> PreflightShellPath {
+    tauri::async_runtime::spawn_blocking(hydrate_shell_path_blocking)
+        .await
+        .unwrap_or_else(|_| shell_path_failure("spawn_error"))
+}
+
+fn hydrate_shell_path_blocking() -> PreflightShellPath {
     let Some(shell) = pick_login_shell() else {
         return shell_path_failure("no_shell");
     };

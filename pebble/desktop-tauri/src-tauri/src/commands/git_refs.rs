@@ -83,8 +83,19 @@ struct GitCommandError {
     message: String,
 }
 
+// Why: sync tauri commands run on the main thread; these spawn `git` child
+// processes (fetches/ref walks can take seconds on large or cold repos), which
+// would freeze the whole window. Run the blocking body on the blocking pool.
 #[tauri::command]
-pub fn git_search_base_ref_details(input: GitBaseRefSearchInput) -> Vec<GitBaseRefSearchResult> {
+pub async fn git_search_base_ref_details(
+    input: GitBaseRefSearchInput,
+) -> Vec<GitBaseRefSearchResult> {
+    tauri::async_runtime::spawn_blocking(move || search_base_ref_details_blocking(input))
+        .await
+        .unwrap_or_default()
+}
+
+fn search_base_ref_details_blocking(input: GitBaseRefSearchInput) -> Vec<GitBaseRefSearchResult> {
     let limit = input.limit.unwrap_or(25).min(100);
     if limit == 0 {
         return Vec::new();
@@ -106,22 +117,41 @@ pub fn git_search_base_ref_details(input: GitBaseRefSearchInput) -> Vec<GitBaseR
 }
 
 #[tauri::command]
-pub fn git_get_base_ref_default(input: GitBaseRefDefaultInput) -> GitBaseRefDefaultResult {
-    let remotes = list_remotes(&input.repo_path);
-    GitBaseRefDefaultResult {
-        default_base_ref: resolve_default_base_ref(&input.repo_path, &remotes),
-        remote_count: remotes.len(),
-    }
+pub async fn git_get_base_ref_default(input: GitBaseRefDefaultInput) -> GitBaseRefDefaultResult {
+    tauri::async_runtime::spawn_blocking(move || {
+        let remotes = list_remotes(&input.repo_path);
+        GitBaseRefDefaultResult {
+            default_base_ref: resolve_default_base_ref(&input.repo_path, &remotes),
+            remote_count: remotes.len(),
+        }
+    })
+    .await
+    .unwrap_or(GitBaseRefDefaultResult {
+        default_base_ref: None,
+        remote_count: 0,
+    })
 }
 
 #[tauri::command]
-pub fn git_resolve_pr_start_point(input: GitResolvePrStartPointInput) -> GitReviewStartPointResult {
-    resolve_pr_start_point(input).unwrap_or_else(GitReviewStartPointResult::failure)
+pub async fn git_resolve_pr_start_point(
+    input: GitResolvePrStartPointInput,
+) -> GitReviewStartPointResult {
+    tauri::async_runtime::spawn_blocking(move || {
+        resolve_pr_start_point(input).unwrap_or_else(GitReviewStartPointResult::failure)
+    })
+    .await
+    .unwrap_or_else(|_| GitReviewStartPointResult::failure("git probe task panicked".to_string()))
 }
 
 #[tauri::command]
-pub fn git_resolve_mr_start_point(input: GitResolveMrStartPointInput) -> GitReviewStartPointResult {
-    resolve_mr_start_point(input).unwrap_or_else(GitReviewStartPointResult::failure)
+pub async fn git_resolve_mr_start_point(
+    input: GitResolveMrStartPointInput,
+) -> GitReviewStartPointResult {
+    tauri::async_runtime::spawn_blocking(move || {
+        resolve_mr_start_point(input).unwrap_or_else(GitReviewStartPointResult::failure)
+    })
+    .await
+    .unwrap_or_else(|_| GitReviewStartPointResult::failure("git probe task panicked".to_string()))
 }
 
 fn resolve_default_base_ref(repo_path: &str, remotes: &[String]) -> Option<String> {
