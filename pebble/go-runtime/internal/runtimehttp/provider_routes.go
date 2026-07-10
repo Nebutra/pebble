@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/tsekaluk/pebble/go-runtime/internal/providercli"
+	"github.com/tsekaluk/pebble/go-runtime/internal/providerrest"
 	"github.com/tsekaluk/pebble/go-runtime/internal/runtimecore"
 )
 
@@ -83,6 +84,27 @@ func (s *Server) handleProviderGitLabMRs(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]interface{}{"items": items})
 }
 
+// handleReviewWorkItems serves the REST-backed providers (bitbucket,
+// azure-devops, gitea) whose PR lists come from their HTTP APIs rather than a
+// local CLI. Routes stay parallel to the github/gitlab ones.
+func (s *Server) handleReviewWorkItems(provider string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		projectID, worktreeID := providerSelector(r)
+		state := r.URL.Query().Get("state")
+		limit := providerIntQuery(r, "limit", 24)
+		items, err := s.manager.ListReviewWorkItems(r.Context(), projectID, worktreeID, provider, state, limit)
+		if err != nil {
+			writeProviderError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{"items": items})
+	}
+}
+
 func (s *Server) handleProviderReviewCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -155,8 +177,12 @@ func writeProviderError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, providercli.ErrCLIMissing):
 		writeError(w, http.StatusNotImplemented, err.Error())
-	case errors.Is(err, providercli.ErrCLIUnauthenticated):
+	case errors.Is(err, providercli.ErrCLIUnauthenticated),
+		errors.Is(err, providerrest.ErrUnauthenticated):
 		writeError(w, http.StatusUnauthorized, err.Error())
+	case errors.Is(err, providerrest.ErrRemoteMismatch),
+		errors.Is(err, providerrest.ErrProviderUnsupported):
+		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, runtimecore.ErrNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, runtimecore.ErrRemoteNeedsRelay):

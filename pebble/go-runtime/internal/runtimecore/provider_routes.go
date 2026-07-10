@@ -2,9 +2,11 @@ package runtimecore
 
 import (
 	"context"
+	"net/http"
 	"strings"
 
 	"github.com/tsekaluk/pebble/go-runtime/internal/providercli"
+	"github.com/tsekaluk/pebble/go-runtime/internal/providerrest"
 )
 
 type HostedReviewCapabilities struct {
@@ -82,6 +84,40 @@ func (m *Manager) ListGitLabMRs(ctx context.Context, projectID string, worktreeI
 	return providercli.ListGitLabMRs(ctx, workdir, state, perPage, query)
 }
 
+// ListReviewWorkItems lists pull requests for the REST-backed providers
+// (bitbucket, azure-devops, gitea) that have no supported CLI. The provider's
+// repo is derived from the workdir's primary git remote, mirroring Electron's
+// repository-ref resolution; tokens come from the same PEBBLE_* env vars
+// Electron's clients read.
+func (m *Manager) ListReviewWorkItems(
+	ctx context.Context,
+	projectID string,
+	worktreeID string,
+	provider string,
+	state string,
+	limit int,
+) ([]providerrest.ReviewWorkItem, error) {
+	workdir, err := m.resolveProviderWorkdir(projectID, worktreeID)
+	if err != nil {
+		return nil, err
+	}
+	remoteURL, err := readPrimaryGitRemoteURL(ctx, workdir)
+	if err != nil {
+		return nil, err
+	}
+	client := http.DefaultClient
+	switch provider {
+	case "bitbucket":
+		return providerrest.ListBitbucketPRs(ctx, client, providerrest.BitbucketConfigFromEnv(), remoteURL, state, limit)
+	case "azure-devops":
+		return providerrest.ListAzureDevOpsPRs(ctx, client, providerrest.AzureDevOpsConfigFromEnv(), remoteURL, state, limit)
+	case "gitea":
+		return providerrest.ListGiteaPRs(ctx, client, providerrest.GiteaConfigFromEnv(), remoteURL, state, limit)
+	default:
+		return nil, providerrest.ErrProviderUnsupported
+	}
+}
+
 // CreateHostedReview creates a provider review from a local project/worktree.
 // Remote projects stay relay-owned and fail before any desktop-local CLI runs.
 func (m *Manager) CreateHostedReview(
@@ -99,6 +135,13 @@ func (m *Manager) CreateHostedReview(
 		return providercli.CreateGitHubPullRequest(ctx, workdir, request), nil
 	case "gitlab":
 		return providercli.CreateGitLabMergeRequest(ctx, workdir, request), nil
+	// Honest gap: REST-backed creation for these providers is not wired yet;
+	// listing works, so the message names the exact missing operation.
+	case "bitbucket", "azure-devops", "gitea":
+		return providercli.CreateReviewResult{
+			Code:  "unsupported_provider",
+			Error: "Creating " + request.Provider + " reviews from the local runtime is not supported yet (listing is).",
+		}, nil
 	default:
 		return providercli.CreateReviewResult{
 			Code:  "unsupported_provider",
