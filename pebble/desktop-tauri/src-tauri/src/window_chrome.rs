@@ -25,9 +25,15 @@ pub fn apply_window_chrome(window: &WebviewWindow) {
     macos::apply_traffic_light_inset(window);
 }
 
+pub fn promote_launch_window(window: &WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    macos::promote_launch_window(window);
+}
+
 #[cfg(target_os = "macos")]
 mod macos {
-    use objc2_app_kit::{NSWindow, NSWindowButton};
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{NSApp, NSWindow, NSWindowButton};
     use objc2_foundation::NSRect;
     use tauri::{WebviewWindow, WindowEvent};
 
@@ -50,17 +56,38 @@ mod macos {
         });
     }
 
-    fn inset_now(window: &WebviewWindow) {
-        let Ok(ptr) = window.ns_window() else {
+    pub fn promote_launch_window(window: &WebviewWindow) {
+        if let Some(ns_window) = ns_window(window) {
+            ns_window.makeKeyAndOrderFront(None);
+        }
+
+        let Some(mtm) = MainThreadMarker::new() else {
             return;
         };
-        if ptr.is_null() {
+
+        let app = NSApp(mtm);
+        // Required when Tauri dev launches the raw binary instead of a .app.
+        #[allow(deprecated)]
+        app.activateIgnoringOtherApps(true);
+    }
+
+    fn inset_now(window: &WebviewWindow) {
+        let Some(ns_window) = ns_window(window) else {
             return;
+        };
+        unsafe { inset_traffic_lights(ns_window, TRAFFIC_LIGHT_X, TRAFFIC_LIGHT_Y) };
+    }
+
+    fn ns_window(window: &WebviewWindow) -> Option<&NSWindow> {
+        let Ok(ptr) = window.ns_window() else {
+            return None;
+        };
+        if ptr.is_null() {
+            return None;
         }
         // Safety: Tauri returns a live NSWindow* for this webview window, and
-        // window events + setup run on the AppKit main thread.
-        let ns_window: &NSWindow = unsafe { &*(ptr as *const NSWindow) };
-        unsafe { inset_traffic_lights(ns_window, TRAFFIC_LIGHT_X, TRAFFIC_LIGHT_Y) };
+        // launch/window event handling runs on the AppKit main thread.
+        Some(unsafe { &*(ptr as *const NSWindow) })
     }
 
     // Ported from tao's inset_traffic_lights (view.rs): resize the title-bar

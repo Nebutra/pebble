@@ -223,6 +223,29 @@ func nullableGitURL(value string) GitRemoteURLResult {
 	return GitRemoteURLResult{URL: &value}
 }
 
+func readGitHubRemoteIdentity(ctx context.Context, repoPath string, remoteName string) *GitHubRepositoryIdentity {
+	remoteURL, err := readGitOutput(ctx, repoPath, "remote", "get-url", remoteName)
+	if err != nil || remoteURL == "" {
+		return nil
+	}
+	remote, ok := parseHostedRemote(remoteURL)
+	if !ok || remote.Provider != hostedRemoteGitHub {
+		return nil
+	}
+	parts := strings.Split(remote.Path, "/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return nil
+	}
+	return &GitHubRepositoryIdentity{Owner: parts[0], Repo: parts[1]}
+}
+
+func sameGitHubRepositoryIdentity(left *GitHubRepositoryIdentity, right *GitHubRepositoryIdentity) bool {
+	if left == nil || right == nil {
+		return false
+	}
+	return strings.EqualFold(left.Owner, right.Owner) && strings.EqualFold(left.Repo, right.Repo)
+}
+
 func isFullGitObjectID(value string) bool {
 	if len(value) != 40 {
 		return false
