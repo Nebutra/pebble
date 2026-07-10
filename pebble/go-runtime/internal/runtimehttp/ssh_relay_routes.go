@@ -1,6 +1,7 @@
 package runtimehttp
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -39,6 +40,60 @@ func (s *Server) handleRemotePreservedBranchRemovals(w http.ResponseWriter, r *h
 	}
 	result, err := s.manager.CompleteRemotePreservedBranchRemoval(req)
 	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleRemoteNestedRepoScans(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		hostID := strings.TrimSpace(r.URL.Query().Get("hostId"))
+		scanPath := strings.TrimSpace(r.URL.Query().Get("path"))
+		if hostID == "" || scanPath == "" {
+			writeError(w, http.StatusBadRequest, "hostId and path query parameters are required")
+			return
+		}
+		scan, ok := s.manager.RemoteNestedRepoScanForHost(hostID, scanPath)
+		if !ok {
+			writeError(w, http.StatusNotFound, "no relay nested scan recorded for host and path")
+			return
+		}
+		writeJSON(w, http.StatusOK, scan)
+	case http.MethodPost:
+		var req runtimecore.UpdateRemoteNestedRepoScanRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		scan, err := s.manager.UpdateRemoteNestedRepoScan(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, scan)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleProjectGroupImportRemoteNested(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.ImportRemoteNestedReposRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.ImportRemoteNestedRepos(req)
+	if err != nil {
+		// A missing scan is a caller-sequencing problem, not a server fault:
+		// the relay worker must post a scan before an import can trust paths.
+		if errors.Is(err, runtimecore.ErrRemoteNestedScanRequired) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
 		writeRuntimeError(w, err)
 		return
 	}

@@ -122,7 +122,10 @@ type NestedRepoScanOptions struct {
 }
 
 type NestedRepoScanRequest struct {
-	Path    string                `json:"path"`
+	Path string `json:"path"`
+	// ScanID opts the caller into streaming progress: the runtime emits
+	// "project-group.scan-progress" snapshots keyed by this id while walking.
+	ScanID  string                `json:"scanId,omitempty"`
 	Options NestedRepoScanOptions `json:"options,omitempty"`
 }
 
@@ -143,6 +146,9 @@ type NestedRepoScanResult struct {
 	MaxDepth         int                   `json:"maxDepth"`
 	MaxRepos         int                   `json:"maxRepos"`
 	TimeoutMs        *int64                `json:"timeoutMs"`
+	// DirectoriesVisited gives long scans a liveness signal in progress
+	// snapshots; additive so consumers of the Electron shape can ignore it.
+	DirectoriesVisited int `json:"directoriesVisited"`
 }
 
 type ProjectGroupImportNestedRequest struct {

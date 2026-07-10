@@ -72,6 +72,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/project-groups/move-project", s.handleProjectGroupMoveProject)
 	s.mux.HandleFunc("/v1/project-groups/scan-nested", s.handleProjectGroupScanNested)
 	s.mux.HandleFunc("/v1/project-groups/import-nested", s.handleProjectGroupImportNested)
+	s.mux.HandleFunc("/v1/project-groups/remote-nested-scans", s.handleRemoteNestedRepoScans)
+	s.mux.HandleFunc("/v1/project-groups/import-remote-nested", s.handleProjectGroupImportRemoteNested)
 	s.mux.HandleFunc("/v1/project-groups/", s.handleProjectGroupByID)
 	s.mux.HandleFunc("/v1/folder-workspaces", s.handleFolderWorkspaces)
 	s.mux.HandleFunc("/v1/folder-workspaces/path-status", s.handleFolderWorkspacePathStatus)

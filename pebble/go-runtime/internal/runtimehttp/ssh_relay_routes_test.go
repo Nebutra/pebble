@@ -126,3 +126,86 @@ func TestRemoteAgentDetectionRoutes(t *testing.T) {
 		t.Fatalf("expected 404 for unknown host, got %d", missingRec.Code)
 	}
 }
+
+func TestRemoteNestedRepoScanRoutes(t *testing.T) {
+	server, _, _ := newSshRelayTestServer(t)
+	scan := runtimecore.NestedRepoScanResult{
+		SelectedPath:     "/srv/projects",
+		SelectedPathKind: "non_git_folder",
+		Repos: []runtimecore.NestedRepoCandidate{
+			{Path: "/srv/projects/api", DisplayName: "api", Depth: 1},
+		},
+	}
+	rec := postRelayJSON(t, server, "/v1/project-groups/remote-nested-scans", runtimecore.UpdateRemoteNestedRepoScanRequest{
+		HostID: "host-1",
+		Path:   "/srv/projects",
+		Scan:   scan,
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/project-groups/remote-nested-scans?hostId=host-1&path=%2Fsrv%2Fprojects", nil)
+	get := httptest.NewRecorder()
+	server.ServeHTTP(get, req)
+	if get.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", get.Code, get.Body.String())
+	}
+	var cached runtimecore.RemoteNestedRepoScan
+	if err := json.Unmarshal(get.Body.Bytes(), &cached); err != nil {
+		t.Fatal(err)
+	}
+	if cached.HostID != "host-1" || len(cached.Scan.Repos) != 1 {
+		t.Fatalf("unexpected cached scan: %#v", cached)
+	}
+
+	miss := httptest.NewRequest(http.MethodGet, "/v1/project-groups/remote-nested-scans?hostId=host-2&path=%2Fsrv%2Fprojects", nil)
+	missRec := httptest.NewRecorder()
+	server.ServeHTTP(missRec, miss)
+	if missRec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for unknown host, got %d", missRec.Code)
+	}
+}
+
+func TestImportRemoteNestedRoute(t *testing.T) {
+	server, _, _ := newSshRelayTestServer(t)
+	// Import before any relay scan is a sequencing conflict, not a 500.
+	rec := postRelayJSON(t, server, "/v1/project-groups/import-remote-nested", runtimecore.ImportRemoteNestedReposRequest{
+		HostID:     "host-1",
+		ParentPath: "/srv/projects",
+	})
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409 without a posted scan, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	post := postRelayJSON(t, server, "/v1/project-groups/remote-nested-scans", runtimecore.UpdateRemoteNestedRepoScanRequest{
+		HostID: "host-1",
+		Path:   "/srv/projects",
+		Scan: runtimecore.NestedRepoScanResult{
+			SelectedPath:     "/srv/projects",
+			SelectedPathKind: "non_git_folder",
+			Repos: []runtimecore.NestedRepoCandidate{
+				{Path: "/srv/projects/api", DisplayName: "api", Depth: 1},
+			},
+		},
+	})
+	if post.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", post.Code, post.Body.String())
+	}
+
+	imported := postRelayJSON(t, server, "/v1/project-groups/import-remote-nested", runtimecore.ImportRemoteNestedReposRequest{
+		HostID:     "host-1",
+		ParentPath: "/srv/projects",
+		Mode:       "separate",
+	})
+	if imported.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", imported.Code, imported.Body.String())
+	}
+	var result runtimecore.ProjectGroupImportResult
+	if err := json.Unmarshal(imported.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.ImportedCount != 1 {
+		t.Fatalf("expected one imported ssh project, got %#v", result)
+	}
+}

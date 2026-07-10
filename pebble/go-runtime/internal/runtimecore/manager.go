@@ -43,6 +43,7 @@ type Manager struct {
 	remoteFileTrees          map[string]RemoteFileTreeSnapshot
 	remoteFileContents       map[string]RemoteFileContentSnapshot
 	remoteAgentDetections    map[string]RemoteAgentDetection
+	remoteNestedRepoScans    map[string]RemoteNestedRepoScan
 	settings                 map[string]RuntimeSetting
 	keybindings              map[string]Keybinding
 	browserTabs              map[string]BrowserTab
@@ -93,6 +94,7 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 		remoteFileTrees:          make(map[string]RemoteFileTreeSnapshot),
 		remoteFileContents:       make(map[string]RemoteFileContentSnapshot),
 		remoteAgentDetections:    make(map[string]RemoteAgentDetection),
+		remoteNestedRepoScans:    make(map[string]RemoteNestedRepoScan),
 		settings:                 make(map[string]RuntimeSetting),
 		keybindings:              make(map[string]Keybinding),
 		browserTabs:              make(map[string]BrowserTab),

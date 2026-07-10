@@ -74,10 +74,16 @@ type nestedFolderScope struct {
 }
 
 type nestedProjectGroupResolver struct {
-	manager             *Manager
-	parentPath          string
-	groupName           string
-	mode                string
+	manager    *Manager
+	parentPath string
+	groupName  string
+	mode       string
+	// connectionID marks groups created for relay-only SSH imports so the
+	// desktop can attribute them to the remote host.
+	connectionID *string
+	// relativePathForRepo abstracts local (filepath) vs remote (posix slash)
+	// path math when deciding which folder scope a repo belongs to.
+	relativePathForRepo func(parentPath string, repoPath string) string
 	folderScopes        map[string]nestedFolderScope
 	folderScopeGroups   map[string]ProjectGroup
 	meaningfulScopePath map[string]struct{}
@@ -258,6 +264,33 @@ func (m *Manager) MoveProjectToGroup(req MoveProjectToGroupRequest) (Project, er
 }
 
 func (m *Manager) ScanNestedRepos(ctx context.Context, req NestedRepoScanRequest) (NestedRepoScanResult, error) {
+	scanID := strings.TrimSpace(req.ScanID)
+	var onProgress func(NestedRepoScanResult)
+	if scanID != "" {
+		onProgress = func(snapshot NestedRepoScanResult) {
+			m.emit("project-group.scan-progress", map[string]interface{}{
+				"scanId": scanID,
+				"scan":   snapshot,
+			})
+		}
+	}
+	return ScanNestedReposOnHost(ctx, req, onProgress)
+}
+
+// nestedScanProgressInterval throttles directory-visit progress snapshots so a
+// long walk streams liveness without flooding the event channel.
+const nestedScanProgressInterval = 500 * time.Millisecond
+
+// ScanNestedReposOnHost walks a folder for sibling git repos. Exported (not
+// just a Manager method) because pebble-relay-worker runs the identical scan
+// on relay-only SSH hosts and posts the result back to the runtime gateway.
+// onProgress, when non-nil, receives partial snapshots: one per repo found
+// (Electron's cadence) plus throttled directory-visit updates.
+func ScanNestedReposOnHost(
+	ctx context.Context,
+	req NestedRepoScanRequest,
+	onProgress func(NestedRepoScanResult),
+) (NestedRepoScanResult, error) {
 	startedAt := time.Now()
 	options := normalizeNestedRepoScanOptions(req.Options)
 	selectedPath, err := normalizeLocalPath(req.Path)
@@ -272,6 +305,17 @@ func (m *Manager) ScanNestedRepos(ctx context.Context, req NestedRepoScanRequest
 		MaxDepth:         options.maxDepth,
 		MaxRepos:         options.maxRepos,
 		TimeoutMs:        timeoutMs,
+	}
+	lastProgressAt := startedAt
+	emitProgress := func() {
+		if onProgress == nil {
+			return
+		}
+		lastProgressAt = time.Now()
+		snapshot := result
+		snapshot.Repos = append([]NestedRepoCandidate{}, result.Repos...)
+		snapshot.DurationMs = time.Since(startedAt).Milliseconds()
+		onProgress(snapshot)
 	}
 	if isGitRepoMarker(selectedPath) {
 		result.SelectedPathKind = "git_repo"
@@ -307,6 +351,10 @@ func (m *Manager) ScanNestedRepos(ctx context.Context, req NestedRepoScanRequest
 		entries, err := os.ReadDir(current.path)
 		if err != nil {
 			continue
+		}
+		result.DirectoriesVisited++
+		if onProgress != nil && time.Since(lastProgressAt) >= nestedScanProgressInterval {
+			emitProgress()
 		}
 		currentIgnoreRules := append(
 			append([]nestedIgnoreRule{}, current.ignoreRules...),
@@ -348,6 +396,7 @@ func (m *Manager) ScanNestedRepos(ctx context.Context, req NestedRepoScanRequest
 					DisplayName: pathBase(childPath),
 					Depth:       childDepth,
 				})
+				emitProgress()
 				continue
 			}
 			if current.depth < options.maxDepth {
@@ -708,6 +757,16 @@ func selectNestedRepoImportPaths(
 	scan NestedRepoScanResult,
 	requested []string,
 ) nestedRepoImportSelection {
+	return selectNestedRepoImportPathsByKey(scan, requested, nestedRepoComparisonPath)
+}
+
+// selectNestedRepoImportPathsByKey parametrizes the path comparison so remote
+// (posix) relay scans can reuse the local selection semantics.
+func selectNestedRepoImportPathsByKey(
+	scan NestedRepoScanResult,
+	requested []string,
+	nestedRepoComparisonPath func(string) string,
+) nestedRepoImportSelection {
 	candidatesByPath := map[string]string{}
 	for _, repo := range scan.Repos {
 		candidatesByPath[nestedRepoComparisonPath(repo.Path)] = repo.Path
@@ -859,7 +918,26 @@ func newNestedProjectGroupResolver(
 	mode string,
 	repoPaths []string,
 ) *nestedProjectGroupResolver {
-	scopes := buildNestedFolderScopes(parentPath, repoPaths)
+	return newNestedProjectGroupResolverWithScopes(
+		manager,
+		parentPath,
+		groupName,
+		mode,
+		buildNestedFolderScopes(parentPath, repoPaths),
+		nil,
+		getNestedFolderRelativePathForRepo,
+	)
+}
+
+func newNestedProjectGroupResolverWithScopes(
+	manager *Manager,
+	parentPath string,
+	groupName string,
+	mode string,
+	scopes []nestedFolderScope,
+	connectionID *string,
+	relativePathForRepo func(parentPath string, repoPath string) string,
+) *nestedProjectGroupResolver {
 	folderScopes := make(map[string]nestedFolderScope, len(scopes))
 	meaningful := make(map[string]struct{}, len(scopes))
 	for _, scope := range scopes {
@@ -871,6 +949,8 @@ func newNestedProjectGroupResolver(
 		parentPath:          parentPath,
 		groupName:           strings.TrimSpace(groupName),
 		mode:                strings.TrimSpace(mode),
+		connectionID:        connectionID,
+		relativePathForRepo: relativePathForRepo,
 		folderScopes:        folderScopes,
 		folderScopeGroups:   map[string]ProjectGroup{},
 		meaningfulScopePath: meaningful,
@@ -882,7 +962,7 @@ func (resolver *nestedProjectGroupResolver) getGroupForRepo(repoPath string) (*P
 	if err != nil || root == nil {
 		return root, err
 	}
-	folderRelativePath := getNestedFolderRelativePathForRepo(resolver.parentPath, repoPath)
+	folderRelativePath := resolver.relativePathForRepo(resolver.parentPath, repoPath)
 	if folderRelativePath == "" {
 		return root, nil
 	}
@@ -906,9 +986,10 @@ func (resolver *nestedProjectGroupResolver) ensureRootGroup() (*ProjectGroup, er
 	}
 	parentPath := resolver.parentPath
 	created, err := resolver.manager.CreateProjectGroup(CreateProjectGroupRequest{
-		Name:        groupName,
-		ParentPath:  &parentPath,
-		CreatedFrom: "folder-scan",
+		Name:         groupName,
+		ParentPath:   &parentPath,
+		ConnectionID: resolver.connectionID,
+		CreatedFrom:  "folder-scan",
 	})
 	if err != nil {
 		return nil, err
@@ -944,6 +1025,7 @@ func (resolver *nestedProjectGroupResolver) ensureFolderScopeGroup(
 	created, err := resolver.manager.CreateProjectGroup(CreateProjectGroupRequest{
 		Name:          scope.name,
 		ParentPath:    &parentPath,
+		ConnectionID:  resolver.connectionID,
 		ParentGroupID: &parentGroupID,
 		CreatedFrom:   "folder-scan",
 	})
