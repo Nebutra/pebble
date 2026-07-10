@@ -1,8 +1,21 @@
 import type { PreloadApi } from '../../../src/preload/api-types'
 import type { GlobalSettings, PersistedUIState } from '../../../src/shared/types'
 
+type TauriActivateWorktreeEvent = Parameters<
+  Parameters<PreloadApi['ui']['onActivateWorktree']>[0]
+>[0]
+type TauriOpenFileFromMobileEvent = Parameters<
+  Parameters<PreloadApi['ui']['onOpenFileFromMobile']>[0]
+>[0]
+type TauriOpenDiffFromMobileEvent = Parameters<
+  Parameters<PreloadApi['ui']['onOpenDiffFromMobile']>[0]
+>[0]
+
 const settingsChangedListeners = new Set<(updates: Partial<GlobalSettings>) => void>()
 const uiStateChangedListeners = new Set<(ui: PersistedUIState) => void>()
+const activateWorktreeListeners = new Set<(data: TauriActivateWorktreeEvent) => void>()
+const openFileFromMobileListeners = new Set<(data: TauriOpenFileFromMobileEvent) => void>()
+const openDiffFromMobileListeners = new Set<(data: TauriOpenDiffFromMobileEvent) => void>()
 
 export function installTauriSettingsEventApi(): void {
   if (!hasTauriInternals()) {
@@ -42,8 +55,44 @@ export function installTauriSettingsEventApi(): void {
       return () => {
         uiStateChangedListeners.delete(callback)
       }
+    },
+    onActivateWorktree: (callback) => {
+      activateWorktreeListeners.add(callback)
+      return () => {
+        activateWorktreeListeners.delete(callback)
+      }
+    },
+    onOpenFileFromMobile: (callback) => {
+      openFileFromMobileListeners.add(callback)
+      return () => {
+        openFileFromMobileListeners.delete(callback)
+      }
+    },
+    onOpenDiffFromMobile: (callback) => {
+      openDiffFromMobileListeners.add(callback)
+      return () => {
+        openDiffFromMobileListeners.delete(callback)
+      }
     }
   } satisfies PreloadApi['ui']
+}
+
+export function emitTauriActivateWorktree(data: TauriActivateWorktreeEvent): void {
+  for (const listener of activateWorktreeListeners) {
+    listener(data)
+  }
+}
+
+export function emitTauriOpenFileFromMobile(data: TauriOpenFileFromMobileEvent): void {
+  for (const listener of openFileFromMobileListeners) {
+    listener(data)
+  }
+}
+
+export function emitTauriOpenDiffFromMobile(data: TauriOpenDiffFromMobileEvent): void {
+  for (const listener of openDiffFromMobileListeners) {
+    listener(data)
+  }
 }
 
 function hasTauriInternals(): boolean {
