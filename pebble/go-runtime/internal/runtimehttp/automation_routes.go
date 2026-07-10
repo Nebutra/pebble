@@ -79,6 +79,30 @@ func (s *Server) handleAutomationRuns(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.manager.ListAutomationRuns(r.URL.Query().Get("automationId")))
 }
 
+// handleAutomationRunByID owns /v1/automations/runs/{id}/... — currently the
+// renderer dispatch-outcome writeback (Electron markDispatchResult parity).
+func (s *Server) handleAutomationRunByID(w http.ResponseWriter, r *http.Request) {
+	runID, action := splitAutomationRunPath(r.URL.Path)
+	if runID == "" {
+		writeError(w, http.StatusNotFound, "automation run not found")
+		return
+	}
+	if r.Method != http.MethodPost || action != "dispatch-result" {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.AutomationDispatchResultRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	run, err := s.manager.RecordAutomationRunDispatchResult(runID, req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}
+
 func (s *Server) handleAutomationEvaluate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -98,6 +122,18 @@ func (s *Server) handleAutomationEvaluate(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusAccepted, runs)
+}
+
+func splitAutomationRunPath(path string) (string, string) {
+	trimmed := strings.TrimPrefix(path, "/v1/automations/runs/")
+	parts := strings.Split(strings.Trim(trimmed, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return "", ""
+	}
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], strings.Join(parts[1:], "/")
 }
 
 func splitAutomationPath(path string) (string, string) {

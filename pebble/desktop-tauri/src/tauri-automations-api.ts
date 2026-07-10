@@ -11,6 +11,7 @@ import type {
 } from '../../../src/shared/automations-types'
 import { requestRuntimeJson } from './pebble-tauri-runtime-transport'
 import { onTauriAutomationDispatchRequested } from './tauri-automation-dispatch-events'
+import { toRuntimeDispatchResultRequest } from './tauri-automation-run-result-mapping'
 import {
   applyAutomationUpdates,
   mapRuntimeAutomation,
@@ -51,7 +52,10 @@ export function createPebbleAutomationsApi(
     // fired; returning the recorded result keeps the renderer's dispatch gate
     // consistent with the native gate instead of re-running the command.
     runPrecheck: ({ automationId, runId }) => readTauriAutomationPrecheckResult(automationId, runId),
-    markDispatchResult: (result) => readTauriAutomationRunResult(result),
+    // Why: the renderer performs the actual dispatch work (workspace, agent
+    // terminal), so its reported outcome must be written back onto the Go run
+    // record — Electron markDispatchResult parity, not just a read-back.
+    markDispatchResult: (result) => writeTauriAutomationDispatchResult(result),
     snapshotWorkspaceName: async () => 0,
     rendererReady: async () => undefined,
     onDispatchRequested: (callback) => onTauriAutomationDispatchRequested(callback)
@@ -201,15 +205,22 @@ async function readTauriAutomationPrecheckResult(
   return runs.find((entry) => entry.id === runId)?.precheckResult ?? null
 }
 
-async function readTauriAutomationRunResult(
+async function writeTauriAutomationDispatchResult(
   result: AutomationDispatchResult
 ): Promise<AutomationRun> {
-  const runs = await listTauriAutomationRuns()
-  const run = runs.find((entry) => entry.id === result.runId)
-  if (!run) {
-    throw new Error('Automation run not found.')
-  }
-  return run
+  const run = await requestRuntimeJson<RuntimeAutomationRun>(
+    `/v1/automations/runs/${encodeURIComponent(result.runId)}/dispatch-result`,
+    {
+      method: 'POST',
+      body: toRuntimeDispatchResultRequest(result),
+      timeoutMs: 5000
+    }
+  )
+  const automations = await readRuntimeAutomations()
+  return mapRuntimeAutomationRun(
+    run,
+    automations.find((automation) => automation.id === run.automationId)
+  )
 }
 
 async function readRuntimeAutomations(): Promise<RuntimeAutomation[]> {

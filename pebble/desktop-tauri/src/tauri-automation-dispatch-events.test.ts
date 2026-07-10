@@ -3,7 +3,7 @@ import type { AutomationDispatchRequest } from '../../../src/shared/automations-
 import type { RuntimeEventStreamEntry } from './runtime-command-shapes'
 import { subscribeRuntimeEventPush } from './tauri-runtime-event-push'
 import { onTauriAutomationDispatchRequested } from './tauri-automation-dispatch-events'
-import { mapRuntimePrecheckResult } from './tauri-automation-runtime-mapping'
+import { mapRuntimePrecheckResult } from './tauri-automation-run-result-mapping'
 
 vi.mock('./tauri-runtime-event-push', () => ({
   subscribeRuntimeEventPush: vi.fn()

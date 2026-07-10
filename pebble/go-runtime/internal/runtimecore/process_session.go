@@ -76,6 +76,14 @@ func startProcessSession(ctx context.Context, req StartSessionRequest, emit func
 		emit:         emit,
 		stateChanged: make(chan struct{}),
 	}
+	if req.hookEndpoint.port > 0 {
+		// Hook scripts attribute events by launch token; sessions started
+		// without one still need hook-status attribution, so mint one here.
+		if session.launchToken == "" {
+			session.launchToken = newID("hooktok")
+		}
+		req.hookEnv = agentHookSessionEnv(req.hookEndpoint, session)
+	}
 	if err := startPlatformProcessSession(ctx, session, req); err != nil {
 		return nil, err
 	}

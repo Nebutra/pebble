@@ -450,6 +450,10 @@ type StartSessionRequest struct {
 	Prompt      string   `json:"prompt,omitempty"`
 	Cols        int      `json:"cols,omitempty"`
 	Rows        int      `json:"rows,omitempty"`
+	// hookEndpoint/hookEnv are runtime-internal spawn context (never client
+	// JSON): the hook ingest endpoint stamped into the PTY environment.
+	hookEndpoint sessionHookEndpoint
+	hookEnv      []string
 }
 
 type SessionInputRequest struct {

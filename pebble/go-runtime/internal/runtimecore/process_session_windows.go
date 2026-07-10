@@ -8,10 +8,10 @@ import (
 	"os/exec"
 )
 
-func startPlatformProcessSession(ctx context.Context, session *processSession, _ StartSessionRequest) error {
+func startPlatformProcessSession(ctx context.Context, session *processSession, req StartSessionRequest) error {
 	cmd := exec.CommandContext(ctx, session.command[0], session.command[1:]...)
 	cmd.Dir = session.cwd
-	cmd.Env = os.Environ()
+	cmd.Env = append(os.Environ(), req.hookEnv...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return err

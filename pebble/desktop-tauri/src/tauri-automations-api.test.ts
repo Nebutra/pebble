@@ -156,6 +156,139 @@ describe('createPebbleAutomationsApi', () => {
     })
   })
 
+  it('writes renderer dispatch outcomes back onto the Go run record', async () => {
+    requestRuntimeJsonMock.mockImplementation(async (path) => {
+      if (String(path).endsWith('/dispatch-result')) {
+        return {
+          id: 'run-1',
+          automationId: 'auto-1',
+          reason: 'schedule',
+          status: 'queued',
+          dispatchState: {
+            status: 'completed',
+            workspaceId: 'ws-1',
+            workspaceDisplayName: 'feature/agent-work',
+            terminalSessionId: 'sess-7',
+            terminalPaneKey: 'tab-1:leaf-1',
+            terminalPtyId: 'pty-9',
+            reportedAt: '2026-05-13T02:00:00Z'
+          },
+          createdAt: '2026-05-13T01:00:00Z',
+          updatedAt: '2026-05-13T02:00:00Z'
+        }
+      }
+      return [runtimeAutomation()]
+    })
+    const api = createPebbleAutomationsApi({} as PreloadApi['automations'])
+
+    const run = await api.markDispatchResult({
+      runId: 'run-1',
+      status: 'completed',
+      workspaceId: 'ws-1',
+      workspaceDisplayName: 'feature/agent-work',
+      terminalSessionId: 'sess-7',
+      terminalPaneKey: 'tab-1:leaf-1',
+      terminalPtyId: 'pty-9'
+    })
+
+    expect(requestRuntimeJsonMock).toHaveBeenCalledWith(
+      '/v1/automations/runs/run-1/dispatch-result',
+      {
+        method: 'POST',
+        body: {
+          status: 'completed',
+          workspaceId: 'ws-1',
+          workspaceDisplayName: 'feature/agent-work',
+          terminalSessionId: 'sess-7',
+          terminalPaneKey: 'tab-1:leaf-1',
+          terminalPtyId: 'pty-9'
+        },
+        timeoutMs: 5000
+      }
+    )
+    expect(run).toMatchObject({
+      id: 'run-1',
+      status: 'completed',
+      workspaceId: 'ws-1',
+      workspaceDisplayName: 'feature/agent-work',
+      terminalSessionId: 'sess-7',
+      terminalPaneKey: 'tab-1:leaf-1',
+      terminalPtyId: 'pty-9'
+    })
+  })
+
+  it('surfaces renderer dispatch failures from the written-back run record', async () => {
+    requestRuntimeJsonMock.mockImplementation(async (path) => {
+      if (String(path).endsWith('/dispatch-result')) {
+        return {
+          id: 'run-2',
+          automationId: 'auto-1',
+          reason: 'schedule',
+          status: 'failed',
+          dispatchState: {
+            status: 'dispatch_failed',
+            error: 'workspace setup failed',
+            reportedAt: '2026-05-13T02:00:00Z'
+          },
+          error: 'workspace setup failed',
+          createdAt: '2026-05-13T01:00:00Z',
+          updatedAt: '2026-05-13T02:00:00Z'
+        }
+      }
+      return [runtimeAutomation()]
+    })
+    const api = createPebbleAutomationsApi({} as PreloadApi['automations'])
+
+    const run = await api.markDispatchResult({
+      runId: 'run-2',
+      status: 'dispatch_failed',
+      error: 'workspace setup failed'
+    })
+
+    expect(run).toMatchObject({
+      id: 'run-2',
+      status: 'dispatch_failed',
+      error: 'workspace setup failed'
+    })
+  })
+
+  it('surfaces unavailable external managers instead of a fake empty state', async () => {
+    const api = createPebbleAutomationsApi({} as PreloadApi['automations'])
+
+    const managers = await api.listExternalManagers()
+
+    expect(managers).toEqual([
+      expect.objectContaining({
+        id: 'tauri-hermes-local-unavailable',
+        provider: 'hermes',
+        status: 'unavailable',
+        canManage: false,
+        error: 'External automation managers require the Tauri external automation adapter.'
+      }),
+      expect.objectContaining({
+        id: 'tauri-openclaw-local-unavailable',
+        provider: 'openclaw',
+        status: 'unavailable',
+        canManage: false,
+        error: 'External automation managers require the Tauri external automation adapter.'
+      })
+    ])
+  })
+
+  it('rejects external automation mutations with the explicit Tauri adapter gap', async () => {
+    const api = createPebbleAutomationsApi({} as PreloadApi['automations'])
+
+    await expect(
+      api.runExternalAction({
+        managerId: 'tauri-hermes-local-unavailable',
+        provider: 'hermes',
+        target: { type: 'local' },
+        jobId: 'job-1',
+        action: 'run'
+      })
+    ).rejects.toThrow('External automation managers require the Tauri external automation adapter.')
+  })
+
   it('handles automation runtime RPC methods for paired-runtime parity', async () => {
     requestRuntimeJsonMock.mockResolvedValueOnce([runtimeAutomation()])
 

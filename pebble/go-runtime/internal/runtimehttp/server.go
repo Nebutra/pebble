@@ -2,11 +2,14 @@ package runtimehttp
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -21,10 +24,15 @@ type Server struct {
 	manager     *runtimecore.Manager
 	mux         *http.ServeMux
 	bearerToken string
+	// hookToken authorizes /hook/{source} ingest posts, which carry
+	// X-Pebble-Agent-Hook-Token instead of a bearer header.
+	hookToken string
 }
 
 type ServerOptions struct {
 	BearerToken string
+	// HookToken overrides the agent-hook ingest token; defaults to BearerToken.
+	HookToken string
 }
 
 func NewServer(manager *runtimecore.Manager) *Server {
@@ -32,10 +40,15 @@ func NewServer(manager *runtimecore.Manager) *Server {
 }
 
 func NewServerWithOptions(manager *runtimecore.Manager, options ServerOptions) *Server {
+	hookToken := strings.TrimSpace(options.HookToken)
+	if hookToken == "" {
+		hookToken = strings.TrimSpace(options.BearerToken)
+	}
 	server := &Server{
 		manager:     manager,
 		mux:         http.NewServeMux(),
 		bearerToken: strings.TrimSpace(options.BearerToken),
+		hookToken:   hookToken,
 	}
 	server.routes()
 	return server
@@ -54,6 +67,11 @@ func (s *Server) authorize(r *http.Request) bool {
 		return true
 	}
 	if r.URL.Path == "/v1/mobile-relay" && isWebSocketUpgrade(r) {
+		return true
+	}
+	// Hook scripts authenticate with X-Pebble-Agent-Hook-Token inside the
+	// ingest handler; they never hold the runtime bearer token.
+	if strings.HasPrefix(r.URL.Path, "/hook/") {
 		return true
 	}
 	token := bearerTokenFromHeader(r.Header.Get("Authorization"))
@@ -100,7 +118,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/automations", s.handleAutomations)
 	s.mux.HandleFunc("/v1/automations/evaluate", s.handleAutomationEvaluate)
 	s.mux.HandleFunc("/v1/automations/runs", s.handleAutomationRuns)
+	s.mux.HandleFunc("/v1/automations/runs/", s.handleAutomationRunByID)
 	s.mux.HandleFunc("/v1/automations/", s.handleAutomationByID)
+	s.mux.HandleFunc("/hook/", s.handleAgentHookIngest)
 	s.mux.HandleFunc("/v1/external-tasks", s.handleExternalTasks)
 	s.mux.HandleFunc("/v1/external-tasks/", s.handleExternalTaskByID)
 	s.mux.HandleFunc("/v1/files/tree", s.handleFileTree)
@@ -1603,10 +1623,27 @@ func Start(ctx context.Context, listen string, manager *runtimecore.Manager) err
 }
 
 func StartWithOptions(ctx context.Context, listen string, manager *runtimecore.Manager, options ServerOptions) error {
-	server := &http.Server{Addr: listen, Handler: NewServerWithOptions(manager, options)}
+	// Hook scripts refuse to post without a token, so mint one when the
+	// runtime itself is running tokenless (localhost trust model).
+	if strings.TrimSpace(options.HookToken) == "" {
+		options.HookToken = strings.TrimSpace(options.BearerToken)
+	}
+	if options.HookToken == "" {
+		options.HookToken = randomAgentHookToken()
+	}
+	listener, err := net.Listen("tcp", listen)
+	if err != nil {
+		return err
+	}
+	// Sessions spawned by the manager stamp this endpoint into PTY env so
+	// managed agent hook scripts reach the /hook ingest route.
+	if addr, ok := listener.Addr().(*net.TCPAddr); ok {
+		manager.ConfigureSessionHookEndpoint(addr.Port, options.HookToken)
+	}
+	server := &http.Server{Handler: NewServerWithOptions(manager, options)}
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- server.ListenAndServe()
+		errCh <- server.Serve(listener)
 	}()
 	select {
 	case <-ctx.Done():
@@ -1620,4 +1657,15 @@ func StartWithOptions(ctx context.Context, listen string, manager *runtimecore.M
 		}
 		return err
 	}
+}
+
+// randomAgentHookToken returns a fresh per-process hook ingest token. On the
+// (practically impossible) rand failure it returns "", which keeps ingest in
+// the same open localhost-trust mode as a tokenless bearer config.
+func randomAgentHookToken() string {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(buf)
 }

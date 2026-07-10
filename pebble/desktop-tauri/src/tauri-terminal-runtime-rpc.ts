@@ -1,14 +1,21 @@
 import type {
   RuntimeTerminalAgentStatus,
+  RuntimeTerminalCreate,
+  RuntimeTerminalFocus,
+  RuntimeTerminalResolvePane,
+  RuntimeTerminalSplit,
   RuntimeTerminalState,
   RuntimeTerminalWaitCondition
 } from '../../../src/shared/runtime-types'
-import { requestRuntimeJson } from './pebble-tauri-runtime-transport'
+import { parsePaneKey } from '../../../src/shared/stable-pane-id'
+import { getHostPlatform, requestRuntimeJson } from './pebble-tauri-runtime-transport'
+import { readWorktrees } from './pebble-tauri-workspace-runtime-api'
 
 type RuntimeSessionStatus = 'starting' | 'running' | 'exited' | 'failed' | 'stopped'
 
 type RuntimeSession = {
   id: string
+  projectId?: string
   worktreeId?: string
   cwd: string
   command: string[]
@@ -17,7 +24,10 @@ type RuntimeSession = {
   leafId?: string
   status: RuntimeSessionStatus
   exitCode?: number | null
+  hookAgentState?: 'working' | 'idle' | 'permission'
   updatedAt?: string
+  cols?: number
+  rows?: number
 }
 
 type RuntimeOutputChunk = {
@@ -37,8 +47,12 @@ export async function callTauriTerminalRuntimeRpc(
   params: unknown
 ): Promise<RuntimeTerminalRpcResult> {
   switch (method) {
+    case 'terminal.create':
+      return handled({ terminal: await createTerminal(params) })
     case 'terminal.list':
       return handled(await listTerminals(params))
+    case 'terminal.resolveActive':
+      return handled({ handle: await resolveActiveTerminal(params) })
     case 'terminal.show':
       return handled({ terminal: await showTerminal(params) })
     case 'terminal.read':
@@ -55,12 +69,53 @@ export async function callTauriTerminalRuntimeRpc(
       return handled({ agentStatus: await readTerminalAgentStatus(params) })
     case 'terminal.isRunningAgent':
       return handled({ isRunningAgent: isRunningAgent(await readSessionFromParams(params)) })
+    case 'terminal.resolvePane':
+      return handled({ terminal: await resolveTerminalPane(params) })
     case 'terminal.stop':
       return handled(await stopTerminals(params))
     case 'terminal.stopExact':
       return handled(await stopExactTerminals(params))
+    case 'terminal.focus':
+      return handled({ focus: await focusTerminal(params) })
+    case 'terminal.close':
+      return handled({ close: await closeTerminal(params) })
+    case 'terminal.split':
+      return handled({ split: await splitTerminal(params) })
     default:
       return { handled: false }
+  }
+}
+
+async function createTerminal(params: unknown): Promise<RuntimeTerminalCreate> {
+  const input = readObject(params)
+  const worktree = await resolveSessionWorktree(params)
+  const tabId = readString(input.tabId) ?? `tab-${crypto.randomUUID()}`
+  const leafId = readString(input.leafId) ?? crypto.randomUUID()
+  const session = await requestRuntimeJson<RuntimeSession>('/v1/sessions', {
+    method: 'POST',
+    timeoutMs: 15_000,
+    body: {
+      projectId: worktree.projectId,
+      worktreeId: worktree.id,
+      cwd: readString(input.cwd) ?? worktree.path,
+      command: shellCommandForRuntime(readString(input.command)),
+      agentKind: readAgentKind(input),
+      tabId,
+      leafId,
+      launchToken: readString(input.launchToken) ?? undefined,
+      prompt: readString(input.prompt) ?? undefined,
+      cols: readNumber(input.cols) ?? undefined,
+      rows: readNumber(input.rows) ?? undefined
+    }
+  })
+  return {
+    handle: session.id,
+    tabId: session.tabId || tabId,
+    paneKey: session.leafId || leafId,
+    ptyId: session.id,
+    worktreeId: session.worktreeId || worktree.id,
+    title: terminalTitle(session),
+    surface: input.surface === 'background' ? 'background' : 'visible'
   }
 }
 
@@ -78,6 +133,19 @@ async function listTerminals(params: unknown) {
     totalCount: filtered.length,
     truncated: filtered.length > terminals.length
   }
+}
+
+async function resolveActiveTerminal(params: unknown): Promise<string | null> {
+  const worktreeId = normalizeRuntimeWorktreeId(readString(readObject(params).worktree))
+  const sessions = (await listSessions()).filter(
+    (session) => isLiveSession(session) && (!worktreeId || session.worktreeId === worktreeId)
+  )
+  sessions.sort((left, right) => {
+    const leftUpdated = readTimestamp(left.updatedAt) ?? 0
+    const rightUpdated = readTimestamp(right.updatedAt) ?? 0
+    return rightUpdated - leftUpdated
+  })
+  return sessions[0]?.id ?? null
 }
 
 async function showTerminal(params: unknown) {
@@ -167,26 +235,53 @@ async function sendTerminalInput(params: unknown) {
   return { handle: session.id, accepted: true, bytesWritten }
 }
 
+type RuntimeSessionWaitResult = {
+  sessionId: string
+  condition: string
+  satisfied: boolean
+  timedOut: boolean
+  status: RuntimeSessionStatus
+  hookAgentState?: 'working' | 'idle' | 'permission'
+  exitCode?: number | null
+}
+
+function toSessionStatusTerminalState(status: RuntimeSessionStatus): RuntimeTerminalState {
+  return status === 'starting' || status === 'running' ? 'running' : 'exited'
+}
+
 async function waitForTerminal(params: unknown) {
   const input = readObject(params)
   const condition = readWaitCondition(input.for)
   const terminal = readTerminalHandle(params)
-  const deadline = Date.now() + Math.max(1, readNumber(input.timeoutMs) ?? DEFAULT_WAIT_TIMEOUT_MS)
-  let session = await findSession(terminal)
-  if (condition === 'exit') {
-    while (session && isLiveSession(session) && Date.now() < deadline) {
-      await delay(250)
-      session = await findSession(terminal)
+  const timeoutMs = Math.max(1, readNumber(input.timeoutMs) ?? DEFAULT_WAIT_TIMEOUT_MS)
+  try {
+    // Runtime-side blocking wait: exit tracks process death, tui-idle tracks
+    // hook-reported agent readiness — no renderer polling loop.
+    const wait = await requestRuntimeJson<RuntimeSessionWaitResult>(
+      `/v1/sessions/${encodeURIComponent(terminal)}/wait`,
+      {
+        method: 'POST',
+        body: { for: condition, timeoutMs },
+        // Transport budget must outlive the runtime's own wait deadline.
+        timeoutMs: timeoutMs + 5000
+      }
+    )
+    return {
+      handle: terminal,
+      condition,
+      satisfied: wait.satisfied === true,
+      status: toSessionStatusTerminalState(wait.status),
+      exitCode: wait.exitCode ?? null
     }
-  }
-  const status = session ? toTerminalState(session) : 'exited'
-  const satisfied = condition === 'exit' ? status !== 'running' : Boolean(session && isLiveSession(session))
-  return {
-    handle: terminal,
-    condition,
-    satisfied,
-    status,
-    exitCode: session?.exitCode ?? null
+  } catch {
+    // A missing/stopped session can never become idle, but it has exited.
+    return {
+      handle: terminal,
+      condition,
+      satisfied: condition === 'exit',
+      status: 'exited' as RuntimeTerminalState,
+      exitCode: null
+    }
   }
 }
 
@@ -196,10 +291,9 @@ async function readTerminalAgentStatus(params: unknown): Promise<RuntimeTerminal
   return {
     handle: session.id,
     isRunningAgent: runningAgent,
-    // Why: Go sessions know whether an agent owns the PTY, but not yet the
-    // richer hook-level idle/permission state. Keep this explicit until the
-    // runtime status contract carries those hook events.
-    status: runningAgent ? 'working' : null
+    // Hook-reported readiness (working/idle/permission) wins when present;
+    // an agent PTY with no hook events yet is assumed working.
+    status: runningAgent ? (session.hookAgentState ?? 'working') : null
   }
 }
 
@@ -269,6 +363,74 @@ async function stopExactTerminals(params: unknown) {
   }
 }
 
+async function resolveTerminalPane(params: unknown): Promise<RuntimeTerminalResolvePane | null> {
+  const paneKey = readRequiredString(readObject(params).paneKey, 'pane key')
+  const parsed = parsePaneKey(paneKey)
+  const sessions = await listSessions()
+  const session = sessions.find((candidate) => {
+    if (parsed) {
+      return candidate.tabId === parsed.tabId && candidate.leafId === parsed.leafId
+    }
+    return `${candidate.tabId ?? ''}:${candidate.leafId ?? ''}` === paneKey
+  })
+  if (!session) {
+    return null
+  }
+  return {
+    handle: session.id,
+    tabId: session.tabId || `tab-${session.id}`,
+    leafId: session.leafId || `leaf-${session.id}`,
+    ptyId: session.id
+  }
+}
+
+async function focusTerminal(params: unknown): Promise<RuntimeTerminalFocus> {
+  const session = await readSessionFromParams(params)
+  return {
+    handle: session.id,
+    tabId: session.tabId || `tab-${session.id}`,
+    worktreeId: session.worktreeId ?? ''
+  }
+}
+
+async function closeTerminal(params: unknown) {
+  const session = await readSessionFromParams(params)
+  const stopped = await requestRuntimeJson<RuntimeSession>(
+    `/v1/sessions/${encodeURIComponent(session.id)}`,
+    { method: 'DELETE' }
+  )
+  return {
+    handle: stopped.id,
+    tabId: stopped.tabId || session.tabId || `tab-${stopped.id}`,
+    ptyKilled: true
+  }
+}
+
+async function splitTerminal(params: unknown): Promise<RuntimeTerminalSplit> {
+  const input = readObject(params)
+  const source = await readSessionFromParams(params)
+  const session = await requestRuntimeJson<RuntimeSession>('/v1/sessions', {
+    method: 'POST',
+    timeoutMs: 15_000,
+    body: {
+      projectId: source.projectId,
+      worktreeId: source.worktreeId,
+      cwd: source.cwd,
+      command: shellCommandForRuntime(readString(input.command)) ?? source.command,
+      agentKind: source.agentKind,
+      tabId: source.tabId || `tab-${source.id}`,
+      leafId: crypto.randomUUID(),
+      cols: source.cols,
+      rows: source.rows
+    }
+  })
+  return {
+    handle: session.id,
+    tabId: session.tabId || source.tabId || `tab-${source.id}`,
+    paneRuntimeId: readPaneRuntimeId(session)
+  }
+}
+
 async function readSessionFromParams(params: unknown): Promise<RuntimeSession> {
   const terminal = readTerminalHandle(params)
   const session = await findSession(terminal)
@@ -287,7 +449,6 @@ async function listSessions(): Promise<RuntimeSession[]> {
 }
 
 function mapRuntimeSessionToTerminal(session: RuntimeSession) {
-  const title = session.command.join(' ') || session.agentKind || 'Terminal'
   return {
     handle: session.id,
     ptyId: session.id,
@@ -296,12 +457,56 @@ function mapRuntimeSessionToTerminal(session: RuntimeSession) {
     branch: '',
     tabId: session.tabId || `pty:${session.id}`,
     leafId: session.leafId || session.tabId || `pty:${session.id}`,
-    title,
+    title: terminalTitle(session),
     connected: isLiveSession(session),
     writable: isLiveSession(session),
     lastOutputAt: readTimestamp(session.updatedAt),
     preview: ''
   }
+}
+
+async function resolveSessionWorktree(params: unknown): Promise<{
+  id: string
+  projectId: string
+  path: string
+}> {
+  const input = readObject(params)
+  const selector = normalizeRuntimeWorktreeId(
+    readString(input.worktree) ?? readString(input.worktreeId)
+  )
+  if (!selector) {
+    throw new Error('terminal_create_requires_worktree')
+  }
+  const worktree = (await readWorktrees()).find((entry) => entry.id === selector)
+  const projectId = worktree?.projectId ?? worktree?.repoId
+  if (!worktree || !projectId || (worktree.hostId && worktree.hostId !== 'local')) {
+    throw new Error(`terminal_worktree_not_available:${selector}`)
+  }
+  return { id: worktree.id, projectId, path: worktree.path }
+}
+
+function shellCommandForRuntime(command: string | null): string[] | undefined {
+  if (!command) {
+    return undefined
+  }
+  return getHostPlatform() === 'win32'
+    ? ['cmd.exe', '/d', '/s', '/c', command]
+    : ['/bin/sh', '-lc', command]
+}
+
+function readAgentKind(input: Record<string, unknown>): string | undefined {
+  return (
+    readString(input.agentKind) ??
+    readString(input.agent) ??
+    readString(readObject(input.agent).id) ??
+    readString(input.launchAgent) ??
+    readString(readObject(input.launchAgent).id) ??
+    undefined
+  )
+}
+
+function terminalTitle(session: RuntimeSession): string {
+  return session.command.join(' ') || session.agentKind || 'Terminal'
 }
 
 function terminalTailLines(chunks: RuntimeOutputChunk[]): string[] {
@@ -402,8 +607,4 @@ function readStringList(value: unknown): string[] {
 
 function handled(result: unknown): RuntimeTerminalRpcResult {
   return { handled: true, result }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms))
 }

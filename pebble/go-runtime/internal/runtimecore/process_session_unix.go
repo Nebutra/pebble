@@ -10,10 +10,10 @@ import (
 	terminalpty "github.com/creack/pty"
 )
 
-func startPlatformProcessSession(ctx context.Context, session *processSession, _ StartSessionRequest) error {
+func startPlatformProcessSession(ctx context.Context, session *processSession, req StartSessionRequest) error {
 	cmd := exec.CommandContext(ctx, session.command[0], session.command[1:]...)
 	cmd.Dir = session.cwd
-	cmd.Env = os.Environ()
+	cmd.Env = append(os.Environ(), req.hookEnv...)
 	ptyFile, err := terminalpty.StartWithSize(cmd, toPtyWinsize(session.cols, session.rows))
 	if err != nil {
 		return err

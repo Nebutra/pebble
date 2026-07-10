@@ -63,6 +63,9 @@ type Manager struct {
 	nextSubscriber           uint64
 	unavailableTool          []string
 	relayID                  string
+	// hookEndpoint is stamped into PTY env so agent hook scripts can reach the
+	// runtime's /hook ingest route (Electron parity: env-passed endpoint).
+	hookEndpoint sessionHookEndpoint
 }
 
 func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
@@ -999,6 +1002,7 @@ func (m *Manager) StartSession(ctx context.Context, req StartSessionRequest) (Se
 	if err != nil {
 		return Session{}, err
 	}
+	resolvedReq.hookEndpoint = m.currentSessionHookEndpoint()
 	session, err := startProcessSession(context.Background(), resolvedReq, m.emit)
 	if err != nil {
 		return Session{}, err

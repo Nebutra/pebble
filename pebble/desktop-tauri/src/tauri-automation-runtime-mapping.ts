@@ -4,7 +4,6 @@ import type {
   AutomationCreateInput,
   AutomationExecutionTargetType,
   AutomationPrecheck,
-  AutomationPrecheckResult,
   AutomationRun,
   AutomationRunStatus,
   AutomationSchedulerOwner,
@@ -13,6 +12,12 @@ import type {
 } from '../../../src/shared/automations-types'
 import { isTuiAgent } from '../../../src/shared/tui-agent-config'
 import type { TuiAgent } from '../../../src/shared/types'
+import {
+  mapRuntimePrecheckResult,
+  readDispatchRunStatus,
+  type RuntimeAutomationDispatchState,
+  type RuntimeAutomationPrecheckResult
+} from './tauri-automation-run-result-mapping'
 
 const AUTOMATION_PAYLOAD_KEY = 'pebbleAutomation'
 const DEFAULT_AUTOMATION_GRACE_MINUTES = 720
@@ -42,20 +47,6 @@ export type RuntimeAutomation = {
   updatedAt?: string
 }
 
-export type RuntimeAutomationPrecheckResult = {
-  command?: string
-  exitCode?: number | null
-  timedOut?: boolean
-  durationMs?: number
-  stdout?: string
-  stderr?: string
-  stdoutTruncated?: boolean
-  stderrTruncated?: boolean
-  error?: string
-  startedAt?: string
-  completedAt?: string
-}
-
 export type RuntimeAutomationRun = {
   id: string
   automationId: string
@@ -68,6 +59,7 @@ export type RuntimeAutomationRun = {
   agentRunId?: string
   computerActionId?: string
   precheckResult?: RuntimeAutomationPrecheckResult | null
+  dispatchState?: RuntimeAutomationDispatchState | null
   error?: string
   createdAt?: string
   updatedAt?: string
@@ -166,6 +158,9 @@ export function mapRuntimeAutomationRun(
   const updatedAt = dateMs(run.updatedAt, createdAt)
   const runContext = objectValue(stored.runContext) as Automation['runContext']
   const sourceContext = objectValue(stored.sourceContext) as Automation['sourceContext']
+  // The renderer-reported dispatch outcome (workspace/session identity,
+  // final status) is authoritative over the runtime's coarser native status.
+  const dispatch = run.dispatchState ?? null
   return {
     id: run.id,
     automationId: run.automationId,
@@ -173,24 +168,30 @@ export function mapRuntimeAutomationRun(
     sourceContext: sourceContext ?? automation?.sourceContext ?? null,
     title: automation ? `${automation.name} run` : `Automation run ${run.id}`,
     scheduledFor: createdAt,
-    status: mapRuntimeRunStatus(run.status),
+    status: readDispatchRunStatus(dispatch?.status) ?? mapRuntimeRunStatus(run.status),
     trigger: run.reason === 'schedule' ? 'scheduled' : 'manual',
-    workspaceId: nullableStringValue(stored.workspaceId) ?? automation?.workspaceId ?? null,
-    workspaceDisplayName: null,
+    workspaceId:
+      nullableStringValue(dispatch?.workspaceId) ??
+      nullableStringValue(stored.workspaceId) ??
+      automation?.workspaceId ??
+      null,
+    workspaceDisplayName: nullableStringValue(dispatch?.workspaceDisplayName),
     sessionKind: 'terminal',
     chatSessionId: null,
-    terminalSessionId: null,
-    terminalPaneKey: null,
-    terminalPtyId: null,
+    terminalSessionId: nullableStringValue(dispatch?.terminalSessionId),
+    terminalPaneKey: nullableStringValue(dispatch?.terminalPaneKey),
+    terminalPtyId: nullableStringValue(dispatch?.terminalPtyId),
     outputSnapshot: createRunOutputSnapshot(run, updatedAt),
     precheckResult: mapRuntimePrecheckResult(run.precheckResult),
     usage: null,
-    error: stringValue(run.error) || null,
+    error: nullableStringValue(dispatch?.error) ?? (stringValue(run.error) || null),
     startedAt: createdAt,
     dispatchedAt: updatedAt,
     createdAt
   }
 }
+
+
 
 export function toAutomationPayloadSnapshot(automation: Automation): AutomationPayloadSnapshot {
   return {
@@ -380,30 +381,6 @@ function mapRuntimeRunStatus(status: RuntimeAutomationRun['status']): Automation
     return 'skipped_precheck'
   }
   return 'pending'
-}
-
-// Converts the Go runtime's RFC3339 precheck timestamps into the renderer's
-// millisecond-epoch AutomationPrecheckResult shape.
-export function mapRuntimePrecheckResult(
-  result: RuntimeAutomationPrecheckResult | null | undefined
-): AutomationPrecheckResult | null {
-  if (!result) {
-    return null
-  }
-  const startedAt = dateMs(result.startedAt, Date.now())
-  return {
-    command: stringValue(result.command),
-    exitCode: typeof result.exitCode === 'number' ? result.exitCode : null,
-    timedOut: result.timedOut === true,
-    durationMs: numberValue(result.durationMs, 0),
-    stdout: typeof result.stdout === 'string' ? result.stdout : '',
-    stderr: typeof result.stderr === 'string' ? result.stderr : '',
-    stdoutTruncated: result.stdoutTruncated === true,
-    stderrTruncated: result.stderrTruncated === true,
-    error: stringValue(result.error) || null,
-    startedAt,
-    completedAt: dateMs(result.completedAt, startedAt)
-  }
 }
 
 // True when the runtime payload carries the desktop shell's automation

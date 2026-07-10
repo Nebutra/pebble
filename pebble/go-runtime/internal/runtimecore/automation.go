@@ -136,9 +136,12 @@ type AutomationRun struct {
 	// PrecheckResult records whether a scheduled run's precheck passed (run
 	// proceeded) or failed (run recorded as skipped_precheck).
 	PrecheckResult *AutomationPrecheckResult `json:"precheckResult,omitempty"`
-	Error          string                    `json:"error,omitempty"`
-	CreatedAt      time.Time                 `json:"createdAt"`
-	UpdatedAt      time.Time                 `json:"updatedAt"`
+	// DispatchState is the desktop renderer's reported dispatch outcome for
+	// runs whose real work happens in a renderer-driven workspace session.
+	DispatchState *AutomationDispatchState `json:"dispatchState,omitempty"`
+	Error         string                   `json:"error,omitempty"`
+	CreatedAt     time.Time                `json:"createdAt"`
+	UpdatedAt     time.Time                `json:"updatedAt"`
 }
 
 func (m *Manager) CreateAutomation(req CreateAutomationRequest) (Automation, error) {
