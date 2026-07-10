@@ -11,7 +11,7 @@ import (
 // ghPRListFields mirrors WORK_ITEM_PR_LIST_JSON_FIELDS in src/main/github/client.ts.
 // gh infers owner/repo from the git remotes in workdir, matching Electron's
 // cwd-based resolution.
-const ghPRListFields = "number,title,state,url,labels,updatedAt,author,isDraft,headRefName,baseRefName,headRefOid"
+const ghPRListFields = "number,title,state,url,labels,updatedAt,author,isDraft,headRefName,baseRefName,headRefOid,isCrossRepository"
 
 // ghPRRaw is the subset of `gh pr list/view --json` output this package maps.
 type ghPRRaw struct {
@@ -28,6 +28,9 @@ type ghPRRaw struct {
 	HeadRefOid  string           `json:"headRefOid"`
 	Merged      bool             `json:"merged"`
 	MergedAt    *json.RawMessage `json:"mergedAt"`
+	// IsCrossRepository is a *bool (not bool) so its absence in older gh
+	// responses stays distinguishable from an explicit false.
+	IsCrossRepository *bool `json:"isCrossRepository"`
 }
 
 type ghLabel struct {
@@ -124,18 +127,19 @@ func mapGitHubPR(raw *ghPRRaw) GitHubWorkItem {
 		}
 	}
 	item := GitHubWorkItem{
-		ID:          fmt.Sprintf("pr:%d", raw.Number),
-		Type:        "pr",
-		Number:      raw.Number,
-		Title:       raw.Title,
-		State:       mapPRState(raw),
-		URL:         raw.URL,
-		Labels:      labels,
-		UpdatedAt:   raw.UpdatedAt,
-		Author:      ghAuthorLogin(raw.Author),
-		BranchName:  raw.HeadRefName,
-		BaseRefName: raw.BaseRefName,
-		HeadSha:     raw.HeadRefOid,
+		ID:                fmt.Sprintf("pr:%d", raw.Number),
+		Type:              "pr",
+		Number:            raw.Number,
+		Title:             raw.Title,
+		State:             mapPRState(raw),
+		URL:               raw.URL,
+		Labels:            labels,
+		UpdatedAt:         raw.UpdatedAt,
+		Author:            ghAuthorLogin(raw.Author),
+		BranchName:        raw.HeadRefName,
+		BaseRefName:       raw.BaseRefName,
+		HeadSha:           raw.HeadRefOid,
+		IsCrossRepository: raw.IsCrossRepository,
 	}
 	return item
 }

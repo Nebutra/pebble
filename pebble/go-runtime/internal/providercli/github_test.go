@@ -67,8 +67,8 @@ func withEmptyPath(t *testing.T, dir string) {
 }
 
 const ghPRListJSON = `[
-  {"number":42,"title":"Add feature","state":"OPEN","url":"https://github.com/o/r/pull/42","labels":[{"name":"enhancement"},{"name":"needs-review"}],"updatedAt":"2024-01-02T03:04:05Z","author":{"login":"octocat"},"isDraft":false,"headRefName":"feature","baseRefName":"main","headRefOid":"abc123"},
-  {"number":41,"title":"Draft work","state":"OPEN","url":"https://github.com/o/r/pull/41","labels":[],"updatedAt":"2024-01-01T00:00:00Z","author":{"login":"hubot"},"isDraft":true,"headRefName":"draft","baseRefName":"main","headRefOid":"def456"}
+  {"number":42,"title":"Add feature","state":"OPEN","url":"https://github.com/o/r/pull/42","labels":[{"name":"enhancement"},{"name":"needs-review"}],"updatedAt":"2024-01-02T03:04:05Z","author":{"login":"octocat"},"isDraft":false,"headRefName":"feature","baseRefName":"main","headRefOid":"abc123","isCrossRepository":false},
+  {"number":41,"title":"Draft work","state":"OPEN","url":"https://github.com/o/r/pull/41","labels":[],"updatedAt":"2024-01-01T00:00:00Z","author":{"login":"hubot"},"isDraft":true,"headRefName":"draft","baseRefName":"main","headRefOid":"def456","isCrossRepository":true}
 ]`
 
 func TestListGitHubPRsHappyPath(t *testing.T) {
@@ -99,6 +99,30 @@ func TestListGitHubPRsHappyPath(t *testing.T) {
 	}
 	if items[1].State != "draft" {
 		t.Fatalf("expected draft state for isDraft item, got %q", items[1].State)
+	}
+	if first.IsCrossRepository == nil || *first.IsCrossRepository {
+		t.Fatalf("expected same-repo PR to report isCrossRepository=false, got %+v", first.IsCrossRepository)
+	}
+	if items[1].IsCrossRepository == nil || !*items[1].IsCrossRepository {
+		t.Fatalf("expected fork PR to report isCrossRepository=true, got %+v", items[1].IsCrossRepository)
+	}
+}
+
+func TestListGitHubPRsIsCrossRepositoryUnknownWhenFieldMissing(t *testing.T) {
+	// Older gh responses (or callers without the field) omit isCrossRepository
+	// entirely; the pointer must stay nil rather than default to false.
+	json := `[{"number":7,"title":"No cross-repo field","state":"OPEN","url":"https://github.com/o/r/pull/7","labels":[],"updatedAt":"2024-01-01T00:00:00Z","author":{"login":"a"},"isDraft":false,"headRefName":"h","baseRefName":"main","headRefOid":"z"}]`
+	dir := fakeCLIStub(t, "gh", json, 0)
+	withPath(t, dir)
+	items, err := ListGitHubPRs(context.Background(), "", 24)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if items[0].IsCrossRepository != nil {
+		t.Fatalf("expected nil isCrossRepository when field is absent, got %+v", items[0].IsCrossRepository)
 	}
 }
 

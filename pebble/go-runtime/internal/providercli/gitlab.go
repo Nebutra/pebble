@@ -123,18 +123,30 @@ func mapGitLabMR(raw *glabMRRaw) GitLabWorkItem {
 		idPart = fmt.Sprintf("unknown-%d", raw.IID)
 	}
 	return GitLabWorkItem{
-		ID:          "gitlab-mr-" + idPart,
-		Type:        "mr",
-		Number:      raw.IID,
-		Title:       raw.Title,
-		State:       mapMRState(raw.State, raw.Draft, raw.Title),
-		URL:         url,
-		Labels:      labels,
-		UpdatedAt:   raw.UpdatedAt,
-		Author:      glabAuthorUsername(raw.Author),
-		BranchName:  raw.SourceBranch,
-		BaseRefName: raw.TargetBranch,
+		ID:                "gitlab-mr-" + idPart,
+		Type:              "mr",
+		Number:            raw.IID,
+		Title:             raw.Title,
+		State:             mapMRState(raw.State, raw.Draft, raw.Title),
+		URL:               url,
+		Labels:            labels,
+		UpdatedAt:         raw.UpdatedAt,
+		Author:            glabAuthorUsername(raw.Author),
+		BranchName:        raw.SourceBranch,
+		BaseRefName:       raw.TargetBranch,
+		IsCrossRepository: glabIsCrossRepository(raw.SourceProjectID, raw.TargetProjectID),
 	}
+}
+
+// glabIsCrossRepository mirrors mapMRToWorkItem: a fork MR is one where
+// source_project_id !== target_project_id. Nil when either id is missing so
+// callers can't mistake "unknown" for "same repo".
+func glabIsCrossRepository(sourceProjectID, targetProjectID *int) *bool {
+	if sourceProjectID == nil || targetProjectID == nil {
+		return nil
+	}
+	isCrossRepository := *sourceProjectID != *targetProjectID
+	return &isCrossRepository
 }
 
 func glabAuthorUsername(user *glabUser) *string {
