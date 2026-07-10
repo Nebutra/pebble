@@ -170,34 +170,50 @@ struct UploadResponse {
     ticket_id: String,
 }
 
+// Why: sync commands run on the Tauri main thread; trace-file reads and
+// process spawns below can block for seconds, so bodies run in spawn_blocking.
 #[tauri::command]
-pub fn diagnostics_get_status(app: tauri::AppHandle) -> Result<DiagnosticsStatusPayload, String> {
-    Ok(resolve_diagnostics_status(&app)?)
+pub async fn diagnostics_get_status(
+    app: tauri::AppHandle,
+) -> Result<DiagnosticsStatusPayload, String> {
+    tauri::async_runtime::spawn_blocking(move || resolve_diagnostics_status(&app))
+        .await
+        .map_err(|error| format!("Diagnostics status task failed: {error}"))?
 }
 
 #[tauri::command]
-pub fn diagnostics_collect_bundle(
+pub async fn diagnostics_collect_bundle(
     app: tauri::AppHandle,
-    state: tauri::State<DiagnosticsState>,
+    state: tauri::State<'_, DiagnosticsState>,
     input: DiagnosticsCollectInput,
 ) -> Result<DiagnosticsBundlePayload, String> {
-    let status = resolve_diagnostics_status(&app)?;
-    if !status.bundle_enabled {
-        return Err("creating review files is disabled".to_string());
-    }
-    let lookback_minutes = normalize_lookback_minutes(input.lookback_minutes);
-    let bundle = collect_diagnostic_bundle(&app, &input.app_version, lookback_minutes)?;
-    remember_pending_bundle(&state, &bundle)?;
+    let (bundle, preview_file_path) = tauri::async_runtime::spawn_blocking(move || {
+        let status = resolve_diagnostics_status(&app)?;
+        if !status.bundle_enabled {
+            return Err("creating review files is disabled".to_string());
+        }
+        let lookback_minutes = normalize_lookback_minutes(input.lookback_minutes);
+        let bundle = collect_diagnostic_bundle(&app, &input.app_version, lookback_minutes)?;
+        let preview_file_path = write_bundle_preview_file(&bundle)?;
+        Ok((bundle, preview_file_path))
+    })
+    .await
+    .map_err(|error| format!("Diagnostics collect task failed: {error}"))??;
+    remember_pending_bundle(&state, &bundle, preview_file_path)?;
     Ok(to_bundle_payload(&bundle))
 }
 
 #[tauri::command]
-pub fn diagnostics_open_bundle_preview(
-    state: tauri::State<DiagnosticsState>,
+pub async fn diagnostics_open_bundle_preview(
+    state: tauri::State<'_, DiagnosticsState>,
     input: DiagnosticsBundleIdInput,
 ) -> Result<(), String> {
     let preview_file_path = get_pending_preview_file_path(&state, &input.bundle_submission_id)?;
-    if !open_with_system_default(&preview_file_path) {
+    let opened =
+        tauri::async_runtime::spawn_blocking(move || open_with_system_default(&preview_file_path))
+            .await
+            .map_err(|error| format!("Diagnostics preview task failed: {error}"))?;
+    if !opened {
         return Err("could not open review file".to_string());
     }
     if let Some(pending) = lock_state(&state.pending_bundles)?.get_mut(&input.bundle_submission_id)
@@ -519,8 +535,8 @@ fn read_lines_newest_first(text: &str) -> Vec<String> {
 fn remember_pending_bundle(
     state: &DiagnosticsState,
     bundle: &CollectedDiagnosticBundle,
+    preview_file_path: PathBuf,
 ) -> Result<(), String> {
-    let preview_file_path = write_bundle_preview_file(bundle)?;
     let mut pending = lock_state(&state.pending_bundles)?;
     prune_pending_bundles(&mut pending);
     pending.insert(

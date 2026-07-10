@@ -21,6 +21,25 @@ function fallbackStatus(agent: AgentHookInstallStatus['agent']): AgentHookInstal
   }
 }
 
+function fallbackApi(): Parameters<typeof createPebbleAgentHooksApi>[0] {
+  return {
+    claudeStatus: () => Promise.resolve(fallbackStatus('claude')),
+    openClaudeStatus: () => Promise.resolve(fallbackStatus('openclaude')),
+    codexStatus: () => Promise.resolve(fallbackStatus('codex')),
+    geminiStatus: () => Promise.resolve(fallbackStatus('gemini')),
+    antigravityStatus: () => Promise.resolve(fallbackStatus('antigravity')),
+    ampStatus: () => Promise.resolve(fallbackStatus('amp')),
+    cursorStatus: () => Promise.resolve(fallbackStatus('cursor')),
+    droidStatus: () => Promise.resolve(fallbackStatus('droid')),
+    commandCodeStatus: () => Promise.resolve(fallbackStatus('command-code')),
+    grokStatus: () => Promise.resolve(fallbackStatus('grok')),
+    copilotStatus: () => Promise.resolve(fallbackStatus('copilot')),
+    hermesStatus: () => Promise.resolve(fallbackStatus('hermes')),
+    devinStatus: () => Promise.resolve(fallbackStatus('devin')),
+    kimiStatus: () => Promise.resolve(fallbackStatus('kimi'))
+  }
+}
+
 describe('createPebbleAgentHooksApi', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -50,21 +69,7 @@ describe('createPebbleAgentHooksApi', () => {
       throw new Error(`unexpected invoke ${command}`)
     })
 
-    const api = createPebbleAgentHooksApi({
-      claudeStatus: () => Promise.resolve(fallbackStatus('claude')),
-      openClaudeStatus: () => Promise.resolve(fallbackStatus('openclaude')),
-      codexStatus: () => Promise.resolve(fallbackStatus('codex')),
-      geminiStatus: () => Promise.resolve(fallbackStatus('gemini')),
-      antigravityStatus: () => Promise.resolve(fallbackStatus('antigravity')),
-      ampStatus: () => Promise.resolve(fallbackStatus('amp')),
-      cursorStatus: () => Promise.resolve(fallbackStatus('cursor')),
-      droidStatus: () => Promise.resolve(fallbackStatus('droid')),
-      commandCodeStatus: () => Promise.resolve(fallbackStatus('command-code')),
-      grokStatus: () => Promise.resolve(fallbackStatus('grok')),
-      copilotStatus: () => Promise.resolve(fallbackStatus('copilot')),
-      hermesStatus: () => Promise.resolve(fallbackStatus('hermes')),
-      devinStatus: () => Promise.resolve(fallbackStatus('devin'))
-    })
+    const api = createPebbleAgentHooksApi(fallbackApi())
 
     await expect(api.claudeStatus()).resolves.toMatchObject({
       agent: 'claude',
@@ -80,24 +85,20 @@ describe('createPebbleAgentHooksApi', () => {
   })
 
   it('reports an explicit gap for agents without a native status check', async () => {
-    const api = createPebbleAgentHooksApi({
-      claudeStatus: () => Promise.resolve(fallbackStatus('claude')),
-      openClaudeStatus: () => Promise.resolve(fallbackStatus('openclaude')),
-      codexStatus: () => Promise.resolve(fallbackStatus('codex')),
-      geminiStatus: () => Promise.resolve(fallbackStatus('gemini')),
-      antigravityStatus: () => Promise.resolve(fallbackStatus('antigravity')),
-      ampStatus: () => Promise.resolve(fallbackStatus('amp')),
-      cursorStatus: () => Promise.resolve(fallbackStatus('cursor')),
-      droidStatus: () => Promise.resolve(fallbackStatus('droid')),
-      commandCodeStatus: () => Promise.resolve(fallbackStatus('command-code')),
-      grokStatus: () => Promise.resolve(fallbackStatus('grok')),
-      copilotStatus: () => Promise.resolve(fallbackStatus('copilot')),
-      hermesStatus: () => Promise.resolve(fallbackStatus('hermes')),
-      devinStatus: () => Promise.resolve(fallbackStatus('devin'))
-    })
+    const api = createPebbleAgentHooksApi(fallbackApi())
 
     const status = await api.cursorStatus()
     expect(status.agent).toBe('cursor')
+    expect(status.state).toBe('error')
+    expect(status.detail).toMatch(/not yet implemented/)
+    expect(invokeMock).not.toHaveBeenCalled()
+  })
+
+  it('reports an explicit gap for kimi status', async () => {
+    const api = createPebbleAgentHooksApi(fallbackApi())
+
+    const status = await api.kimiStatus()
+    expect(status.agent).toBe('kimi')
     expect(status.state).toBe('error')
     expect(status.detail).toMatch(/not yet implemented/)
     expect(invokeMock).not.toHaveBeenCalled()
@@ -107,19 +108,8 @@ describe('createPebbleAgentHooksApi', () => {
     globalThis.window = {} as unknown as Window & typeof globalThis
     const claudeStatus = vi.fn(() => Promise.resolve(fallbackStatus('claude')))
     const api = createPebbleAgentHooksApi({
-      claudeStatus,
-      openClaudeStatus: () => Promise.resolve(fallbackStatus('openclaude')),
-      codexStatus: () => Promise.resolve(fallbackStatus('codex')),
-      geminiStatus: () => Promise.resolve(fallbackStatus('gemini')),
-      antigravityStatus: () => Promise.resolve(fallbackStatus('antigravity')),
-      ampStatus: () => Promise.resolve(fallbackStatus('amp')),
-      cursorStatus: () => Promise.resolve(fallbackStatus('cursor')),
-      droidStatus: () => Promise.resolve(fallbackStatus('droid')),
-      commandCodeStatus: () => Promise.resolve(fallbackStatus('command-code')),
-      grokStatus: () => Promise.resolve(fallbackStatus('grok')),
-      copilotStatus: () => Promise.resolve(fallbackStatus('copilot')),
-      hermesStatus: () => Promise.resolve(fallbackStatus('hermes')),
-      devinStatus: () => Promise.resolve(fallbackStatus('devin'))
+      ...fallbackApi(),
+      claudeStatus
     })
 
     await api.claudeStatus()

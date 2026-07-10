@@ -48,11 +48,7 @@ export function createPebbleAgentHooksApi(base: AgentHooksApi): AgentHooksApi {
     grokStatus: () => Promise.resolve(gapStatus('grok')),
     copilotStatus: () => Promise.resolve(gapStatus('copilot')),
     hermesStatus: () => Promise.resolve(gapStatus('hermes')),
-    devinStatus: () => Promise.resolve(gapStatus('devin'))
-    // Why: kimiStatus is implemented at runtime (src/preload/index.ts,
-    // src/main/ipc/agent-hooks.ts) but missing from the shared PreloadApi
-    // type in src/preload/api-types.ts — a pre-existing Electron-side
-    // type/impl drift outside this track's scope, so this bridge matches the
-    // declared type rather than widening it.
+    devinStatus: () => Promise.resolve(gapStatus('devin')),
+    kimiStatus: () => Promise.resolve(gapStatus('kimi'))
   }
 }
