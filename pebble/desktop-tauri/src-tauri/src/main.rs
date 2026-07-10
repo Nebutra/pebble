@@ -15,12 +15,15 @@ fn main() {
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .manage(commands::browser_guest_find::BrowserGuestFindState::default())
         .manage(commands::crash_reports::CrashReportsState::default())
         .manage(commands::diagnostics::DiagnosticsState::default())
         .manage(commands::filesystem_watch::FsWatcherState::default())
         .manage(commands::terminal_artifacts::TerminalArtifactsState::default())
         .manage(commands::runtime_environments::RuntimeEnvironmentSubscriptionsState::default())
         .manage(commands::runtime_event_stream::RuntimeEventStreamState::default())
+        .manage(commands::source_control_text_generation::SourceControlTextGenerationState::default())
+        .manage(commands::speech::SpeechState::default())
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(ActivationPolicy::Regular);
@@ -50,6 +53,13 @@ pub fn run() {
             commands::agent_hooks::agent_hooks_devin_status,
             commands::agent_hooks::agent_hooks_kimi_status,
             commands::browser_detection::browser_detect_installed_browsers,
+            commands::browser_annotation_overlay::browser_annotation_overlay_set,
+            commands::browser_child_webview::browser_child_webview_create,
+            commands::browser_cookies::browser_guest_clear_cookies,
+            commands::browser_cookies::browser_guest_import_cookie_file,
+            commands::browser_guest_find::browser_guest_find,
+            commands::browser_guest_find::browser_guest_stop_find,
+            commands::browser_guest_evaluate::browser_guest_evaluate,
             commands::computer_permissions::computer_permissions_open,
             commands::computer_permissions::computer_permissions_reset,
             commands::computer_permissions::computer_permissions_status,
@@ -106,6 +116,16 @@ pub fn run() {
             commands::runtime_status::register_native_provider,
             commands::settings_store::read_settings_document,
             commands::settings_store::write_settings_document,
+            commands::speech::speech_get_openai_key_status,
+            commands::speech::speech_save_openai_key,
+            commands::speech::speech_clear_openai_key,
+            commands::speech::speech_get_model_states,
+            commands::speech::speech_download_model,
+            commands::speech::speech_cancel_download,
+            commands::speech::speech_delete_model,
+            commands::speech::speech_start_dictation,
+            commands::speech::speech_feed_audio,
+            commands::speech::speech_stop_dictation,
             commands::shell::shell_path_exists,
             commands::shell::shell_open_in_file_manager,
             commands::shell::shell_open_in_external_editor,
@@ -116,6 +136,10 @@ pub fn run() {
             commands::shell::shell_pick_directory,
             commands::shell::shell_pick_repo_icon_image,
             commands::shell::shell_copy_file,
+            commands::source_control_text_generation::source_control_text_generation_cancel,
+            commands::source_control_text_generation::source_control_text_generation_commit_context,
+            commands::source_control_text_generation::source_control_text_generation_execute_plan,
+            commands::source_control_text_generation::source_control_text_generation_pull_request_context,
             commands::terminal_artifacts::terminal_artifact_grant,
             commands::terminal_artifacts::terminal_artifact_preview,
             commands::terminal_artifacts::terminal_artifact_read,
