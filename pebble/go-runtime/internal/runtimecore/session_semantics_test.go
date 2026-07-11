@@ -62,16 +62,14 @@ func TestSessionAltScreenActiveFromStream(t *testing.T) {
 	}
 	t.Cleanup(func() { _, _ = manager.StopSession(leave.ID) })
 
-	// Wait until the stream has been consumed (the "done" line arrived), then the
-	// final rmcup must have flipped alt-screen back off.
+	// Wait until the stream has been consumed and the final rmcup has flipped
+	// alt-screen back off. Output now flushes byte-immediate (not line-buffered,
+	// see readStream), so a tiny printf can arrive as a single chunk; wait on
+	// the actual alt-screen state rather than an output chunk count.
 	if !waitFor(3*time.Second, func() bool {
 		s, ok := findSession(manager.ListSessions(), leave.ID)
-		return ok && s.OutputChunks >= 2
+		return ok && s.OutputChunks >= 1 && !s.AltScreenActive
 	}) {
-		t.Fatal("expected the leave session's output to be consumed")
-	}
-	s, _ := findSession(manager.ListSessions(), leave.ID)
-	if s.AltScreenActive {
 		t.Fatal("expected altScreenActive false after rmcup")
 	}
 }

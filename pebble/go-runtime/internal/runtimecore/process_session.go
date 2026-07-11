@@ -1,7 +1,6 @@
 package runtimecore
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -191,12 +190,14 @@ func (s *processSession) stop() (Session, error) {
 }
 
 func (s *processSession) readStream(stream string, reader io.Reader) {
-	// Why: alt-screen smcup/rmcup sequences (e.g. ESC[?1049h) carry no newline,
-	// so a line scanner would not observe them until the next newline — which a
-	// full-screen TUI may never emit. Feed the raw bytes to the alt-screen
-	// scanner as they arrive, then split into newline-delimited output chunks.
+	// Why: output must reach the renderer byte-immediate, not line-buffered — a
+	// shell prompt has no trailing newline, so gating emission on '\n' left a
+	// freshly opened terminal showing nothing until the user typed a line that
+	// happened to complete one (matches Electron's node-pty onData, which fires
+	// on every raw read with no line buffering). Alt-screen smcup/rmcup
+	// sequences also carry no newline, so the alt-screen scanner needs the same
+	// raw, immediate bytes.
 	buf := make([]byte, 4096)
-	var pending []byte
 	for {
 		n, readErr := reader.Read(buf)
 		if n > 0 {
@@ -206,13 +207,9 @@ func (s *processSession) readStream(stream string, reader io.Reader) {
 				s.altScreen.Feed(raw)
 				s.mu.Unlock()
 			}
-			pending = append(pending, raw...)
-			pending = s.flushCompleteLines(stream, pending)
+			s.appendOutput(stream, string(raw))
 		}
 		if readErr != nil {
-			if len(pending) > 0 {
-				s.appendOutput(stream, string(pending))
-			}
 			// A closed PTY surfaces as EOF or os.ErrClosed on the master fd; both
 			// are normal session teardown, not stream errors worth surfacing.
 			if !errors.Is(readErr, io.EOF) && !errors.Is(readErr, os.ErrClosed) {
@@ -223,19 +220,6 @@ func (s *processSession) readStream(stream string, reader io.Reader) {
 			s.outputEvents.flushNow()
 			return
 		}
-	}
-}
-
-// flushCompleteLines emits each newline-terminated line as its own output chunk
-// (preserving the trailing newline) and returns the unterminated remainder.
-func (s *processSession) flushCompleteLines(stream string, pending []byte) []byte {
-	for {
-		idx := bytes.IndexByte(pending, '\n')
-		if idx < 0 {
-			return pending
-		}
-		s.appendOutput(stream, string(pending[:idx+1]))
-		pending = pending[idx+1:]
 	}
 }
 
