@@ -29,6 +29,7 @@ import {
 import { renderSourceControlActionCommandTemplate } from "../../../src/shared/source-control-ai-actions";
 import type { ResolvedSourceControlAiGenerationParams } from "../../../src/shared/source-control-ai";
 import type { TuiAgent } from "../../../src/shared/types";
+import { requestRuntimeJson } from "./pebble-tauri-runtime-transport";
 
 const GENERATION_TIMEOUT_MS = 60_000;
 const MAX_AGENT_OUTPUT_BYTES = 4 * 1024 * 1024;
@@ -86,13 +87,6 @@ async function generateTauriCommitMessage(args: {
   connectionId?: string;
   sourceControlAiResolvedParams?: ResolvedSourceControlAiGenerationParams;
 }): Promise<CommitGenerationResult> {
-  if (args.connectionId) {
-    return {
-      success: false,
-      error:
-        "Remote commit message generation is not yet wired through the Tauri SSH relay.",
-    };
-  }
   const params = args.sourceControlAiResolvedParams;
   if (!params) {
     return {
@@ -101,10 +95,24 @@ async function generateTauriCommitMessage(args: {
     };
   }
 
-  const context = await invoke<CommitContextResult>(
-    "source_control_text_generation_commit_context",
-    { input: { cwd: args.worktreePath } },
-  );
+  let context: CommitContextResult;
+  try {
+    context = args.connectionId
+      ? await fetchSshCommitContext(args.connectionId, args.worktreePath)
+      : await invoke<CommitContextResult>(
+          "source_control_text_generation_commit_context",
+          { input: { cwd: args.worktreePath } },
+        );
+  } catch (error) {
+    return {
+      success: false,
+      error: describeRelayContextError(
+        "commit message",
+        args.connectionId,
+        error,
+      ),
+    };
+  }
   if (!context.stagedSummary.trim() && !context.stagedPatch.trim()) {
     return { success: false, error: "No staged changes to summarize." };
   }
@@ -154,13 +162,6 @@ async function generateTauriPullRequestFields(args: {
   draft: boolean;
   sourceControlAiResolvedParams?: ResolvedSourceControlAiGenerationParams;
 }): Promise<PullRequestGenerationResult> {
-  if (args.connectionId) {
-    return {
-      success: false,
-      error:
-        "Remote pull request detail generation is not yet wired through the Tauri SSH relay.",
-    };
-  }
   const params = args.sourceControlAiResolvedParams;
   if (!params) {
     return {
@@ -169,18 +170,32 @@ async function generateTauriPullRequestFields(args: {
     };
   }
 
-  const context = await invoke<PullRequestContextResult>(
-    "source_control_text_generation_pull_request_context",
-    {
-      input: {
-        cwd: args.worktreePath,
-        base: args.base,
-        currentTitle: args.title,
-        currentBody: args.body,
-        currentDraft: args.draft,
-      },
-    },
-  );
+  let context: PullRequestContextResult;
+  try {
+    context = args.connectionId
+      ? await fetchSshPullRequestContext(args.connectionId, args)
+      : await invoke<PullRequestContextResult>(
+          "source_control_text_generation_pull_request_context",
+          {
+            input: {
+              cwd: args.worktreePath,
+              base: args.base,
+              currentTitle: args.title,
+              currentBody: args.body,
+              currentDraft: args.draft,
+            },
+          },
+        );
+  } catch (error) {
+    return {
+      success: false,
+      error: describeRelayContextError(
+        "pull request details",
+        args.connectionId,
+        error,
+      ),
+    };
+  }
   if (!context) {
     return { success: false, error: "No branch changes to summarize." };
   }
@@ -234,6 +249,105 @@ async function generateTauriPullRequestFields(args: {
       branchChangedByPreparation: context.branchChangedByPreparation,
     };
   }
+}
+
+/** Response shape from the Go runtime's SSH-relay commit-context route (see
+ * runtimecore.GitCommitTextGenerationContext / ssh_target_routes.go). */
+type SshGitCommitContextResponse = {
+  branch: string | null;
+  stagedSummary: string;
+  stagedPatch: string;
+};
+
+/** Response shape from the Go runtime's SSH-relay pull-request-context route
+ * (see runtimecore.GitPullRequestTextGenerationContext). */
+type SshGitPullRequestContextResponse = {
+  branch: string | null;
+  base: string;
+  branchChangedByPreparation: boolean;
+  currentTitle: string;
+  currentBody: string;
+  currentDraft: boolean;
+  commitSummary: string;
+  changeSummary: string;
+  patch: string;
+} | null;
+
+// Why a Go HTTP route rather than a new Tauri command: the Go runtime already
+// owns the system-ssh exec (ProbeSshTarget's connection args) needed to run
+// pebble-relay-worker on the remote host, so calling its route directly here
+// mirrors tauri-ssh-targets-api.ts's established pattern instead of adding a
+// second SSH-exec implementation in Rust.
+async function fetchSshCommitContext(
+  connectionId: string,
+  worktreePath: string,
+): Promise<CommitContextResult> {
+  const response = await requestRuntimeJson<SshGitCommitContextResponse>(
+    `/v1/ssh-targets/${encodeURIComponent(connectionId)}/git-text-generation-context`,
+    {
+      method: "POST",
+      body: { kind: "commit", repoRoot: worktreePath },
+      timeoutMs: GENERATION_TIMEOUT_MS,
+    },
+  );
+  return {
+    branch: response.branch,
+    stagedSummary: response.stagedSummary,
+    stagedPatch: response.stagedPatch,
+  };
+}
+
+async function fetchSshPullRequestContext(
+  connectionId: string,
+  args: {
+    worktreePath: string;
+    base: string;
+    title: string;
+    body: string;
+    draft: boolean;
+  },
+): Promise<PullRequestContextResult> {
+  const response = await requestRuntimeJson<SshGitPullRequestContextResponse>(
+    `/v1/ssh-targets/${encodeURIComponent(connectionId)}/git-text-generation-context`,
+    {
+      method: "POST",
+      body: {
+        kind: "pull-request",
+        repoRoot: args.worktreePath,
+        base: args.base,
+        currentTitle: args.title,
+        currentBody: args.body,
+        currentDraft: args.draft,
+      },
+      timeoutMs: GENERATION_TIMEOUT_MS,
+    },
+  );
+  if (!response) {
+    return null;
+  }
+  return {
+    branch: response.branch,
+    base: response.base,
+    branchChangedByPreparation: response.branchChangedByPreparation,
+    currentTitle: response.currentTitle,
+    currentBody: response.currentBody,
+    currentDraft: response.currentDraft,
+    commitSummary: response.commitSummary,
+    changeSummary: response.changeSummary,
+    patch: response.patch,
+  };
+}
+
+function describeRelayContextError(
+  what: string,
+  connectionId: string | undefined,
+  error: unknown,
+): string {
+  const detail = error instanceof Error ? error.message : String(error);
+  if (!connectionId) {
+    return `Failed to read ${what} context: ${detail}`;
+  }
+  return `Failed to read ${what} context from the SSH remote: ${detail}`;
 }
 
 async function discoverTauriCommitMessageModels(args: {

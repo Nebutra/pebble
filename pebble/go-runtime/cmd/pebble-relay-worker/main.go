@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tsekaluk/pebble/go-runtime/internal/remotehooks"
 	"github.com/tsekaluk/pebble/go-runtime/internal/runtimecore"
 )
 
@@ -46,10 +47,29 @@ func run(args []string, client *http.Client, output io.Writer) error {
 		return runAgentDetect(args[1:], client, output)
 	case "scan-nested":
 		return runScanNested(args[1:], client, output)
+	case "agent-hooks-install":
+		return runAgentHooksInstall(args[1:], output)
+	case "external-automations":
+		return runExternalAutomations(args[1:], output)
+	case "ports-detect":
+		return runPortsDetect(output)
+	case "git-text-generation-context":
+		return runGitTextGenerationContext(args[1:], output)
 	default:
 		usage()
 		return fmt.Errorf("unknown relay worker command %q", args[0])
 	}
+}
+
+func runAgentHooksInstall(args []string, output io.Writer) error {
+	fs := flag.NewFlagSet("agent-hooks-install", flag.ContinueOnError)
+	fs.SetOutput(output)
+	home := fs.String("home", "", "remote user home")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	statuses := remotehooks.InstallAll(*home)
+	return json.NewEncoder(output).Encode(map[string]any{"version": 1, "statuses": statuses})
 }
 
 func runFileTree(args []string, client *http.Client, output io.Writer) error {
@@ -474,5 +494,5 @@ func postJSON(client *http.Client, output io.Writer, endpoint string, token stri
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: pebble-relay-worker <file-tree|file-read|git-status|worktree-remove|branch-delete|agent-detect|scan-nested> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: pebble-relay-worker <file-tree|file-read|git-status|worktree-remove|branch-delete|agent-detect|scan-nested|agent-hooks-install|external-automations|ports-detect|git-text-generation-context> [flags]")
 }

@@ -56,6 +56,11 @@ Current implementation:
   Electron `SshConnection` cachedPassphrase/cachedPassword parity) so an already-unlocked target
   does not re-prompt within a runtime lifetime. Credentials are never written to the state file;
   the cache is cleared on disconnect and target removal, and the desktop re-seeds after restart.
+- Go owns system-OpenSSH local port-forward processes, durable forward configuration, reconnect
+  restoration, target-scoped cleanup, and legacy forward-ID migration. The deployed relay worker
+  detects Linux/macOS listening ports, while bounded raw SSH directory browsing preserves the
+  pre-project picker contract. Tauri exposes CRUD/list/change events, detected-port polling, and
+  directory browsing without inheriting the web client's empty mocks.
 
 ### Workspace Service
 
@@ -120,12 +125,19 @@ Current implementation:
 - Windows uses a bounded PowerShell/CIM JSON process snapshot and descendant graph to report the
   deepest active lineage plus child-process facts; unlike Unix this is a lineage approximation
   because Windows exposes no equivalent terminal foreground marker.
+- Windows process sessions use the OS ConPTY API through `go-pty`, including initial geometry,
+  resize, bidirectional terminal streams, context cancellation, and process-tree lifecycle instead
+  of the former stdin/stdout pipe approximation.
 - SSH project sessions are real Go-managed PTYs whose child process is system OpenSSH. The resolver
   keeps remote cwd validation off the desktop filesystem, quotes cwd/argv as data, reuses the
   memory-only SSH credential cache, and preserves the original command in session metadata. All
   existing input/output/resize/tail/driver-lock APIs therefore work without an Electron relay PTY.
 - Target-scoped termination resolves session project ownership through `project.hostId` and stops
   only sessions belonging to that SSH target; Tauri Settings calls the runtime route instead of a no-op.
+- Reset Relay deduplicates concurrent resets, force-terminates those target-scoped PTYs, clears the
+  memory-only credential cache, terminates target-scoped forward processes, and then emits
+  disconnected state. Ordinary Disconnect also stops live forwards but preserves their durable
+  configuration so the next successful connection restores them.
 
 ### Agent Lifecycle Service
 
@@ -245,19 +257,38 @@ Current implementation:
   route now covers the realistic post-creation mutation set Electron supports (title/body edit,
   reviewer add/remove, close/reopen) for GitHub via `gh pr edit/close/reopen` and GitLab via `glab
   api PUT`/`mr close`/`mr reopen`; GitLab's reviewer set is a full-list REST replace in Electron
-  (not an add/remove delta), so incremental reviewer mutation for GitLab stays an explicit gap.
-  Hosted-review update/mutation actions for providers beyond GitHub/GitLab (and GitLab's retarget-
-  base/draft-toggle, which Electron itself doesn't implement) remain explicit gaps while provider
-  mutations move out of Electron. Go now parses porcelain unmerged states into Electron's exact
-  conflict-kind union with merge/rebase/cherry-pick operation detection, exposes binary diff byte
-  sizes/image-mime flags, synthesizes submodule pointer diffs with structured old/new SHA
-  metadata, and lets relay workers report remote base-status drift through the same reconcile
-  endpoint used locally. Full parity still needs remote/SSH text-generation relay parity (the relay
-  worker posts git-status projections only — no staged/base diff patch or commit-log content, and
-  no per-file-diff/log relay route — so native commit-message/PR-field generation stays local-only
-  until that richer relay context lands, a large gap rather than a wiring fix) and non-GitHub/GitLab
-  review creation (Bitbucket/Azure DevOps/Gitea have native PR listing via REST but not
-  creation/update).
+  (not an add/remove delta), so incremental reviewer mutation for GitLab stays an explicit gap
+  (GitLab's retarget-base/draft-toggle also stay unimplemented, matching Electron). Bitbucket, Azure
+  DevOps, and Gitea now have native creation and update alongside their existing REST-backed
+  listing: `CreateBitbucketPR`/`CreateAzureDevOpsPR`/`CreateGiteaPR` POST to each provider's pull
+  request collection endpoint, and `UpdateBitbucketPR`/`UpdateAzureDevOpsPR`/`UpdateGiteaPR` mutate
+  title/body/reviewers/state on the same resource (Bitbucket via PUT plus a `/decline` state-
+  transition call, Azure DevOps and Gitea via PATCH), reusing each provider's existing
+  Config/authHeaders/repo-ref machinery and dispatched through the same `CreateHostedReview`/
+  `UpdateHostedReview` provider switch GitHub/GitLab use. Three real per-provider limitations are
+  explicit gaps rather than silently approximated: Bitbucket Cloud has no reopen endpoint for a
+  declined PR (closing is one-way; the code and doc both say so) and no incremental reviewer add/
+  remove (its PR update endpoint only replaces the full reviewer list, so add/remove requests return
+  an explicit unsupported result); Azure DevOps has no "closed"/"open" status of its own (only
+  active/abandoned/completed), so close/reopen map to its real `abandoned`/`active` transitions as
+  the closest equivalent rather than a faithful pair (a completed/merged PR cannot be un-completed
+  through this path). Go now parses porcelain unmerged states into Electron's exact conflict-kind
+  union with merge/rebase/cherry-pick operation detection, exposes binary diff byte sizes/image-mime
+  flags, synthesizes submodule pointer diffs with structured old/new SHA metadata, and lets relay
+  workers report remote base-status drift through the same reconcile endpoint used locally.
+  Remote/SSH text-generation relay parity is now closed: `pebble-relay-worker
+  git-text-generation-context` builds the same staged-diff (commit message) or base-vs-head diff/log
+  (pull request fields) context the local Rust command reads, but against the remote git checkout on
+  the SSH host; Go's `POST /v1/ssh-targets/{id}/git-text-generation-context` route execs that
+  subcommand over a direct system-ssh call (the same non-interactive connection args as
+  `ProbeSshTarget`) and returns its JSON stdout. Tauri's `generateTauriCommitMessage` /
+  `generateTauriPullRequestFields` call this route instead of failing immediately when
+  `connectionId` is set, then build the identical prompt via the shared
+  `buildCommitMessagePrompt`/`buildPullRequestFieldsPrompt` helpers and run the same local
+  `runTauriPlan` agent execution as the local path — only the git context's source (local Rust vs.
+  SSH relay) differs, not how the agent CLI is invoked. Remaining gap: this still assumes the relay
+  worker binary is already deployed and reachable on the remote host's `PATH`; a host with no relay
+  worker installed surfaces a relay-context fetch error instead of falling back.
 - SSH/remote source-control projections can be updated by relay workers through the runtime
   gateway; direct git status/diff execution still returns relay-required errors without a worker.
   The runtime normalizes external changed-file status values, drops invalid workspace paths, and

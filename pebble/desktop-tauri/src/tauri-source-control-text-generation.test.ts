@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { homeDirMock, invokeMock } = vi.hoisted(() => ({
+const { homeDirMock, invokeMock, requestRuntimeJsonMock } = vi.hoisted(() => ({
   homeDirMock: vi.fn(),
   invokeMock: vi.fn(),
+  requestRuntimeJsonMock: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -11,6 +12,10 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("@tauri-apps/api/path", () => ({
   homeDir: homeDirMock,
+}));
+
+vi.mock("./pebble-tauri-runtime-transport", () => ({
+  requestRuntimeJson: requestRuntimeJsonMock,
 }));
 
 import type { PreloadApi } from "../../../src/preload/api-types";
@@ -135,6 +140,171 @@ describe("createPebbleGitTextGenerationApi", () => {
       },
       agentLabel: "printf",
       branchChangedByPreparation: false,
+    });
+  });
+
+  it("generates a commit message through the SSH relay context when connectionId is set", async () => {
+    requestRuntimeJsonMock.mockImplementation(
+      async (path: string, options: { body?: unknown }) => {
+        expect(path).toBe(
+          "/v1/ssh-targets/conn-1/git-text-generation-context",
+        );
+        expect(options.body).toMatchObject({
+          kind: "commit",
+          repoRoot: "/remote/repo",
+        });
+        return {
+          branch: "main",
+          stagedSummary: "M\tREADME.md",
+          stagedPatch:
+            "diff --git a/README.md b/README.md\n+SSH relay generation",
+        };
+      },
+    );
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === "source_control_text_generation_execute_plan") {
+        return {
+          stdout: "Add SSH relay commit generation\n",
+          stderr: "",
+          exitCode: 0,
+          timedOut: false,
+          canceled: false,
+          spawnError: null,
+        };
+      }
+      throw new Error(`unexpected command ${command}`);
+    });
+
+    await expect(
+      createGitApi().generateCommitMessage({
+        worktreePath: "/remote/repo",
+        connectionId: "conn-1",
+        sourceControlAiResolvedParams: customParams,
+      }),
+    ).resolves.toEqual({
+      success: true,
+      message: "Add SSH relay commit generation",
+      agentLabel: "printf",
+    });
+
+    expect(requestRuntimeJsonMock).toHaveBeenCalledWith(
+      "/v1/ssh-targets/conn-1/git-text-generation-context",
+      expect.objectContaining({
+        method: "POST",
+        body: { kind: "commit", repoRoot: "/remote/repo" },
+      }),
+    );
+    // Local invoke must never be asked to read commit context for an SSH project.
+    expect(invokeMock).not.toHaveBeenCalledWith(
+      "source_control_text_generation_commit_context",
+      expect.anything(),
+    );
+  });
+
+  it("surfaces a relay failure instead of the old hardcoded not-wired error", async () => {
+    requestRuntimeJsonMock.mockRejectedValue(
+      new Error("ssh target not found"),
+    );
+
+    const result = await createGitApi().generateCommitMessage({
+      worktreePath: "/remote/repo",
+      connectionId: "conn-missing",
+      sourceControlAiResolvedParams: customParams,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("ssh target not found");
+      expect(result.error).not.toContain("not yet wired");
+    }
+  });
+
+  it("generates pull request fields through the SSH relay context when connectionId is set", async () => {
+    requestRuntimeJsonMock.mockImplementation(
+      async (path: string, options: { body?: unknown }) => {
+        expect(path).toBe(
+          "/v1/ssh-targets/conn-1/git-text-generation-context",
+        );
+        expect(options.body).toMatchObject({
+          kind: "pull-request",
+          repoRoot: "/remote/repo",
+          base: "main",
+        });
+        return {
+          branch: "feature/relay-pr",
+          base: "main",
+          branchChangedByPreparation: false,
+          currentTitle: "",
+          currentBody: "",
+          currentDraft: false,
+          commitSummary: "- Add relay PR generation",
+          changeSummary: "M\tREADME.md",
+          patch: "diff --git a/README.md b/README.md\n+relay PR",
+        };
+      },
+    );
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === "source_control_text_generation_execute_plan") {
+        return {
+          stdout: JSON.stringify({
+            title: "Add SSH relay PR generation",
+            body: "Summary\n- Adds relay-backed generation.",
+            draft: false,
+          }),
+          stderr: "",
+          exitCode: 0,
+          timedOut: false,
+          canceled: false,
+          spawnError: null,
+        };
+      }
+      throw new Error(`unexpected command ${command}`);
+    });
+
+    await expect(
+      createGitApi().generatePullRequestFields({
+        worktreePath: "/remote/repo",
+        connectionId: "conn-1",
+        base: "main",
+        title: "",
+        body: "",
+        draft: false,
+        sourceControlAiResolvedParams: customParams,
+      }),
+    ).resolves.toMatchObject({
+      success: true,
+      fields: {
+        base: "main",
+        title: "Add SSH relay PR generation",
+        body: "Summary\n- Adds relay-backed generation.",
+        draft: false,
+      },
+      agentLabel: "printf",
+      branchChangedByPreparation: false,
+    });
+
+    expect(invokeMock).not.toHaveBeenCalledWith(
+      "source_control_text_generation_pull_request_context",
+      expect.anything(),
+    );
+  });
+
+  it("reports no branch changes when the relay reports nothing to summarize", async () => {
+    requestRuntimeJsonMock.mockResolvedValue(null);
+
+    const result = await createGitApi().generatePullRequestFields({
+      worktreePath: "/remote/repo",
+      connectionId: "conn-1",
+      base: "main",
+      title: "",
+      body: "",
+      draft: false,
+      sourceControlAiResolvedParams: customParams,
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: "No branch changes to summarize.",
     });
   });
 });

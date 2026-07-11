@@ -45,6 +45,7 @@ type SshTarget struct {
 }
 
 type SavedSshPortForward struct {
+	ID         string `json:"id,omitempty"`
 	LocalPort  int    `json:"localPort"`
 	RemoteHost string `json:"remoteHost"`
 	RemotePort int    `json:"remotePort"`
@@ -403,39 +404,9 @@ func isRuntimeOwnedTarget(target SshTarget) bool {
 }
 
 func sshProbeArgs(target SshTarget) []string {
-	// BatchMode=yes: no prompts. ConnectTimeout bounds the TCP connect within the
-	// outer context deadline. StrictHostKeyChecking=accept-new avoids a hang on an
-	// unknown host key while still refusing a changed key.
-	args := []string{
-		"-o", "BatchMode=yes",
-		"-o", "ConnectTimeout=8",
-		"-o", "StrictHostKeyChecking=accept-new",
-		"-o", "PasswordAuthentication=no",
-		"-o", "NumberOfPasswordPrompts=0",
-	}
-	if target.Port != 0 && target.Port != 22 {
-		args = append(args, "-p", strconv.Itoa(target.Port))
-	}
-	if target.IdentityFile != "" {
-		args = append(args, "-o", "IdentitiesOnly=yes", "-i", target.IdentityFile)
-	}
-	if target.ProxyCommand != "" {
-		args = append(args, "-o", "ProxyCommand="+target.ProxyCommand)
-	}
-	if target.JumpHost != "" {
-		args = append(args, "-J", target.JumpHost)
-	}
-	destination := target.Host
-	// Why: configHost resolves through ~/.ssh/config; prefer it so ProxyJump and
-	// per-host options the config declares are honored by the probe.
-	if target.ConfigHost != "" && target.Source == "ssh-config" {
-		destination = target.ConfigHost
-	}
-	if target.Username != "" {
-		destination = target.Username + "@" + destination
-	}
-	args = append(args, destination, "true")
-	return args
+	// The probe reuses the shared connection args (BatchMode/ConnectTimeout/
+	// identity/proxy) and only adds its own no-op remote command.
+	return append(sshConnectionArgs(target), "true")
 }
 
 func sshProbeErrorStatus(detail string) string {
