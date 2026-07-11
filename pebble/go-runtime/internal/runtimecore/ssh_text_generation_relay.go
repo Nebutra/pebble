@@ -143,6 +143,19 @@ func sshConnectionArgs(target SshTarget) []string {
 	if target.JumpHost != "" {
 		args = append(args, "-J", target.JumpHost)
 	}
+	// Why: ControlMaster/ControlPath/ControlPersist multiplex every SSH exec
+	// against this target (probe, relay-worker invocation, ...) over one
+	// connection instead of a fresh TCP+auth handshake each time, mirroring
+	// Electron's system-ssh-args.ts. Skipped when the target opts out, on
+	// Windows (no unix domain sockets), or when the computed socket path
+	// would exceed the platform's length limit.
+	if socketPath, ok := controlSocketPath(target); ok {
+		args = append(args,
+			"-o", "ControlMaster=auto",
+			"-o", "ControlPath="+socketPath,
+			"-o", "ControlPersist=300",
+		)
+	}
 	destination := target.Host
 	// Why: configHost resolves through ~/.ssh/config; prefer it so ProxyJump and
 	// per-host options the config declares are honored.

@@ -56,6 +56,17 @@ Current implementation:
   Electron `SshConnection` cachedPassphrase/cachedPassword parity) so an already-unlocked target
   does not re-prompt within a runtime lifetime. Credentials are never written to the state file;
   the cache is cleared on disconnect and target removal, and the desktop re-seeds after restart.
+- Every non-Windows SSH exec (probes, relay-worker invocations) reuses one multiplexed OpenSSH
+  connection per target instead of a fresh TCP+auth handshake each time: `sshConnectionArgs` adds
+  `ControlMaster=auto`/`ControlPath=<deterministic per-target socket>`/`ControlPersist=300`,
+  mirroring Electron's `ssh-control-socket.ts`/`system-ssh-args.ts`. The socket path hashes the
+  target's identity fields (id, effective host, port, username, proxy/jump/identity) into a private
+  per-uid directory, falls back to no reuse if the computed path would exceed the platform's unix
+  socket length limit, and is removed on target deletion. `SshTarget.systemSshConnectionReuse` (an
+  existing persisted field, previously unread) opts a target out. One narrower gap versus Electron:
+  Go does not currently resolve `ssh -G` config the way Electron's `SshResolvedConfig` does, so it
+  cannot detect that a user's own `~/.ssh/config` already sets `ControlMaster`/`ControlPath` and
+  defer to it — Pebble's ControlPath always takes precedence rather than skipping when redundant.
 - Go owns system-OpenSSH local port-forward processes, durable forward configuration, reconnect
   restoration, target-scoped cleanup, and legacy forward-ID migration. The deployed relay worker
   detects Linux/macOS listening ports, while bounded raw SSH directory browsing preserves the

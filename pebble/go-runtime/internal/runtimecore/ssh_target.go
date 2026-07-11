@@ -231,6 +231,9 @@ func (m *Manager) DeleteSshTarget(id string) (SshTarget, error) {
 	m.mu.Unlock()
 	// Why: a removed target must not leave its credential resident in memory.
 	m.sshCredentials.clear(id)
+	// Why: a stale ControlMaster socket for a deleted target is orphaned —
+	// best-effort cleanup, not worth failing deletion over.
+	removeControlSocketPath(target)
 	if err != nil {
 		return SshTarget{}, err
 	}
