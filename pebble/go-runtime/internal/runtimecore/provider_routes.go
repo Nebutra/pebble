@@ -150,6 +150,38 @@ func (m *Manager) CreateHostedReview(
 	}
 }
 
+// UpdateHostedReview applies a post-creation mutation (title/body edit,
+// reviewer add/remove, close/reopen) to an existing provider review. Remote
+// projects stay relay-owned, matching CreateHostedReview's local-only scope.
+func (m *Manager) UpdateHostedReview(
+	ctx context.Context,
+	projectID string,
+	worktreeID string,
+	request providercli.UpdateReviewRequest,
+) (providercli.UpdateReviewResult, error) {
+	workdir, err := m.resolveProviderWorkdir(projectID, worktreeID)
+	if err != nil {
+		return providercli.UpdateReviewResult{}, err
+	}
+	switch request.Provider {
+	case "github":
+		return providercli.UpdateGitHubPullRequest(ctx, workdir, request), nil
+	case "gitlab":
+		return providercli.UpdateGitLabMergeRequest(ctx, workdir, request), nil
+	// Honest gap: no CLI/REST-backed update wiring for these providers yet.
+	case "bitbucket", "azure-devops", "gitea":
+		return providercli.UpdateReviewResult{
+			Code:  "unsupported_provider",
+			Error: "Updating " + request.Provider + " reviews from the local runtime is not supported yet.",
+		}, nil
+	default:
+		return providercli.UpdateReviewResult{
+			Code:  "unsupported_provider",
+			Error: "Updating reviews for this provider is not supported yet.",
+		}, nil
+	}
+}
+
 func (m *Manager) HostedReviewCapabilities(
 	ctx context.Context,
 	projectID string,

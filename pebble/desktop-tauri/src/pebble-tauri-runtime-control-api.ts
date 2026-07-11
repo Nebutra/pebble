@@ -69,6 +69,8 @@ import {
   fetchHostedReviewCreationEligibility,
   fetchHostedReviewForBranch,
   fetchReviewWorkItems,
+  updateHostedReview,
+  type UpdateHostedReviewResult,
 } from "./tauri-provider-review-bridge";
 import { readHostTerminalCapabilities } from "./host-terminal-capabilities";
 
@@ -494,6 +496,42 @@ async function callPebbleRuntimeMethod(
         return okRuntimeRpc(await fetchGitHubPRChecks(getProviderJson, params));
       case "gitlab.listMRs":
         return okRuntimeRpc(await fetchGitLabMRs(getProviderJson, params));
+      case "github.updatePR":
+        return okRuntimeRpc(
+          await updateTauriHostedReview("github", params, {
+            fromUpdates: true,
+          }),
+        );
+      case "github.updatePRState":
+        return okRuntimeRpc(
+          await updateTauriHostedReview("github", params, {
+            fromUpdates: true,
+          }),
+        );
+      case "github.requestPRReviewers":
+        return okRuntimeRpc(
+          await updateTauriHostedReview("github", params, {
+            reviewersField: "addReviewers",
+          }),
+        );
+      case "github.removePRReviewers":
+        return okRuntimeRpc(
+          await updateTauriHostedReview("github", params, {
+            reviewersField: "removeReviewers",
+          }),
+        );
+      case "gitlab.updateMR":
+        return okRuntimeRpc(
+          await updateTauriHostedReview("gitlab", params, {
+            fromUpdates: true,
+          }),
+        );
+      case "gitlab.updateMRState":
+        return okRuntimeRpc(
+          await updateTauriHostedReview("gitlab", params, {
+            stateField: "state",
+          }),
+        );
       // Provider-neutral list for the REST-backed providers (bitbucket,
       // azure-devops, gitea); params carry the provider discriminator.
       case "providerReview.listWorkItems":
@@ -570,6 +608,37 @@ async function createTauriHostedReview(
 ): Promise<CreateHostedReviewResult> {
   await ensurePebbleRuntimeProcess();
   return createHostedReview(requestRuntimeJson, params);
+}
+
+// Maps the renderer's per-operation github.*/gitlab.* RPC param shapes
+// (prNumber/iid, updates.{title,body,state}, reviewers) onto the Go runtime's
+// single provider-neutral update route.
+async function updateTauriHostedReview(
+  provider: "github" | "gitlab",
+  params: unknown,
+  shape: {
+    fromUpdates?: boolean;
+    stateField?: "state";
+    reviewersField?: "addReviewers" | "removeReviewers";
+  },
+): Promise<UpdateHostedReviewResult> {
+  await ensurePebbleRuntimeProcess();
+  const input = (params ?? {}) as Record<string, unknown>;
+  const number = input.prNumber ?? input.iid;
+  const updates = (input.updates ?? {}) as Record<string, unknown>;
+  const body: Record<string, unknown> = { ...input, number };
+  if (shape.fromUpdates) {
+    if (typeof updates.title === "string") body.title = updates.title;
+    if (typeof updates.body === "string") body.body = updates.body;
+    if (typeof updates.state === "string") body.state = updates.state;
+  }
+  if (shape.stateField) {
+    body.state = input[shape.stateField];
+  }
+  if (shape.reviewersField && Array.isArray(input.reviewers)) {
+    body[shape.reviewersField] = input.reviewers;
+  }
+  return updateHostedReview(requestRuntimeJson, { ...body, provider });
 }
 
 async function readOrCreateRuntimeStatus(

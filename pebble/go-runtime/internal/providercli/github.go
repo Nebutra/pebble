@@ -6,7 +6,55 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
+
+// GitHubForkParent mirrors the owner/repo pair getRepoUpstream resolves in
+// src/main/github/client.ts.
+type GitHubForkParent struct {
+	Owner string
+	Repo  string
+}
+
+// ResolveGitHubForkParent asks the GitHub API for originOwner/originRepo's fork
+// parent, mirroring getRepoUpstream's API fallback path (src/main/github/client.ts)
+// for repos with no `upstream` git remote configured. Best-effort: any CLI
+// failure (missing gh, unauthenticated, non-fork, network) resolves to nil
+// rather than surfacing an error, matching Electron's swallow-and-return-null
+// behavior for this best-effort lookup.
+func ResolveGitHubForkParent(ctx context.Context, workdir string, originOwner string, originRepo string) *GitHubForkParent {
+	owner := strings.TrimSpace(originOwner)
+	repo := strings.TrimSpace(originRepo)
+	if owner == "" || repo == "" {
+		return nil
+	}
+	// Why: best-effort fork lookup must not block callers on a stalled gh
+	// process, mirroring the 10s cap in getRepoUpstream.
+	runCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	out, err := runCLI(runCtx, "gh", workdir, "repo", "view", owner+"/"+repo, "--json", "isFork,parent")
+	if err != nil {
+		return nil
+	}
+	var data struct {
+		IsFork bool `json:"isFork"`
+		Parent *struct {
+			Name  string `json:"name"`
+			Owner struct {
+				Login string `json:"login"`
+			} `json:"owner"`
+		} `json:"parent"`
+	}
+	if json.Unmarshal(out, &data) != nil || !data.IsFork || data.Parent == nil {
+		return nil
+	}
+	parentOwner := strings.TrimSpace(data.Parent.Owner.Login)
+	parentRepo := strings.TrimSpace(data.Parent.Name)
+	if parentOwner == "" || parentRepo == "" {
+		return nil
+	}
+	return &GitHubForkParent{Owner: parentOwner, Repo: parentRepo}
+}
 
 // ghPRListFields mirrors WORK_ITEM_PR_LIST_JSON_FIELDS in src/main/github/client.ts.
 // gh infers owner/repo from the git remotes in workdir, matching Electron's

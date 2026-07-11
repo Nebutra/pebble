@@ -160,6 +160,66 @@ func TestProviderReviewCreateRoute(t *testing.T) {
 	}
 }
 
+func TestProviderReviewUpdateRoute(t *testing.T) {
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectID := localProject(t, manager)
+	fakeProviderCLI(t, "gh", "", 0)
+	server := NewServer(manager)
+
+	body := strings.NewReader(`{
+		"projectId":"` + projectID + `",
+		"provider":"github",
+		"number":42,
+		"title":"New title",
+		"body":"New body"
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/providers/reviews/update", body)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var result providercli.UpdateReviewResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK {
+		t.Fatalf("unexpected update result: %+v", result)
+	}
+}
+
+func TestProviderReviewUpdateRouteUnsupportedProvider(t *testing.T) {
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectID := localProject(t, manager)
+	server := NewServer(manager)
+
+	body := strings.NewReader(`{
+		"projectId":"` + projectID + `",
+		"provider":"bitbucket",
+		"number":1,
+		"title":"New title"
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/providers/reviews/update", body)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var result providercli.UpdateReviewResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.OK || result.Code != "unsupported_provider" {
+		t.Fatalf("expected unsupported_provider gap, got %+v", result)
+	}
+}
+
 func TestProviderReviewCapabilitiesRoute(t *testing.T) {
 	repo := t.TempDir()
 	for _, args := range [][]string{

@@ -192,6 +192,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/providers/azure-devops/pulls", s.handleReviewWorkItems("azure-devops"))
 	s.mux.HandleFunc("/v1/providers/gitea/pulls", s.handleReviewWorkItems("gitea"))
 	s.mux.HandleFunc("/v1/providers/reviews", s.handleProviderReviewCreate)
+	s.mux.HandleFunc("/v1/providers/reviews/update", s.handleProviderReviewUpdate)
 	s.mux.HandleFunc("/v1/providers/review-capabilities", s.handleProviderReviewCapabilities)
 	s.mux.HandleFunc("/v1/mobile-relay/status", s.handleMobileRelayStatus)
 	s.mux.HandleFunc("/v1/mobile-relay/pairing-codes", s.handleMobileRelayPairingCodes)
