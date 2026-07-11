@@ -1,4 +1,5 @@
 pub mod agent_hooks;
+pub mod app_native;
 pub mod browser_annotation_overlay;
 pub mod browser_child_webview;
 pub mod browser_cookies;
@@ -7,8 +8,12 @@ pub mod browser_guest_evaluate;
 pub mod browser_guest_find;
 pub mod cli_registration;
 pub mod computer_permissions;
+pub mod computer_use_action_translation;
+pub mod computer_use_helper_socket;
+pub mod computer_use_provider;
 pub mod crash_reports;
 pub mod deep_link;
+pub mod developer_permissions;
 pub mod diagnostics;
 pub mod file_picker;
 pub mod filesystem_watch;

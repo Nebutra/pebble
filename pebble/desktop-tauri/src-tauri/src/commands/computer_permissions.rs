@@ -496,6 +496,31 @@ fn permission_id_arg(permission_id: ComputerUsePermissionId) -> &'static str {
     }
 }
 
+// Why: the native computer-use provider must gate queue execution on the same
+// helper-app TCC status these commands report, not a parallel re-derivation.
+#[cfg(target_os = "macos")]
+pub(crate) fn computer_use_helper_executable(app: &tauri::AppHandle) -> Option<PathBuf> {
+    let helper_app_path = resolve_helper_app_path(app)?;
+    resolve_helper_executable_path(&helper_app_path)
+}
+
+/// Returns the ids of permissions not yet granted (empty means fully granted).
+#[cfg(target_os = "macos")]
+pub(crate) fn computer_use_missing_permissions(
+    app: &tauri::AppHandle,
+) -> Result<Vec<String>, String> {
+    let status = resolve_computer_permissions_status(app)?;
+    if let Some(reason) = status.helper_unavailable_reason {
+        return Err(reason);
+    }
+    Ok(status
+        .permissions
+        .iter()
+        .filter(|permission| !matches!(permission.status, ComputerUsePermissionStatus::Granted))
+        .map(|permission| permission_id_arg(permission.id).to_string())
+        .collect())
+}
+
 fn path_string(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }

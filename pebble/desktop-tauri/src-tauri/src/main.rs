@@ -16,12 +16,16 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .manage(commands::browser_guest_find::BrowserGuestFindState::default())
+        .manage(
+            commands::browser_child_webview::NativeBrowserDownloadRegistry::default(),
+        )
         .manage(commands::crash_reports::CrashReportsState::default())
         .manage(commands::diagnostics::DiagnosticsState::default())
         .manage(commands::filesystem_watch::FsWatcherState::default())
         .manage(commands::terminal_artifacts::TerminalArtifactsState::default())
         .manage(commands::runtime_environments::RuntimeEnvironmentSubscriptionsState::default())
         .manage(commands::runtime_event_stream::RuntimeEventStreamState::default())
+        .manage(commands::computer_use_provider::ComputerUseProviderState::default())
         .manage(commands::source_control_text_generation::SourceControlTextGenerationState::default())
         .manage(commands::speech::SpeechState::default())
         .setup(|app| {
@@ -38,31 +42,50 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
+            commands::app_native::app_floating_markdown_directory,
+            commands::app_native::app_pick_floating_workspace_directory,
+            commands::app_native::app_pick_floating_markdown_document,
+            commands::app_native::app_keyboard_input_source_id,
+            commands::app_native::app_list_fonts,
             commands::agent_hooks::agent_hooks_claude_status,
             commands::agent_hooks::agent_hooks_openclaude_status,
+            commands::agent_hooks::agent_hooks_apply_claude_compatible,
             commands::agent_hooks::agent_hooks_codex_status,
             commands::agent_hooks::agent_hooks_gemini_status,
+            commands::agent_hooks::agent_hooks_apply_gemini,
             commands::agent_hooks::agent_hooks_antigravity_status,
             commands::agent_hooks::agent_hooks_amp_status,
+            commands::agent_hooks::agent_hooks_apply_amp,
             commands::agent_hooks::agent_hooks_cursor_status,
+            commands::agent_hooks::agent_hooks_apply_cursor,
             commands::agent_hooks::agent_hooks_droid_status,
+            commands::agent_hooks::agent_hooks_apply_droid,
             commands::agent_hooks::agent_hooks_command_code_status,
+            commands::agent_hooks::agent_hooks_apply_command_code,
             commands::agent_hooks::agent_hooks_grok_status,
+            commands::agent_hooks::agent_hooks_apply_grok,
             commands::agent_hooks::agent_hooks_copilot_status,
             commands::agent_hooks::agent_hooks_hermes_status,
             commands::agent_hooks::agent_hooks_devin_status,
+            commands::agent_hooks::agent_hooks_apply_devin,
             commands::agent_hooks::agent_hooks_kimi_status,
+            commands::agent_hooks::agent_hooks_apply_kimi,
             commands::browser_detection::browser_detect_installed_browsers,
             commands::browser_annotation_overlay::browser_annotation_overlay_set,
             commands::browser_child_webview::browser_child_webview_create,
+            commands::browser_child_webview::browser_child_webview_cancel_download,
+            commands::browser_child_webview::browser_child_webview_screenshot,
             commands::browser_cookies::browser_guest_clear_cookies,
             commands::browser_cookies::browser_guest_import_cookie_file,
+            commands::browser_cookies::browser_cookie_source_import::browser_guest_import_from_browser,
             commands::browser_guest_find::browser_guest_find,
             commands::browser_guest_find::browser_guest_stop_find,
             commands::browser_guest_evaluate::browser_guest_evaluate,
             commands::computer_permissions::computer_permissions_open,
             commands::computer_permissions::computer_permissions_reset,
             commands::computer_permissions::computer_permissions_status,
+            commands::computer_use_provider::start_computer_use_provider,
+            commands::computer_use_provider::stop_computer_use_provider,
             commands::crash_reports::crash_reports_dismiss,
             commands::crash_reports::crash_reports_format,
             commands::crash_reports::crash_reports_get_latest_pending,
@@ -71,6 +94,9 @@ pub fn run() {
             commands::crash_reports::crash_reports_record_renderer_error,
             commands::crash_reports::crash_reports_submit,
             commands::deep_link::deep_link_initial_urls,
+            commands::developer_permissions::developer_permissions_status,
+            commands::developer_permissions::developer_permissions_request,
+            commands::developer_permissions::developer_permissions_open_settings,
             commands::diagnostics::diagnostics_collect_bundle,
             commands::diagnostics::diagnostics_delete_bundle,
             commands::diagnostics::diagnostics_discard_bundle_preview,
@@ -151,7 +177,10 @@ pub fn run() {
             commands::notifications::request_native_notification_permission,
             commands::cli_registration::cli_install_status,
             commands::cli_registration::cli_install,
-            commands::cli_registration::cli_remove
+            commands::cli_registration::cli_remove,
+            commands::cli_registration::cli_wsl_install_status,
+            commands::cli_registration::cli_wsl_install,
+            commands::cli_registration::cli_wsl_remove
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Pebble Tauri desktop shell");
