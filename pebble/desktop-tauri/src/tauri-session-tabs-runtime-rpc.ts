@@ -10,6 +10,13 @@ import type {
 import type { TabGroupLayoutNode, TerminalPaneLayoutNode } from '../../../src/shared/types'
 import { requestRuntimeJson } from './pebble-tauri-runtime-transport'
 import { readWorktrees } from './pebble-tauri-workspace-runtime-api'
+import {
+  isTerminalPaneLayoutNode,
+  rehydrateSessionTabViewState,
+  scheduleSessionTabViewStateSave,
+  type RuntimeSessionTabProps,
+  type RuntimeSessionTabViewState
+} from './tauri-session-tab-view-state-persistence'
 import { callTauriTerminalRuntimeRpc } from './tauri-terminal-runtime-rpc'
 
 type RuntimeSessionStatus = 'starting' | 'running' | 'exited' | 'failed' | 'stopped'
@@ -32,32 +39,34 @@ type RuntimeSessionTabsRpcResult = {
   result?: unknown
 }
 
-type RuntimeSessionTabProps = {
-  color?: string | null
-  isPinned?: boolean
-  viewMode?: 'terminal' | 'chat'
-}
-
-type RuntimeSessionPaneLayout = {
-  root: TerminalPaneLayoutNode | null
-  expandedLeafId: string | null
-  titlesByLeafId?: Record<string, string>
-}
-
-type RuntimeSessionTabViewState = {
-  activeTabId?: string | null
-  activeGroupId?: string | null
-  tabGroups?: RuntimeMobileSessionTabGroup[]
-  tabGroupLayout?: TabGroupLayoutNode | null
-  tabPropsByTabId: Map<string, RuntimeSessionTabProps>
-  paneLayoutByTabId: Map<string, RuntimeSessionPaneLayout>
-  snapshotVersion: number
-}
-
 const sessionTabViewStateByWorktree = new Map<string, RuntimeSessionTabViewState>()
+// Memoized per worktree so the runtime snapshot is fetched once; the resolved
+// promise stays as a "already rehydrated" marker for later calls.
+const sessionTabRehydrationByWorktree = new Map<string, Promise<void>>()
 
 export function clearTauriSessionTabViewStateForTests(): void {
   sessionTabViewStateByWorktree.clear()
+  sessionTabRehydrationByWorktree.clear()
+}
+
+// Why: the mirror's tab/group/pane state is module memory only; seeding it from
+// the runtime's persisted snapshot on first access is what keeps tab layouts
+// from resetting on every window reload or runtime restart.
+function ensureSessionTabViewStateRehydrated(worktreeId: string): Promise<void> {
+  const existing = sessionTabRehydrationByWorktree.get(worktreeId)
+  if (existing) {
+    return existing
+  }
+  const rehydration = rehydrateSessionTabViewState(worktreeId, getSessionTabViewState(worktreeId))
+  sessionTabRehydrationByWorktree.set(worktreeId, rehydration)
+  return rehydration
+}
+
+// Why: every mutating RPC schedules a debounced snapshot write so the layout a
+// user just arranged survives the next reload; the persistence module owns the
+// debounce/serialization against /v1/session-tab-layouts/{worktreeId}.
+function persistSessionTabViewState(worktreeId: string): void {
+  scheduleSessionTabViewStateSave(worktreeId, getSessionTabViewState(worktreeId))
 }
 
 export async function callTauriSessionTabsRuntimeRpc(
@@ -95,6 +104,7 @@ export async function callTauriSessionTabsRuntimeRpc(
 
 async function readSessionTabs(params: unknown): Promise<RuntimeMobileSessionTabsResult> {
   const worktreeId = await resolveWorktreeId(params)
+  await ensureSessionTabViewStateRehydrated(worktreeId)
   return sessionTabsSnapshot(worktreeId, await listWorktreeSessions(worktreeId))
 }
 
@@ -107,6 +117,7 @@ async function readAllSessionTabs(): Promise<RuntimeMobileSessionTabsResult[]> {
   for (const worktree of worktrees) {
     worktreeIds.add(worktree.id)
   }
+  await Promise.all([...worktreeIds].map((id) => ensureSessionTabViewStateRehydrated(id)))
   return [...worktreeIds].map((worktreeId) =>
     sessionTabsSnapshot(
       worktreeId,
@@ -132,6 +143,13 @@ async function createSessionTerminalTab(
   if (!session) {
     throw new Error('session_terminal_not_found')
   }
+  if (session.worktreeId) {
+    await ensureSessionTabViewStateRehydrated(session.worktreeId)
+    const state = getSessionTabViewState(session.worktreeId)
+    state.activeTabId = sessionTabId(session)
+    state.snapshotVersion += 1
+    persistSessionTabViewState(session.worktreeId)
+  }
   return {
     tab: mapSessionToTerminalTab(session, true),
     publicationEpoch: publicationEpoch(),
@@ -141,6 +159,7 @@ async function createSessionTerminalTab(
 
 async function closeSessionTab(params: unknown): Promise<RuntimeMobileSessionTabsResult> {
   const worktreeId = await resolveWorktreeId(params)
+  await ensureSessionTabViewStateRehydrated(worktreeId)
   const tabId = readRequiredString(readObject(params).tabId, 'tab id')
   const sessions = await listWorktreeSessions(worktreeId)
   const target = sessions.find((session) => sessionTabId(session) === tabId || session.id === tabId)
@@ -156,11 +175,14 @@ async function closeSessionTab(params: unknown): Promise<RuntimeMobileSessionTab
     worktreeId,
     nextSessions.map((session) => sessionTabId(session))
   )
-  return sessionTabsSnapshot(worktreeId, nextSessions)
+  const snapshot = sessionTabsSnapshot(worktreeId, nextSessions)
+  persistSessionTabViewState(worktreeId)
+  return snapshot
 }
 
 async function activateSessionTab(params: unknown): Promise<RuntimeMobileSessionTabsResult> {
   const worktreeId = await resolveWorktreeId(params)
+  await ensureSessionTabViewStateRehydrated(worktreeId)
   const tabId = readRequiredString(readObject(params).tabId, 'tab id')
   const sessions = await listWorktreeSessions(worktreeId)
   const snapshot = sessionTabsSnapshot(worktreeId, sessions, tabId)
@@ -168,6 +190,7 @@ async function activateSessionTab(params: unknown): Promise<RuntimeMobileSession
   state.activeTabId = snapshot.activeTabId
   state.activeGroupId = snapshot.activeGroupId
   state.snapshotVersion += 1
+  persistSessionTabViewState(worktreeId)
   return sessionTabsSnapshot(worktreeId, sessions, snapshot.activeTabId ?? tabId)
 }
 
@@ -192,6 +215,7 @@ async function moveSessionTab(params: unknown): Promise<RuntimeMobileSessionTabM
     state.activeGroupId = targetGroup.id
     state.activeTabId = tabId
     state.snapshotVersion += 1
+    persistSessionTabViewState(worktreeId)
     return { moved: true }
   }
   if (move.kind === 'move-to-group') {
@@ -204,6 +228,7 @@ async function moveSessionTab(params: unknown): Promise<RuntimeMobileSessionTabM
     state.activeGroupId = move.targetGroupId
     state.activeTabId = tabId
     state.snapshotVersion += 1
+    persistSessionTabViewState(worktreeId)
     return { moved: true }
   }
   const split = splitTabIntoGroup(snapshot, tabId, move)
@@ -212,6 +237,7 @@ async function moveSessionTab(params: unknown): Promise<RuntimeMobileSessionTabM
   state.activeGroupId = split.activeGroupId
   state.activeTabId = tabId
   state.snapshotVersion += 1
+  persistSessionTabViewState(worktreeId)
   return { moved: true }
 }
 
@@ -231,6 +257,7 @@ async function updateSessionPaneLayout(params: unknown): Promise<{ updated: true
       : {})
   })
   getSessionTabViewState(worktreeId).snapshotVersion += 1
+  persistSessionTabViewState(worktreeId)
   return { updated: true }
 }
 
@@ -257,6 +284,7 @@ async function setSessionTabProps(params: unknown): Promise<{ updated: true }> {
     ...props
   })
   getSessionTabViewState(worktreeId).snapshotVersion += 1
+  persistSessionTabViewState(worktreeId)
   return { updated: true }
 }
 
@@ -756,26 +784,6 @@ function readPaneLayoutRoot(value: unknown): TerminalPaneLayoutNode | null {
     throw new Error('invalid_pane_layout')
   }
   return value
-}
-
-function isTerminalPaneLayoutNode(value: unknown): value is TerminalPaneLayoutNode {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-  const node = value as Record<string, unknown>
-  if (node.type === 'leaf') {
-    return typeof node.leafId === 'string' && node.leafId.length > 0
-  }
-  if (node.type !== 'split') {
-    return false
-  }
-  return (
-    (node.direction === 'horizontal' || node.direction === 'vertical') &&
-    (node.ratio === undefined ||
-      (typeof node.ratio === 'number' && node.ratio >= 0 && node.ratio <= 1)) &&
-    isTerminalPaneLayoutNode(node.first) &&
-    isTerminalPaneLayoutNode(node.second)
-  )
 }
 
 function handled(result: unknown): RuntimeSessionTabsRpcResult {
