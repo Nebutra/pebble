@@ -169,7 +169,7 @@ Current implementation:
 - Go persists automation definitions and run records, supports manual, interval, and RRULE
   triggers, and executes actions through existing task, message, dispatch, agent-run, and
   computer-action services. RRULE evaluation uses `github.com/teambition/rrule-go` and supports the
-  DAILY/WEEKLY/MONTHLY subset (with INTERVAL/BYDAY/UNTIL/COUNT) that the Electron reference schedule
+  HOURLY/DAILY/WEEKLY/MONTHLY subset (with INTERVAL/BYDAY/UNTIL/COUNT) that the canonical schedule
   builder actually emits; other frequencies (e.g. YEARLY) are rejected at create/update time.
 - HTTP and CLI expose automation create/update/delete/list, run listing, manual triggering, and
   interval/RRULE evaluation endpoints (`pebble-control automation add/update --schedule rrule
@@ -479,8 +479,24 @@ Current implementation:
   bounded log-tail primitive; Electron's parity mechanism is the third-party `serve-sim` helper
   (private CoreSimulator HID injection), which would need to be replaced by Facebook's `idb` or an
   XCTest UI-automation harness to close.
-- Android device discovery, gestures, screenshots, install/launch, and logs still have no native
-  adapter (out of scope for the iOS slice); non-macOS hosts also report an explicit unsupported gap.
+- Any host with the Android SDK command-line tools on PATH: a native adb adapter
+  (`commands/emulator_android_provider.rs`, argv/parsing logic in `commands/emulator_android_adb.rs`)
+  reconciles `adb devices -l` (connected devices/emulators) and `emulator -list-avds` (defined-but-
+  not-booted AVDs) into the Go device store, resolving AVD names for `emulator-*` serials via
+  `adb emu avd name`, and drains the `emulator.*` action queue for install (`adb install -r`),
+  launch (`adb shell monkey -p <package> -c android.intent.category.LAUNCHER 1`), and screenshot
+  (`adb exec-out screencap -p`, raw PNG on stdout). When `adb`/`emulator` are not resolvable on
+  PATH, it returns the same explicit unsupported-toolchain result as the iOS adapter instead of
+  registering a non-functional provider. Tap/swipe/pressKey/type/rotate/logs are honest typed
+  gaps, same shape as iOS: gestures/keys/text need `adb shell input tap|swipe|text|keyevent` or a
+  UIAutomator-based harness (out of scope for this install/launch/screenshot slice); rotation has
+  no cross-device adb verb (the emulator-console-only `adb emu rotate` would not work on physical
+  hardware); logs need a streaming transport since `adb logcat` is unbounded and incompatible with
+  the claim/complete queue model.
+- Renderer follow-up: the generic Emulator UI already renders whatever the Go device store
+  reports, so Android devices should surface automatically once this adapter is running; no
+  renderer change landed as part of this slice, and any renderer-side Android-specific affordance
+  (e.g. distinguishing AVD-only "available" entries from connected devices) is a follow-up.
 
 ### Mobile Relay Service
 
@@ -578,11 +594,30 @@ Current implementation:
   regression.
 - Tauri wraps the web-compatible settings and UI state APIs with renderer-visible change events so
   menu actions can update the canonical store the same way Electron main-process broadcasts do.
+- Settings, onboarding, keybindings, persisted UI layout, and the local workspace session use the
+  Rust atomic named-document store with one-time localStorage migration and rollback copies.
+  Dynamic remote-host sessions use a dedicated bounded JSON store whose filenames are SHA-256 host
+  identities, with synchronous renderer caching and Windows-compatible replacement writes.
+- Tauri replaces the web platform guess with a native Rust probe: Node-compatible platform names,
+  real kernel/Windows release values, and Linux Wayland/X11 detection feed the unchanged synchronous
+  renderer contract used by PTY compatibility and terminal WebGL policy.
+- Tauri uses the OS clipboard for bounded local text read/write and image read/write. Clipboard
+  images are decoded with size/dimension limits and saved under the app cache for local attachment
+  flows; paired/SSH image targets retain the runtime transport. Native file clipboard formats,
+  Linux primary selection, and OS-level paste/paste-and-match-style remain explicit parity gates.
+- Tauri listens to native window drag/drop events, converts physical coordinates by the display
+  scale factor, resolves the existing editor/terminal/composer/explorer/project-sidebar DOM target
+  markers (including Shadow DOM ancestry), and fans the shared validated payload into the unchanged
+  React `ui.onFileDrop` consumers.
 - Tauri persists pairing-backed remote runtime environments through native Rust commands that read
   and write `pebble-environments.json`, validate `pebble://pair?...` payloads, redact device
   secrets from renderer responses, and harden the credential file on supported platforms.
 - Tauri registers the `pebble` scheme, filters startup and opened URL events to Pebble protocol
   links, and routes `pebble://pair?...` through the runtime environment add/status refresh path.
+  A native single-instance callback forwards Windows/Linux second-instance argv into the existing
+  process, restores and focuses the main window, while a Rust pending queue closes the macOS
+  cold-start race before the renderer listener is installed. Rust and renderer both deduplicate
+  replayed activations.
 - Tauri maps workspace-backed renderer `pty` calls onto Go runtime process sessions for the
   migration path: spawn starts `/v1/sessions`, input writes `/input`, clearBuffer drops the runtime
   tail, output/status events feed the renderer through the existing `pty.onData`/`pty.onExit`
@@ -737,12 +772,16 @@ subscribe/unsubscribe` snapshots and mutations from Go session records plus a Ta
   Tauri fetches Nebutra `whats-new/changelog.json` through Rust/reqwest before emitting available
   statuses so the Electron release-popup content model stays shared. Missing updater signing config
   or platform endpoints must surface as explicit errors with manual release links instead of fake
-  downloaded states.
+  downloaded states. Release packaging validates and writes the tag/root semver into Tauri's
+  bundle config, and the renderer reads the installed bundle version from Tauri itself, preventing
+  the former `0.1.0` shell metadata from corrupting update comparisons and signed artifact names.
 - Tauri replaces the web crash-report mock with native commands for renderer error-boundary
   reports, breadcrumbs, pending/latest lookup, dismiss/sent transitions, copyable crash text, and
   Nebutra crash feedback submission with native NDJSON diagnostic bundle attachment. The same
   diagnostics command path backs Settings privacy previews, preview-open enforcement, upload, and
-  delete requests.
+  delete requests. Renderer reports and diagnostic bundles read the installed Tauri bundle version,
+  while unexpected non-zero Go runtime exits create native pending reports with executable,
+  endpoint, exit-code, and breadcrumb context; an explicit user Stop remains non-crashing.
 - `verify-tauri-mainline.mjs` checks the renderer entry, preload bridge, Vite aliasing, CSS source,
   Tauri identity, window bounds, native window/menu/settings/shell bridges, runtime PTY fallback,
   mobile driver-state mirrors, remote runtime environment store commands, git base-ref lookup, preflight agent detection,

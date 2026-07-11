@@ -21,14 +21,26 @@ pub fn run() {
         )
         .manage(commands::crash_reports::CrashReportsState::default())
         .manage(commands::diagnostics::DiagnosticsState::default())
+        .manage(commands::deep_link::DeepLinkState::default())
         .manage(commands::filesystem_watch::FsWatcherState::default())
         .manage(commands::terminal_artifacts::TerminalArtifactsState::default())
         .manage(commands::runtime_environments::RuntimeEnvironmentSubscriptionsState::default())
         .manage(commands::runtime_event_stream::RuntimeEventStreamState::default())
         .manage(commands::computer_use_provider::ComputerUseProviderState::default())
         .manage(commands::emulator_ios_provider::EmulatorIosProviderState::default())
+        .manage(commands::emulator_android_provider::EmulatorAndroidProviderState::default())
         .manage(commands::source_control_text_generation::SourceControlTextGenerationState::default())
         .manage(commands::speech::SpeechState::default())
+        // Why: Windows/Linux protocol activation launches another process;
+        // forward its argv to the existing shell so deep links are never lost.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            commands::deep_link::emit_deep_links(app, argv);
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(ActivationPolicy::Regular);
@@ -48,6 +60,7 @@ pub fn run() {
             commands::app_native::app_pick_floating_markdown_document,
             commands::app_native::app_keyboard_input_source_id,
             commands::app_native::app_list_fonts,
+            commands::app_native::app_platform_info,
             commands::agent_accounts::agent_account_auth_status,
             commands::rate_limits::rate_limits_fetch_claude,
             commands::rate_limits::rate_limits_fetch_codex,
@@ -97,6 +110,8 @@ pub fn run() {
             commands::computer_use_provider::stop_computer_use_provider,
             commands::emulator_ios_provider::start_emulator_ios_provider,
             commands::emulator_ios_provider::stop_emulator_ios_provider,
+            commands::emulator_android_provider::start_emulator_android_provider,
+            commands::emulator_android_provider::stop_emulator_android_provider,
             commands::crash_reports::crash_reports_dismiss,
             commands::crash_reports::crash_reports_format,
             commands::crash_reports::crash_reports_get_latest_pending,
@@ -156,6 +171,8 @@ pub fn run() {
             commands::runtime_status::register_native_provider,
             commands::settings_store::read_settings_document,
             commands::settings_store::write_settings_document,
+            commands::session_store::read_host_workspace_session,
+            commands::session_store::write_host_workspace_session,
             commands::speech::speech_get_openai_key_status,
             commands::speech::speech_save_openai_key,
             commands::speech::speech_clear_openai_key,
@@ -187,15 +204,23 @@ pub fn run() {
             commands::terminal_artifacts::terminal_artifact_write,
             commands::updater::updater_check_latest_release,
             commands::updater::updater_fetch_changelog_entries,
+            commands::updater::updater_fetch_nudge,
+            commands::webview_reload::webview_reload,
             commands::notifications::show_native_notification,
             commands::notifications::native_notification_permission,
             commands::notifications::request_native_notification_permission,
+            commands::notifications::open_notification_system_settings,
+            commands::notifications::load_notification_sound,
             commands::cli_registration::cli_install_status,
             commands::cli_registration::cli_install,
             commands::cli_registration::cli_remove,
             commands::cli_registration::cli_wsl_install_status,
             commands::cli_registration::cli_wsl_install,
             commands::cli_registration::cli_wsl_remove
+            ,commands::clipboard::clipboard_read_text
+            ,commands::clipboard::clipboard_write_text
+            ,commands::clipboard::clipboard_save_image_as_temp_file
+            ,commands::clipboard::clipboard_write_image
         ])
         .build(tauri::generate_context!())
         .expect("failed to build Pebble Tauri desktop shell");
