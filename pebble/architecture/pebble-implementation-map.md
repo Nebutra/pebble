@@ -61,9 +61,12 @@ Current implementation:
   `ControlMaster=auto`/`ControlPath=<deterministic per-target socket>`/`ControlPersist=300`,
   mirroring Electron's `ssh-control-socket.ts`/`system-ssh-args.ts`. The socket path hashes the
   target's identity fields (id, effective host, port, username, proxy/jump/identity) into a private
-  per-uid directory, falls back to no reuse if the computed path would exceed the platform's unix
-  socket length limit, and is removed on target deletion. `SshTarget.systemSshConnectionReuse` (an
-  existing persisted field, previously unread) opts a target out. One narrower gap versus Electron:
+  per-uid directory (preferring a short `XDG_RUNTIME_DIR`-backed path before falling back to
+  `TempDir`, and lstat-validating an existing directory's owner/mode rather than trusting a
+  pre-existing or symlinked path, matching Electron's `ensurePrivateDirectory`), falls back to no
+  reuse if the computed path would exceed the platform's unix socket length limit, and is removed on
+  target deletion. `SshTarget.systemSshConnectionReuse` (an existing persisted field, previously
+  unread) opts a target out. One narrower gap versus Electron:
   Go does not currently resolve `ssh -G` config the way Electron's `SshResolvedConfig` does, so it
   cannot detect that a user's own `~/.ssh/config` already sets `ControlMaster`/`ControlPath` and
   defer to it — Pebble's ControlPath always takes precedence rather than skipping when redundant.

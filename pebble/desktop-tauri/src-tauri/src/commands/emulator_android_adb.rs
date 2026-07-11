@@ -6,19 +6,16 @@
 
 use serde_json::Value;
 
-/// One device entry from `adb devices -l`, cross-referenced against
-/// `emulator -list-avds` to resolve an AVD name for emulator-style serials
-/// (`emulator-NNNN`). Physical/hardware devices have no AVD name.
+/// One device entry from `adb devices -l`. `adb`'s own listing carries no AVD
+/// name — the caller resolves it separately per serial via `emulator
+/// -list-avds`/`adb emu avd name` (see `emulator_android_provider.rs`'s
+/// `resolve_avd_name`), so it is not a field here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AdbDevice {
     /// adb serial, e.g. "emulator-5554" or a hardware device's USB/TCP serial.
     pub serial: String,
     /// Raw adb state ("device", "offline", "unauthorized", ...).
     pub state: String,
-    /// Resolved AVD name for `emulator-*` serials when `emulator -list-avds`
-    /// found a matching running instance; `None` for hardware devices or
-    /// when the AVD name could not be resolved.
-    pub avd_name: Option<String>,
     /// `adb devices -l`'s `model:` field when present (hardware devices).
     pub model: Option<String>,
 }
@@ -102,7 +99,6 @@ pub fn parse_adb_devices(stdout: &str) -> Vec<AdbDevice> {
         devices.push(AdbDevice {
             serial: serial.to_string(),
             state: state.to_string(),
-            avd_name: None,
             model,
         });
     }
@@ -245,9 +241,55 @@ pub fn payload_str<'a>(payload: &'a Value, key: &str) -> Option<&'a str> {
     payload.get(key).and_then(Value::as_str)
 }
 
+/// Validates an Android application ID against the platform's own naming
+/// rules (dot-separated segments, each starting with a letter and containing
+/// only letters/digits/underscores). `adb shell` joins its trailing argv into
+/// one string and hands it to the device's shell, so an unvalidated package
+/// name reaching `adb shell monkey -p <package> ...` could carry shell
+/// metacharacters (`;`, `$()`, backticks) executed on the attached device —
+/// this allowlist rejects anything that isn't a real package identifier
+/// before it ever reaches argv construction.
+pub fn is_valid_android_package_name(value: &str) -> bool {
+    if value.is_empty() || value.len() > 255 {
+        return false;
+    }
+    value.split('.').all(|segment| {
+        let mut chars = segment.chars();
+        matches!(chars.next(), Some(first) if first.is_ascii_alphabetic())
+            && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn valid_package_names_are_accepted() {
+        assert!(is_valid_android_package_name("com.example.app"));
+        assert!(is_valid_android_package_name("com.example.app_2"));
+        assert!(is_valid_android_package_name("a.b.c"));
+    }
+
+    #[test]
+    fn shell_metacharacters_are_rejected() {
+        assert!(!is_valid_android_package_name("com.example;reboot"));
+        assert!(!is_valid_android_package_name("com.example$(reboot)"));
+        assert!(!is_valid_android_package_name("com.example`reboot`"));
+        assert!(!is_valid_android_package_name("com.example && reboot"));
+        assert!(!is_valid_android_package_name("com.example|reboot"));
+    }
+
+    #[test]
+    fn malformed_segments_are_rejected() {
+        assert!(!is_valid_android_package_name(""));
+        assert!(!is_valid_android_package_name("."));
+        assert!(!is_valid_android_package_name("com..example"));
+        assert!(!is_valid_android_package_name(".com.example"));
+        assert!(!is_valid_android_package_name("com.example."));
+        assert!(!is_valid_android_package_name("1com.example"));
+        assert!(!is_valid_android_package_name(&"com.".repeat(100)));
+    }
 
     const SAMPLE_DEVICES: &str = "List of devices attached\n\
 emulator-5554\tdevice product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1\n\
@@ -260,7 +302,10 @@ emulator-5556\toffline transport_id:3\n\
         let devices = parse_adb_devices(SAMPLE_DEVICES);
         assert_eq!(devices.len(), 3);
 
-        let emu = devices.iter().find(|d| d.serial == "emulator-5554").unwrap();
+        let emu = devices
+            .iter()
+            .find(|d| d.serial == "emulator-5554")
+            .unwrap();
         assert_eq!(emu.state, "device");
         assert_eq!(emu.model.as_deref(), Some("sdk_gphone64_arm64"));
 
@@ -268,7 +313,10 @@ emulator-5556\toffline transport_id:3\n\
         assert_eq!(hw.state, "device");
         assert_eq!(hw.model.as_deref(), Some("Galaxy_S23"));
 
-        let offline = devices.iter().find(|d| d.serial == "emulator-5556").unwrap();
+        let offline = devices
+            .iter()
+            .find(|d| d.serial == "emulator-5556")
+            .unwrap();
         assert_eq!(offline.state, "offline");
         assert_eq!(offline.model, None);
     }

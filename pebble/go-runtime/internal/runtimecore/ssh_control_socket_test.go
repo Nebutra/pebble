@@ -1,6 +1,8 @@
 package runtimecore
 
 import (
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -8,6 +10,79 @@ import (
 
 func boolPtr(value bool) *bool {
 	return &value
+}
+
+func TestControlSocketDirectoryPrefersXdgRuntimeDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("control sockets are unix-only")
+	}
+	xdg := t.TempDir()
+	t.Setenv("XDG_RUNTIME_DIR", xdg)
+
+	dir, ok := controlSocketDirectory()
+	if !ok {
+		t.Fatal("expected a control socket directory")
+	}
+	want := filepath.Join(xdg, "pebble-ssh")
+	if dir != want {
+		t.Fatalf("expected XDG_RUNTIME_DIR-backed dir %q, got %q", want, dir)
+	}
+}
+
+func TestControlSocketDirectoryFallsBackWhenXdgUnset(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("control sockets are unix-only")
+	}
+	t.Setenv("XDG_RUNTIME_DIR", "")
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+
+	dir, ok := controlSocketDirectory()
+	if !ok {
+		t.Fatal("expected a control socket directory")
+	}
+	if !strings.HasPrefix(dir, tmp) {
+		t.Fatalf("expected dir under TMPDIR %q, got %q", tmp, dir)
+	}
+}
+
+func TestControlSocketDirectoryRejectsGroupOrWorldAccessibleExisting(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("control sockets are unix-only")
+	}
+	t.Setenv("XDG_RUNTIME_DIR", "")
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+
+	existing := filepath.Join(tmp, controlSocketTempDirName())
+	if err := os.MkdirAll(existing, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	_, ok := controlSocketDirectory()
+	if ok {
+		t.Fatal("expected a pre-existing group/world-accessible directory to be rejected")
+	}
+}
+
+func TestControlSocketDirectoryRejectsSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("control sockets are unix-only")
+	}
+	t.Setenv("XDG_RUNTIME_DIR", "")
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+
+	elsewhere := t.TempDir()
+	link := filepath.Join(tmp, controlSocketTempDirName())
+	if err := os.Symlink(elsewhere, link); err != nil {
+		t.Fatal(err)
+	}
+
+	_, ok := controlSocketDirectory()
+	if ok {
+		t.Fatal("expected a symlinked directory to be rejected rather than silently followed")
+	}
 }
 
 func TestControlSocketPathIsDeterministic(t *testing.T) {

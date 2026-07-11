@@ -172,10 +172,11 @@ func (m *Manager) startSshPortForward(ctx context.Context, targetID string, forw
 		}
 		return fmt.Errorf("SSH port forward failed to start: %w", err)
 	case <-started.C:
+		process := &sshPortForwardProcess{command: command, cleanup: cleanup}
 		m.mu.Lock()
-		m.sshPortForwards[forward.ID] = &sshPortForwardProcess{command: command, cleanup: cleanup}
+		m.sshPortForwards[forward.ID] = process
 		m.mu.Unlock()
-		go m.watchSshPortForward(forward.ID, exited)
+		go m.watchSshPortForward(forward.ID, process, exited)
 		return nil
 	case <-ctx.Done():
 		_ = command.Process.Kill()
@@ -188,15 +189,22 @@ func (m *Manager) startSshPortForward(ctx context.Context, targetID string, forw
 	}
 }
 
-func (m *Manager) watchSshPortForward(id string, exited <-chan error) {
+// watchSshPortForward waits for the forward process this call started to
+// exit, then untracks and cleans it up. It only acts if the map still holds
+// the SAME process instance: an id can be reused (UpdateSshPortForward stops
+// then immediately restarts a forward under the same id), and this
+// goroutine's exit signal can arrive after a new process has already been
+// registered under that id — deleting/cleaning up by id alone would tear
+// down the new, still-running forward instead of the one this call owns.
+func (m *Manager) watchSshPortForward(id string, owned *sshPortForwardProcess, exited <-chan error) {
 	<-exited
 	m.mu.Lock()
-	process := m.sshPortForwards[id]
-	delete(m.sshPortForwards, id)
-	m.mu.Unlock()
-	if process != nil {
-		process.cleanup()
+	current, ok := m.sshPortForwards[id]
+	if ok && current == owned {
+		delete(m.sshPortForwards, id)
 	}
+	m.mu.Unlock()
+	owned.cleanup()
 }
 
 func (m *Manager) stopSshPortForward(id string) {

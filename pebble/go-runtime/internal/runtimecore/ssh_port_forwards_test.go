@@ -4,6 +4,7 @@ package runtimecore
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -104,3 +105,52 @@ func TestSshPortForwardRejectsUnsafeHost(t *testing.T) {
 		t.Fatal("expected unsafe host to be rejected")
 	}
 }
+
+// TestWatchSshPortForwardIgnoresReplacedProcess exercises the exact race an id
+// reuse can hit: a stale watcher's exit signal arrives after a NEW process has
+// already been registered under the same id (e.g. UpdateSshPortForward stops
+// then immediately restarts a forward). The stale watcher must not delete or
+// clean up the new, still-running process.
+func TestWatchSshPortForwardIgnoresReplacedProcess(t *testing.T) {
+	manager, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const id = "fwd-1"
+	oldCleaned := make(chan struct{}, 1)
+	oldProcess := &sshPortForwardProcess{cleanup: func() { oldCleaned <- struct{}{} }}
+	newCleaned := make(chan struct{}, 1)
+	newProcess := &sshPortForwardProcess{cleanup: func() { newCleaned <- struct{}{} }}
+
+	// Simulate the old process having already been registered, then replaced
+	// by a new one under the same id (as UpdateSshPortForward's stop+restart
+	// does) before the old watcher's exit signal arrives.
+	manager.mu.Lock()
+	manager.sshPortForwards[id] = newProcess
+	manager.mu.Unlock()
+
+	exited := make(chan error, 1)
+	exited <- errWatchTestExit
+	manager.watchSshPortForward(id, oldProcess, exited)
+
+	select {
+	case <-oldCleaned:
+	default:
+		t.Fatal("expected the stale watcher to clean up its own (old) process")
+	}
+	select {
+	case <-newCleaned:
+		t.Fatal("stale watcher must not clean up the new process it never owned")
+	default:
+	}
+
+	manager.mu.RLock()
+	current := manager.sshPortForwards[id]
+	manager.mu.RUnlock()
+	if current != newProcess {
+		t.Fatal("stale watcher must not delete the new process's map entry")
+	}
+}
+
+var errWatchTestExit = errors.New("simulated forward exit")

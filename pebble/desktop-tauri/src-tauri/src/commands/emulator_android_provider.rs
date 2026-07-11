@@ -134,9 +134,9 @@ mod adb_worker {
     use serde_json::Value;
 
     use super::super::emulator_android_adb::{
-        avd_only_status, build_avd_name_argv, is_emulator_serial, map_adb_state, parse_adb_devices,
-        parse_avd_list, parse_avd_name_response, payload_str, AdbCommand, AdbDevice,
-        EmulatorDeviceStatus,
+        avd_only_status, build_avd_name_argv, is_emulator_serial, is_valid_android_package_name,
+        map_adb_state, parse_adb_devices, parse_avd_list, parse_avd_name_response, payload_str,
+        AdbCommand, AdbDevice, EmulatorDeviceStatus,
     };
     use super::{
         EmulatorAndroidProviderStartCommand, EMULATOR_ANDROID_PROVIDER_ID,
@@ -375,8 +375,9 @@ mod adb_worker {
             Ok(bytes) => {
                 let encoded = BASE64_STANDARD.encode(bytes);
                 ActionCompletion::Completed {
-                    result_json: serde_json::json!({ "imageBase64": encoded, "mimeType": "image/png" })
-                        .to_string(),
+                    result_json:
+                        serde_json::json!({ "imageBase64": encoded, "mimeType": "image/png" })
+                            .to_string(),
                 }
             }
             Err(error) => ActionCompletion::Failed {
@@ -417,6 +418,15 @@ mod adb_worker {
                     .to_string(),
             };
         };
+        // Why: `adb shell` joins its trailing argv into one string for the
+        // device's own shell to interpret, so an unvalidated package name
+        // could carry shell metacharacters executed on the attached device.
+        if !is_valid_android_package_name(package) {
+            return ActionCompletion::Failed {
+                error_message: "invalid_target: packageName is not a valid Android application ID"
+                    .to_string(),
+            };
+        }
         let command = AdbCommand::Launch {
             serial: serial.to_string(),
             package: package.to_string(),
@@ -527,11 +537,23 @@ mod adb_worker {
         let known_avds = list_avd_names().unwrap_or_default();
         let existing = fetch_existing_emulator_devices(runtime_url, bearer_token);
 
-        // Connected devices/emulators from `adb devices -l`.
+        // Connected devices/emulators from `adb devices -l`. AdbDevice.avd_name
+        // is never populated by parse_adb_devices (adb's own listing doesn't
+        // carry it) — track resolved names here instead of reading it back off
+        // `device`, or every running AVD would also match the AVD-only branch
+        // below and flap between running/available on every reconcile pass.
+        let mut connected_avd_names: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
         for device in &devices {
             let avd_name = resolve_avd_name(&device.serial);
+            if let Some(name) = &avd_name {
+                connected_avd_names.insert(name.clone());
+            }
             let status = map_adb_state(&device.state);
-            let display_name = avd_name.clone().or_else(|| device.model.clone()).unwrap_or_else(|| device.serial.clone());
+            let display_name = avd_name
+                .clone()
+                .or_else(|| device.model.clone())
+                .unwrap_or_else(|| device.serial.clone());
             reconcile_one(
                 runtime_url,
                 bearer_token,
@@ -546,10 +568,6 @@ mod adb_worker {
         // AVDs that `emulator -list-avds` knows about but that have no
         // connected `adb devices` entry — surfaced as `available` (defined,
         // not booted), matching a stopped-simulator entry on the iOS side.
-        let connected_avd_names: std::collections::HashSet<&str> = devices
-            .iter()
-            .filter_map(|d| d.avd_name.as_deref())
-            .collect();
         for avd_name in &known_avds {
             if connected_avd_names.contains(avd_name.as_str()) {
                 continue;
@@ -820,6 +838,18 @@ mod adb_worker {
                 panic!("expected Failed completion");
             };
             assert!(error_message.contains("packageName"));
+        }
+
+        #[test]
+        fn launch_rejects_shell_metacharacters_in_package_name() {
+            let completion = run_launch(
+                "emulator-5554",
+                &serde_json::json!({ "packageName": "com.example;reboot" }),
+            );
+            let ActionCompletion::Failed { error_message } = completion else {
+                panic!("expected Failed completion, package name should never reach adb argv");
+            };
+            assert!(error_message.contains("valid Android application ID"));
         }
 
         #[test]

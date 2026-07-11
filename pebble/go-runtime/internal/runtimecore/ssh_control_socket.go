@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -44,16 +43,6 @@ func controlSocketPath(target SshTarget) (string, bool) {
 		return "", false
 	}
 	return path, true
-}
-
-// controlSocketDirectory resolves (and ensures) a private per-uid directory
-// for control sockets, mirroring Electron's uid-scoped socket directory.
-func controlSocketDirectory() (string, bool) {
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("pebble-ssh-cm-%d", os.Geteuid()))
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", false
-	}
-	return dir, true
 }
 
 // controlSocketHash hashes the same identity fields Electron hashes (target
