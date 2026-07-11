@@ -56,6 +56,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::app_native::app_floating_markdown_directory,
+            commands::app_native::app_floating_terminal_cwd,
             commands::app_native::app_pick_floating_workspace_directory,
             commands::app_native::app_pick_floating_markdown_document,
             commands::app_native::app_keyboard_input_source_id,

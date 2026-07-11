@@ -5,6 +5,49 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::{AppHandle, Manager};
 
+#[tauri::command]
+pub fn app_floating_terminal_cwd(path: Option<String>) -> Result<String, String> {
+    let home =
+        home_dir().ok_or_else(|| "Could not resolve the user home directory.".to_string())?;
+    resolve_floating_terminal_cwd(&home, path.as_deref())
+        .map(|value| value.to_string_lossy().into_owned())
+}
+
+fn home_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("USERPROFILE")
+            .map(PathBuf::from)
+            .or_else(|| {
+                let drive = std::env::var_os("HOMEDRIVE")?;
+                let path = std::env::var_os("HOMEPATH")?;
+                Some(PathBuf::from(drive).join(path))
+            })
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::env::var_os("HOME").map(PathBuf::from)
+    }
+}
+
+fn resolve_floating_terminal_cwd(home: &Path, requested: Option<&str>) -> Result<PathBuf, String> {
+    let requested = requested.map(str::trim).filter(|value| !value.is_empty());
+    let resolved = match requested {
+        None | Some("~") => home.to_path_buf(),
+        Some(value) if value.starts_with("~/") || value.starts_with("~\\") => {
+            home.join(&value[2..])
+        }
+        Some(value) => PathBuf::from(value),
+    };
+    if !resolved.is_dir() {
+        return Err(format!(
+            "Terminal working directory does not exist: {}",
+            resolved.to_string_lossy()
+        ));
+    }
+    Ok(resolved)
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MarkdownDocument {
@@ -12,6 +55,108 @@ pub struct MarkdownDocument {
     relative_path: String,
     basename: String,
     name: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformInfo {
+    platform: String,
+    os_release: String,
+    display_server: Option<String>,
+}
+
+#[tauri::command]
+pub fn app_platform_info() -> PlatformInfo {
+    PlatformInfo {
+        platform: match std::env::consts::OS {
+            "macos" => "darwin",
+            "windows" => "win32",
+            other => other,
+        }
+        .to_string(),
+        os_release: platform_os_release(),
+        display_server: linux_display_server(),
+    }
+}
+
+fn platform_os_release() -> String {
+    #[cfg(target_os = "windows")]
+    let command = Command::new("powershell.exe")
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-Command",
+            "[Environment]::OSVersion.Version.ToString()",
+        ])
+        .output();
+    #[cfg(not(target_os = "windows"))]
+    let command = Command::new("uname").arg("-r").output();
+    command
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+fn linux_display_server() -> Option<String> {
+    if std::env::consts::OS != "linux" {
+        return None;
+    }
+    let session = std::env::var("XDG_SESSION_TYPE")
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if session == "wayland" || std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        return Some("wayland".to_string());
+    }
+    if session == "x11" || std::env::var_os("DISPLAY").is_some() {
+        return Some("x11".to_string());
+    }
+    None
+}
+
+#[cfg(test)]
+mod platform_tests {
+    use super::*;
+
+    #[test]
+    fn reports_node_compatible_platform_and_release() {
+        let info = app_platform_info();
+        assert!(matches!(
+            info.platform.as_str(),
+            "darwin" | "win32" | "linux"
+        ));
+        assert!(!info.os_release.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod floating_terminal_tests {
+    use super::*;
+
+    #[test]
+    fn resolves_home_and_home_relative_paths() {
+        let home = std::env::temp_dir();
+        assert_eq!(
+            resolve_floating_terminal_cwd(&home, Some("~")).unwrap(),
+            home
+        );
+        let child = home.join("pebble-floating-terminal-test");
+        fs::create_dir_all(&child).unwrap();
+        assert_eq!(
+            resolve_floating_terminal_cwd(&home, Some("~/pebble-floating-terminal-test")).unwrap(),
+            child
+        );
+        let _ = fs::remove_dir(child);
+    }
+
+    #[test]
+    fn rejects_missing_working_directories() {
+        let missing = std::env::temp_dir().join("pebble-missing-floating-terminal-directory");
+        let error = resolve_floating_terminal_cwd(&std::env::temp_dir(), missing.to_str())
+            .expect_err("missing cwd must be rejected");
+        assert!(error.contains("does not exist"));
+    }
 }
 
 #[tauri::command]

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 const ATOM_FEED_URL: &str = "https://github.com/nebutra/pebble/releases.atom";
 const CHANGELOG_JSON_URL: &str = "https://www.nebutra.com/pebble/whats-new/changelog.json";
+const NUDGE_JSON_URL: &str = "https://www.nebutra.com/pebble/whats-new/nudge.json";
 const RELEASES_DOWNLOAD_BASE: &str = "https://github.com/nebutra/pebble/releases/download";
 const RELEASES_TAG_BASE: &str = "https://github.com/nebutra/pebble/releases/tag";
 const FETCH_TIMEOUT_SECONDS: u64 = 5;
@@ -145,6 +146,33 @@ pub async fn updater_fetch_changelog_entries() -> Result<serde_json::Value, Stri
         .json::<serde_json::Value>()
         .await
         .map_err(|error| format!("Could not parse Pebble changelog: {error}"))
+}
+
+#[tauri::command]
+pub async fn updater_fetch_nudge() -> Result<serde_json::Value, String> {
+    fetch_bounded_json(NUDGE_JSON_URL, "nudge").await
+}
+
+async fn fetch_bounded_json(url: &str, label: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(FETCH_TIMEOUT_SECONDS))
+        .build()
+        .map_err(|error| format!("Could not create Pebble {label} client: {error}"))?;
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|error| format!("Could not fetch Pebble {label}: {error}"))?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "Could not fetch Pebble {label}: status {}",
+            response.status().as_u16()
+        ));
+    }
+    response
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|error| format!("Could not parse Pebble {label}: {error}"))
 }
 
 async fn fetch_release_feed_tags() -> Result<Vec<ReleaseFeedTag>, String> {
