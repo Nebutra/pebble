@@ -35,10 +35,11 @@ Current implementation:
   including ready/running/degraded/error state, from validated, TTL-bound provider reports.
 - Go runtime HTTP can enforce an optional bearer token for control-plane APIs while leaving mobile
   relay WebSocket authentication to pairing secrets and encrypted sessions.
-- Tauri can launch and stop a local `pebble-runtime` process for the desktop development loop while
-  preserving the same HTTP gateway and bearer-token boundary used by external runtimes; source
-  checkouts can fall back to `go run ./cmd/pebble-runtime` from `go-runtime` until packaged sidecars
-  exist.
+- Tauri can launch and stop a local `pebble-runtime` process while preserving the same HTTP gateway
+  and bearer-token boundary used by external runtimes. Dev and release builds generate
+  target-qualified `pebble-runtime` and `pebble-relay-worker` sidecars; macOS universal builds lipo
+  arm64 and amd64 Go outputs. The Rust host resolves the bundled runtime first, while source
+  checkouts retain a `go run ./cmd/pebble-runtime` fallback.
 - Go exposes `/v1/events` as a server-sent event stream with event IDs; Rust/Tauri,
   desktop UI, and `pebble-control events` can read bounded, topic-filtered batches from that stream
   for runtime diagnostics.
@@ -70,8 +71,10 @@ Current implementation:
   worktree-remove`/`branch-delete`: the worker executes the shared host-side removal
   (`RemoveGitWorktreeOnHost`/`ForceDeleteGitBranchOnHost`) on the remote host and posts completions
   to `/v1/worktrees/remote-removals` and `/v1/worktrees/branches/remote-removals`, which retire the
-  metadata record with the same preserved-branch contract as local deletions. Hook-aware archival
-  remains a parity gap.
+  metadata record with the same preserved-branch contract as local deletions. Worktree removal
+  (local and relay-backed) runs the project's `pebble.yaml` `scripts.archive` hook first, with
+  Electron-parity cwd/env/shell/timeout; hook failure or timeout vetoes the removal with a typed
+  409 instead of silently proceeding.
 - Go persists worktree instance identity plus worktree/folder workspace lineage records, and Tauri
   bridges lineage list/set/create runtime calls into the existing renderer and CLI contracts.
 - Go persists display/comment/archive/pin/read status, workspace status, manual order, and smart-sort
@@ -96,8 +99,13 @@ Current implementation:
   now emits final scan progress events, lets the existing UI cancel active scan IDs into a stopped
   result, and gives scan/import calls renderer-aligned bounded timeouts. Go nested scan/import now
   threads the HTTP request context through the walk, so a dropped or cancelled request aborts the
-  traversal and yields the same partial `stopped` result as the UI cancel flow. Streaming scan
-  progress plus legacy SSH relay-only nested import paths remain explicit gaps.
+  traversal and yields the same partial `stopped` result as the UI cancel flow. Scans carrying a
+  `scanId` stream `project-group.scan-progress` snapshots (per-repo plus throttled directory-visit
+  counts) over the existing event push channel, for local and relay scans alike. Relay-only
+  (no paired runtime environment) nested scan/import now works too: `pebble-relay-worker
+  scan-nested` runs the same walk on the remote host and posts cached snapshots the runtime
+  serves through `projectGroup.scanNested`/`projectGroup.importNested` when the connection is
+  relay-only.
 
 ### Terminal Service
 
@@ -159,9 +167,10 @@ Current implementation:
   (workspace create/reuse, agent terminal launch, completion bookkeeping) runs against the Go
   runtime. `runPrecheck` returns the natively recorded result rather than re-running the command.
 - Tauri projects local Hermes/OpenClaw sources as explicit unavailable external managers instead of
-  returning an empty fake state. External automation manager execution (Hermes/OpenClaw) and
-  persisting renderer dispatch status updates back onto Go run records are still explicit
-  migration gaps, not fake-success fallbacks.
+  returning an empty fake state. `markDispatchResult` now writes the renderer's reported dispatch
+  outcome back onto the Go `AutomationRun` record (`POST /v1/automations/runs/{id}/dispatch-result`)
+  instead of only reading it back. External automation manager execution (Hermes/OpenClaw) is
+  still an explicit migration gap, not a fake-success fallback.
 
 ### External Task Service
 
@@ -204,10 +213,14 @@ Current implementation:
   and pull-request field generation: Rust reads staged/base diff context and runs bounded,
   cancelable agent plans while shared prompt/parser code keeps renderer output parity. Hosted-review
   update/mutation actions for providers beyond GitHub/GitLab remain explicit gaps while provider
-  mutations move out of Electron. Full parity still needs conflict metadata, rich submodule/binary
-  diff metadata, remote/SSH base-status parity, remote/SSH text-generation relay parity, PR
+  mutations move out of Electron. Go now parses porcelain unmerged states into Electron's exact
+  conflict-kind union with merge/rebase/cherry-pick operation detection, exposes binary diff byte
+  sizes/image-mime flags, synthesizes submodule pointer diffs with structured old/new SHA
+  metadata, and lets relay workers report remote base-status drift through the same reconcile
+  endpoint used locally. Full parity still needs remote/SSH text-generation relay parity, PR
   template body hydration, GitHub API fork-parent fallback without an `upstream` remote, provider
-  review update actions, and non-GitHub/GitLab review creation.
+  review update actions, and non-GitHub/GitLab review creation (Bitbucket/Azure DevOps/Gitea have
+  native PR listing via REST but not creation/update).
 - SSH/remote source-control projections can be updated by relay workers through the runtime
   gateway; direct git status/diff execution still returns relay-required errors without a worker.
   The runtime normalizes external changed-file status values, drops invalid workspace paths, and
@@ -539,7 +552,7 @@ subscribe/unsubscribe` snapshots and mutations from Go session records plus a Ta
   semantics, failed runtime sessions stay visible as blocked work needing attention, kill maps to
   interrupted completion, and `/v1/sessions` snapshots carry tab/leaf/launch metadata so hot reload
   can rehydrate live agent rows.
-- Tauri reconciles Claude, OpenClaude, Gemini, Cursor, Droid, Command Code, Grok, Devin, and Kimi managed hooks through Rust at startup and whenever the
+- Tauri reconciles Claude, OpenClaude, Gemini, Cursor, Droid, Command Code, Grok, Devin, Kimi, and Amp managed hooks through Rust at startup and whenever the
   canonical `agentStatusHooksEnabled` setting changes. The native host preserves unrelated hook
   definitions, writes executable scripts before atomically replacing settings JSON, and removes
   only Pebble-owned entries on opt-out. Gemini preserves its `{}` stdout response, 10-second
@@ -560,8 +573,32 @@ subscribe/unsubscribe` snapshots and mutations from Go session records plus a Ta
   Kimi manages one convergent marker-delimited block in `config.toml`, preserves all user TOML
   outside that block, creates a rolling `.bak`, and always installs a POSIX script for Kimi's Git
   Bash shell on every platform.
-  The remaining agent-specific JSON/TOML hook formats and
-  SSH hook installation remain explicit migration work rather than fake installed states.
+  Amp writes the complete five-event TypeScript plugin with live endpoint-file refresh, bounded
+  payload projection and a 50-item non-blocking POST queue; ownership markers prevent install or
+  removal from touching a user-authored same-name plugin.
+  Copilot owns the dedicated `hooks/pebble.json` lifecycle for all 13 documented events, preserves
+  user definitions, cleans stale managed commands across unknown events, and writes the executable
+  POSIX/PowerShell script before atomically replacing the hook file.
+  Antigravity owns the `~/.gemini/config/hooks.json` `pebble-status` bundle, preserving the three
+  direct-command events, nested `PostToolUse` matcher schema, passive permission output, and
+  event-specific Windows wrappers without touching adjacent user bundles.
+  Hermes parses and atomically rewrites `config.yaml` with a rolling backup, owns only marked
+  plugin files, and installs the complete ten-event Python plugin with endpoint refresh and bounded
+  payload projection before enabling it.
+  Codex owns the platform-specific managed runtime home, six status hooks, exact canonical SHA-256
+  trust identities, approved/disabled user-hook trust remapping after group-index shifts, system
+  config stripping, and resource symlink or ownership-marked copy fallback.
+  SSH managed-hook transport is now a versioned Go runtime action rather than Electron SFTP: it
+  preserves saved target options, uses memory-only askpass credentials, bounds script/input/output
+  and execution time, and exposes a purpose-scoped Tauri client. Agent-specific remote mutation
+  payloads now run through `pebble-relay-worker agent-hooks-install`; all fourteen remote formats
+  are complete, including Hermes YAML/plugin files, Devin JSONC, Kimi marker-delimited TOML, and
+  Codex canonical trusted hashes. Before bootstrap, Go probes the remote OS/architecture, resolves
+  or cross-builds a CGO-free matching worker, atomically deploys it to `~/.pebble/bin`, and injects
+  the deployed path into the purpose-scoped install script.
+  Successful Tauri SSH connection invokes installation best-effort so a malformed agent config
+  cannot disable the workspace.
+  Real-host Linux/macOS amd64/arm64 relay deployment remains a release validation gate.
 - Tauri exposes renderer-compatible mobile fit/driver snapshots, listener subscriptions, and
   desktop reclaim actions for terminal/browser presence-lock surfaces. This prevents stuck empty
   APIs in the renderer contract. Live shared-control ingestion now lands in the Go runtime:
