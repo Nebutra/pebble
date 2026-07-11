@@ -1,3 +1,4 @@
+pub mod agent_accounts;
 pub mod agent_hooks;
 pub mod app_native;
 pub mod browser_annotation_overlay;
@@ -21,6 +22,7 @@ pub mod git_refs;
 pub mod hooks;
 pub mod notifications;
 pub mod preflight;
+pub mod rate_limits;
 pub mod remote_runtime_rpc;
 pub mod runtime_environments;
 pub mod runtime_event_stream;

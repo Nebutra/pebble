@@ -61,6 +61,24 @@ fn is_command_on_path(command: &str) -> bool {
         .any(|candidate| is_executable_file(&candidate))
 }
 
+/// Resolve a bare command to a concrete executable path using PATH plus the
+/// common agent install dirs. GUI launches often miss the user's shell PATH,
+/// so callers spawn by resolved path instead of bare name.
+pub fn resolve_command_path(command: &str) -> Option<PathBuf> {
+    let command_path = Path::new(command);
+    if command_path.components().count() > 1 {
+        return is_executable_file(command_path).then(|| command_path.to_path_buf());
+    }
+    search_path_dirs()
+        .into_iter()
+        .flat_map(|dir| {
+            executable_names(command)
+                .into_iter()
+                .map(move |name| dir.join(name))
+        })
+        .find(|candidate| is_executable_file(candidate))
+}
+
 fn search_path_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     if let Some(path_env) = env::var_os("PATH") {
