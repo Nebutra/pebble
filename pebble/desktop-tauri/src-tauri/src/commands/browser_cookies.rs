@@ -5,6 +5,9 @@ use serde::{Deserialize, Serialize};
 use tauri::{webview::Cookie, AppHandle, Manager};
 use time::OffsetDateTime;
 
+#[path = "browser_cookie_source_import.rs"]
+pub mod browser_cookie_source_import;
+
 const BROWSER_WEBVIEW_LABEL_PREFIX: &str = "browser-";
 const MAX_COOKIE_FILE_BYTES: u64 = 16 * 1024 * 1024;
 const MAX_COOKIE_ENTRIES: usize = 50_000;
