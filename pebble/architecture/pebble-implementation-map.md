@@ -112,6 +112,15 @@ Current implementation:
 Owns terminal session lifecycle, PTY binding, shell injection, foreground process
 tracking, agent launch, output buffering, and local/remote routing.
 
+Current implementation:
+
+- Go PTY sessions persist geometry and output, track DEC alternate-screen transitions, and expose a
+  bounded Unix process-table status probe with foreground process and child-process facts. Tauri
+  `terminal.inspectProcess` consumes that status endpoint instead of guessing from the launch command.
+- Windows uses a bounded PowerShell/CIM JSON process snapshot and descendant graph to report the
+  deepest active lineage plus child-process facts; unlike Unix this is a lineage approximation
+  because Windows exposes no equivalent terminal foreground marker.
+
 ### Agent Lifecycle Service
 
 Owns agent profiles, profile mutation, process-backed agent runs, prompt injection policy, and run
@@ -152,8 +161,12 @@ Current implementation:
   so list/create/update/delete, run listing, manual Run Now, and RRULE scheduling are backed by real
   runtime storage. Rust also owns local Hermes/OpenClaw external-manager discovery, bounded CLI
   lifecycle mutations, and paged local Hermes Markdown plus `state.db` run-history hydration while
-  the renderer reuses the canonical job mappers. Remote SSH external managers remain a separate
-  parity gate.
+  the renderer reuses the canonical job mappers. Go deploys a purpose-scoped relay worker for SSH
+  Hermes/OpenClaw discovery, bounded mutations, run counts, and paged Hermes Markdown plus
+  CGO-free SQLite transcript history using the same 24-hour session/output merge rule as Electron.
+- Go evaluates missed scheduled occurrences against the renderer-authored grace window, records
+  out-of-window runs as `skipped_missed` at their original occurrence time without dispatching,
+  and advances the recurrence from the current scheduler time.
 - Go executes automation prechecks natively: a bounded shell command (default 60s, max 600s
   timeout, exit 0 = pass) gates scheduled triggers in the automation's working directory (explicit
   `workingDir`, payload `cwd`, or the targeted worktree/project path), records the full
@@ -173,8 +186,9 @@ Current implementation:
 - Tauri projects local Hermes/OpenClaw sources as explicit unavailable external managers instead of
   returning an empty fake state. `markDispatchResult` now writes the renderer's reported dispatch
   outcome back onto the Go `AutomationRun` record (`POST /v1/automations/runs/{id}/dispatch-result`)
-  instead of only reading it back. External automation manager execution (Hermes/OpenClaw) is
-  still an explicit migration gap, not a fake-success fallback.
+  instead of only reading it back. External automation manager lifecycle execution (Hermes/OpenClaw
+  create/update/pause/resume/delete via native Rust CLI invocation in `external_automations.rs`) has
+  landed; on-demand run-now triggering for these external managers remains an explicit gap.
 
 ### External Task Service
 
@@ -298,14 +312,14 @@ Current implementation:
 - CLI/provider callers can report browser download filename, path, byte progress, and error
   metadata through the same download update route.
 - Go records browser screenshot references and exposes `browser.screenshot` provider commands.
-  On macOS, the Tauri provider captures the live child WKWebView through AppKit and returns the
-  existing base64 PNG/JPEG payload; WebView2 and WebKitGTK capture adapters remain platform gaps.
+  Tauri captures live child WebViews through AppKit, WebView2, or WebKitGTK and returns the existing
+  base64 PNG/JPEG payload with optional CSS-coordinate cropping.
 - Rust/Tauri expose browser action poll/update commands that claim only `browser.*` runtime actions
   and report completion through the shared computer-action endpoint.
 - The Tauri desktop shell bridges runtime browser profiles, download cancellation, and
   `browser.changed` events into the existing Electron renderer contract, detects installed browser
   profile candidates for the import picker through a native Rust command, and registers a degraded
-  browser provider until binary capture, source-browser decryption, and full CDP parity are available.
+  browser provider until Chromium/Safari source-browser decryption and full CDP parity are available.
 - Tauri local runtime RPC maps browser profile create/list/delete plus tab create/list/show/close
   lifecycle calls onto Go `/v1/browser/*` routes so renderer runtime callers do not fall back to
   `method_not_available` for stateful browser records.
@@ -330,7 +344,8 @@ Current implementation:
 - Tauri manual cookie-file import now stays native end to end: Rust owns the file picker, enforces
   file/entry limits, validates cookie fields, writes HttpOnly/Secure/SameSite/expiry metadata through
   the matching child WebView cookie store, and returns only counts plus domain names. Direct import
-  from installed Chromium/Firefox/Safari profiles remains gated until native database decryption lands.
+  from installed Firefox profiles uses a bounded native SQLite snapshot; Chromium/Safari import
+  remains gated until native credential decryption lands.
 - Tauri maps the renderer's `findInPage` and `stopFindInPage` compatibility calls to bounded Rust
   commands for the active child WebView. Rust validates the browser-only child label, evaluates the
   native `window.find` request with a timeout, and returns Electron-shaped match events so the
@@ -349,9 +364,11 @@ Current implementation:
 - Tauri runtime RPC maps `browser.eval` to the live child WebView through the bounded Rust callback
   bridge and preserves the Electron `{ result, origin }` contract. Viewport and context-menu
   inspection work without claiming full CDP element/action parity.
+- Tauri runtime RPC reuses the same native Firefox/profile cookie importer and default-cookie clear
+  adapter as the desktop Browser API instead of returning fixed unsuccessful placeholders.
 - Tauri runtime RPC queues `browser.screenshot` through the same provider action path and waits for
-  the action result. The macOS executor now captures the live child WKWebView through a Rust/AppKit
-  command and returns `{ data, format }` without another renderer contract change.
+  the action result. The platform executor captures WKWebView, WebView2, or WebKitGTK through Rust
+  and returns `{ data, format }` without another renderer contract change.
 - Tauri records toolbar viewport overrides per browser page and runtime `browser.viewport` returns
   explicit request dimensions or the stored page override until the native WebView/CDP adapter
   exists, so renderer input-scaling paths do not crash while avoiding a fake claim that real
@@ -632,12 +649,13 @@ subscribe/unsubscribe` snapshots and mutations from Go session records plus a Ta
   `session.driver` events stream to the Tauri driver mirror so the renderer lock banner mounts,
   and the desktop fit-restore action reclaims runtime-side. Browser/emulator shared-control
   ingestion and mobile-side driver notification remain parity gates.
-- Tauri exposes the canonical speech model catalog and model states that explicitly mark the
-  native STT adapter as unavailable, plus functional lifecycle listener registration. This keeps
-  Settings and dictation surfaces on the Electron renderer contract; renderer feature gates now
-  disable Tauri dictation controls before they call mutating speech APIs that would reject, without
-  pretending Tauri can download models or transcribe audio before the native speech backend is
-  migrated.
+- Tauri exposes the canonical speech model catalog with functional lifecycle listener registration,
+  and the native speech backend itself has landed: cloud transcription via OpenAI
+  (`speech_openai_transcription.rs`, key stored through `speech_openai_key_store.rs`) and local
+  on-device transcription via a sherpa-onnx engine (`speech_local_engine.rs`,
+  `speech_local_dictation.rs`, model fetch/verify in `speech_model_download.rs`). Settings and
+  dictation surfaces read/write against these native adapters instead of the Electron renderer
+  contract.
 - Tauri detects installed local CLI agents by reusing the shared `TUI_AGENT_CONFIG` command catalog
   and a native Rust PATH/install-dir probe, so agent settings and launch surfaces are no longer fed
   mock empty detection results. Tauri CLI registration uses native Rust for the host command and
