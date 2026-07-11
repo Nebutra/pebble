@@ -131,3 +131,108 @@ func TestNormalizeAzureDevOpsAPIBaseURL(t *testing.T) {
 		t.Errorf("unexpected normalized base: %q", got)
 	}
 }
+
+func TestCreateAzureDevOpsPRPostsAndMapsCreated(t *testing.T) {
+	var gotMethod, gotPath string
+	var gotBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"pullRequestId": 55,
+			"title":         "Add feature",
+			"status":        "active",
+			"sourceRefName": "refs/heads/feature",
+			"targetRefName": "refs/heads/main",
+			"creationDate":  "2026-01-01T00:00:00Z",
+			"_links":        map[string]interface{}{"web": map[string]interface{}{"href": "https://dev.azure.com/org/proj/_git/repo/pullrequest/55"}},
+		})
+	}))
+	defer server.Close()
+
+	config := AzureDevOpsConfig{APIBaseURL: server.URL, PAT: "pat", Username: "u"}
+	result := CreateAzureDevOpsPR(context.Background(), server.Client(), config, "https://dev.azure.com/org/proj/_git/repo", CreateReviewInput{
+		Base: "main", Head: "feature", Title: "Add feature", Draft: true,
+	})
+	if !result.OK || result.Number != 55 || result.URL != "https://dev.azure.com/org/proj/_git/repo/pullrequest/55" {
+		t.Fatalf("unexpected create result: %+v", result)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/_apis/git/repositories/repo/pullrequests" {
+		t.Errorf("unexpected request %s %s", gotMethod, gotPath)
+	}
+	if gotBody["sourceRefName"] != "refs/heads/feature" || gotBody["targetRefName"] != "refs/heads/main" || gotBody["isDraft"] != true {
+		t.Errorf("unexpected request body: %+v", gotBody)
+	}
+}
+
+func TestCreateAzureDevOpsPRValidatesInput(t *testing.T) {
+	result := CreateAzureDevOpsPR(context.Background(), nil, AzureDevOpsConfig{}, "https://dev.azure.com/org/proj/_git/repo", CreateReviewInput{
+		Base: "main", Head: "main", Title: "x",
+	})
+	if result.OK || result.Code != "validation" {
+		t.Fatalf("expected validation result for equal base/head, got %+v", result)
+	}
+}
+
+func TestUpdateAzureDevOpsPRPatchesStatusAndReviewers(t *testing.T) {
+	var calls []string
+	var lastPatchBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		if r.Method == http.MethodPatch {
+			_ = json.NewDecoder(r.Body).Decode(&lastPatchBody)
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{})
+	}))
+	defer server.Close()
+
+	config := AzureDevOpsConfig{APIBaseURL: server.URL, PAT: "pat", Username: "u"}
+	title := "Updated title"
+	result := UpdateAzureDevOpsPR(context.Background(), server.Client(), config, "https://dev.azure.com/org/proj/_git/repo", 12, UpdateReviewInput{
+		Title:        &title,
+		State:        "closed",
+		AddReviewers: []string{"reviewer-id"},
+	})
+	if !result.OK {
+		t.Fatalf("expected update to succeed, got %+v", result)
+	}
+	if lastPatchBody["status"] != "abandoned" || lastPatchBody["title"] != "Updated title" {
+		t.Errorf("unexpected PATCH body: %+v", lastPatchBody)
+	}
+	foundReviewerPut := false
+	for _, call := range calls {
+		if call == "PUT /_apis/git/repositories/repo/pullrequests/12/reviewers/reviewer-id" {
+			foundReviewerPut = true
+		}
+	}
+	if !foundReviewerPut {
+		t.Errorf("expected reviewer PUT call, got calls: %v", calls)
+	}
+}
+
+func TestUpdateAzureDevOpsPROpenMapsToActiveStatus(t *testing.T) {
+	var lastPatchBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&lastPatchBody)
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{})
+	}))
+	defer server.Close()
+
+	config := AzureDevOpsConfig{APIBaseURL: server.URL, PAT: "pat", Username: "u"}
+	result := UpdateAzureDevOpsPR(context.Background(), server.Client(), config, "https://dev.azure.com/org/proj/_git/repo", 12, UpdateReviewInput{
+		State: "open",
+	})
+	if !result.OK || lastPatchBody["status"] != "active" {
+		t.Fatalf("expected reopen to map to active status, got result=%+v body=%+v", result, lastPatchBody)
+	}
+}
+
+func TestUpdateAzureDevOpsPRValidatesNumber(t *testing.T) {
+	result := UpdateAzureDevOpsPR(context.Background(), nil, AzureDevOpsConfig{APIBaseURL: "http://unused"}, "https://dev.azure.com/org/proj/_git/repo", 0, UpdateReviewInput{})
+	if result.OK || result.Code != "validation" {
+		t.Fatalf("expected validation for missing number, got %+v", result)
+	}
+}

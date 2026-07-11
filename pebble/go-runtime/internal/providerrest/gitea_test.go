@@ -151,3 +151,99 @@ func TestNormalizeGiteaAPIBaseURL(t *testing.T) {
 		t.Errorf("normalization should be idempotent, got %q", got)
 	}
 }
+
+func TestCreateGiteaPRPostsAndMapsCreated(t *testing.T) {
+	var gotMethod, gotPath string
+	var gotBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"number":   21,
+			"title":    "Add feature",
+			"state":    "open",
+			"html_url": "https://git.example.com/owner/repo/pulls/21",
+		})
+	}))
+	defer server.Close()
+
+	config := GiteaConfig{APIBaseURL: normalizeGiteaAPIBaseURL(server.URL), Token: "tok"}
+	result := CreateGiteaPR(context.Background(), server.Client(), config, "git@git.example.com:owner/repo.git", CreateReviewInput{
+		Base: "main", Head: "feature", Title: "Add feature", Body: "Body",
+	})
+	if !result.OK || result.Number != 21 || result.URL != "https://git.example.com/owner/repo/pulls/21" {
+		t.Fatalf("unexpected create result: %+v", result)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/api/v1/repos/owner/repo/pulls" {
+		t.Errorf("unexpected request %s %s", gotMethod, gotPath)
+	}
+	if gotBody["base"] != "main" || gotBody["head"] != "feature" {
+		t.Errorf("unexpected request body: %+v", gotBody)
+	}
+}
+
+func TestCreateGiteaPRValidatesInput(t *testing.T) {
+	result := CreateGiteaPR(context.Background(), nil, GiteaConfig{}, "git@git.example.com:owner/repo.git", CreateReviewInput{
+		Base: "main", Head: "main", Title: "x",
+	})
+	if result.OK || result.Code != "validation" {
+		t.Fatalf("expected validation result for equal base/head, got %+v", result)
+	}
+}
+
+func TestUpdateGiteaPRPatchesAndUpdatesReviewers(t *testing.T) {
+	var calls []string
+	var lastPatchBody map[string]interface{}
+	var lastReviewersBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		if r.Method == http.MethodPatch {
+			_ = json.NewDecoder(r.Body).Decode(&lastPatchBody)
+		}
+		if strings.HasSuffix(r.URL.Path, "/requested_reviewers") {
+			_ = json.NewDecoder(r.Body).Decode(&lastReviewersBody)
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{})
+	}))
+	defer server.Close()
+
+	config := GiteaConfig{APIBaseURL: normalizeGiteaAPIBaseURL(server.URL), Token: "tok"}
+	title := "Updated title"
+	result := UpdateGiteaPR(context.Background(), server.Client(), config, "git@git.example.com:owner/repo.git", 4, UpdateReviewInput{
+		Title:           &title,
+		State:           "closed",
+		AddReviewers:    []string{"alice"},
+		RemoveReviewers: []string{"bob"},
+	})
+	if !result.OK {
+		t.Fatalf("expected update to succeed, got %+v", result)
+	}
+	if lastPatchBody["title"] != "Updated title" || lastPatchBody["state"] != "closed" {
+		t.Errorf("unexpected PATCH body: %+v", lastPatchBody)
+	}
+	wantCalls := map[string]int{
+		"PATCH /api/v1/repos/owner/repo/pulls/4":                      1,
+		"POST /api/v1/repos/owner/repo/pulls/4/requested_reviewers":   1,
+		"DELETE /api/v1/repos/owner/repo/pulls/4/requested_reviewers": 1,
+	}
+	for _, call := range calls {
+		if _, ok := wantCalls[call]; !ok {
+			t.Errorf("unexpected call: %s (all calls: %v)", call, calls)
+		}
+	}
+	if len(calls) != 3 {
+		t.Errorf("expected 3 calls, got %v", calls)
+	}
+	if reviewers, _ := lastReviewersBody["reviewers"].([]interface{}); len(reviewers) != 1 {
+		t.Errorf("unexpected reviewers body: %+v", lastReviewersBody)
+	}
+}
+
+func TestUpdateGiteaPRValidatesNumber(t *testing.T) {
+	result := UpdateGiteaPR(context.Background(), nil, GiteaConfig{APIBaseURL: "http://unused"}, "git@git.example.com:owner/repo.git", 0, UpdateReviewInput{})
+	if result.OK || result.Code != "validation" {
+		t.Fatalf("expected validation for missing number, got %+v", result)
+	}
+}

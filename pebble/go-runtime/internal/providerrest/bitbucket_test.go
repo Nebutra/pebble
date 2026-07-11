@@ -127,3 +127,112 @@ func TestBitbucketListStates(t *testing.T) {
 		t.Errorf("default states: %v", got)
 	}
 }
+
+func TestCreateBitbucketPRPostsAndMapsCreated(t *testing.T) {
+	var gotMethod, gotPath string
+	var gotBody map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"id":    9,
+			"title": "Add feature",
+			"state": "OPEN",
+			"links": map[string]interface{}{"html": map[string]interface{}{"href": "https://bitbucket.org/team/app/pull-requests/9"}},
+			"source": map[string]interface{}{
+				"branch": map[string]interface{}{"name": "feature"},
+			},
+			"destination": map[string]interface{}{
+				"branch": map[string]interface{}{"name": "main"},
+			},
+		})
+	}))
+	defer server.Close()
+
+	config := BitbucketConfig{APIBaseURL: server.URL, AccessToken: "tok"}
+	result := CreateBitbucketPR(context.Background(), server.Client(), config, "git@bitbucket.org:team/app.git", CreateReviewInput{
+		Base: "main", Head: "feature", Title: "Add feature", Body: "Body",
+	})
+	if !result.OK || result.Number != 9 || result.URL != "https://bitbucket.org/team/app/pull-requests/9" {
+		t.Fatalf("unexpected create result: %+v", result)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/repositories/team/app/pullrequests" {
+		t.Errorf("unexpected request %s %s", gotMethod, gotPath)
+	}
+	source, _ := gotBody["source"].(map[string]interface{})
+	sourceBranch, _ := source["branch"].(map[string]interface{})
+	if sourceBranch["name"] != "feature" {
+		t.Errorf("unexpected request body: %+v", gotBody)
+	}
+}
+
+func TestCreateBitbucketPRValidatesInput(t *testing.T) {
+	result := CreateBitbucketPR(context.Background(), nil, BitbucketConfig{}, "git@bitbucket.org:team/app.git", CreateReviewInput{
+		Base: "main", Head: "main", Title: "x",
+	})
+	if result.OK || result.Code != "validation" {
+		t.Fatalf("expected validation result for equal base/head, got %+v", result)
+	}
+}
+
+func TestCreateBitbucketPRRemoteMismatch(t *testing.T) {
+	result := CreateBitbucketPR(context.Background(), nil, BitbucketConfig{}, "git@github.com:o/r.git", CreateReviewInput{
+		Base: "main", Head: "feature", Title: "x",
+	})
+	if result.OK || result.Code != "unsupported_provider" {
+		t.Fatalf("expected unsupported_provider for non-bitbucket remote, got %+v", result)
+	}
+}
+
+func TestUpdateBitbucketPRTitleAndDeclineState(t *testing.T) {
+	var calls []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{})
+	}))
+	defer server.Close()
+
+	title := "New title"
+	config := BitbucketConfig{APIBaseURL: server.URL, AccessToken: "tok"}
+	result := UpdateBitbucketPR(context.Background(), server.Client(), config, "git@bitbucket.org:team/app.git", 7, UpdateReviewInput{
+		Title: &title,
+		State: "closed",
+	})
+	if !result.OK {
+		t.Fatalf("expected update to succeed, got %+v", result)
+	}
+	wantCalls := []string{
+		"PUT /repositories/team/app/pullrequests/7",
+		"POST /repositories/team/app/pullrequests/7/decline",
+	}
+	if len(calls) != len(wantCalls) || calls[0] != wantCalls[0] || calls[1] != wantCalls[1] {
+		t.Errorf("unexpected calls: %v", calls)
+	}
+}
+
+func TestUpdateBitbucketPRReopenIsUnsupported(t *testing.T) {
+	result := UpdateBitbucketPR(context.Background(), nil, BitbucketConfig{APIBaseURL: "http://unused"}, "git@bitbucket.org:team/app.git", 7, UpdateReviewInput{
+		State: "open",
+	})
+	if result.OK || result.Code != "unsupported_provider" {
+		t.Fatalf("expected reopen to be an explicit unsupported gap, got %+v", result)
+	}
+}
+
+func TestUpdateBitbucketPRIncrementalReviewersIsUnsupported(t *testing.T) {
+	result := UpdateBitbucketPR(context.Background(), nil, BitbucketConfig{APIBaseURL: "http://unused"}, "git@bitbucket.org:team/app.git", 7, UpdateReviewInput{
+		AddReviewers: []string{"dev"},
+	})
+	if result.OK || result.Code != "unsupported_provider" {
+		t.Fatalf("expected incremental reviewer add/remove to be unsupported, got %+v", result)
+	}
+}
+
+func TestUpdateBitbucketPRValidatesNumber(t *testing.T) {
+	result := UpdateBitbucketPR(context.Background(), nil, BitbucketConfig{APIBaseURL: "http://unused"}, "git@bitbucket.org:team/app.git", 0, UpdateReviewInput{})
+	if result.OK || result.Code != "validation" {
+		t.Fatalf("expected validation for missing number, got %+v", result)
+	}
+}

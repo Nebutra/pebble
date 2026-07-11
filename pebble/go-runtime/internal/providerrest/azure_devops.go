@@ -319,3 +319,191 @@ func mapAzureDevOpsPRState(raw *azureDevOpsPRRaw) string {
 	}
 	return "open"
 }
+
+func azureDevOpsBranchRef(branch string) string {
+	return "refs/heads/" + strings.TrimPrefix(branch, "refs/heads/")
+}
+
+func azureDevOpsAPIURL(repo *azureDevOpsRepoRef, config AzureDevOpsConfig, path string) string {
+	baseURL := repo.APIBaseURL
+	if config.APIBaseURL != "" {
+		baseURL = config.APIBaseURL
+	}
+	query := url.Values{}
+	query.Set("api-version", "7.1")
+	return strings.TrimRight(baseURL, "/") + path + "?" + query.Encode()
+}
+
+// CreateAzureDevOpsPR creates a pull request via a POST to the pullrequests
+// collection endpoint (Azure DevOps REST API). Azure DevOps has no bundled
+// CLI to shell out to, so this goes straight to REST.
+func CreateAzureDevOpsPR(
+	ctx context.Context,
+	client *http.Client,
+	config AzureDevOpsConfig,
+	remoteURL string,
+	input CreateReviewInput,
+) CreateReviewOutput {
+	repo := parseAzureDevOpsRepoRef(remoteURL)
+	if repo == nil {
+		return CreateReviewOutput{Code: "unsupported_provider", Error: "Creating pull requests requires an Azure DevOps remote."}
+	}
+	base := strings.TrimSpace(input.Base)
+	head := strings.TrimSpace(input.Head)
+	title := strings.TrimSpace(input.Title)
+	if base == "" || head == "" || title == "" {
+		return CreateReviewOutput{Code: "validation", Error: "Create PR failed: base branch, head branch, and title are required."}
+	}
+	if strings.EqualFold(base, head) {
+		return CreateReviewOutput{Code: "validation", Error: "Create PR failed: choose a different base branch before creating a pull request."}
+	}
+	requestBody := map[string]interface{}{
+		"sourceRefName": azureDevOpsBranchRef(head),
+		"targetRefName": azureDevOpsBranchRef(base),
+		"title":         title,
+		"description":   input.Body,
+	}
+	if input.Draft {
+		requestBody["isDraft"] = true
+	}
+	endpoint := azureDevOpsAPIURL(repo, config, "/_apis/git/repositories/"+url.PathEscape(repo.Repository)+"/pullrequests")
+	var raw azureDevOpsPRRaw
+	_, err := mutateProviderJSON(ctx, client, http.MethodPost, endpoint, config.authHeaders(), azureDevOpsCredentialHint, requestBody, &raw)
+	if err != nil {
+		result := classifyAzureDevOpsWriteError("Create", err)
+		if result.Code == "already_exists" || result.Code == "unknown_completion" {
+			if existing := findExistingAzureDevOpsPR(ctx, client, config, repo, head); existing != nil {
+				result.Code = "already_exists"
+				result.Error = "A pull request already exists for this branch."
+				result.ExistingReview = existing
+			}
+		}
+		return result
+	}
+	if raw.PullRequestID <= 0 {
+		if existing := findExistingAzureDevOpsPR(ctx, client, config, repo, head); existing != nil {
+			return CreateReviewOutput{OK: true, Number: existing.Number, URL: existing.URL}
+		}
+		return CreateReviewOutput{Code: "unknown_completion", Error: "PR creation may have completed. Refreshing branch review state..."}
+	}
+	created := mapAzureDevOpsPR(&raw, repo.WebBaseURL)
+	return CreateReviewOutput{OK: true, Number: created.Number, URL: created.URL}
+}
+
+// UpdateAzureDevOpsPR updates title/description/status via PATCH to the pull
+// request resource. Azure DevOps only supports status transitions among
+// active/abandoned/completed (no distinct "closed" concept), so close maps to
+// "abandoned" and reopen maps to "active" -- the closest real equivalents,
+// not a faithful close/reopen pair (there is no way to un-complete a merged
+// PR, and re-activating an abandoned PR is Azure's actual reopen mechanism).
+func UpdateAzureDevOpsPR(
+	ctx context.Context,
+	client *http.Client,
+	config AzureDevOpsConfig,
+	remoteURL string,
+	number int,
+	input UpdateReviewInput,
+) UpdateReviewOutput {
+	repo := parseAzureDevOpsRepoRef(remoteURL)
+	if repo == nil {
+		return UpdateReviewOutput{Code: "unsupported_provider", Error: "Updating pull requests requires an Azure DevOps remote."}
+	}
+	if number <= 0 {
+		return UpdateReviewOutput{Code: "validation", Error: "Update PR failed: a pull request number is required."}
+	}
+	resourcePath := "/_apis/git/repositories/" + url.PathEscape(repo.Repository) + "/pullrequests/" + strconv.Itoa(number)
+	endpoint := azureDevOpsAPIURL(repo, config, resourcePath)
+
+	fields := map[string]interface{}{}
+	if input.Title != nil {
+		title := strings.TrimSpace(*input.Title)
+		if title == "" {
+			return UpdateReviewOutput{Code: "validation", Error: "Update PR failed: title cannot be empty."}
+		}
+		fields["title"] = title
+	}
+	if input.Body != nil {
+		fields["description"] = *input.Body
+	}
+	switch input.State {
+	case "closed":
+		fields["status"] = "abandoned"
+	case "open":
+		fields["status"] = "active"
+	case "":
+		// no state change requested
+	default:
+		return UpdateReviewOutput{Code: "validation", Error: "Update PR failed: state must be \"open\" or \"closed\"."}
+	}
+	if len(fields) > 0 {
+		if _, err := mutateProviderJSON(ctx, client, http.MethodPatch, endpoint, config.authHeaders(), azureDevOpsCredentialHint, fields, nil); err != nil {
+			result := classifyAzureDevOpsWriteError("Update", err)
+			return UpdateReviewOutput{OK: false, Code: result.Code, Error: strings.Replace(result.Error, "Create PR", "Update PR", 1)}
+		}
+	}
+	if len(input.AddReviewers) > 0 || len(input.RemoveReviewers) > 0 {
+		if err := updateAzureDevOpsReviewers(ctx, client, config, repo, number, input); err != nil {
+			result := classifyAzureDevOpsWriteError("Update", err)
+			return UpdateReviewOutput{OK: false, Code: result.Code, Error: strings.Replace(result.Error, "Create PR", "Update PR", 1)}
+		}
+	}
+	return UpdateReviewOutput{OK: true}
+}
+
+// updateAzureDevOpsReviewers adds/removes reviewers via the reviewers
+// sub-resource: PUT to add (upsert-by-id), DELETE to remove.
+func updateAzureDevOpsReviewers(
+	ctx context.Context,
+	client *http.Client,
+	config AzureDevOpsConfig,
+	repo *azureDevOpsRepoRef,
+	number int,
+	input UpdateReviewInput,
+) error {
+	base := "/_apis/git/repositories/" + url.PathEscape(repo.Repository) + "/pullrequests/" + strconv.Itoa(number) + "/reviewers"
+	for _, reviewer := range input.AddReviewers {
+		reviewer = strings.TrimSpace(reviewer)
+		if reviewer == "" {
+			continue
+		}
+		endpoint := azureDevOpsAPIURL(repo, config, base+"/"+url.PathEscape(reviewer))
+		if _, err := mutateProviderJSON(ctx, client, http.MethodPut, endpoint, config.authHeaders(), azureDevOpsCredentialHint, map[string]interface{}{"vote": 0}, nil); err != nil {
+			return err
+		}
+	}
+	for _, reviewer := range input.RemoveReviewers {
+		reviewer = strings.TrimSpace(reviewer)
+		if reviewer == "" {
+			continue
+		}
+		endpoint := azureDevOpsAPIURL(repo, config, base+"/"+url.PathEscape(reviewer))
+		if _, err := mutateProviderJSON(ctx, client, http.MethodDelete, endpoint, config.authHeaders(), azureDevOpsCredentialHint, nil, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func findExistingAzureDevOpsPR(
+	ctx context.Context,
+	client *http.Client,
+	config AzureDevOpsConfig,
+	repo *azureDevOpsRepoRef,
+	head string,
+) *ReviewSummary {
+	items, err := ListAzureDevOpsPRs(ctx, client, config, repo.WebBaseURL, "all", 25)
+	if err != nil {
+		return nil
+	}
+	for i := range items {
+		if strings.EqualFold(items[i].BranchName, head) {
+			return &ReviewSummary{Number: items[i].Number, URL: items[i].URL}
+		}
+	}
+	return nil
+}
+
+func classifyAzureDevOpsWriteError(action string, err error) CreateReviewOutput {
+	code, message := classifyReviewWriteError(action, "Azure DevOps", err)
+	return CreateReviewOutput{Code: code, Error: message}
+}

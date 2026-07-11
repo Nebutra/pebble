@@ -191,7 +191,7 @@ func TestProviderReviewUpdateRoute(t *testing.T) {
 	}
 }
 
-func TestProviderReviewUpdateRouteUnsupportedProvider(t *testing.T) {
+func TestProviderReviewUpdateRouteUnknownProvider(t *testing.T) {
 	manager, err := runtimecore.NewManager(t.TempDir(), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -201,7 +201,7 @@ func TestProviderReviewUpdateRouteUnsupportedProvider(t *testing.T) {
 
 	body := strings.NewReader(`{
 		"projectId":"` + projectID + `",
-		"provider":"bitbucket",
+		"provider":"unknown-provider",
 		"number":1,
 		"title":"New title"
 	}`)
@@ -217,6 +217,114 @@ func TestProviderReviewUpdateRouteUnsupportedProvider(t *testing.T) {
 	}
 	if result.OK || result.Code != "unsupported_provider" {
 		t.Fatalf("expected unsupported_provider gap, got %+v", result)
+	}
+}
+
+// bitbucketRemoteRepo creates a local git repo with a Bitbucket-shaped origin
+// remote, mirroring the git setup TestProviderReviewCapabilitiesRoute uses.
+func bitbucketRemoteRepo(t *testing.T) string {
+	t.Helper()
+	repo := t.TempDir()
+	for _, args := range [][]string{
+		{"init"},
+		{"remote", "add", "origin", "git@bitbucket.org:team/app.git"},
+	} {
+		command := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v failed: %v: %s", args, err, output)
+		}
+	}
+	return repo
+}
+
+// TestProviderReviewCreateAndUpdateRouteBitbucket exercises the REST-backed
+// provider dispatch end to end (HTTP route -> manager -> providerrest),
+// confirming Bitbucket create/update is wired the same way github/gitlab is.
+func TestProviderReviewCreateAndUpdateRouteBitbucket(t *testing.T) {
+	var lastMethod, lastPath string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lastMethod = r.Method
+		lastPath = r.URL.Path
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/pullrequests") {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":    3,
+				"title": "Open PR",
+				"state": "OPEN",
+				"links": map[string]interface{}{"html": map[string]interface{}{"href": "https://bitbucket.org/team/app/pull-requests/3"}},
+				"source": map[string]interface{}{
+					"branch": map[string]interface{}{"name": "feature"},
+				},
+				"destination": map[string]interface{}{
+					"branch": map[string]interface{}{"name": "main"},
+				},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{})
+	}))
+	defer upstream.Close()
+	t.Setenv("PEBBLE_BITBUCKET_API_BASE_URL", upstream.URL)
+	t.Setenv("PEBBLE_BITBUCKET_ACCESS_TOKEN", "tok")
+
+	repo := bitbucketRemoteRepo(t)
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(runtimecore.CreateProjectRequest{
+		Name: "repo", Path: repo, LocationKind: "local",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := NewServer(manager)
+
+	createBody := strings.NewReader(`{
+		"projectId":"` + project.ID + `",
+		"provider":"bitbucket",
+		"base":"main",
+		"head":"feature",
+		"title":"Open PR"
+	}`)
+	createReq := httptest.NewRequest(http.MethodPost, "/v1/providers/reviews", createBody)
+	createRec := httptest.NewRecorder()
+	server.ServeHTTP(createRec, createReq)
+	if createRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", createRec.Code, createRec.Body.String())
+	}
+	var createResult providercli.CreateReviewResult
+	if err := json.Unmarshal(createRec.Body.Bytes(), &createResult); err != nil {
+		t.Fatal(err)
+	}
+	if !createResult.OK || createResult.Number != 3 || createResult.URL != "https://bitbucket.org/team/app/pull-requests/3" {
+		t.Fatalf("unexpected create result: %+v", createResult)
+	}
+	if lastMethod != http.MethodPost || lastPath != "/repositories/team/app/pullrequests" {
+		t.Errorf("unexpected create request: %s %s", lastMethod, lastPath)
+	}
+
+	updateBody := strings.NewReader(`{
+		"projectId":"` + project.ID + `",
+		"provider":"bitbucket",
+		"number":3,
+		"title":"New title"
+	}`)
+	updateReq := httptest.NewRequest(http.MethodPost, "/v1/providers/reviews/update", updateBody)
+	updateRec := httptest.NewRecorder()
+	server.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", updateRec.Code, updateRec.Body.String())
+	}
+	var updateResult providercli.UpdateReviewResult
+	if err := json.Unmarshal(updateRec.Body.Bytes(), &updateResult); err != nil {
+		t.Fatal(err)
+	}
+	if !updateResult.OK {
+		t.Fatalf("unexpected update result: %+v", updateResult)
+	}
+	if lastMethod != http.MethodPut || lastPath != "/repositories/team/app/pullrequests/3" {
+		t.Errorf("unexpected update request: %s %s", lastMethod, lastPath)
 	}
 }
 

@@ -135,19 +135,56 @@ func (m *Manager) CreateHostedReview(
 		return providercli.CreateGitHubPullRequest(ctx, workdir, request), nil
 	case "gitlab":
 		return providercli.CreateGitLabMergeRequest(ctx, workdir, request), nil
-	// Honest gap: REST-backed creation for these providers is not wired yet;
-	// listing works, so the message names the exact missing operation.
 	case "bitbucket", "azure-devops", "gitea":
-		return providercli.CreateReviewResult{
-			Code:  "unsupported_provider",
-			Error: "Creating " + request.Provider + " reviews from the local runtime is not supported yet (listing is).",
-		}, nil
+		return m.createRESTHostedReview(ctx, workdir, request)
 	default:
 		return providercli.CreateReviewResult{
 			Code:  "unsupported_provider",
 			Error: "Creating reviews for this provider is not supported yet.",
 		}, nil
 	}
+}
+
+// createRESTHostedReview dispatches PR creation for the REST-backed providers
+// (bitbucket, azure-devops, gitea), which have no bundled CLI. The repo ref is
+// derived from the workdir's primary git remote, matching ListReviewWorkItems.
+func (m *Manager) createRESTHostedReview(
+	ctx context.Context,
+	workdir string,
+	request providercli.CreateReviewRequest,
+) (providercli.CreateReviewResult, error) {
+	remoteURL, err := readPrimaryGitRemoteURL(ctx, workdir)
+	if err != nil {
+		return providercli.CreateReviewResult{}, err
+	}
+	client := http.DefaultClient
+	input := providerrest.CreateReviewInput{
+		Base: request.Base, Head: request.Head, Title: request.Title,
+		Body: request.Body, Draft: request.Draft, UseTemplate: request.UseTemplate,
+	}
+	var out providerrest.CreateReviewOutput
+	switch request.Provider {
+	case "bitbucket":
+		out = providerrest.CreateBitbucketPR(ctx, client, providerrest.BitbucketConfigFromEnv(), remoteURL, input)
+	case "azure-devops":
+		out = providerrest.CreateAzureDevOpsPR(ctx, client, providerrest.AzureDevOpsConfigFromEnv(), remoteURL, input)
+	case "gitea":
+		out = providerrest.CreateGiteaPR(ctx, client, providerrest.GiteaConfigFromEnv(), remoteURL, input)
+	default:
+		return providercli.CreateReviewResult{
+			Code:  "unsupported_provider",
+			Error: "Creating reviews for this provider is not supported yet.",
+		}, nil
+	}
+	return convertCreateReviewOutput(out), nil
+}
+
+func convertCreateReviewOutput(out providerrest.CreateReviewOutput) providercli.CreateReviewResult {
+	result := providercli.CreateReviewResult{OK: out.OK, Number: out.Number, URL: out.URL, Code: out.Code, Error: out.Error}
+	if out.ExistingReview != nil {
+		result.ExistingReview = &providercli.ReviewSummary{Number: out.ExistingReview.Number, URL: out.ExistingReview.URL}
+	}
+	return result
 }
 
 // UpdateHostedReview applies a post-creation mutation (title/body edit,
@@ -168,18 +205,48 @@ func (m *Manager) UpdateHostedReview(
 		return providercli.UpdateGitHubPullRequest(ctx, workdir, request), nil
 	case "gitlab":
 		return providercli.UpdateGitLabMergeRequest(ctx, workdir, request), nil
-	// Honest gap: no CLI/REST-backed update wiring for these providers yet.
 	case "bitbucket", "azure-devops", "gitea":
-		return providercli.UpdateReviewResult{
-			Code:  "unsupported_provider",
-			Error: "Updating " + request.Provider + " reviews from the local runtime is not supported yet.",
-		}, nil
+		return m.updateRESTHostedReview(ctx, workdir, request)
 	default:
 		return providercli.UpdateReviewResult{
 			Code:  "unsupported_provider",
 			Error: "Updating reviews for this provider is not supported yet.",
 		}, nil
 	}
+}
+
+// updateRESTHostedReview dispatches PR updates for the REST-backed providers
+// (bitbucket, azure-devops, gitea), mirroring createRESTHostedReview's
+// remote-derived repo-ref resolution.
+func (m *Manager) updateRESTHostedReview(
+	ctx context.Context,
+	workdir string,
+	request providercli.UpdateReviewRequest,
+) (providercli.UpdateReviewResult, error) {
+	remoteURL, err := readPrimaryGitRemoteURL(ctx, workdir)
+	if err != nil {
+		return providercli.UpdateReviewResult{}, err
+	}
+	client := http.DefaultClient
+	input := providerrest.UpdateReviewInput{
+		Title: request.Title, Body: request.Body, State: request.State,
+		AddReviewers: request.AddReviewers, RemoveReviewers: request.RemoveReviewers,
+	}
+	var out providerrest.UpdateReviewOutput
+	switch request.Provider {
+	case "bitbucket":
+		out = providerrest.UpdateBitbucketPR(ctx, client, providerrest.BitbucketConfigFromEnv(), remoteURL, request.Number, input)
+	case "azure-devops":
+		out = providerrest.UpdateAzureDevOpsPR(ctx, client, providerrest.AzureDevOpsConfigFromEnv(), remoteURL, request.Number, input)
+	case "gitea":
+		out = providerrest.UpdateGiteaPR(ctx, client, providerrest.GiteaConfigFromEnv(), remoteURL, request.Number, input)
+	default:
+		return providercli.UpdateReviewResult{
+			Code:  "unsupported_provider",
+			Error: "Updating reviews for this provider is not supported yet.",
+		}, nil
+	}
+	return providercli.UpdateReviewResult{OK: out.OK, Code: out.Code, Error: out.Error}, nil
 }
 
 func (m *Manager) HostedReviewCapabilities(

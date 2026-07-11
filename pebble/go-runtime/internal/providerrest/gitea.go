@@ -275,3 +275,198 @@ func giteaIsCrossRepository(head, base *giteaPRBranch) *bool {
 	isCross := head.Repo.ID != base.Repo.ID
 	return &isCross
 }
+
+// CreateGiteaPR creates a pull request via a POST to the pulls collection
+// endpoint (Gitea/Forgejo REST API). Gitea's API is the closest of the three
+// REST-backed providers to GitHub's own PR shape.
+func CreateGiteaPR(
+	ctx context.Context,
+	client *http.Client,
+	config GiteaConfig,
+	remoteURL string,
+	input CreateReviewInput,
+) CreateReviewOutput {
+	repo := parseGiteaRepoRef(remoteURL)
+	if repo == nil {
+		return CreateReviewOutput{Code: "unsupported_provider", Error: "Creating pull requests requires a Gitea remote."}
+	}
+	base := strings.TrimSpace(input.Base)
+	head := strings.TrimSpace(input.Head)
+	title := strings.TrimSpace(input.Title)
+	if base == "" || head == "" || title == "" {
+		return CreateReviewOutput{Code: "validation", Error: "Create PR failed: base branch, head branch, and title are required."}
+	}
+	if strings.EqualFold(base, head) {
+		return CreateReviewOutput{Code: "validation", Error: "Create PR failed: choose a different base branch before creating a pull request."}
+	}
+	requestBody := map[string]interface{}{
+		"base":  base,
+		"head":  head,
+		"title": title,
+		"body":  input.Body,
+	}
+	if input.Draft {
+		requestBody["draft"] = true
+	}
+	baseURL := repo.APIBaseURL
+	if config.APIBaseURL != "" {
+		baseURL = config.APIBaseURL
+	}
+	endpoint := fmt.Sprintf("%s/repos/%s/%s/pulls", strings.TrimRight(baseURL, "/"), url.PathEscape(repo.Owner), url.PathEscape(repo.Repo))
+	var raw giteaPRRaw
+	_, err := mutateProviderJSON(ctx, client, http.MethodPost, endpoint, config.authHeaders(), giteaCredentialHint, requestBody, &raw)
+	if err != nil {
+		result := classifyGiteaWriteError("Create", err)
+		if result.Code == "already_exists" || result.Code == "unknown_completion" {
+			if existing := findExistingGiteaPR(ctx, client, config, repo, head); existing != nil {
+				result.Code = "already_exists"
+				result.Error = "A pull request already exists for this branch."
+				result.ExistingReview = existing
+			}
+		}
+		return result
+	}
+	if raw.Number <= 0 {
+		if existing := findExistingGiteaPR(ctx, client, config, repo, head); existing != nil {
+			return CreateReviewOutput{OK: true, Number: existing.Number, URL: existing.URL}
+		}
+		return CreateReviewOutput{Code: "unknown_completion", Error: "PR creation may have completed. Refreshing branch review state..."}
+	}
+	created := mapGiteaPR(&raw)
+	return CreateReviewOutput{OK: true, Number: created.Number, URL: created.URL}
+}
+
+// UpdateGiteaPR updates title/body/state via PATCH to the pull request
+// resource, and reviewer add/remove via the requested_reviewers sub-resource
+// (POST to add, DELETE to remove) -- following review_update.go's GitHub
+// branch for behavior parity where Gitea's endpoints line up with gh's.
+func UpdateGiteaPR(
+	ctx context.Context,
+	client *http.Client,
+	config GiteaConfig,
+	remoteURL string,
+	number int,
+	input UpdateReviewInput,
+) UpdateReviewOutput {
+	repo := parseGiteaRepoRef(remoteURL)
+	if repo == nil {
+		return UpdateReviewOutput{Code: "unsupported_provider", Error: "Updating pull requests requires a Gitea remote."}
+	}
+	if number <= 0 {
+		return UpdateReviewOutput{Code: "validation", Error: "Update PR failed: a pull request number is required."}
+	}
+	baseURL := repo.APIBaseURL
+	if config.APIBaseURL != "" {
+		baseURL = config.APIBaseURL
+	}
+	resourcePath := fmt.Sprintf("%s/repos/%s/%s/pulls/%d", strings.TrimRight(baseURL, "/"), url.PathEscape(repo.Owner), url.PathEscape(repo.Repo), number)
+
+	fields := map[string]interface{}{}
+	if input.Title != nil {
+		title := strings.TrimSpace(*input.Title)
+		if title == "" {
+			return UpdateReviewOutput{Code: "validation", Error: "Update PR failed: title cannot be empty."}
+		}
+		fields["title"] = title
+	}
+	if input.Body != nil {
+		fields["body"] = *input.Body
+	}
+	switch input.State {
+	case "closed":
+		fields["state"] = "closed"
+	case "open":
+		fields["state"] = "open"
+	case "":
+		// no state change requested
+	default:
+		return UpdateReviewOutput{Code: "validation", Error: "Update PR failed: state must be \"open\" or \"closed\"."}
+	}
+	if len(fields) > 0 {
+		if _, err := mutateProviderJSON(ctx, client, http.MethodPatch, resourcePath, config.authHeaders(), giteaCredentialHint, fields, nil); err != nil {
+			result := classifyGiteaWriteError("Update", err)
+			return UpdateReviewOutput{OK: false, Code: result.Code, Error: strings.Replace(result.Error, "Create PR", "Update PR", 1)}
+		}
+	}
+	if len(input.AddReviewers) > 0 {
+		if err := postGiteaReviewers(ctx, client, config, resourcePath, input.AddReviewers); err != nil {
+			result := classifyGiteaWriteError("Update", err)
+			return UpdateReviewOutput{OK: false, Code: result.Code, Error: strings.Replace(result.Error, "Create PR", "Update PR", 1)}
+		}
+	}
+	if len(input.RemoveReviewers) > 0 {
+		if err := deleteGiteaReviewers(ctx, client, config, resourcePath, input.RemoveReviewers); err != nil {
+			result := classifyGiteaWriteError("Update", err)
+			return UpdateReviewOutput{OK: false, Code: result.Code, Error: strings.Replace(result.Error, "Create PR", "Update PR", 1)}
+		}
+	}
+	return UpdateReviewOutput{OK: true}
+}
+
+func postGiteaReviewers(ctx context.Context, client *http.Client, config GiteaConfig, resourcePath string, reviewers []string) error {
+	logins := normalizeGiteaReviewerLogins(reviewers)
+	if len(logins) == 0 {
+		return nil
+	}
+	_, err := mutateProviderJSON(
+		ctx, client, http.MethodPost, resourcePath+"/requested_reviewers",
+		config.authHeaders(), giteaCredentialHint, map[string]interface{}{"reviewers": logins}, nil,
+	)
+	return err
+}
+
+func deleteGiteaReviewers(ctx context.Context, client *http.Client, config GiteaConfig, resourcePath string, reviewers []string) error {
+	logins := normalizeGiteaReviewerLogins(reviewers)
+	if len(logins) == 0 {
+		return nil
+	}
+	_, err := mutateProviderJSON(
+		ctx, client, http.MethodDelete, resourcePath+"/requested_reviewers",
+		config.authHeaders(), giteaCredentialHint, map[string]interface{}{"reviewers": logins}, nil,
+	)
+	return err
+}
+
+func normalizeGiteaReviewerLogins(reviewers []string) []string {
+	logins := make([]string, 0, len(reviewers))
+	for _, reviewer := range reviewers {
+		trimmed := strings.TrimSpace(reviewer)
+		if trimmed != "" {
+			logins = append(logins, trimmed)
+		}
+	}
+	return logins
+}
+
+func findExistingGiteaPR(
+	ctx context.Context,
+	client *http.Client,
+	config GiteaConfig,
+	repo *giteaRepoRef,
+	head string,
+) *ReviewSummary {
+	baseURL := repo.APIBaseURL
+	if config.APIBaseURL != "" {
+		baseURL = config.APIBaseURL
+	}
+	query := url.Values{}
+	query.Set("state", "open")
+	query.Set("limit", "25")
+	endpoint := fmt.Sprintf("%s/repos/%s/%s/pulls?%s", strings.TrimRight(baseURL, "/"), url.PathEscape(repo.Owner), url.PathEscape(repo.Repo), query.Encode())
+	var raw []giteaPRRaw
+	if err := fetchProviderJSON(ctx, client, endpoint, config.authHeaders(), giteaCredentialHint, &raw); err != nil {
+		return nil
+	}
+	for i := range raw {
+		if raw[i].Head != nil && strings.EqualFold(raw[i].Head.Ref, head) {
+			item := mapGiteaPR(&raw[i])
+			return &ReviewSummary{Number: item.Number, URL: item.URL}
+		}
+	}
+	return nil
+}
+
+func classifyGiteaWriteError(action string, err error) CreateReviewOutput {
+	code, message := classifyReviewWriteError(action, "Gitea", err)
+	return CreateReviewOutput{Code: code, Error: message}
+}
