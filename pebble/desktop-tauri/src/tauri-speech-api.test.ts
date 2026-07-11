@@ -98,7 +98,7 @@ describe('createPebbleSpeechApi', () => {
     expect(invokeMock).not.toHaveBeenCalled()
   })
 
-  it('starts cloud dictation natively and keeps local inference an explicit gap', async () => {
+  it('starts cloud dictation natively without probing local capability', async () => {
     const api = await loadSpeechApi()
 
     await api.startDictation('openai-gpt-4o-mini-transcribe', undefined, 'session-1')
@@ -106,8 +106,50 @@ describe('createPebbleSpeechApi', () => {
       modelId: 'openai-gpt-4o-mini-transcribe',
       sessionId: 'session-1'
     })
+    expect(invokeMock).not.toHaveBeenCalledWith('speech_local_inference_supported')
+  })
 
+  it('routes local models natively when the Rust build carries the engine', async () => {
+    const api = await loadSpeechApi()
+    invokeMock.mockImplementation((command: string) =>
+      Promise.resolve(command === 'speech_local_inference_supported' ? true : undefined)
+    )
+    const manifest = SPEECH_MODEL_CATALOG.find((m) => m.id === 'whisper-tiny')!
+
+    await api.startDictation('whisper-tiny', [], 'session-2')
+    expect(invokeMock).toHaveBeenCalledWith('speech_start_dictation', {
+      modelId: 'whisper-tiny',
+      sessionId: 'session-2',
+      localModel: {
+        modelType: manifest.type,
+        streaming: manifest.streaming,
+        sampleRate: manifest.sampleRate,
+        files: manifest.files
+      }
+    })
+  })
+
+  it('keeps the typed local-inference gap when the engine is absent or unprobeable', async () => {
+    const api = await loadSpeechApi()
+    invokeMock.mockImplementation((command: string) =>
+      command === 'speech_local_inference_supported'
+        ? Promise.resolve(false)
+        : Promise.resolve(undefined)
+    )
     await expect(api.startDictation('whisper-tiny', [], 'session-2')).rejects.toThrow(
+      'Local speech models are not available in the Tauri shell yet'
+    )
+    expect(invokeMock).not.toHaveBeenCalledWith('speech_start_dictation', expect.anything())
+
+    // Older Rust binaries without the probe command must fail closed too.
+    vi.resetModules()
+    const staleApi = await loadSpeechApi()
+    invokeMock.mockImplementation((command: string) =>
+      command === 'speech_local_inference_supported'
+        ? Promise.reject(new Error('unknown command'))
+        : Promise.resolve(undefined)
+    )
+    await expect(staleApi.startDictation('whisper-tiny', [], 'session-3')).rejects.toThrow(
       'Local speech models are not available in the Tauri shell yet'
     )
   })
@@ -134,15 +176,20 @@ describe('createPebbleSpeechApi', () => {
 
   it('dispatches native speech events to subscribers until unsubscribed', async () => {
     const api = await loadSpeechApi()
+    const onPartial = vi.fn()
     const onFinal = vi.fn()
     const onProgress = vi.fn()
     const onStopped = vi.fn()
 
     const unsubscribeFinal = api.onFinalTranscript(onFinal)
+    api.onPartialTranscript(onPartial)
     api.onDownloadProgress(onProgress)
     api.onStopped(onStopped)
     await Promise.resolve()
 
+    eventHandlers.get('pebble:speech-partial-transcript')?.({
+      payload: { text: 'hel', sessionId: 'session-1' }
+    })
     eventHandlers.get('pebble:speech-final-transcript')?.({
       payload: { text: 'hello', sessionId: 'session-1' }
     })
@@ -151,6 +198,7 @@ describe('createPebbleSpeechApi', () => {
     })
     eventHandlers.get('pebble:speech-stopped')?.({ payload: { sessionId: 'session-1' } })
 
+    expect(onPartial).toHaveBeenCalledWith({ text: 'hel', sessionId: 'session-1' })
     expect(onFinal).toHaveBeenCalledWith({ text: 'hello', sessionId: 'session-1' })
     expect(onProgress).toHaveBeenCalledWith({ modelId: 'whisper-tiny', progress: 0.5 })
     expect(onStopped).toHaveBeenCalledWith({ sessionId: 'session-1' })

@@ -15,17 +15,39 @@ import { SPEECH_MODEL_CATALOG, getCatalogModel } from '../../../src/main/speech/
 // this flag means at least one native dictation path is operational.
 export const TAURI_SPEECH_AVAILABLE = true
 
-export function isTauriSpeechModelAvailable(modelId: string): boolean {
-  return getCatalogModel(modelId)?.provider === 'openai'
-}
-
-// Honest gap: cloud (OpenAI) dictation, key storage, and model downloads are
-// native; local sherpa-onnx/whisper inference is not ported to the Tauri shell.
+// Honest gap: cloud dictation, key storage, downloads, and (when the Rust
+// build carries the `local-speech` feature) local sherpa-onnx inference are
+// native. Builds without the engine report this typed gap for local models.
 const TAURI_LOCAL_INFERENCE_UNAVAILABLE =
   'Local speech models are not available in the Tauri shell yet. Choose an OpenAI model.'
 
+// Why: whether local inference exists is a compile-time fact of the Rust
+// binary; probe once and cache for the sync availability check.
+let localInferenceProbe: Promise<boolean> | null = null
+let localInferenceSupported = false
+
+function probeLocalInferenceSupport(): Promise<boolean> {
+  localInferenceProbe ??= invoke<boolean>('speech_local_inference_supported')
+    .then((supported) => {
+      localInferenceSupported = supported === true
+      return localInferenceSupported
+    })
+    .catch(() => false)
+  return localInferenceProbe
+}
+
+export function isTauriSpeechModelAvailable(modelId: string): boolean {
+  const provider = getCatalogModel(modelId)?.provider
+  if (provider === 'local') {
+    void probeLocalInferenceSupport()
+    return localInferenceSupported
+  }
+  return provider === 'openai'
+}
+
 const DOWNLOAD_PROGRESS_EVENT = 'pebble:speech-download-progress'
 const READY_EVENT = 'pebble:speech-ready'
+const PARTIAL_TRANSCRIPT_EVENT = 'pebble:speech-partial-transcript'
 const FINAL_TRANSCRIPT_EVENT = 'pebble:speech-final-transcript'
 const STOPPED_EVENT = 'pebble:speech-stopped'
 const ERROR_EVENT = 'pebble:speech-error'
@@ -61,6 +83,9 @@ function ensureTauriSpeechEventListeners(): void {
     emitSpeechEvent('downloadProgress', event.payload)
   )
   void listen<SpeechLifecycleEvent>(READY_EVENT, (event) => emitSpeechEvent('ready', event.payload))
+  void listen<SpeechTranscriptEvent>(PARTIAL_TRANSCRIPT_EVENT, (event) =>
+    emitSpeechEvent('partial', event.payload)
+  )
   void listen<SpeechTranscriptEvent>(FINAL_TRANSCRIPT_EVENT, (event) =>
     emitSpeechEvent('final', event.payload)
   )
@@ -136,14 +161,29 @@ export function createPebbleSpeechApi(base: PreloadApi['speech']): PreloadApi['s
     },
     cancelDownload: (modelId) => invoke('speech_cancel_download', { modelId }),
     deleteModel: (modelId) => invoke('speech_delete_model', { modelId }),
-    // Why: hotwords only apply to local sherpa-onnx decoding, which is not
-    // ported; the cloud path ignores them, matching Electron's OpenAI branch.
-    startDictation: (modelId, _hotwords, sessionId) => {
+    // Why: hotwords need sherpa's modified_beam_search wiring which is not
+    // ported yet; local decoding runs greedy_search and the cloud path
+    // ignores them, matching Electron's OpenAI branch.
+    startDictation: async (modelId, _hotwords, sessionId) => {
       const manifest = getCatalogModel(modelId)
-      if (manifest && manifest.provider !== 'openai') {
-        return Promise.reject(new Error(TAURI_LOCAL_INFERENCE_UNAVAILABLE))
-      }
       ensureTauriSpeechEventListeners()
+      if (manifest && manifest.provider !== 'openai') {
+        if (!(await probeLocalInferenceSupport())) {
+          throw new Error(TAURI_LOCAL_INFERENCE_UNAVAILABLE)
+        }
+        return invoke('speech_start_dictation', {
+          modelId,
+          sessionId,
+          // Rust validates and resolves against this manifest slice so the
+          // TS catalog stays the single source of model metadata.
+          localModel: {
+            modelType: manifest.type,
+            streaming: manifest.streaming,
+            sampleRate: manifest.sampleRate,
+            files: manifest.files ?? []
+          }
+        })
+      }
       return invoke('speech_start_dictation', { modelId, sessionId })
     },
     feedAudio: (samples, sampleRate, sessionId = DEFAULT_SESSION_ID) =>

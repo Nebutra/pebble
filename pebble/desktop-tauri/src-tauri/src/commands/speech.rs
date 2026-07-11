@@ -1,10 +1,8 @@
 //! Tauri speech commands: OpenAI key storage, model archive downloads, and
-//! cloud (OpenAI) dictation sessions. The renderer-facing contract mirrors
-//! Electron's `speech:*` IPC surface; the model catalog stays TS-owned and
-//! manifests are passed in, so there is a single source of truth.
-//!
-//! Local sherpa-onnx/whisper inference is not ported yet — `start_dictation`
-//! returns an explicit typed error for local models.
+//! dictation sessions — cloud (OpenAI) plus local sherpa-onnx inference when
+//! the `local-speech` feature is compiled in. The renderer-facing contract
+//! mirrors Electron's `speech:*` IPC surface; the model catalog stays TS-owned
+//! and manifests are passed in, so there is a single source of truth.
 
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
@@ -14,6 +12,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+use super::speech_local_dictation::{
+    spawn_local_dictation, LocalSessionCommand, LocalSpeechEvent, LocalSpeechEventSink,
+};
+use super::speech_local_engine;
+use super::speech_local_model::{resolve_model_paths, LocalSpeechModelSpec};
 use super::speech_model_download::{
     cleanup_partial_model, download_archive, extract_archive_blocking, flatten_nested_model_dir,
     model_files_present, safe_model_dir, verify_archive_sha256,
@@ -26,6 +29,7 @@ use super::speech_openai_transcription::{
 
 const DOWNLOAD_PROGRESS_EVENT: &str = "pebble:speech-download-progress";
 const READY_EVENT: &str = "pebble:speech-ready";
+const PARTIAL_TRANSCRIPT_EVENT: &str = "pebble:speech-partial-transcript";
 const FINAL_TRANSCRIPT_EVENT: &str = "pebble:speech-final-transcript";
 const STOPPED_EVENT: &str = "pebble:speech-stopped";
 const ERROR_EVENT: &str = "pebble:speech-error";
@@ -48,9 +52,15 @@ struct ActiveDownload {
     phase: DownloadPhase,
 }
 
-struct DictationSession {
-    model_id: String,
-    samples: Vec<f32>,
+enum DictationSession {
+    /// OpenAI cloud transcription — audio buffers until stop, then uploads.
+    Cloud { model_id: String, samples: Vec<f32> },
+    /// Local sherpa-onnx inference — audio streams to a per-session engine
+    /// thread; transcripts flow back through the event sink.
+    Local {
+        commands: std::sync::mpsc::Sender<LocalSessionCommand>,
+        model_sample_rate: u32,
+    },
 }
 
 #[derive(Default)]
@@ -434,16 +444,23 @@ pub async fn speech_delete_model(
     .map_err(|e| e.to_string())?
 }
 
+/// Capability probe for the TS bridge: true when the sherpa-onnx engine was
+/// compiled in (`local-speech` feature) and local models can run natively.
+#[tauri::command]
+pub fn speech_local_inference_supported() -> bool {
+    speech_local_engine::local_inference_supported()
+}
+
 #[tauri::command]
 pub async fn speech_start_dictation(
     app: AppHandle,
     state: State<'_, SpeechState>,
     model_id: String,
     session_id: String,
+    local_model: Option<LocalSpeechModelSpec>,
 ) -> Result<(), String> {
     if openai_transcription_model_for_id(&model_id).is_none() {
-        // Honest gap: sherpa-onnx/whisper local inference is not ported.
-        return Err(LOCAL_INFERENCE_UNAVAILABLE.to_string());
+        return start_local_dictation(app, state, model_id, session_id, local_model).await;
     }
 
     let key_configured = tauri::async_runtime::spawn_blocking(speech_openai_key_store::has_key)
@@ -460,7 +477,7 @@ pub async fn speech_start_dictation(
         }
         sessions.insert(
             session_id.clone(),
-            DictationSession {
+            DictationSession::Cloud {
                 model_id,
                 samples: Vec::new(),
             },
@@ -471,6 +488,131 @@ pub async fn speech_start_dictation(
     Ok(())
 }
 
+async fn start_local_dictation(
+    app: AppHandle,
+    state: State<'_, SpeechState>,
+    model_id: String,
+    session_id: String,
+    local_model: Option<LocalSpeechModelSpec>,
+) -> Result<(), String> {
+    if !speech_local_engine::local_inference_supported() {
+        // Honest gap: the sherpa-onnx engine was not compiled into this build.
+        return Err(LOCAL_INFERENCE_UNAVAILABLE.to_string());
+    }
+    // The catalog is TS-owned; without a manifest spec Rust cannot know the
+    // model family, so treat it as the same typed gap Electron users never hit.
+    let Some(spec) = local_model else {
+        return Err(LOCAL_INFERENCE_UNAVAILABLE.to_string());
+    };
+
+    let model_dir = safe_model_dir(&speech_models_dir(&app)?, &model_id)?;
+    let probe_dir = model_dir.clone();
+    let probe_files = spec.files.clone();
+    let downloaded =
+        tauri::async_runtime::spawn_blocking(move || model_files_present(&probe_dir, &probe_files))
+            .await
+            .map_err(|e| e.to_string())?;
+    if !downloaded {
+        return Err("Model not ready: not-downloaded".to_string());
+    }
+
+    let paths = resolve_model_paths(&spec, &model_dir)?;
+    let factory = speech_local_engine::local_engine_factory(&spec, &paths)?;
+    let handle = spawn_local_dictation(factory, local_speech_event_sink(&app, &session_id));
+
+    {
+        let mut sessions = state.sessions.lock().expect("speech sessions poisoned");
+        if !sessions.is_empty() {
+            // Why: dropping the command sender tears the freshly spawned
+            // engine thread down; the loser of the race must not leak it.
+            return Err("dictation_already_active".to_string());
+        }
+        sessions.insert(
+            session_id.clone(),
+            DictationSession::Local {
+                commands: handle.commands.clone(),
+                model_sample_rate: spec.sample_rate,
+            },
+        );
+    }
+
+    match handle.ready.await {
+        Ok(Ok(())) => {
+            let _ = app.emit(READY_EVENT, SessionPayload { session_id });
+            Ok(())
+        }
+        Ok(Err(error)) => {
+            remove_session(&state, &session_id);
+            Err(error)
+        }
+        Err(_) => {
+            remove_session(&state, &session_id);
+            Err("Speech engine thread exited during startup".to_string())
+        }
+    }
+}
+
+fn remove_session(state: &State<'_, SpeechState>, session_id: &str) {
+    state
+        .sessions
+        .lock()
+        .expect("speech sessions poisoned")
+        .remove(session_id);
+}
+
+/// Maps engine-thread events onto the renderer-facing `pebble:speech-*`
+/// events, mirroring Electron's stt-worker → webContents flow.
+fn local_speech_event_sink(app: &AppHandle, session_id: &str) -> LocalSpeechEventSink {
+    let app = app.clone();
+    let session_id = session_id.to_string();
+    Arc::new(move |event| match event {
+        LocalSpeechEvent::Partial(text) => {
+            let _ = app.emit(
+                PARTIAL_TRANSCRIPT_EVENT,
+                TranscriptPayload {
+                    text,
+                    session_id: session_id.clone(),
+                },
+            );
+        }
+        LocalSpeechEvent::Final(text) => {
+            let _ = app.emit(
+                FINAL_TRANSCRIPT_EVENT,
+                TranscriptPayload {
+                    text,
+                    session_id: session_id.clone(),
+                },
+            );
+        }
+        LocalSpeechEvent::Error(error) => {
+            let _ = app.emit(
+                ERROR_EVENT,
+                SessionErrorPayload {
+                    error,
+                    session_id: session_id.clone(),
+                },
+            );
+        }
+        LocalSpeechEvent::Stopped => {
+            // Why: the engine thread is the single source of session
+            // liveness — clear state here so an abandoned session (thread
+            // death, replaced sink) cannot wedge the single-session rule.
+            let state = app.state::<SpeechState>();
+            state
+                .sessions
+                .lock()
+                .expect("speech sessions poisoned")
+                .remove(&session_id);
+            let _ = app.emit(
+                STOPPED_EVENT,
+                SessionPayload {
+                    session_id: session_id.clone(),
+                },
+            );
+        }
+    })
+}
+
 #[tauri::command]
 pub fn speech_feed_audio(
     state: State<'_, SpeechState>,
@@ -478,6 +620,43 @@ pub fn speech_feed_audio(
     samples_base64: String,
     sample_rate: u32,
 ) -> Result<(), String> {
+    let samples = decode_audio_chunk(&samples_base64)?;
+
+    let mut sessions = state.sessions.lock().expect("speech sessions poisoned");
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or_else(|| "No active dictation session".to_string())?;
+    match session {
+        DictationSession::Cloud {
+            samples: buffered, ..
+        } => {
+            let normalized =
+                resample_to_rate(&samples, sample_rate, CLOUD_TRANSCRIPTION_SAMPLE_RATE);
+            let total_seconds =
+                (buffered.len() + normalized.len()) as f64 / CLOUD_TRANSCRIPTION_SAMPLE_RATE as f64;
+            if total_seconds > MAX_CLOUD_AUDIO_SECONDS {
+                return Err(
+                    "Cloud transcription is limited to 10 minutes per dictation".to_string()
+                );
+            }
+            buffered.extend_from_slice(&normalized);
+            Ok(())
+        }
+        DictationSession::Local {
+            commands,
+            model_sample_rate,
+        } => {
+            // Why: sherpa aborts if one recognizer sees mixed input rates —
+            // normalize before the native boundary, like Electron's worker.
+            let normalized = resample_to_rate(&samples, sample_rate, *model_sample_rate);
+            commands
+                .send(LocalSessionCommand::Feed(normalized))
+                .map_err(|_| "Dictation session has ended".to_string())
+        }
+    }
+}
+
+fn decode_audio_chunk(samples_base64: &str) -> Result<Vec<f32>, String> {
     if samples_base64.len() > MAX_AUDIO_CHUNK_BASE64_LENGTH {
         return Err("Audio chunk is too large".to_string());
     }
@@ -487,23 +666,10 @@ pub fn speech_feed_audio(
     if bytes.len() % 4 != 0 {
         return Err("Audio chunk must be little-endian float32 PCM".to_string());
     }
-    let samples: Vec<f32> = bytes
+    Ok(bytes
         .chunks_exact(4)
         .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
-        .collect();
-    let normalized = resample_to_rate(&samples, sample_rate, CLOUD_TRANSCRIPTION_SAMPLE_RATE);
-
-    let mut sessions = state.sessions.lock().expect("speech sessions poisoned");
-    let session = sessions
-        .get_mut(&session_id)
-        .ok_or_else(|| "No active dictation session".to_string())?;
-    let total_seconds =
-        (session.samples.len() + normalized.len()) as f64 / CLOUD_TRANSCRIPTION_SAMPLE_RATE as f64;
-    if total_seconds > MAX_CLOUD_AUDIO_SECONDS {
-        return Err("Cloud transcription is limited to 10 minutes per dictation".to_string());
-    }
-    session.samples.extend_from_slice(&normalized);
-    Ok(())
+        .collect())
 }
 
 #[tauri::command]
@@ -525,8 +691,27 @@ pub async fn speech_stop_dictation(
         return Ok(());
     };
 
-    if !session.samples.is_empty() {
-        match finish_cloud_transcription(&session).await {
+    let (model_id, samples) = match session {
+        DictationSession::Local { commands, .. } => {
+            let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+            if commands
+                .send(LocalSessionCommand::Stop { ack: ack_tx })
+                .is_err()
+            {
+                // Engine thread already gone; its sink may never fire again.
+                let _ = app.emit(STOPPED_EVENT, SessionPayload { session_id });
+                return Ok(());
+            }
+            // Final decode (offline models chew the whole buffer here) and the
+            // stopped event both flow through the engine thread's sink.
+            let _ = ack_rx.await;
+            return Ok(());
+        }
+        DictationSession::Cloud { model_id, samples } => (model_id, samples),
+    };
+
+    if !samples.is_empty() {
+        match finish_cloud_transcription(&model_id, &samples).await {
             Ok(text) => {
                 if !text.is_empty() {
                     let _ = app.emit(
@@ -554,10 +739,32 @@ pub async fn speech_stop_dictation(
     Ok(())
 }
 
-async fn finish_cloud_transcription(session: &DictationSession) -> Result<String, String> {
+async fn finish_cloud_transcription(model_id: &str, samples: &[f32]) -> Result<String, String> {
     let api_key = tauri::async_runtime::spawn_blocking(speech_openai_key_store::read_key)
         .await
         .map_err(|e| e.to_string())??;
-    let wav = encode_pcm16_wav(&session.samples, CLOUD_TRANSCRIPTION_SAMPLE_RATE);
-    transcribe_wav(&session.model_id, &api_key, wav).await
+    let wav = encode_pcm16_wav(samples, CLOUD_TRANSCRIPTION_SAMPLE_RATE);
+    transcribe_wav(model_id, &api_key, wav).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_audio_chunk_round_trips_little_endian_float32() {
+        let samples = [0.0f32, 0.5, -1.0];
+        let bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
+        let encoded = BASE64_STANDARD.encode(bytes);
+        assert_eq!(decode_audio_chunk(&encoded).expect("decode"), samples);
+    }
+
+    #[test]
+    fn decode_audio_chunk_rejects_garbage_and_misaligned_payloads() {
+        assert!(decode_audio_chunk("not base64!").is_err());
+        // 3 bytes is not a whole float32.
+        assert!(decode_audio_chunk(&BASE64_STANDARD.encode([1u8, 2, 3])).is_err());
+        let oversized = "A".repeat(MAX_AUDIO_CHUNK_BASE64_LENGTH + 1);
+        assert!(decode_audio_chunk(&oversized).is_err());
+    }
 }
