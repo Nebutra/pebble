@@ -1620,6 +1620,47 @@ func TestGitRepositoryIdentityEndpoint(t *testing.T) {
 	}
 }
 
+// TestGitRepositoryIdentityEndpointFallsBackToGitHubAPIWithoutUpstreamRemote
+// mirrors getRepoUpstream's API fallback (src/main/github/client.ts) for forks
+// with no local `upstream` remote configured.
+func TestGitRepositoryIdentityEndpointFallsBackToGitHubAPIWithoutUpstreamRemote(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git executable is not available")
+	}
+	repo := t.TempDir()
+	runHTTPGitCommand(t, repo, "init")
+	runHTTPGitCommand(t, repo, "remote", "add", "origin", "git@github.com:fork/pebble.git")
+
+	fakeProviderCLI(t, "gh", `{"isFork":true,"parent":{"name":"pebble","owner":{"login":"nebutra"}}}`, 0)
+
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProject(runtimecore.CreateProjectRequest{Name: "repo", Path: repo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := NewServer(manager)
+	body := strings.NewReader(`{"projectId":"` + project.ID + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/source-control/repository-identity", body)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var identity runtimecore.GitRepositoryIdentityResult
+	if err := json.Unmarshal(rec.Body.Bytes(), &identity); err != nil {
+		t.Fatal(err)
+	}
+	if identity.Slug == nil || identity.Slug.Owner != "fork" || identity.Slug.Repo != "pebble" {
+		t.Fatalf("unexpected slug: %#v", identity.Slug)
+	}
+	if identity.Upstream == nil || identity.Upstream.Owner != "nebutra" || identity.Upstream.Repo != "pebble" {
+		t.Fatalf("expected GitHub API fork-parent fallback to resolve upstream, got: %#v", identity.Upstream)
+	}
+}
+
 func TestGitLocalBranchesAndCheckoutEndpoints(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git executable is not available")

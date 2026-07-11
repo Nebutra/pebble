@@ -140,6 +140,41 @@ func (s *Server) handleProviderReviewCreate(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, result)
 }
 
+func (s *Server) handleProviderReviewUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req struct {
+		ProjectID       string   `json:"projectId"`
+		WorktreeID      string   `json:"worktreeId"`
+		Provider        string   `json:"provider"`
+		Number          int      `json:"number"`
+		Title           *string  `json:"title"`
+		Body            *string  `json:"body"`
+		State           string   `json:"state"`
+		AddReviewers    []string `json:"addReviewers"`
+		RemoveReviewers []string `json:"removeReviewers"`
+	}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.UpdateHostedReview(
+		r.Context(),
+		req.ProjectID,
+		req.WorktreeID,
+		providercli.UpdateReviewRequest{
+			Provider: req.Provider, Number: req.Number, Title: req.Title, Body: req.Body,
+			State: req.State, AddReviewers: req.AddReviewers, RemoveReviewers: req.RemoveReviewers,
+		},
+	)
+	if err != nil {
+		writeProviderError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (s *Server) handleProviderReviewCapabilities(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")

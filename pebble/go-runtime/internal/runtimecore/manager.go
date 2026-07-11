@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tsekaluk/pebble/go-runtime/internal/providercli"
 )
 
 const (
@@ -2715,6 +2717,13 @@ func (m *Manager) GitRepositoryIdentity(ctx context.Context, req GitRepositoryId
 	upstream := readGitHubRemoteIdentity(ctx, base, "upstream")
 	if sameGitHubRepositoryIdentity(slug, upstream) {
 		upstream = nil
+	}
+	// Why: mirrors getRepoUpstream's GitHub API fallback (src/main/github/client.ts)
+	// for forks with no local `upstream` remote configured.
+	if upstream == nil && slug != nil {
+		if parent := providercli.ResolveGitHubForkParent(ctx, base, slug.Owner, slug.Repo); parent != nil {
+			upstream = &GitHubRepositoryIdentity{Owner: parent.Owner, Repo: parent.Repo}
+		}
 	}
 	return GitRepositoryIdentityResult{Slug: slug, Upstream: upstream}, nil
 }

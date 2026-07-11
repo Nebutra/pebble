@@ -39,6 +39,33 @@ type CreateReviewResult struct {
 var githubPullURLPattern = regexp.MustCompile(`https://github\.com/[^/\s]+/[^/\s]+/pull/(\d+)`)
 var gitlabMergeRequestURLPattern = regexp.MustCompile(`https?://[^\s]+/-/merge_requests/(\d+)`)
 
+// pullRequestTemplateCandidates mirrors PULL_REQUEST_TEMPLATE_CANDIDATES in
+// src/main/source-control/pull-request-template.ts so native Create PR
+// hydration finds the same conventional template paths Electron does.
+var pullRequestTemplateCandidates = []string{
+	".github/pull_request_template.md",
+	".github/PULL_REQUEST_TEMPLATE.md",
+	".azuredevops/pull_request_template.md",
+	".azuredevops/PULL_REQUEST_TEMPLATE.md",
+	".gitea/pull_request_template.md",
+	".gitea/PULL_REQUEST_TEMPLATE.md",
+	"pull_request_template.md",
+	"PULL_REQUEST_TEMPLATE.md",
+	"docs/pull_request_template.md",
+	"docs/PULL_REQUEST_TEMPLATE.md",
+}
+
+// mergeRequestTemplateCandidates mirrors MERGE_REQUEST_TEMPLATE_CANDIDATES in
+// the same file. Electron's getTemplateCandidates falls back to the PR
+// candidates after the MR-specific ones for GitLab, so callers append
+// pullRequestTemplateCandidates after this list.
+var mergeRequestTemplateCandidates = []string{
+	".gitlab/merge_request_templates/Default.md",
+	".gitlab/merge_request_templates/default.md",
+	".gitlab/merge_request_template.md",
+	".gitlab/MERGE_REQUEST_TEMPLATE.md",
+}
+
 func IsReviewProviderAuthenticated(ctx context.Context, workdir string, provider string, host string) bool {
 	var bin string
 	switch provider {
@@ -62,14 +89,7 @@ func CreateGitHubPullRequest(ctx context.Context, workdir string, input CreateRe
 	if invalid != nil {
 		return *invalid
 	}
-	body := resolveReviewBody(workdir, input, []string{
-		".github/pull_request_template.md",
-		".github/PULL_REQUEST_TEMPLATE.md",
-		"pull_request_template.md",
-		"PULL_REQUEST_TEMPLATE.md",
-		"docs/pull_request_template.md",
-		"docs/PULL_REQUEST_TEMPLATE.md",
-	})
+	body := resolveReviewBody(workdir, input, pullRequestTemplateCandidates)
 	bodyFile, err := os.CreateTemp("", "pebble-pr-body-*.md")
 	if err != nil {
 		return unknownCreateReviewResult("PR", "GitHub", err)
@@ -115,12 +135,12 @@ func CreateGitLabMergeRequest(ctx context.Context, workdir string, input CreateR
 	if invalid != nil {
 		return *invalid
 	}
-	body := resolveReviewBody(workdir, input, []string{
-		".gitlab/merge_request_templates/Default.md",
-		".gitlab/merge_request_templates/default.md",
-		".gitlab/merge_request_template.md",
-		".gitlab/MERGE_REQUEST_TEMPLATE.md",
-	})
+	// Why: Electron's getTemplateCandidates checks MR-specific paths first, then
+	// falls back to the generic PR template paths for GitLab too.
+	candidates := make([]string, 0, len(mergeRequestTemplateCandidates)+len(pullRequestTemplateCandidates))
+	candidates = append(candidates, mergeRequestTemplateCandidates...)
+	candidates = append(candidates, pullRequestTemplateCandidates...)
+	body := resolveReviewBody(workdir, input, candidates)
 	args := []string{
 		"mr", "create", "--target-branch", base, "--title", title,
 		"--description", body, "--yes",

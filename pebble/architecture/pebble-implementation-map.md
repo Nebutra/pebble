@@ -215,16 +215,28 @@ Current implementation:
   so local Create PR/MR no longer falls through to an unsupported-provider placeholder.
   Tauri preload now overrides the web fallback git generation API with native local commit-message
   and pull-request field generation: Rust reads staged/base diff context and runs bounded,
-  cancelable agent plans while shared prompt/parser code keeps renderer output parity. Hosted-review
-  update/mutation actions for providers beyond GitHub/GitLab remain explicit gaps while provider
+  cancelable agent plans while shared prompt/parser code keeps renderer output parity. Go's
+  Create PR/MR template hydration now matches Electron's full candidate list (`.github/`,
+  `.azuredevops/`, `.gitea/`, root, and `docs/` paths, with GitLab falling back to the generic PR
+  candidates after its own `.gitlab/` paths), and `GitRepositoryIdentity` falls back to a `gh repo
+  view --json isFork,parent` lookup for the fork-parent owner/repo when no local `upstream` remote
+  is configured, mirroring Electron's `getRepoUpstream`. A parallel `/v1/providers/reviews/update`
+  route now covers the realistic post-creation mutation set Electron supports (title/body edit,
+  reviewer add/remove, close/reopen) for GitHub via `gh pr edit/close/reopen` and GitLab via `glab
+  api PUT`/`mr close`/`mr reopen`; GitLab's reviewer set is a full-list REST replace in Electron
+  (not an add/remove delta), so incremental reviewer mutation for GitLab stays an explicit gap.
+  Hosted-review update/mutation actions for providers beyond GitHub/GitLab (and GitLab's retarget-
+  base/draft-toggle, which Electron itself doesn't implement) remain explicit gaps while provider
   mutations move out of Electron. Go now parses porcelain unmerged states into Electron's exact
   conflict-kind union with merge/rebase/cherry-pick operation detection, exposes binary diff byte
   sizes/image-mime flags, synthesizes submodule pointer diffs with structured old/new SHA
   metadata, and lets relay workers report remote base-status drift through the same reconcile
-  endpoint used locally. Full parity still needs remote/SSH text-generation relay parity, PR
-  template body hydration, GitHub API fork-parent fallback without an `upstream` remote, provider
-  review update actions, and non-GitHub/GitLab review creation (Bitbucket/Azure DevOps/Gitea have
-  native PR listing via REST but not creation/update).
+  endpoint used locally. Full parity still needs remote/SSH text-generation relay parity (the relay
+  worker posts git-status projections only — no staged/base diff patch or commit-log content, and
+  no per-file-diff/log relay route — so native commit-message/PR-field generation stays local-only
+  until that richer relay context lands, a large gap rather than a wiring fix) and non-GitHub/GitLab
+  review creation (Bitbucket/Azure DevOps/Gitea have native PR listing via REST but not
+  creation/update).
 - SSH/remote source-control projections can be updated by relay workers through the runtime
   gateway; direct git status/diff execution still returns relay-required errors without a worker.
   The runtime normalizes external changed-file status values, drops invalid workspace paths, and

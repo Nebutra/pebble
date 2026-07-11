@@ -26,6 +26,94 @@ type RuntimePostJson = <T>(
   options: { method: "POST"; body?: unknown; timeoutMs?: number },
 ) => Promise<T>;
 
+// ── Provider review update (post-creation mutations) ─────────────────
+// Mirrors the realistic subset of Electron's github.updatePR / updatePRState /
+// requestPRReviewers / removePRReviewers and gitlab.updateMR / updateMRState
+// IPC surfaces (src/main/runtime/rpc/methods/{github,gitlab}.ts) through the
+// Go runtime's gh/glab CLI-backed update route.
+
+export type UpdateHostedReviewResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+type UpdateHostedReviewParams = ProviderSelectorParams & {
+  provider?: unknown;
+  number?: unknown;
+  title?: unknown;
+  body?: unknown;
+  state?: unknown;
+  addReviewers?: unknown;
+  removeReviewers?: unknown;
+};
+
+export async function updateHostedReview(
+  requestJson: RuntimePostJson,
+  params: unknown,
+): Promise<UpdateHostedReviewResult> {
+  const input = params as UpdateHostedReviewParams;
+  const projectId = readProjectId(input);
+  const provider = readNonEmptyString(input.provider) ?? "unsupported";
+  const number = coercePositiveInt(input.number);
+  if (!projectId || !number) {
+    return {
+      ok: false,
+      error:
+        "Update review failed: repository and review number are required.",
+    };
+  }
+  const worktreeId = await resolveWorktreeId(
+    projectId,
+    readWorktreeSelector(input),
+  );
+  const state = readReviewStateInput(input.state);
+  const result = await requestJson<{ ok: boolean; error?: string }>(
+    "/v1/providers/reviews/update",
+    {
+      method: "POST",
+      timeoutMs: 30_000,
+      body: {
+        projectId,
+        ...(worktreeId ? { worktreeId } : {}),
+        provider,
+        number,
+        ...(readStringValue(input.title) !== null
+          ? { title: readStringValue(input.title) }
+          : {}),
+        ...(readStringValue(input.body) !== null
+          ? { body: readStringValue(input.body) }
+          : {}),
+        ...(state ? { state } : {}),
+        ...(readStringArray(input.addReviewers).length > 0
+          ? { addReviewers: readStringArray(input.addReviewers) }
+          : {}),
+        ...(readStringArray(input.removeReviewers).length > 0
+          ? { removeReviewers: readStringArray(input.removeReviewers) }
+          : {}),
+      },
+    },
+  );
+  return result.ok ? { ok: true } : { ok: false, error: result.error ?? "Update review failed." };
+}
+
+// GitLab's "opened" state name differs from GitHub's "open"; normalize both
+// to the Go route's provider-neutral "open"/"closed" pair.
+function readReviewStateInput(value: unknown): "open" | "closed" | null {
+  if (value === "open" || value === "opened") {
+    return "open";
+  }
+  if (value === "closed") {
+    return "closed";
+  }
+  return null;
+}
+
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((entry): entry is string => typeof entry === "string");
+}
+
 // The renderer sends `repo` as the Pebble Repo.id, which is the runtime's
 // projectId. Worktree-scoped callers may also pass worktreeId.
 type ProviderSelectorParams = {
