@@ -65,6 +65,8 @@ func (s *Server) handleSshTargetByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, target)
+	case action == "credential":
+		s.handleSshTargetCredential(w, r, id)
 	case r.Method == http.MethodPost && action == "probe":
 		result, err := s.manager.ProbeSshTarget(r.Context(), id)
 		if err != nil {
@@ -72,6 +74,47 @@ func (s *Server) handleSshTargetByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, result)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+// handleSshTargetCredential seeds/clears/reads the memory-only relay credential
+// cache. Responses only ever carry booleans — the secret value is never echoed,
+// logged, or persisted (see runtimecore/ssh_credential_cache.go).
+func (s *Server) handleSshTargetCredential(w http.ResponseWriter, r *http.Request, id string) {
+	switch r.Method {
+	case http.MethodGet:
+		status, err := s.manager.SshCredentialStatus(id)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, status)
+	case http.MethodPost:
+		var req struct {
+			Kind  string `json:"kind"`
+			Value string `json:"value"`
+		}
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		if req.Kind != runtimecore.SshCredentialKindPassphrase && req.Kind != runtimecore.SshCredentialKindPassword {
+			writeError(w, http.StatusBadRequest, "credential kind must be passphrase or password")
+			return
+		}
+		if req.Value == "" {
+			writeError(w, http.StatusBadRequest, "credential value is required")
+			return
+		}
+		status, err := s.manager.SeedSshCredential(id, req.Kind, req.Value)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, status)
+	case http.MethodDelete:
+		writeJSON(w, http.StatusOK, s.manager.ClearSshCredential(id))
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}

@@ -228,6 +228,8 @@ func (m *Manager) DeleteSshTarget(id string) (SshTarget, error) {
 	delete(m.sshTargets, id)
 	err := m.saveLocked()
 	m.mu.Unlock()
+	// Why: a removed target must not leave its credential resident in memory.
+	m.sshCredentials.clear(id)
 	if err != nil {
 		return SshTarget{}, err
 	}

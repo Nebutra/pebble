@@ -50,8 +50,11 @@ Current implementation:
 - Go persists SSH targets and runs bounded connectivity probes; Tauri maps target
   list/import/CRUD plus connect/disconnect UI state onto those probe results without claiming the
   SSH relay/PTY stack is complete. Auto-connect passphrase gating reads the persisted
-  `lastRequiredPassphrase` target flag instead of returning a fixed false; relay-side credential
-  cache parity remains a separate gate.
+  `lastRequiredPassphrase` target flag instead of returning a fixed false, and the runtime hosts a
+  memory-only per-target credential cache (`/v1/ssh-targets/{id}/credential` seed/status/clear;
+  Electron `SshConnection` cachedPassphrase/cachedPassword parity) so an already-unlocked target
+  does not re-prompt within a runtime lifetime. Credentials are never written to the state file;
+  the cache is cleared on disconnect and target removal, and the desktop re-seeds after restart.
 
 ### Workspace Service
 
@@ -337,8 +340,9 @@ Current implementation:
   refreshes registration while connected so stale persisted providers do not claim readiness.
   Its degraded capability report now distinguishes working native WebView/find/annotation-overlay/
   cookie-clear, native download start/finish, and macOS/Windows/Linux full/selection screenshot
-  paths from the remaining installed-browser import, macOS/Linux download cancellation, and CDP
-  gaps.
+  paths from the remaining Chromium/Safari cookie decryption, macOS/Linux download cancellation,
+  and CDP gaps. Firefox profile import uses a bounded native SQLite snapshot and the live child
+  WebView cookie store.
 - Tauri runtime RPC now exposes provider list/status/register through the same Go routes, so
   UI, mobile, and runtime diagnostics read the same TTL-bound provider truth instead of a preload
   stub.
@@ -535,6 +539,29 @@ subscribe/unsubscribe` snapshots and mutations from Go session records plus a Ta
   semantics, failed runtime sessions stay visible as blocked work needing attention, kill maps to
   interrupted completion, and `/v1/sessions` snapshots carry tab/leaf/launch metadata so hot reload
   can rehydrate live agent rows.
+- Tauri reconciles Claude, OpenClaude, Gemini, Cursor, Droid, Command Code, Grok, Devin, and Kimi managed hooks through Rust at startup and whenever the
+  canonical `agentStatusHooksEnabled` setting changes. The native host preserves unrelated hook
+  definitions, writes executable scripts before atomically replacing settings JSON, and removes
+  only Pebble-owned entries on opt-out. Gemini preserves its `{}` stdout response, 10-second
+  millisecond-form timeout, current event set, and stale `PreToolUse` cleanup. Windows commands use
+  the same UTF-16LE PowerShell encoding as Electron so profile paths with spaces remain valid.
+  Cursor uses its documented `version: 1` top-level `command` schema across all eight events and
+  sweeps stale direct or nested managed definitions without disturbing user commands.
+  Droid uses all eight Factory events with event-specific matchers and reports `hooksDisabled` as
+  partial even when every managed definition is present.
+  Command Code restores hook metadata stripped by its subprocess environment from ancestor
+  processes or a matching endpoint file; endpoint ports are compared before fields are loaded so a
+  stale file cannot replace current connection credentials.
+  Grok writes only its dedicated trusted global `~/.grok/hooks/pebble-status.json` file, installs
+  all eight events with the correct three matchers, and preserves user definitions in that file.
+  Devin accepts its documented JSONC config, uses platform-specific config roots and Windows
+  `cmd.exe` invocation, installs all eight matcher-less events, and surfaces default/explicit
+  `read_config_from.claude` overlap rather than hiding duplicate hook risk.
+  Kimi manages one convergent marker-delimited block in `config.toml`, preserves all user TOML
+  outside that block, creates a rolling `.bak`, and always installs a POSIX script for Kimi's Git
+  Bash shell on every platform.
+  The remaining agent-specific JSON/TOML hook formats and
+  SSH hook installation remain explicit migration work rather than fake installed states.
 - Tauri exposes renderer-compatible mobile fit/driver snapshots, listener subscriptions, and
   desktop reclaim actions for terminal/browser presence-lock surfaces. This prevents stuck empty
   APIs in the renderer contract. Live shared-control ingestion now lands in the Go runtime:

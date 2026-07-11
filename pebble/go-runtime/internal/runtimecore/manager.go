@@ -57,13 +57,15 @@ type Manager struct {
 	mobilePairings           map[string]MobileRelayPairingRecord
 	mobilePairingCodes       map[string]MobileRelayPairingCode
 	sshTargets               map[string]SshTarget
-	sessionTabLayouts        map[string]SessionTabLayout
-	sessions                 map[string]*processSession
-	sessionDrivers           map[string]SessionDriverState
-	subscribers              map[uint64]chan RuntimeEvent
-	nextSubscriber           uint64
-	unavailableTool          []string
-	relayID                  string
+	// sshCredentials is memory-only by design; see ssh_credential_cache.go.
+	sshCredentials    sshCredentialCache
+	sessionTabLayouts map[string]SessionTabLayout
+	sessions          map[string]*processSession
+	sessionDrivers    map[string]SessionDriverState
+	subscribers       map[uint64]chan RuntimeEvent
+	nextSubscriber    uint64
+	unavailableTool   []string
+	relayID           string
 	// hookEndpoint is stamped into PTY env so agent hook scripts can reach the
 	// runtime's /hook ingest route (Electron parity: env-passed endpoint).
 	hookEndpoint sessionHookEndpoint
