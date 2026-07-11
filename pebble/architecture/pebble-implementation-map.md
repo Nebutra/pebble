@@ -120,6 +120,12 @@ Current implementation:
 - Windows uses a bounded PowerShell/CIM JSON process snapshot and descendant graph to report the
   deepest active lineage plus child-process facts; unlike Unix this is a lineage approximation
   because Windows exposes no equivalent terminal foreground marker.
+- SSH project sessions are real Go-managed PTYs whose child process is system OpenSSH. The resolver
+  keeps remote cwd validation off the desktop filesystem, quotes cwd/argv as data, reuses the
+  memory-only SSH credential cache, and preserves the original command in session metadata. All
+  existing input/output/resize/tail/driver-lock APIs therefore work without an Electron relay PTY.
+- Target-scoped termination resolves session project ownership through `project.hostId` and stops
+  only sessions belonging to that SSH target; Tauri Settings calls the runtime route instead of a no-op.
 
 ### Agent Lifecycle Service
 
@@ -187,8 +193,9 @@ Current implementation:
   returning an empty fake state. `markDispatchResult` now writes the renderer's reported dispatch
   outcome back onto the Go `AutomationRun` record (`POST /v1/automations/runs/{id}/dispatch-result`)
   instead of only reading it back. External automation manager lifecycle execution (Hermes/OpenClaw
-  create/update/pause/resume/delete via native Rust CLI invocation in `external_automations.rs`) has
-  landed; on-demand run-now triggering for these external managers remains an explicit gap.
+  create/update/pause/resume/run-now/delete) has landed via native Rust CLI invocation in
+  `external_automations.rs` for local targets and the relay worker's equivalent action mapping for
+  SSH targets, both driven through the same generic `mutateTauriExternalAutomation` dispatch.
 
 ### External Task Service
 
