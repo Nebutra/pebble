@@ -250,8 +250,7 @@ mod unix_cli {
     }
 }
 
-#[tauri::command]
-pub fn cli_install_status() -> CliInstallStatus {
+fn cli_install_status_blocking() -> CliInstallStatus {
     #[cfg(unix)]
     {
         unix_cli::status()
@@ -267,8 +266,7 @@ pub fn cli_install_status() -> CliInstallStatus {
     }
 }
 
-#[tauri::command]
-pub fn cli_install() -> CliInstallStatus {
+fn cli_install_blocking() -> CliInstallStatus {
     #[cfg(unix)]
     {
         unix_cli::install()
@@ -287,8 +285,7 @@ pub fn cli_install() -> CliInstallStatus {
     }
 }
 
-#[tauri::command]
-pub fn cli_remove() -> CliInstallStatus {
+fn cli_remove_blocking() -> CliInstallStatus {
     #[cfg(unix)]
     {
         unix_cli::remove()
@@ -305,6 +302,32 @@ pub fn cli_remove() -> CliInstallStatus {
     {
         unsupported("platform_not_supported", OTHER_UNSUPPORTED_DETAIL)
     }
+}
+
+// Why: these do filesystem I/O (writability probes, symlink/registry writes)
+// that can stall on a slow/stale mount or AV scan. Running on the main thread
+// would block every other pending IPC call, including unrelated invokes like
+// the terminal cwd lookup — spawn_blocking keeps a slow probe from freezing
+// the whole app.
+#[tauri::command]
+pub async fn cli_install_status() -> CliInstallStatus {
+    tauri::async_runtime::spawn_blocking(cli_install_status_blocking)
+        .await
+        .unwrap_or_else(|_| unsupported("platform_not_supported", "CLI status check failed."))
+}
+
+#[tauri::command]
+pub async fn cli_install() -> CliInstallStatus {
+    tauri::async_runtime::spawn_blocking(cli_install_blocking)
+        .await
+        .unwrap_or_else(|_| unsupported("platform_not_supported", "CLI install failed."))
+}
+
+#[tauri::command]
+pub async fn cli_remove() -> CliInstallStatus {
+    tauri::async_runtime::spawn_blocking(cli_remove_blocking)
+        .await
+        .unwrap_or_else(|_| unsupported("platform_not_supported", "CLI removal failed."))
 }
 
 #[tauri::command]
