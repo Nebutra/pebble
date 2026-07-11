@@ -17,6 +17,8 @@ use std::path::{Path, PathBuf};
 mod agent_hooks_amp;
 #[path = "agent_hooks_antigravity.rs"]
 mod agent_hooks_antigravity;
+#[path = "agent_hooks_codex.rs"]
+mod agent_hooks_codex;
 #[path = "agent_hooks_command_code.rs"]
 mod agent_hooks_command_code;
 #[path = "agent_hooks_copilot.rs"]
@@ -31,6 +33,8 @@ mod agent_hooks_droid;
 mod agent_hooks_gemini;
 #[path = "agent_hooks_grok.rs"]
 mod agent_hooks_grok;
+#[path = "agent_hooks_hermes.rs"]
+mod agent_hooks_hermes;
 #[path = "agent_hooks_kimi.rs"]
 mod agent_hooks_kimi;
 
@@ -269,19 +273,6 @@ fn compute_status(settings: &ClaudeCompatibleSettings) -> AgentHookInstallStatus
         config_path: config_path_string,
         managed_hooks_present,
         detail,
-    }
-}
-
-fn unsupported_status(agent: &'static str) -> AgentHookInstallStatus {
-    AgentHookInstallStatus {
-        agent,
-        state: AgentHookInstallState::Error,
-        config_path: String::new(),
-        managed_hooks_present: false,
-        detail: Some(
-            "Agent hook status for this agent is not yet implemented in the Tauri desktop shell."
-                .to_string(),
-        ),
     }
 }
 
@@ -550,7 +541,12 @@ pub fn agent_hooks_apply_gemini(enabled: bool) -> AgentHookInstallStatus {
 
 #[tauri::command]
 pub fn agent_hooks_codex_status() -> AgentHookInstallStatus {
-    unsupported_status("codex")
+    agent_hooks_codex::status()
+}
+
+#[tauri::command]
+pub fn agent_hooks_apply_codex(enabled: bool) -> AgentHookInstallStatus {
+    agent_hooks_codex::apply(enabled)
 }
 
 #[tauri::command]
@@ -575,7 +571,12 @@ pub fn agent_hooks_apply_copilot(enabled: bool) -> AgentHookInstallStatus {
 
 #[tauri::command]
 pub fn agent_hooks_hermes_status() -> AgentHookInstallStatus {
-    unsupported_status("hermes")
+    agent_hooks_hermes::status()
+}
+
+#[tauri::command]
+pub fn agent_hooks_apply_hermes(enabled: bool) -> AgentHookInstallStatus {
+    agent_hooks_hermes::apply(enabled)
 }
 
 #[cfg(test)]
@@ -1431,10 +1432,234 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_agents_report_explicit_gap() {
-        let status = unsupported_status("cursor");
-        assert!(matches!(status.state, AgentHookInstallState::Error));
-        assert_eq!(status.agent, "cursor");
-        assert!(status.detail.unwrap().contains("not yet implemented"));
+    fn hermes_install_preserves_yaml_and_writes_complete_bounded_plugin() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let home = scope._dir.path().join("hermes-home");
+        std::env::set_var("HERMES_HOME", &home);
+        fs::create_dir_all(&home).unwrap();
+        fs::write(
+            home.join("config.yaml"),
+            "model: test-model\nplugins:\n  enabled:\n    - disk-cleanup\n  disabled:\n    - pebble-status\n",
+        )
+        .unwrap();
+
+        let status = agent_hooks_hermes::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        let config: serde_yaml::Value =
+            serde_yaml::from_str(&fs::read_to_string(home.join("config.yaml")).unwrap()).unwrap();
+        assert_eq!(config["model"], "test-model");
+        assert_eq!(
+            config["plugins"]["enabled"],
+            serde_yaml::to_value(["disk-cleanup", "pebble-status"]).unwrap()
+        );
+        assert_eq!(
+            config["plugins"]["disabled"],
+            serde_yaml::to_value(Vec::<String>::new()).unwrap()
+        );
+        assert!(home.join("config.yaml.bak").exists());
+        let manifest = fs::read_to_string(home.join("plugins/pebble-status/plugin.yaml")).unwrap();
+        for event in [
+            "on_session_start",
+            "pre_llm_call",
+            "post_llm_call",
+            "pre_tool_call",
+            "post_tool_call",
+            "pre_approval_request",
+            "post_approval_response",
+            "on_session_end",
+            "on_session_finalize",
+            "on_session_reset",
+        ] {
+            assert!(manifest.contains(&format!("  - {event}")));
+        }
+        let plugin = fs::read_to_string(home.join("plugins/pebble-status/__init__.py")).unwrap();
+        assert!(plugin.contains("MAX_JSONABLE_NODES = 500"));
+        assert!(plugin.contains("timeout=0.75"));
+        assert!(plugin.contains("/hook/hermes"));
+        std::env::remove_var("HERMES_HOME");
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn hermes_remove_keeps_unmanaged_same_name_plugin() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let home = scope._dir.path().join("hermes-home");
+        let plugin_dir = home.join("plugins/pebble-status");
+        fs::create_dir_all(&plugin_dir).unwrap();
+        fs::write(plugin_dir.join("plugin.yaml"), "name: pebble-status\n").unwrap();
+        fs::write(plugin_dir.join("__init__.py"), "# user plugin\n").unwrap();
+        fs::write(
+            home.join("config.yaml"),
+            "plugins:\n  enabled:\n    - pebble-status\n  disabled: []\n",
+        )
+        .unwrap();
+        std::env::set_var("HERMES_HOME", &home);
+
+        let status = agent_hooks_hermes::apply(false);
+        assert!(matches!(status.state, AgentHookInstallState::Partial));
+        assert!(plugin_dir.exists());
+        assert_eq!(
+            fs::read_to_string(plugin_dir.join("__init__.py")).unwrap(),
+            "# user plugin\n"
+        );
+        std::env::remove_var("HERMES_HOME");
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn codex_trust_hash_matches_electron_reference_vector() {
+        assert_eq!(
+            agent_hooks_codex::trusted_hash("pre_tool_use", "/bin/sh hook"),
+            "sha256:cffe2731482322bd1853e8681848d0f3d9757fd87b2382954a877d314207a41c"
+        );
+    }
+
+    #[test]
+    fn codex_install_writes_six_trusted_runtime_hooks() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let user_data = scope._dir.path().join("user-data");
+        std::env::set_var("PEBBLE_USER_DATA_PATH", &user_data);
+
+        let status = agent_hooks_codex::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        let runtime = user_data.join("codex-runtime-home/home");
+        let hooks: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(runtime.join("hooks.json")).unwrap()).unwrap();
+        assert_eq!(hooks["hooks"].as_object().unwrap().len(), 6);
+        let toml = fs::read_to_string(runtime.join("config.toml")).unwrap();
+        assert_eq!(toml.matches("[hooks.state.").count(), 6);
+        assert_eq!(toml.matches("trusted_hash = \"sha256:").count(), 6);
+        assert!(
+            fs::read_to_string(scope._dir.path().join(".pebble/agent-hooks/codex-hook.sh"))
+                .unwrap()
+                .contains("/hook/codex")
+        );
+        std::env::remove_var("PEBBLE_USER_DATA_PATH");
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn codex_remove_preserves_user_hook_and_unrelated_trust() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let user_data = scope._dir.path().join("user-data");
+        std::env::set_var("PEBBLE_USER_DATA_PATH", &user_data);
+        agent_hooks_codex::apply(true);
+        let runtime = user_data.join("codex-runtime-home/home");
+        let hooks_path = runtime.join("hooks.json");
+        let mut hooks: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&hooks_path).unwrap()).unwrap();
+        hooks["hooks"]["Custom"] = serde_json::json!([{
+            "hooks": [{ "type": "command", "command": "user-hook", "timeout": 20 }]
+        }]);
+        fs::write(&hooks_path, serde_json::to_vec_pretty(&hooks).unwrap()).unwrap();
+        let toml_path = runtime.join("config.toml");
+        fs::write(
+            &toml_path,
+            format!("{}\n[hooks.state.\"user:key:0:0\"]\nenabled = true\ntrusted_hash = \"sha256:user\"\n", fs::read_to_string(&toml_path).unwrap()),
+        )
+        .unwrap();
+
+        let status = agent_hooks_codex::apply(false);
+        assert!(matches!(status.state, AgentHookInstallState::NotInstalled));
+        let hooks: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(hooks_path).unwrap()).unwrap();
+        assert_eq!(
+            hooks["hooks"]["Custom"][0]["hooks"][0]["command"],
+            "user-hook"
+        );
+        let toml = fs::read_to_string(toml_path).unwrap();
+        assert!(toml.contains("sha256:user"));
+        assert_eq!(toml.matches("trusted_hash = \"sha256:").count(), 1);
+        std::env::remove_var("PEBBLE_USER_DATA_PATH");
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn codex_install_mirrors_system_user_hooks_config_and_resources() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let user_data = scope._dir.path().join("user-data");
+        std::env::set_var("PEBBLE_USER_DATA_PATH", &user_data);
+        let system = scope._dir.path().join(".codex");
+        fs::create_dir_all(system.join("skills")).unwrap();
+        fs::write(system.join("skills/example.md"), "skill").unwrap();
+        fs::write(
+            system.join("hooks.json"),
+            r#"{"hooks":{"Stop":[{"hooks":[{"command":"user-hook","timeout":20}]},{"hooks":[{"command":"${CLAUDE_PLUGIN_ROOT}/bad"}]}]}}"#,
+        )
+        .unwrap();
+        fs::write(
+            system.join("config.toml"),
+            "model = \"gpt-test\"\n\n[hooks.state.\"system:key:0:0\"]\nenabled = true\ntrusted_hash = \"sha256:system\"\n",
+        )
+        .unwrap();
+
+        let status = agent_hooks_codex::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        let runtime = user_data.join("codex-runtime-home/home");
+        let hooks: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(runtime.join("hooks.json")).unwrap()).unwrap();
+        let stop = hooks["hooks"]["Stop"].as_array().unwrap();
+        assert!(stop[0]["hooks"][0]["command"]
+            .as_str()
+            .unwrap()
+            .contains("codex-hook"));
+        assert_eq!(stop[1]["hooks"][0]["command"], "user-hook");
+        assert!(!hooks.to_string().contains("CLAUDE_PLUGIN_ROOT"));
+        let toml = fs::read_to_string(runtime.join("config.toml")).unwrap();
+        assert!(toml.contains("model = \"gpt-test\""));
+        assert!(!toml.contains("sha256:system"));
+        assert_eq!(toml.matches("trusted_hash = \"sha256:").count(), 6);
+        assert_eq!(
+            fs::read_to_string(runtime.join("skills/example.md")).unwrap(),
+            "skill"
+        );
+        std::env::remove_var("PEBBLE_USER_DATA_PATH");
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn codex_mirrors_disabled_system_user_hook_trust_at_runtime_index() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let user_data = scope._dir.path().join("user-data");
+        std::env::set_var("PEBBLE_USER_DATA_PATH", &user_data);
+        let system = scope._dir.path().join(".codex");
+        fs::create_dir_all(&system).unwrap();
+        let hooks_path = system.join("hooks.json");
+        fs::write(
+            &hooks_path,
+            r#"{"hooks":{"Stop":[{"hooks":[{"command":"user-hook","timeout":20,"async":true}]}]}}"#,
+        )
+        .unwrap();
+        let canonical = fs::canonicalize(&hooks_path).unwrap();
+        let key = format!("{}:stop:0:0", canonical.display());
+        let hash = agent_hooks_codex::hook_hash("stop", "user-hook", 20, true, None, None);
+        fs::write(
+            system.join("config.toml"),
+            format!(
+                "[hooks.state.\"{}\"]\nenabled = false\ntrusted_hash = \"{hash}\"\n",
+                key.replace('\\', "\\\\").replace('"', "\\\"")
+            ),
+        )
+        .unwrap();
+
+        let status = agent_hooks_codex::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        let runtime = user_data.join("codex-runtime-home/home");
+        let runtime_hooks = fs::canonicalize(runtime.join("hooks.json")).unwrap();
+        let runtime_key = format!("{}:stop:1:0", runtime_hooks.display())
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"");
+        let toml = fs::read_to_string(runtime.join("config.toml")).unwrap();
+        let start = toml.find(&runtime_key).unwrap();
+        assert!(toml[start..].starts_with(&format!("{runtime_key}\"]\nenabled = false")));
+        assert!(toml[start..].contains(&hash));
+        std::env::remove_var("PEBBLE_USER_DATA_PATH");
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
     }
 }
