@@ -247,18 +247,29 @@ fn trust_key(path: &Path, event_label: &str, group: usize, handler: usize) -> St
     format!("{}:{event_label}:{group}:{handler}", canonical_path(path))
 }
 
-fn hook_hash(event_label: &str, command: &str, timeout: u64, asynchronous: bool, matcher: Option<&str>, status_message: Option<&str>) -> String {
+pub(super) fn hook_hash(
+    event_label: &str,
+    command: &str,
+    timeout: u64,
+    asynchronous: bool,
+    matcher: Option<&str>,
+    status_message: Option<&str>,
+) -> String {
     let mut handler = BTreeMap::new();
     handler.insert("async", json!(asynchronous));
     handler.insert("command", json!(command));
-    if let Some(message) = status_message { handler.insert("statusMessage", json!(message)); }
+    if let Some(message) = status_message {
+        handler.insert("statusMessage", json!(message));
+    }
     handler.insert("timeout", json!(timeout.max(1)));
     handler.insert("type", json!("command"));
     let mut identity = BTreeMap::new();
     identity.insert("event_name", json!(event_label));
     identity.insert("hooks", json!([handler]));
     if !matches!(event_label, "user_prompt_submit" | "stop") {
-        if let Some(matcher) = matcher { identity.insert("matcher", json!(matcher)); }
+        if let Some(matcher) = matcher {
+            identity.insert("matcher", json!(matcher));
+        }
     }
     let serialized = serde_json::to_vec(&identity).expect("JSON identity is serializable");
     format!("sha256:{:x}", Sha256::digest(serialized))
@@ -330,6 +341,138 @@ fn upsert_trust(mut content: String, entries: &[(&str, String, bool)]) -> String
         };
     }
     content
+}
+
+#[derive(Clone)]
+struct MirroredTrust {
+    event_label: String,
+    group: usize,
+    handler: usize,
+    hash: String,
+    enabled: bool,
+}
+
+fn event_label(event: &str) -> Option<&'static str> {
+    EVENTS
+        .iter()
+        .find_map(|(name, label)| (*name == event).then_some(*label))
+        .or(match event {
+            "PreCompact" => Some("pre_compact"),
+            "PostCompact" => Some("post_compact"),
+            _ => None,
+        })
+}
+
+fn hook_signature(label: &str, definition: &Value, hook: &Value) -> Option<String> {
+    Some(format!(
+        "{label}\u{0}{}\u{0}{}\u{0}{}\u{0}{:?}\u{0}{:?}",
+        hook.get("command")?.as_str()?,
+        hook.get("timeout")
+            .and_then(Value::as_u64)
+            .unwrap_or(600)
+            .max(1),
+        hook.get("async").and_then(Value::as_bool).unwrap_or(false),
+        definition.get("matcher").and_then(Value::as_str),
+        hook.get("statusMessage").and_then(Value::as_str),
+    ))
+}
+
+fn mirrored_user_trust(runtime_hooks: &serde_json::Map<String, Value>) -> Vec<MirroredTrust> {
+    let Some(system_path) = system_home().map(|home| home.join("hooks.json")) else {
+        return Vec::new();
+    };
+    let Some(system_toml) = system_home()
+        .map(|home| home.join("config.toml"))
+        .and_then(|path| fs::read_to_string(path).ok())
+    else {
+        return Vec::new();
+    };
+    let Ok(system) = read_hooks(&system_path) else {
+        return Vec::new();
+    };
+    let mut approvals = BTreeMap::<String, bool>::new();
+    if let Some(hooks) = system.get("hooks").and_then(Value::as_object) {
+        for (event, definitions) in hooks {
+            let Some(label) = event_label(event) else {
+                continue;
+            };
+            let Some(definitions) = definitions.as_array() else {
+                continue;
+            };
+            for (group, definition) in definitions.iter().enumerate() {
+                let Some(items) = definition.get("hooks").and_then(Value::as_array) else {
+                    continue;
+                };
+                for (handler, hook) in items.iter().enumerate() {
+                    let Some(command) = hook.get("command").and_then(Value::as_str) else {
+                        continue;
+                    };
+                    if managed(command) {
+                        continue;
+                    }
+                    let hash = hook_hash(
+                        label,
+                        command,
+                        hook.get("timeout").and_then(Value::as_u64).unwrap_or(600),
+                        hook.get("async").and_then(Value::as_bool).unwrap_or(false),
+                        definition.get("matcher").and_then(Value::as_str),
+                        hook.get("statusMessage").and_then(Value::as_str),
+                    );
+                    let (trusted, disabled) = trust_state(
+                        &system_toml,
+                        &trust_key(&system_path, label, group, handler),
+                        &hash,
+                    );
+                    if trusted {
+                        if let Some(signature) = hook_signature(label, definition, hook) {
+                            approvals
+                                .entry(signature)
+                                .and_modify(|enabled| *enabled |= !disabled)
+                                .or_insert(!disabled);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let mut output = Vec::new();
+    for (event, definitions) in runtime_hooks {
+        let Some(label) = event_label(event) else {
+            continue;
+        };
+        let Some(definitions) = definitions.as_array() else {
+            continue;
+        };
+        for (group, definition) in definitions.iter().enumerate() {
+            let Some(items) = definition.get("hooks").and_then(Value::as_array) else {
+                continue;
+            };
+            for (handler, hook) in items.iter().enumerate() {
+                let Some(signature) = hook_signature(label, definition, hook) else {
+                    continue;
+                };
+                let Some(enabled) = approvals.get(&signature) else {
+                    continue;
+                };
+                let command = hook.get("command").and_then(Value::as_str).unwrap();
+                output.push(MirroredTrust {
+                    event_label: label.into(),
+                    group,
+                    handler,
+                    hash: hook_hash(
+                        label,
+                        command,
+                        hook.get("timeout").and_then(Value::as_u64).unwrap_or(600),
+                        hook.get("async").and_then(Value::as_bool).unwrap_or(false),
+                        definition.get("matcher").and_then(Value::as_str),
+                        hook.get("statusMessage").and_then(Value::as_str),
+                    ),
+                    enabled: *enabled,
+                });
+            }
+        }
+    }
+    output
 }
 
 fn remove_managed_trust(content: String, hooks_path: &Path, command: &str) -> String {
@@ -586,6 +729,11 @@ pub(super) fn apply(enabled: bool) -> AgentHookInstallStatus {
                 current.insert(0, json!({ "hooks": [{ "type": "command", "command": command, "timeout": TIMEOUT }] }));
             }
         }
+        let user_trust = if enabled {
+            mirrored_user_trust(hooks)
+        } else {
+            Vec::new()
+        };
         write_atomic(
             &path,
             &[
@@ -602,10 +750,25 @@ pub(super) fn apply(enabled: bool) -> AgentHookInstallStatus {
                 .iter()
                 .map(|(_, label)| (trust_key(&path, label, 0, 0), trusted_hash(label, &command)))
                 .collect::<Vec<_>>();
-            let borrowed = entries
+            let mut borrowed = entries
                 .iter()
-                .map(|(key, hash)| (key.as_str(), hash.clone()))
+                .map(|(key, hash)| (key.as_str(), hash.clone(), true))
                 .collect::<Vec<_>>();
+            let user_entries = user_trust
+                .iter()
+                .map(|entry| {
+                    (
+                        trust_key(&path, &entry.event_label, entry.group, entry.handler),
+                        entry.hash.clone(),
+                        entry.enabled,
+                    )
+                })
+                .collect::<Vec<_>>();
+            borrowed.extend(
+                user_entries
+                    .iter()
+                    .map(|(key, hash, enabled)| (key.as_str(), hash.clone(), *enabled)),
+            );
             toml = upsert_trust(toml, &borrowed);
         } else {
             toml = remove_managed_trust(toml, &path, &command);
