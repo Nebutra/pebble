@@ -149,7 +149,11 @@ Current implementation:
 --rrule <RFC5545> --dtstart <RFC3339>`).
 - Tauri maps local `window.api.automations` and `automation.*` runtime RPC calls onto the Go
   automation HTTP routes, preserving the renderer's rich automation fields inside runtime payloads
-  so list/create/update/delete, run listing, and manual Run Now are backed by real runtime storage.
+  so list/create/update/delete, run listing, manual Run Now, and RRULE scheduling are backed by real
+  runtime storage. Rust also owns local Hermes/OpenClaw external-manager discovery, bounded CLI
+  lifecycle mutations, and paged local Hermes Markdown plus `state.db` run-history hydration while
+  the renderer reuses the canonical job mappers. Remote SSH external managers remain a separate
+  parity gate.
 - Go executes automation prechecks natively: a bounded shell command (default 60s, max 600s
   timeout, exit 0 = pass) gates scheduled triggers in the automation's working directory (explicit
   `workingDir`, payload `cwd`, or the targeted worktree/project path), records the full
@@ -400,8 +404,16 @@ Current implementation:
   gestures, installs, launches, screenshots, and log requests through the shared action contract.
 - `pebble-control emulator command` can attach a JSON payload for coordinates, text input, bundle
   identifiers, or adapter-specific command parameters during relay diagnostics.
-- Platform discovery, gestures, screenshots, install/launch, and logs still belong in the native
-  iOS/Android adapters.
+- macOS: a native iOS Simulator adapter (`commands/emulator_ios_provider.rs`) reconciles
+  `xcrun simctl list devices` into the Go device store and drains the `emulator.*` action queue
+  for install/launch/screenshot (base64 PNG) via simctl; boot/shutdown recycling and idempotent
+  simctl error handling follow Electron's `ios-emulator-backend.ts` patterns. Tap/swipe/pressKey/
+  type/rotate/logs are honest typed gaps — simctl has no synthetic input or rotation API and no
+  bounded log-tail primitive; Electron's parity mechanism is the third-party `serve-sim` helper
+  (private CoreSimulator HID injection), which would need to be replaced by Facebook's `idb` or an
+  XCTest UI-automation harness to close.
+- Android device discovery, gestures, screenshots, install/launch, and logs still have no native
+  adapter (out of scope for the iOS slice); non-macOS hosts also report an explicit unsupported gap.
 
 ### Mobile Relay Service
 

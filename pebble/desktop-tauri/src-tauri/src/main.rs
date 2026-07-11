@@ -26,6 +26,7 @@ pub fn run() {
         .manage(commands::runtime_environments::RuntimeEnvironmentSubscriptionsState::default())
         .manage(commands::runtime_event_stream::RuntimeEventStreamState::default())
         .manage(commands::computer_use_provider::ComputerUseProviderState::default())
+        .manage(commands::emulator_ios_provider::EmulatorIosProviderState::default())
         .manage(commands::source_control_text_generation::SourceControlTextGenerationState::default())
         .manage(commands::speech::SpeechState::default())
         .setup(|app| {
@@ -94,6 +95,8 @@ pub fn run() {
             commands::computer_permissions::computer_permissions_status,
             commands::computer_use_provider::start_computer_use_provider,
             commands::computer_use_provider::stop_computer_use_provider,
+            commands::emulator_ios_provider::start_emulator_ios_provider,
+            commands::emulator_ios_provider::stop_emulator_ios_provider,
             commands::crash_reports::crash_reports_dismiss,
             commands::crash_reports::crash_reports_format,
             commands::crash_reports::crash_reports_get_latest_pending,
@@ -103,6 +106,9 @@ pub fn run() {
             commands::crash_reports::crash_reports_submit,
             commands::deep_link::deep_link_initial_urls,
             commands::developer_permissions::developer_permissions_status,
+            commands::external_automations::external_automations_list_local,
+            commands::external_automations::external_automations_mutate_local,
+            commands::hermes_automation_history::external_automations_list_local_runs,
             commands::developer_permissions::developer_permissions_request,
             commands::developer_permissions::developer_permissions_open_settings,
             commands::diagnostics::diagnostics_collect_bundle,
