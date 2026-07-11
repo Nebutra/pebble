@@ -61,6 +61,7 @@ type Manager struct {
 	sshTargets               map[string]SshTarget
 	// sshCredentials is memory-only by design; see ssh_credential_cache.go.
 	sshCredentials    sshCredentialCache
+	sshPortForwards   map[string]*sshPortForwardProcess
 	sessionTabLayouts map[string]SessionTabLayout
 	sessions          map[string]*processSession
 	sessionDrivers    map[string]SessionDriverState
@@ -116,6 +117,7 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 		mobilePairings:           make(map[string]MobileRelayPairingRecord),
 		mobilePairingCodes:       make(map[string]MobileRelayPairingCode),
 		sshTargets:               make(map[string]SshTarget),
+		sshPortForwards:          make(map[string]*sshPortForwardProcess),
 		sessionTabLayouts:        make(map[string]SessionTabLayout),
 		sessions:                 make(map[string]*processSession),
 		sessionDrivers:           make(map[string]SessionDriverState),
@@ -218,13 +220,20 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 	for _, pairing := range state.MobilePairings {
 		manager.mobilePairings[pairing.DeviceID] = pairing
 	}
+	migratedSshPortForwardIDs := false
 	for _, target := range state.SshTargets {
+		for index := range target.PortForwards {
+			if strings.TrimSpace(target.PortForwards[index].ID) == "" {
+				target.PortForwards[index].ID = newID("sshfwd")
+				migratedSshPortForwardIDs = true
+			}
+		}
 		manager.sshTargets[target.ID] = target
 	}
 	for _, layout := range state.SessionTabLayouts {
 		manager.sessionTabLayouts[layout.WorktreeID] = layout
 	}
-	if migratedWorktreeInstances {
+	if migratedWorktreeInstances || migratedSshPortForwardIDs {
 		if err := manager.saveLocked(); err != nil {
 			return nil, err
 		}

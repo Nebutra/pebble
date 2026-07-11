@@ -2,6 +2,7 @@ package runtimecore
 
 import (
 	"encoding/json"
+	"os/exec"
 	"time"
 )
 
@@ -426,6 +427,7 @@ type Session struct {
 	// mirroring the renderer's pty.getForegroundProcess contract. nil when it
 	// cannot be determined or the platform does not support it.
 	ForegroundProcess *string `json:"foregroundProcess,omitempty"`
+	HasChildProcesses bool    `json:"hasChildProcesses"`
 	// ForegroundProcessUnsupportedReason is set only on platforms where
 	// foreground detection is not implemented, so the renderer can distinguish
 	// "unsupported" from "no foreground detected".
@@ -452,8 +454,11 @@ type StartSessionRequest struct {
 	Rows        int      `json:"rows,omitempty"`
 	// hookEndpoint/hookEnv are runtime-internal spawn context (never client
 	// JSON): the hook ingest endpoint stamped into the PTY environment.
-	hookEndpoint sessionHookEndpoint
-	hookEnv      []string
+	hookEndpoint     sessionHookEndpoint
+	hookEnv          []string
+	launchCommand    []string
+	launchCwd        string
+	configureCommand func(*exec.Cmd) (func(), error)
 }
 
 type SessionInputRequest struct {

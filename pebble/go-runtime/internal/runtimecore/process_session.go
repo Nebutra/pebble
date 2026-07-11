@@ -15,28 +15,31 @@ import (
 const maxSessionChunks = 2048
 
 type processSession struct {
-	mu          sync.RWMutex
-	id          string
-	projectID   string
-	worktreeID  string
-	cwd         string
-	command     []string
-	agentKind   string
-	tabID       string
-	leafID      string
-	launchToken string
-	prompt      string
-	status      SessionStatus
-	exitCode    *int
-	startedAt   time.Time
-	updatedAt   time.Time
-	cols        int
-	rows        int
-	cmd         *exec.Cmd
-	stdin       io.WriteCloser
-	resizePty   func(cols int, rows int) error
-	output      []OutputChunk
-	emit        func(topic string, payload interface{})
+	mu             sync.RWMutex
+	id             string
+	projectID      string
+	worktreeID     string
+	cwd            string
+	command        []string
+	agentKind      string
+	tabID          string
+	leafID         string
+	launchToken    string
+	prompt         string
+	status         SessionStatus
+	exitCode       *int
+	startedAt      time.Time
+	updatedAt      time.Time
+	cols           int
+	rows           int
+	pid            int
+	waitProcess    func() error
+	killProcess    func() error
+	stdin          io.WriteCloser
+	resizePty      func(cols int, rows int) error
+	cleanupProcess func()
+	output         []OutputChunk
+	emit           func(topic string, payload interface{})
 	// outputEvents coalesces session.output emissions so /v1/events stays
 	// bounded under rapid PTY output; see session_output_events.go.
 	outputEvents sessionOutputEmitter
@@ -170,7 +173,7 @@ func (s *processSession) stop() (Session, error) {
 		s.mu.Unlock()
 		return s.snapshot(), nil
 	}
-	cmd := s.cmd
+	killProcess := s.killProcess
 	stdin := s.stdin
 	s.status = SessionStopped
 	s.updatedAt = time.Now().UTC()
@@ -179,8 +182,8 @@ func (s *processSession) stop() (Session, error) {
 	if stdin != nil {
 		_ = stdin.Close()
 	}
-	if cmd != nil && cmd.Process != nil {
-		if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+	if killProcess != nil {
+		if err := killProcess(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 			return Session{}, err
 		}
 	}
@@ -251,7 +254,10 @@ func (s *processSession) appendOutput(stream string, content string) {
 }
 
 func (s *processSession) wait() {
-	err := s.cmd.Wait()
+	if s.cleanupProcess != nil {
+		defer s.cleanupProcess()
+	}
+	err := s.waitProcess()
 	s.mu.Lock()
 	if s.status == SessionStopped {
 		s.updatedAt = time.Now().UTC()
@@ -357,10 +363,7 @@ func normalizeSessionSize(cols int, rows int) (int, int) {
 func (s *processSession) statusSnapshot() Session {
 	s.mu.RLock()
 	snapshot := s.buildSnapshotLocked()
-	pid := 0
-	if s.cmd != nil && s.cmd.Process != nil {
-		pid = s.cmd.Process.Pid
-	}
+	pid := s.pid
 	running := s.status == SessionRunning
 	s.mu.RUnlock()
 
@@ -369,7 +372,9 @@ func (s *processSession) statusSnapshot() Session {
 		return snapshot
 	}
 	if running {
-		if name, ok := resolveForegroundProcessName(pid); ok {
+		name, hasChildren, ok := resolveProcessInspection(pid)
+		snapshot.HasChildProcesses = hasChildren
+		if ok {
 			snapshot.ForegroundProcess = &name
 		}
 	}

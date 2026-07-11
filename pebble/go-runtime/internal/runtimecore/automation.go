@@ -35,9 +35,10 @@ const (
 type AutomationRunStatus string
 
 const (
-	AutomationRunQueued    AutomationRunStatus = "queued"
-	AutomationRunCompleted AutomationRunStatus = "completed"
-	AutomationRunFailed    AutomationRunStatus = "failed"
+	AutomationRunQueued        AutomationRunStatus = "queued"
+	AutomationRunCompleted     AutomationRunStatus = "completed"
+	AutomationRunFailed        AutomationRunStatus = "failed"
+	AutomationRunSkippedMissed AutomationRunStatus = "skipped_missed"
 	// AutomationRunSkippedPrecheck mirrors Electron's skipped_precheck status:
 	// the schedule fired but the precheck gate did not pass, so no action ran.
 	AutomationRunSkippedPrecheck AutomationRunStatus = "skipped_precheck"
@@ -64,7 +65,7 @@ type AutomationSchedule struct {
 	EventTopic      string                 `json:"eventTopic,omitempty"`
 	Timezone        string                 `json:"timezone,omitempty"`
 	// Rrule is an RFC 5545 recurrence rule string (e.g. "FREQ=WEEKLY;BYDAY=MO,WE;INTERVAL=2").
-	// Supported subset mirrors the Electron reference path: DAILY/WEEKLY/MONTHLY frequencies with
+	// Supported subset mirrors the canonical renderer: HOURLY/DAILY/WEEKLY/MONTHLY frequencies with
 	// INTERVAL/BYDAY/UNTIL/COUNT — the practical range the product's schedule builder emits.
 	Rrule string `json:"rrule,omitempty"`
 	// DtStart anchors the recurrence; occurrences are computed relative to it, not to Timezone
@@ -347,13 +348,79 @@ func (m *Manager) EvaluateScheduledAutomations(ctx context.Context, now time.Tim
 	due := m.dueAutomations(now.UTC())
 	runs := make([]AutomationRun, 0, len(due))
 	for _, automation := range due {
-		run, err := m.triggerAutomationAt(ctx, automation.ID, TriggerAutomationRequest{Reason: AutomationRunSchedule}, now)
+		scheduledFor := *automation.NextRunAt
+		if now.UTC().Sub(scheduledFor) > automationMissedRunGrace(automation) {
+			run, err := m.recordMissedAutomationRun(automation, scheduledFor, now.UTC())
+			if err != nil {
+				return runs, err
+			}
+			runs = append(runs, run)
+			continue
+		}
+		run, err := m.triggerAutomationAt(ctx, automation.ID, TriggerAutomationRequest{Reason: AutomationRunSchedule}, scheduledFor)
 		if err != nil {
 			return runs, err
 		}
 		runs = append(runs, run)
 	}
 	return runs, nil
+}
+
+func automationMissedRunGrace(automation Automation) time.Duration {
+	const defaultGraceMinutes = 720
+	payload, ok := automation.Action.Payload[AutomationRendererPayloadKey].(map[string]interface{})
+	if !ok {
+		return defaultGraceMinutes * time.Minute
+	}
+	minutes, ok := automationNumber(payload["missedRunGraceMinutes"])
+	if !ok || minutes < 0 {
+		return defaultGraceMinutes * time.Minute
+	}
+	return time.Duration(minutes * float64(time.Minute))
+}
+
+func automationNumber(value interface{}) (float64, bool) {
+	switch typed := value.(type) {
+	case float64:
+		return typed, true
+	case float32:
+		return float64(typed), true
+	case int:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	case json.Number:
+		parsed, err := typed.Float64()
+		return parsed, err == nil
+	default:
+		return 0, false
+	}
+}
+
+func (m *Manager) recordMissedAutomationRun(automation Automation, scheduledFor, now time.Time) (AutomationRun, error) {
+	run := AutomationRun{
+		ID:           newID("autorun"),
+		AutomationID: automation.ID,
+		Reason:       AutomationRunSchedule,
+		Status:       AutomationRunSkippedMissed,
+		Payload:      mergedAutomationPayload(automation.Action.Payload, nil),
+		Error:        "Pebble was unavailable during the missed-run grace window.",
+		CreatedAt:    scheduledFor.UTC(),
+		UpdatedAt:    now,
+	}
+	automation.LastTriggeredAt = &scheduledFor
+	automation.NextRunAt = nextAutomationRunAt(automation.Schedule, now, automation.Enabled)
+	automation.UpdatedAt = now
+	m.mu.Lock()
+	m.automations[automation.ID] = automation
+	m.automationRuns[run.ID] = run
+	err := m.saveLocked()
+	m.mu.Unlock()
+	if err != nil {
+		return AutomationRun{}, err
+	}
+	m.emit("automation.changed", map[string]interface{}{"automation": automation, "run": run})
+	return run, nil
 }
 
 // RunAutomationScheduler evaluates due scheduled automations every interval
@@ -571,7 +638,7 @@ func resolveAutomationDtStart(schedule AutomationSchedule) (time.Time, error) {
 }
 
 // buildAutomationRRule parses the RFC 5545 recurrence string and restricts it to the practical
-// subset the schedule builder emits (DAILY/WEEKLY/MONTHLY with INTERVAL/BYDAY/UNTIL/COUNT) so
+// subset the schedule builder emits (HOURLY/DAILY/WEEKLY/MONTHLY with INTERVAL/BYDAY/UNTIL/COUNT) so
 // obscure RFC corners (e.g. BYSETPOS, secondly frequencies) fail fast with a clear error.
 func buildAutomationRRule(rruleStr string, dtStart time.Time) (*rrule.RRule, error) {
 	option, err := rrule.StrToROptionInLocation(rruleStr, dtStart.Location())
@@ -579,9 +646,9 @@ func buildAutomationRRule(rruleStr string, dtStart time.Time) (*rrule.RRule, err
 		return nil, errors.New("invalid automation rrule: " + err.Error())
 	}
 	switch option.Freq {
-	case rrule.DAILY, rrule.WEEKLY, rrule.MONTHLY:
+	case rrule.HOURLY, rrule.DAILY, rrule.WEEKLY, rrule.MONTHLY:
 	default:
-		return nil, errors.New("unsupported automation rrule frequency (supported: DAILY, WEEKLY, MONTHLY)")
+		return nil, errors.New("unsupported automation rrule frequency (supported: HOURLY, DAILY, WEEKLY, MONTHLY)")
 	}
 	option.Dtstart = dtStart
 	rule, err := rrule.NewRRule(*option)

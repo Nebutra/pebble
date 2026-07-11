@@ -1,3 +1,5 @@
+//go:build !windows
+
 package runtimecore
 
 import "testing"
@@ -29,6 +31,16 @@ func TestForegroundUnknownPgid(t *testing.T) {
 	rows := parsePsRows(foregroundPsFixture)
 	if got := foregroundProcessNameForPgid(rows, 999); got != "" {
 		t.Fatalf("foreground for unknown pgid = %q, want empty", got)
+	}
+}
+
+func TestProcessGroupChildDetection(t *testing.T) {
+	rows := parsePsRows(foregroundPsFixture)
+	if !processGroupHasChildren(rows, 200, 200) {
+		t.Fatal("expected process group 200 to contain a child")
+	}
+	if processGroupHasChildren(rows, 999, 999) {
+		t.Fatal("unknown process group reported children")
 	}
 }
 
