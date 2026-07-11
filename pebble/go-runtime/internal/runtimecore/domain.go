@@ -459,11 +459,16 @@ type StartSessionRequest struct {
 type SessionInputRequest struct {
 	Text          string `json:"text"`
 	AppendNewline bool   `json:"appendNewline,omitempty"`
+	// Source identifies the writer for presence-lock enforcement
+	// ("desktop" | "mobile"; empty = legacy caller, accepted).
+	Source string `json:"source,omitempty"`
 }
 
 type SessionResizeRequest struct {
 	Cols int `json:"cols"`
 	Rows int `json:"rows"`
+	// Source gates desktop resizes while a mobile client drives.
+	Source string `json:"source,omitempty"`
 }
 
 type OutputChunk struct {

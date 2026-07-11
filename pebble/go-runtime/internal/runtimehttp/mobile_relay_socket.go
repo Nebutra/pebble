@@ -327,7 +327,15 @@ func (s *Server) handleMobileRelayTerminalInput(conn *websocketConn, state *mobi
 	if !decodeMobileRelayPayload(conn, state, message.Payload, &payload) {
 		return true
 	}
-	err := s.manager.WriteSession(payload.SessionID, runtimecore.SessionInputRequest{Text: payload.Data})
+	// Mobile input is a deliberate take-floor action: the device becomes the
+	// session driver so desktop-sourced writes lock out until reclaim,
+	// matching Electron's presence-lock semantics.
+	err := s.manager.WriteSessionFromClient(
+		payload.SessionID,
+		runtimecore.SessionInputRequest{Text: payload.Data},
+		runtimecore.SessionInputSourceMobile,
+		state.deviceID,
+	)
 	if err != nil {
 		_ = writeMobileRelayError(conn, state, "terminal_input_failed", err.Error())
 	}

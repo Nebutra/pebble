@@ -1,5 +1,6 @@
 import type { PreloadApi } from '../../../src/preload/api-types'
 import type { Worktree } from '../../../src/shared/types'
+import { isEphemeralSetupTerminalWorktreeId } from '../../../src/shared/ephemeral-setup-terminal-worktree-id'
 import {
   createRuntimeResourceGetCommand,
   createRuntimeResourceRequestCommand,
@@ -90,10 +91,12 @@ function hasTauriInternals(): boolean {
 }
 
 async function spawnRuntimePty(opts: PtySpawnOptions): Promise<PtySpawnResult> {
-  const projectId = await resolveRuntimeProjectId(opts)
+  const ephemeral = isEphemeralSetupTerminalWorktreeId(opts.worktreeId ?? '')
+  const projectId = ephemeral ? '' : await resolveRuntimeProjectId(opts)
   const body = {
     projectId,
-    worktreeId: opts.worktreeId,
+    worktreeId: ephemeral ? undefined : opts.worktreeId,
+    ephemeral,
     cwd: opts.cwd,
     command: resolveRuntimeCommand(opts),
     agentKind: opts.launchAgent,
@@ -149,7 +152,12 @@ function isWindowsHost(): boolean {
 
 async function writeRuntimePty(id: string, data: string): Promise<boolean> {
   try {
-    await requestRuntimeJson('POST', `/v1/sessions/${encodeURIComponent(id)}/input`, { text: data })
+    // source:'desktop' lets the runtime refuse the write (423) while a mobile
+    // client holds the presence lock, mirroring Electron's pty:writeAccepted.
+    await requestRuntimeJson('POST', `/v1/sessions/${encodeURIComponent(id)}/input`, {
+      text: data,
+      source: 'desktop'
+    })
     return true
   } catch {
     return false
@@ -196,11 +204,11 @@ function resizeRuntimePty(id: string, cols: number, rows: number): void {
   if (!size) {
     return
   }
-  void requestRuntimeJson<RuntimeSession>(
-    'POST',
-    `/v1/sessions/${encodeURIComponent(id)}/resize`,
-    size
-  ).catch(() => undefined)
+  void requestRuntimeJson<RuntimeSession>('POST', `/v1/sessions/${encodeURIComponent(id)}/resize`, {
+    ...size,
+    // Desktop resizes are gated runtime-side while a mobile client drives.
+    source: 'desktop'
+  }).catch(() => undefined)
 }
 
 function rememberRuntimePtySize(
@@ -223,7 +231,7 @@ function forgetRuntimePtyState(id: string): void {
 }
 
 async function listRuntimeSessions(): Promise<RuntimeSession[]> {
-  return requestRuntimeJson<RuntimeSession[]>('GET', '/v1/sessions').catch(() => [])
+  return requestRuntimeJson<RuntimeSession[]>('GET', '/v1/sessions')
 }
 
 async function findRuntimeSession(id: string): Promise<RuntimeSession | null> {

@@ -58,6 +58,7 @@ import {
   readTauriComputerUsePermissionStatus,
 } from "./tauri-computer-use-permissions-api";
 import { subscribeTauriRuntimeEnvironment } from "./tauri-runtime-environment-subscription-api";
+import { registerRuntimeSessionDriverConsumer } from "./tauri-runtime-session-driver-relay";
 import { callTauriSessionTabsRuntimeRpc } from "./tauri-session-tabs-runtime-rpc";
 import { emitTauriActivateWorktree } from "./tauri-settings-event-api";
 import { callTauriTerminalRuntimeRpc } from "./tauri-terminal-runtime-rpc";
@@ -132,6 +133,12 @@ const terminalFitOverrideListeners = new Set<
 >();
 const terminalDriverListeners = new Set<(event: TerminalDriverEvent) => void>();
 const browserDriverListeners = new Set<(event: BrowserDriverEvent) => void>();
+
+// Runtime session.driver events (mobile relay input takes the floor, desktop
+// reclaims) feed the same driver map the renderer lock banner listens on.
+registerRuntimeSessionDriverConsumer((sessionId, driver) =>
+  setTerminalDriver(sessionId, driver),
+);
 
 export function createPebbleRuntimeApi(
   base: PreloadApi["runtime"],
@@ -769,8 +776,12 @@ async function restoreTauriTerminalFit(
   if (hadFitOverride) {
     emitTerminalFitOverride({ ptyId, mode: "desktop-fit", cols: 0, rows: 0 });
   }
-  // Why: Tauri does not yet host Electron's mobile runtime, but the renderer
-  // button must still release any mirrored mobile lock instead of staying stuck.
+  // Why: the runtime enforces the presence lock on writes, so a desktop
+  // take-back must flip the runtime-side driver too, not only the mirror.
+  await requestRuntimeJson(`/v1/sessions/${encodeURIComponent(ptyId)}/reclaim-desktop`, {
+    method: "POST",
+    timeoutMs: 5000,
+  }).catch(() => undefined);
   setTerminalDriver(ptyId, { kind: "desktop" });
   return { restored: hadFitOverride || previousDriver.kind === "mobile" };
 }

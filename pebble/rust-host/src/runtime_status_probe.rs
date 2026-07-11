@@ -110,6 +110,7 @@ pub enum RuntimeResourceWriteMethod {
     Delete,
     Post,
     Patch,
+    Put,
 }
 
 impl RuntimeResourceWriteMethod {
@@ -118,6 +119,7 @@ impl RuntimeResourceWriteMethod {
             Self::Delete => "DELETE",
             Self::Post => "POST",
             Self::Patch => "PATCH",
+            Self::Put => "PUT",
         }
     }
 }

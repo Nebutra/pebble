@@ -59,6 +59,7 @@ type Manager struct {
 	sshTargets               map[string]SshTarget
 	sessionTabLayouts        map[string]SessionTabLayout
 	sessions                 map[string]*processSession
+	sessionDrivers           map[string]SessionDriverState
 	subscribers              map[uint64]chan RuntimeEvent
 	nextSubscriber           uint64
 	unavailableTool          []string
@@ -113,6 +114,7 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 		sshTargets:               make(map[string]SshTarget),
 		sessionTabLayouts:        make(map[string]SessionTabLayout),
 		sessions:                 make(map[string]*processSession),
+		sessionDrivers:           make(map[string]SessionDriverState),
 		subscribers:              make(map[uint64]chan RuntimeEvent),
 		unavailableTool:          append([]string(nil), unavailableTools...),
 		relayID:                  state.RelayID,

@@ -6,21 +6,18 @@ import {
   type TauriRuntimeAgentSession
 } from './tauri-agent-status-api'
 import { subscribeRuntimeEventPush } from './tauri-runtime-event-push'
+import {
+  mapRuntimePtyOutputEntry,
+  mapRuntimePtyStatusEntry,
+  mapRuntimeSessionDriverEntry
+} from './tauri-runtime-pty-event-mapping'
+import { deliverRuntimeSessionDriver } from './tauri-runtime-session-driver-relay'
 
 type PtyApi = PreloadApi['pty']
 type PtyData = Parameters<Parameters<PtyApi['onData']>[0]>[0]
 type PtyExit = Parameters<Parameters<PtyApi['onExit']>[0]>[0]
 
 type RuntimeSession = TauriRuntimeAgentSession
-
-type RuntimeOutputChunk = {
-  content: string
-}
-
-type RuntimeEvent = {
-  topic: string
-  payload?: unknown
-}
 
 const ptyDataListeners = new Set<(data: PtyData) => void>()
 const ptyExitListeners = new Set<(data: PtyExit) => void>()
@@ -72,6 +69,9 @@ async function startRuntimePtyEventDelivery(): Promise<void> {
       if (entry.topic === 'session.status' || !entry.topic) {
         handleRuntimePtyStatusEntry(entry)
       }
+      if (entry.topic === 'session.driver' || !entry.topic) {
+        handleRuntimeSessionDriverEntry(entry)
+      }
     },
     // Push disconnected (or never connected) -> poll; reconnected -> stop polling. Unsupported
     // transports never emit a connect, so their status stays false and polling runs for good.
@@ -103,33 +103,33 @@ function isPollGenerationCurrent(generation: number): boolean {
 }
 
 function handleRuntimePtyOutputEntry(event: RuntimeEventStreamEntry): void {
-  const payload = parseRuntimeEventPayload(event)
-  if (!payload || payload.topic !== 'session.output') {
+  const output = mapRuntimePtyOutputEntry(event)
+  if (!output) {
     return
   }
-  const payloadBody = readObject(payload.payload)
-  const session = payloadBody.session as RuntimeSession | undefined
-  const chunk = payloadBody.chunk as RuntimeOutputChunk | undefined
-  if (!session?.id || !chunk?.content) {
-    return
-  }
-  emitRuntimePtyData(session.id, chunk.content)
+  emitRuntimePtyData(output.sessionId, output.content)
 }
 
 function handleRuntimePtyStatusEntry(event: RuntimeEventStreamEntry): void {
-  const payload = parseRuntimeEventPayload(event)
-  if (!payload || payload.topic !== 'session.status') {
-    return
-  }
-  const payloadBody = readObject(payload.payload)
-  const session = (payloadBody.session ?? payload.payload) as RuntimeSession | undefined
-  if (!session?.id) {
+  const session = mapRuntimePtyStatusEntry(event)
+  if (!session) {
     return
   }
   emitRuntimeAgentSessionStatus(session)
   if (session.status === 'exited' || session.status === 'failed' || session.status === 'stopped') {
     emitRuntimePtyExit(session)
   }
+}
+
+// Push-only: driver flips come from mobile relay input (presence lock), so a
+// polling fallback would add per-session round trips for a rare transition;
+// the reclaim button re-reads the runtime state on demand instead.
+function handleRuntimeSessionDriverEntry(event: RuntimeEventStreamEntry): void {
+  const driverEvent = mapRuntimeSessionDriverEntry(event)
+  if (!driverEvent) {
+    return
+  }
+  deliverRuntimeSessionDriver(driverEvent.sessionId, driverEvent.driver)
 }
 
 async function pumpRuntimePtyOutput(generation: number): Promise<void> {
@@ -181,18 +181,6 @@ function emitRuntimePtyExit(session: RuntimeSession): void {
   for (const listener of ptyExitListeners) {
     listener({ id: session.id, code: session.exitCode ?? 0 })
   }
-}
-
-function parseRuntimeEventPayload(event: RuntimeEventStreamEntry): RuntimeEvent | null {
-  try {
-    return JSON.parse(event.data) as RuntimeEvent
-  } catch {
-    return null
-  }
-}
-
-function readObject(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {}
 }
 
 function delay(ms: number): Promise<void> {

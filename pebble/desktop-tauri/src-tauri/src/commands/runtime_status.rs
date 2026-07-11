@@ -281,11 +281,12 @@ pub async fn request_runtime_resource_json(
                 input.bearer_token,
                 timeout,
             )),
-            "DELETE" | "POST" | "PATCH" => {
+            "DELETE" | "POST" | "PATCH" | "PUT" => {
                 let write_method = match method.as_str() {
                     "DELETE" => RuntimeResourceWriteMethod::Delete,
                     "POST" => RuntimeResourceWriteMethod::Post,
                     "PATCH" => RuntimeResourceWriteMethod::Patch,
+                    "PUT" => RuntimeResourceWriteMethod::Put,
                     _ => unreachable!("method is matched above"),
                 };
                 write_runtime_resource(RuntimeResourceWriteRequest::new(
@@ -299,7 +300,7 @@ pub async fn request_runtime_resource_json(
             }
             _ => {
                 return Err(
-                    "runtime resource method must be GET, POST, PATCH, or DELETE".to_string(),
+                    "runtime resource method must be GET, POST, PATCH, PUT, or DELETE".to_string(),
                 )
             }
         };

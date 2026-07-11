@@ -425,7 +425,7 @@ func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 		if !decodeJSON(w, r, &req) {
 			return
 		}
-		if err := s.manager.WriteSession(id, req); err != nil {
+		if err := s.manager.WriteSessionFromClient(id, req, runtimecore.SessionInputSource(req.Source), ""); err != nil {
 			writeRuntimeError(w, err)
 			return
 		}
@@ -435,12 +435,24 @@ func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 		if !decodeJSON(w, r, &req) {
 			return
 		}
+		// Presence-lock defense-in-depth: while mobile drives, desktop-side
+		// resizes (auto-fit, split drag) must not reach the PTY.
+		if !s.manager.SessionResizeAllowedFor(id, runtimecore.SessionInputSource(req.Source)) {
+			writeRuntimeError(w, runtimecore.ErrSessionInputLocked)
+			return
+		}
 		session, err := s.manager.ResizeSession(id, req)
 		if err != nil {
 			writeRuntimeError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, session)
+	case r.Method == http.MethodGet && action == "driver":
+		writeJSON(w, http.StatusOK, s.manager.GetSessionDriver(id))
+	case r.Method == http.MethodPost && action == "reclaim-desktop":
+		// Desktop take-back: flips the driver so the renderer lock banner can
+		// unmount; mirrors Electron reclaimTerminalForDesktop (idempotent).
+		writeJSON(w, http.StatusOK, map[string]bool{"reclaimed": s.manager.ReclaimSessionForDesktop(id)})
 	case r.Method == http.MethodGet && action == "status":
 		// Dedicated status read: resolves the terminal foreground process via a
 		// single bounded ps probe, kept off the cheap list-poll path.
@@ -1597,6 +1609,11 @@ func writeRuntimeError(w http.ResponseWriter, err error) {
 		return
 	}
 	status := http.StatusBadRequest
+	if errors.Is(err, runtimecore.ErrSessionInputLocked) {
+		// 423 Locked: distinguishes the mobile presence lock from bad input.
+		writeError(w, http.StatusLocked, err.Error())
+		return
+	}
 	if errors.Is(err, runtimecore.ErrNotFound) ||
 		errors.Is(err, runtimecore.ErrSessionNotFound) ||
 		errors.Is(err, runtimecore.ErrSessionTabLayoutNotFound) ||

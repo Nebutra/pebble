@@ -85,7 +85,7 @@ export interface RuntimeResourceGetCommand {
 
 export interface RuntimeResourceRequestCommand {
   runtimeUrl: string
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   path: string
   bodyJson?: string | null
   bearerToken?: string | null

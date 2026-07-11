@@ -24,7 +24,7 @@ export type PebbleRuntimeStatus = {
   unavailableTools?: string[]
 }
 
-export type RuntimeHttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE'
+export type RuntimeHttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
 
 export async function readPebbleStatusOrNull(): Promise<PebbleRuntimeStatus | null> {
   try {

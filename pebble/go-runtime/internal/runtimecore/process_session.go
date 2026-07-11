@@ -37,7 +37,10 @@ type processSession struct {
 	resizePty   func(cols int, rows int) error
 	output      []OutputChunk
 	emit        func(topic string, payload interface{})
-	altScreen   altScreenScanner
+	// outputEvents coalesces session.output emissions so /v1/events stays
+	// bounded under rapid PTY output; see session_output_events.go.
+	outputEvents sessionOutputEmitter
+	altScreen    altScreenScanner
 	// hookAgentState holds the latest agent-hook-reported readiness (working/
 	// idle/permission); stateChanged is closed-and-replaced on every status or
 	// hook transition so waiters can block without polling.
@@ -84,6 +87,7 @@ func startProcessSession(ctx context.Context, req StartSessionRequest, emit func
 		}
 		req.hookEnv = agentHookSessionEnv(req.hookEndpoint, session)
 	}
+	session.outputEvents.configure(emit)
 	if err := startPlatformProcessSession(ctx, session, req); err != nil {
 		return nil, err
 	}
@@ -211,6 +215,9 @@ func (s *processSession) readStream(stream string, reader io.Reader) {
 			if !errors.Is(readErr, io.EOF) && !errors.Is(readErr, os.ErrClosed) {
 				s.appendOutput("stderr", readErr.Error()+"\n")
 			}
+			// Stream teardown: drain the coalescer so trailing output is not
+			// stuck behind an emit window that may outlive the session.
+			s.outputEvents.flushNow()
 			return
 		}
 	}
@@ -240,12 +247,7 @@ func (s *processSession) appendOutput(stream string, content string) {
 	s.updatedAt = chunk.At
 	snapshot := s.snapshotLocked()
 	s.mu.Unlock()
-	if s.emit != nil {
-		s.emit("session.output", map[string]interface{}{
-			"session": snapshot,
-			"chunk":   chunk,
-		})
-	}
+	s.outputEvents.append(chunk, snapshot)
 }
 
 func (s *processSession) wait() {
@@ -271,6 +273,8 @@ func (s *processSession) wait() {
 	s.notifyStateChangedLocked()
 	snapshot := s.snapshotLocked()
 	s.mu.Unlock()
+	// Exit output must be observed before the exit status event.
+	s.outputEvents.flushNow()
 	if s.emit != nil {
 		s.emit("session.status", snapshot)
 	}
