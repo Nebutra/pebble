@@ -61,11 +61,18 @@ fn unsupported(reason: &str, detail: &str) -> CliInstallStatus {
 // Why: any non-Unix, non-Windows target (none currently shipped) has no CLI
 // registration story; keep it explicitly unsupported rather than guessing.
 #[cfg(not(any(unix, target_os = "windows")))]
-const OTHER_UNSUPPORTED_DETAIL: &str =
-    "CLI registration is not available on this platform.";
+const OTHER_UNSUPPORTED_DETAIL: &str = "CLI registration is not available on this platform.";
 
 #[cfg(target_os = "windows")]
 mod cli_registration_windows;
+#[path = "cli_registration_wsl.rs"]
+mod cli_registration_wsl;
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WslCliInput {
+    pub distro: Option<String>,
+}
 
 #[cfg(unix)]
 mod unix_cli {
@@ -269,7 +276,10 @@ pub fn cli_install() -> CliInstallStatus {
     #[cfg(target_os = "windows")]
     {
         let mut registry = cli_registration_windows::win32::Win32UserPathRegistry;
-        cli_registration_windows::install(&cli_registration_windows::win32::env_lookup, &mut registry)
+        cli_registration_windows::install(
+            &cli_registration_windows::win32::env_lookup,
+            &mut registry,
+        )
     }
     #[cfg(not(any(unix, target_os = "windows")))]
     {
@@ -286,12 +296,30 @@ pub fn cli_remove() -> CliInstallStatus {
     #[cfg(target_os = "windows")]
     {
         let mut registry = cli_registration_windows::win32::Win32UserPathRegistry;
-        cli_registration_windows::remove(&cli_registration_windows::win32::env_lookup, &mut registry)
+        cli_registration_windows::remove(
+            &cli_registration_windows::win32::env_lookup,
+            &mut registry,
+        )
     }
     #[cfg(not(any(unix, target_os = "windows")))]
     {
         unsupported("platform_not_supported", OTHER_UNSUPPORTED_DETAIL)
     }
+}
+
+#[tauri::command]
+pub async fn cli_wsl_install_status(input: WslCliInput) -> CliInstallStatus {
+    cli_registration_wsl::status(input.distro).await
+}
+
+#[tauri::command]
+pub async fn cli_wsl_install(input: WslCliInput) -> CliInstallStatus {
+    cli_registration_wsl::install(input.distro).await
+}
+
+#[tauri::command]
+pub async fn cli_wsl_remove(input: WslCliInput) -> CliInstallStatus {
+    cli_registration_wsl::remove(input.distro).await
 }
 
 #[cfg(all(test, unix))]

@@ -39,7 +39,13 @@ fn shim_dir(env_lookup: &dyn Fn(&str) -> Option<String>) -> Option<PathBuf> {
         return Some(PathBuf::from(override_dir));
     }
     let profile = user_profile_dir(env_lookup)?;
-    Some(profile.join("AppData").join("Local").join("Pebble").join("bin"))
+    Some(
+        profile
+            .join("AppData")
+            .join("Local")
+            .join("Pebble")
+            .join("bin"),
+    )
 }
 
 fn launcher_path(env_lookup: &dyn Fn(&str) -> Option<String>) -> Option<PathBuf> {
@@ -58,10 +64,7 @@ fn command_file_name() -> String {
 /// script keeps working if Pebble's install directory moves, but the launcher
 /// path itself is still baked in absolute (matching the Unix symlink target).
 fn shim_script(launcher: &Path) -> String {
-    format!(
-        "@echo off\r\n\"{}\" %*\r\n",
-        launcher.to_string_lossy()
-    )
+    format!("@echo off\r\n\"{}\" %*\r\n", launcher.to_string_lossy())
 }
 
 /// Parses a `;`-delimited PATH string into entries, trimming empties (a
@@ -124,7 +127,10 @@ fn status_from(
         Ok(contents) => {
             let expected = shim_script(launcher);
             if contents == expected.as_bytes() {
-                ("installed".to_string(), Some(launcher.to_string_lossy().into_owned()))
+                (
+                    "installed".to_string(),
+                    Some(launcher.to_string_lossy().into_owned()),
+                )
             } else {
                 // Why: a shim exists but points elsewhere (or predates this
                 // format) — treat it as stale rather than a foreign conflict
@@ -198,7 +204,10 @@ pub fn install(
     if let Err(error) = fs::write(&command_path, shim_script(&launcher)) {
         return unsupported(
             "platform_not_supported",
-            &format!("Could not write shim at {}: {error}", command_path.display()),
+            &format!(
+                "Could not write shim at {}: {error}",
+                command_path.display()
+            ),
         );
     }
     if let Some(new_path) = path_with_dir_appended(registry.read_path().as_deref(), &dir) {
@@ -231,11 +240,11 @@ pub fn remove(
 #[cfg(target_os = "windows")]
 pub mod win32 {
     use super::UserPathRegistry;
-    use winreg::enums::{RegType, HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
-    use winreg::{RegKey, RegValue, ToRegValue};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
     };
+    use winreg::enums::{RegType, HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
+    use winreg::{RegKey, RegValue, ToRegValue};
 
     pub struct Win32UserPathRegistry;
 
@@ -341,7 +350,10 @@ mod tests {
     fn split_path_entries_ignores_empty_segments() {
         assert_eq!(
             split_path_entries(r"C:\Windows;;C:\Windows\System32;"),
-            vec![r"C:\Windows".to_string(), r"C:\Windows\System32".to_string()]
+            vec![
+                r"C:\Windows".to_string(),
+                r"C:\Windows\System32".to_string()
+            ]
         );
     }
 
@@ -357,7 +369,10 @@ mod tests {
     #[test]
     fn path_with_dir_appended_skips_when_already_present() {
         let dir = PathBuf::from(r"C:\Pebble\bin");
-        assert_eq!(path_with_dir_appended(Some(r"C:\Windows;C:\Pebble\bin"), &dir), None);
+        assert_eq!(
+            path_with_dir_appended(Some(r"C:\Windows;C:\Pebble\bin"), &dir),
+            None
+        );
         assert_eq!(
             path_with_dir_appended(Some(r"C:\Windows"), &dir),
             Some(r"C:\Windows;C:\Pebble\bin".to_string())
@@ -384,13 +399,23 @@ mod tests {
         let (dir, launcher) = temp_scope();
         let install_dir = dir.path().join("bin");
         let env_lookup = env_with(vec![
-            ("PEBBLE_CLI_INSTALL_DIR", install_dir.to_string_lossy().into_owned()),
-            ("PEBBLE_CLI_LAUNCHER_PATH", launcher.to_string_lossy().into_owned()),
+            (
+                "PEBBLE_CLI_INSTALL_DIR",
+                install_dir.to_string_lossy().into_owned(),
+            ),
+            (
+                "PEBBLE_CLI_LAUNCHER_PATH",
+                launcher.to_string_lossy().into_owned(),
+            ),
         ]);
         let mut registry = FakeUserPathRegistry::seeded(r"C:\Windows");
 
         let installed = install(&env_lookup, &mut registry);
-        assert_eq!(installed.state, "installed", "detail: {:?}", installed.detail);
+        assert_eq!(
+            installed.state, "installed",
+            "detail: {:?}",
+            installed.detail
+        );
         assert!(installed.path_configured);
         assert_eq!(*registry.broadcast_count.borrow(), 1);
 
@@ -405,7 +430,10 @@ mod tests {
         assert_eq!(*registry.broadcast_count.borrow(), 1);
         let path_entries = split_path_entries(&registry.read_path().unwrap());
         assert_eq!(
-            path_entries.iter().filter(|e| **e == install_dir.to_string_lossy()).count(),
+            path_entries
+                .iter()
+                .filter(|e| **e == install_dir.to_string_lossy())
+                .count(),
             1
         );
     }
@@ -415,8 +443,14 @@ mod tests {
         let (dir, launcher) = temp_scope();
         let install_dir = dir.path().join("bin");
         let env_lookup = env_with(vec![
-            ("PEBBLE_CLI_INSTALL_DIR", install_dir.to_string_lossy().into_owned()),
-            ("PEBBLE_CLI_LAUNCHER_PATH", launcher.to_string_lossy().into_owned()),
+            (
+                "PEBBLE_CLI_INSTALL_DIR",
+                install_dir.to_string_lossy().into_owned(),
+            ),
+            (
+                "PEBBLE_CLI_LAUNCHER_PATH",
+                launcher.to_string_lossy().into_owned(),
+            ),
         ]);
         let mut registry = FakeUserPathRegistry::seeded(r"C:\Windows");
 
@@ -437,8 +471,14 @@ mod tests {
         let (dir, launcher) = temp_scope();
         let install_dir = dir.path().join("bin");
         let env_lookup = env_with(vec![
-            ("PEBBLE_CLI_INSTALL_DIR", install_dir.to_string_lossy().into_owned()),
-            ("PEBBLE_CLI_LAUNCHER_PATH", launcher.to_string_lossy().into_owned()),
+            (
+                "PEBBLE_CLI_INSTALL_DIR",
+                install_dir.to_string_lossy().into_owned(),
+            ),
+            (
+                "PEBBLE_CLI_LAUNCHER_PATH",
+                launcher.to_string_lossy().into_owned(),
+            ),
         ]);
         let mut registry = FakeUserPathRegistry::seeded(r"C:\Windows");
         install(&env_lookup, &mut registry);
@@ -447,8 +487,14 @@ mod tests {
         let other_launcher = dir.path().join("moved-pebble-desktop.exe");
         fs::write(&other_launcher, b"launcher").unwrap();
         let env_lookup_moved = env_with(vec![
-            ("PEBBLE_CLI_INSTALL_DIR", install_dir.to_string_lossy().into_owned()),
-            ("PEBBLE_CLI_LAUNCHER_PATH", other_launcher.to_string_lossy().into_owned()),
+            (
+                "PEBBLE_CLI_INSTALL_DIR",
+                install_dir.to_string_lossy().into_owned(),
+            ),
+            (
+                "PEBBLE_CLI_LAUNCHER_PATH",
+                other_launcher.to_string_lossy().into_owned(),
+            ),
         ]);
         let current = status(&env_lookup_moved, &registry);
         assert_eq!(current.state, "stale");
