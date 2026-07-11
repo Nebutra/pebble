@@ -40,7 +40,13 @@ export function createRuntimeProcessStartCommand(
   input: Partial<RuntimeProcessStartCommand> & { listen: string }
 ): RuntimeProcessStartCommand {
   return {
-    executable: input.executable ?? 'pebble-runtime',
+    // Why: an empty string normalizes to "blank" on the Rust side, which falls
+    // through to its own environment-aware default (the runtime binary bundled
+    // next to the running executable). Hardcoding the bare "pebble-runtime"
+    // name here defeats that resolution and fails to spawn whenever the
+    // binary isn't separately on PATH (e.g. a dev build), silently leaving
+    // the runtime process never started.
+    executable: input.executable ?? '',
     listen: input.listen,
     dataDir: input.dataDir ?? null,
     bearerToken: input.bearerToken ?? null,
