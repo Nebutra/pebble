@@ -11,7 +11,28 @@
 // pattern used by computer_permissions.rs on Linux/Windows.
 use serde::Serialize;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+#[path = "agent_hooks_amp.rs"]
+mod agent_hooks_amp;
+#[path = "agent_hooks_antigravity.rs"]
+mod agent_hooks_antigravity;
+#[path = "agent_hooks_command_code.rs"]
+mod agent_hooks_command_code;
+#[path = "agent_hooks_copilot.rs"]
+mod agent_hooks_copilot;
+#[path = "agent_hooks_cursor.rs"]
+mod agent_hooks_cursor;
+#[path = "agent_hooks_devin.rs"]
+mod agent_hooks_devin;
+#[path = "agent_hooks_droid.rs"]
+mod agent_hooks_droid;
+#[path = "agent_hooks_gemini.rs"]
+mod agent_hooks_gemini;
+#[path = "agent_hooks_grok.rs"]
+mod agent_hooks_grok;
+#[path = "agent_hooks_kimi.rs"]
+mod agent_hooks_kimi;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -80,6 +101,49 @@ fn home_dir() -> Option<PathBuf> {
 
 fn config_path(settings: &ClaudeCompatibleSettings) -> Option<PathBuf> {
     home_dir().map(|home| home.join(settings.config_dir_name).join("settings.json"))
+}
+
+fn managed_script_path(settings: &ClaudeCompatibleSettings) -> Option<PathBuf> {
+    let extension = if cfg!(windows) { "cmd" } else { "sh" };
+    home_dir().map(|home| {
+        home.join(".pebble")
+            .join("agent-hooks")
+            .join(format!("{}.{}", settings.script_base_name, extension))
+    })
+}
+
+fn managed_command(settings: &ClaudeCompatibleSettings) -> Option<String> {
+    let path = managed_script_path(settings)?;
+    if cfg!(windows) {
+        use base64::Engine;
+        let path = path.to_string_lossy().replace('\'', "''");
+        let powershell = format!("& '{path}'; exit $LASTEXITCODE");
+        let utf16le: Vec<u8> = powershell
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let encoded = base64::engine::general_purpose::STANDARD.encode(utf16le);
+        let system_root = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into());
+        return Some(format!(
+            "{}/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}",
+            system_root.replace('\\', "/")
+        ));
+    }
+    let quoted = path.to_string_lossy().replace('\'', "'\\''");
+    Some(format!("if [ -x '{quoted}' ]; then /bin/sh '{quoted}'; fi"))
+}
+
+fn managed_script(settings: &ClaudeCompatibleSettings) -> String {
+    if cfg!(windows) {
+        return format!(
+            "@echo off\r\nsetlocal\r\nif \"%PEBBLE_AGENT_HOOK_PORT%\"==\"\" exit /b 0\r\nif \"%PEBBLE_AGENT_HOOK_TOKEN%\"==\"\" exit /b 0\r\nif \"%PEBBLE_PANE_KEY%\"==\"\" exit /b 0\r\n\"%SystemRoot%\\System32\\curl.exe\" -sS -X POST \"http://127.0.0.1:%PEBBLE_AGENT_HOOK_PORT%/hook/{}\" --connect-timeout 0.5 --max-time 1.5 -H \"Content-Type: application/x-www-form-urlencoded\" -H \"X-Pebble-Agent-Hook-Token: %PEBBLE_AGENT_HOOK_TOKEN%\" --data-urlencode \"paneKey=%PEBBLE_PANE_KEY%\" --data-urlencode \"tabId=%PEBBLE_TAB_ID%\" --data-urlencode \"launchToken=%PEBBLE_AGENT_LAUNCH_TOKEN%\" --data-urlencode \"worktreeId=%PEBBLE_WORKTREE_ID%\" --data-urlencode \"env=%PEBBLE_AGENT_HOOK_ENV%\" --data-urlencode \"version=%PEBBLE_AGENT_HOOK_VERSION%\" --data-urlencode \"payload@-\" >nul 2>&1\r\nexit /b 0\r\n",
+            settings.agent
+        );
+    }
+    format!(
+        "#!/bin/sh\nif [ -n \"$PEBBLE_AGENT_HOOK_ENDPOINT\" ] && [ -r \"$PEBBLE_AGENT_HOOK_ENDPOINT\" ]; then\n  . \"$PEBBLE_AGENT_HOOK_ENDPOINT\" 2>/dev/null || :\nfi\nif [ -z \"$PEBBLE_AGENT_HOOK_PORT\" ] || [ -z \"$PEBBLE_AGENT_HOOK_TOKEN\" ] || [ -z \"$PEBBLE_PANE_KEY\" ]; then\n  exit 0\nfi\npayload=$(cat)\nif [ -z \"$payload\" ]; then\n  exit 0\nfi\nprintf '%s' \"$payload\" | curl -sS -X POST \"http://127.0.0.1:${{PEBBLE_AGENT_HOOK_PORT}}/hook/{}\" \\\n  --connect-timeout 0.5 --max-time 1.5 \\\n  -H \"Content-Type: application/x-www-form-urlencoded\" \\\n  -H \"X-Pebble-Agent-Hook-Token: ${{PEBBLE_AGENT_HOOK_TOKEN}}\" \\\n  --data-urlencode \"paneKey=${{PEBBLE_PANE_KEY}}\" \\\n  --data-urlencode \"tabId=${{PEBBLE_TAB_ID}}\" \\\n  --data-urlencode \"launchToken=${{PEBBLE_AGENT_LAUNCH_TOKEN}}\" \\\n  --data-urlencode \"worktreeId=${{PEBBLE_WORKTREE_ID}}\" \\\n  --data-urlencode \"env=${{PEBBLE_AGENT_HOOK_ENV}}\" \\\n  --data-urlencode \"version=${{PEBBLE_AGENT_HOOK_VERSION}}\" \\\n  --data-urlencode \"payload@-\" >/dev/null 2>&1 || true\nexit 0\n",
+        settings.agent
+    )
 }
 
 /// Mirrors createManagedCommandMatcher in installer-utils.ts: match on the
@@ -192,7 +256,10 @@ fn compute_status(settings: &ClaudeCompatibleSettings) -> AgentHookInstallStatus
     } else {
         (
             AgentHookInstallState::Partial,
-            Some(format!("Managed hook missing for events: {}", missing.join(", "))),
+            Some(format!(
+                "Managed hook missing for events: {}",
+                missing.join(", ")
+            )),
         )
     };
 
@@ -218,6 +285,179 @@ fn unsupported_status(agent: &'static str) -> AgentHookInstallStatus {
     }
 }
 
+fn read_settings_for_mutation(path: &Path) -> Result<serde_json::Value, String> {
+    match fs::read(path) {
+        Ok(bytes) => serde_json::from_slice(&bytes)
+            .map_err(|_| format!("Could not parse {}", path.display())),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(serde_json::json!({})),
+        Err(error) => Err(format!("Could not read {}: {error}", path.display())),
+    }
+}
+
+fn write_json_atomically(path: &Path, value: &serde_json::Value) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "Agent hook config path has no parent.".to_string())?;
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("Could not create {}: {error}", parent.display()))?;
+    let temporary = parent.join(format!(".settings.{}.tmp", uuid::Uuid::new_v4()));
+    let bytes = serde_json::to_vec_pretty(value)
+        .map_err(|error| format!("Could not serialize agent hook settings: {error}"))?;
+    fs::write(&temporary, bytes)
+        .map_err(|error| format!("Could not write {}: {error}", temporary.display()))?;
+    fs::rename(&temporary, path).map_err(|error| {
+        let _ = fs::remove_file(&temporary);
+        format!("Could not replace {}: {error}", path.display())
+    })
+}
+
+fn is_managed_definition(value: &serde_json::Value, settings: &ClaudeCompatibleSettings) -> bool {
+    value
+        .get("hooks")
+        .and_then(serde_json::Value::as_array)
+        .map(|hooks| {
+            hooks.iter().any(|hook| {
+                hook.get("command")
+                    .and_then(serde_json::Value::as_str)
+                    .map(|command| command_references_managed_script(command, settings))
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false)
+}
+
+fn remove_managed_definitions(root: &mut serde_json::Value, settings: &ClaudeCompatibleSettings) {
+    let Some(hooks) = root
+        .get_mut("hooks")
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return;
+    };
+    hooks.retain(|_, definitions| {
+        let Some(items) = definitions.as_array_mut() else {
+            return true;
+        };
+        items.retain(|definition| !is_managed_definition(definition, settings));
+        !items.is_empty()
+    });
+}
+
+fn install_claude_compatible(
+    settings: &'static ClaudeCompatibleSettings,
+) -> AgentHookInstallStatus {
+    let Some(config_path) = config_path(settings) else {
+        return error_status(
+            settings,
+            String::new(),
+            "Could not resolve home directory.".into(),
+        );
+    };
+    let Some(script_path) = managed_script_path(settings) else {
+        return error_status(
+            settings,
+            config_path.display().to_string(),
+            "Could not resolve script path.".into(),
+        );
+    };
+    let result = (|| -> Result<(), String> {
+        let mut root = read_settings_for_mutation(&config_path)?;
+        if !root.is_object() {
+            return Err(format!(
+                "{} must contain a JSON object",
+                config_path.display()
+            ));
+        }
+        remove_managed_definitions(&mut root, settings);
+        let hooks = root
+            .as_object_mut()
+            .expect("validated object")
+            .entry("hooks")
+            .or_insert_with(|| serde_json::json!({}));
+        let hooks = hooks
+            .as_object_mut()
+            .ok_or_else(|| "Agent hooks setting must be an object.".to_string())?;
+        let command =
+            managed_command(settings).ok_or_else(|| "Could not build hook command.".to_string())?;
+        for event in CLAUDE_COMPATIBLE_EVENTS {
+            let matcher = matches!(
+                *event,
+                "PreToolUse" | "PostToolUse" | "PostToolUseFailure" | "PermissionRequest"
+            );
+            let mut definition = serde_json::json!({
+                "hooks": [{ "type": "command", "command": command }]
+            });
+            if matcher {
+                definition["matcher"] = serde_json::Value::String("*".into());
+            }
+            hooks
+                .entry((*event).to_string())
+                .or_insert_with(|| serde_json::json!([]))
+                .as_array_mut()
+                .ok_or_else(|| format!("Hook definitions for {event} must be an array."))?
+                .push(definition);
+        }
+        if let Some(parent) = script_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|error| format!("Could not create hook script directory: {error}"))?;
+        }
+        fs::write(&script_path, managed_script(settings))
+            .map_err(|error| format!("Could not write {}: {error}", script_path.display()))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&script_path, fs::Permissions::from_mode(0o700))
+                .map_err(|error| format!("Could not make hook executable: {error}"))?;
+        }
+        // Settings are written last so no active hook points at a missing script.
+        write_json_atomically(&config_path, &root)
+    })();
+    match result {
+        Ok(()) => compute_status(settings),
+        Err(detail) => error_status(settings, config_path.display().to_string(), detail),
+    }
+}
+
+fn remove_claude_compatible(settings: &'static ClaudeCompatibleSettings) -> AgentHookInstallStatus {
+    let Some(config_path) = config_path(settings) else {
+        return error_status(
+            settings,
+            String::new(),
+            "Could not resolve home directory.".into(),
+        );
+    };
+    let result = (|| -> Result<(), String> {
+        let mut root = read_settings_for_mutation(&config_path)?;
+        remove_managed_definitions(&mut root, settings);
+        write_json_atomically(&config_path, &root)?;
+        if let Some(script_path) = managed_script_path(settings) {
+            match fs::remove_file(script_path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(format!("Could not remove managed hook script: {error}")),
+            }
+        }
+        Ok(())
+    })();
+    match result {
+        Ok(()) => compute_status(settings),
+        Err(detail) => error_status(settings, config_path.display().to_string(), detail),
+    }
+}
+
+#[tauri::command]
+pub fn agent_hooks_apply_claude_compatible(enabled: bool) -> Vec<AgentHookInstallStatus> {
+    [&CLAUDE_SETTINGS, &OPENCLAUDE_SETTINGS]
+        .into_iter()
+        .map(|settings| {
+            if enabled {
+                install_claude_compatible(settings)
+            } else {
+                remove_claude_compatible(settings)
+            }
+        })
+        .collect()
+}
+
 #[tauri::command]
 pub fn agent_hooks_claude_status() -> AgentHookInstallStatus {
     compute_status(&CLAUDE_SETTINGS)
@@ -229,63 +469,113 @@ pub fn agent_hooks_openclaude_status() -> AgentHookInstallStatus {
 }
 
 #[tauri::command]
+pub fn agent_hooks_gemini_status() -> AgentHookInstallStatus {
+    agent_hooks_gemini::status()
+}
+
+#[tauri::command]
+pub fn agent_hooks_cursor_status() -> AgentHookInstallStatus {
+    agent_hooks_cursor::status()
+}
+
+#[tauri::command]
+pub fn agent_hooks_apply_cursor(enabled: bool) -> AgentHookInstallStatus {
+    agent_hooks_cursor::apply(enabled)
+}
+
+#[tauri::command]
+pub fn agent_hooks_droid_status() -> AgentHookInstallStatus {
+    agent_hooks_droid::status()
+}
+
+#[tauri::command]
+pub fn agent_hooks_apply_droid(enabled: bool) -> AgentHookInstallStatus {
+    agent_hooks_droid::apply(enabled)
+}
+
+#[tauri::command]
+pub fn agent_hooks_command_code_status() -> AgentHookInstallStatus {
+    agent_hooks_command_code::status()
+}
+
+#[tauri::command]
+pub fn agent_hooks_apply_command_code(enabled: bool) -> AgentHookInstallStatus {
+    agent_hooks_command_code::apply(enabled)
+}
+
+#[tauri::command]
+pub fn agent_hooks_grok_status() -> AgentHookInstallStatus {
+    agent_hooks_grok::status()
+}
+
+#[tauri::command]
+pub fn agent_hooks_apply_grok(enabled: bool) -> AgentHookInstallStatus {
+    agent_hooks_grok::apply(enabled)
+}
+
+#[tauri::command]
+pub fn agent_hooks_devin_status() -> AgentHookInstallStatus {
+    agent_hooks_devin::status()
+}
+
+#[tauri::command]
+pub fn agent_hooks_apply_devin(enabled: bool) -> AgentHookInstallStatus {
+    agent_hooks_devin::apply(enabled)
+}
+
+#[tauri::command]
+pub fn agent_hooks_kimi_status() -> AgentHookInstallStatus {
+    agent_hooks_kimi::status()
+}
+
+#[tauri::command]
+pub fn agent_hooks_apply_kimi(enabled: bool) -> AgentHookInstallStatus {
+    agent_hooks_kimi::apply(enabled)
+}
+
+#[tauri::command]
+pub fn agent_hooks_amp_status() -> AgentHookInstallStatus {
+    agent_hooks_amp::status()
+}
+
+#[tauri::command]
+pub fn agent_hooks_apply_amp(enabled: bool) -> AgentHookInstallStatus {
+    agent_hooks_amp::apply(enabled)
+}
+
+#[tauri::command]
+pub fn agent_hooks_apply_gemini(enabled: bool) -> AgentHookInstallStatus {
+    agent_hooks_gemini::apply(enabled)
+}
+
+#[tauri::command]
 pub fn agent_hooks_codex_status() -> AgentHookInstallStatus {
     unsupported_status("codex")
 }
 
 #[tauri::command]
-pub fn agent_hooks_gemini_status() -> AgentHookInstallStatus {
-    unsupported_status("gemini")
-}
-
-#[tauri::command]
 pub fn agent_hooks_antigravity_status() -> AgentHookInstallStatus {
-    unsupported_status("antigravity")
+    agent_hooks_antigravity::status()
 }
 
 #[tauri::command]
-pub fn agent_hooks_amp_status() -> AgentHookInstallStatus {
-    unsupported_status("amp")
-}
-
-#[tauri::command]
-pub fn agent_hooks_cursor_status() -> AgentHookInstallStatus {
-    unsupported_status("cursor")
-}
-
-#[tauri::command]
-pub fn agent_hooks_droid_status() -> AgentHookInstallStatus {
-    unsupported_status("droid")
-}
-
-#[tauri::command]
-pub fn agent_hooks_command_code_status() -> AgentHookInstallStatus {
-    unsupported_status("command-code")
-}
-
-#[tauri::command]
-pub fn agent_hooks_grok_status() -> AgentHookInstallStatus {
-    unsupported_status("grok")
+pub fn agent_hooks_apply_antigravity(enabled: bool) -> AgentHookInstallStatus {
+    agent_hooks_antigravity::apply(enabled)
 }
 
 #[tauri::command]
 pub fn agent_hooks_copilot_status() -> AgentHookInstallStatus {
-    unsupported_status("copilot")
+    agent_hooks_copilot::status()
+}
+
+#[tauri::command]
+pub fn agent_hooks_apply_copilot(enabled: bool) -> AgentHookInstallStatus {
+    agent_hooks_copilot::apply(enabled)
 }
 
 #[tauri::command]
 pub fn agent_hooks_hermes_status() -> AgentHookInstallStatus {
     unsupported_status("hermes")
-}
-
-#[tauri::command]
-pub fn agent_hooks_devin_status() -> AgentHookInstallStatus {
-    unsupported_status("devin")
-}
-
-#[tauri::command]
-pub fn agent_hooks_kimi_status() -> AgentHookInstallStatus {
-    unsupported_status("kimi")
 }
 
 #[cfg(test)]
@@ -421,6 +711,722 @@ mod tests {
         );
         let status = compute_status(&OPENCLAUDE_SETTINGS);
         assert!(matches!(status.state, AgentHookInstallState::NotInstalled));
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn install_preserves_unrelated_hooks_and_writes_executable_script() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        write_settings(
+            scope._dir.path(),
+            ".claude",
+            r#"{"theme":"dark","hooks":{"Stop":[{"hooks":[{"type":"command","command":"echo unrelated"}]}]}}"#,
+        );
+
+        let status = install_claude_compatible(&CLAUDE_SETTINGS);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        let config =
+            read_settings_for_mutation(&scope._dir.path().join(".claude").join("settings.json"))
+                .unwrap();
+        assert_eq!(config["theme"], "dark");
+        assert!(config["hooks"]["Stop"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|definition| definition.to_string().contains("echo unrelated")));
+        let script = managed_script_path(&CLAUDE_SETTINGS).unwrap();
+        assert!(script.exists());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(script).unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+        }
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn remove_deletes_only_managed_definitions_and_script() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        assert!(matches!(
+            install_claude_compatible(&CLAUDE_SETTINGS).state,
+            AgentHookInstallState::Installed
+        ));
+        let config_path = scope._dir.path().join(".claude").join("settings.json");
+        let mut config = read_settings_for_mutation(&config_path).unwrap();
+        config["hooks"]["Stop"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({"hooks":[{"type":"command","command":"echo keep"}]}));
+        write_json_atomically(&config_path, &config).unwrap();
+
+        let status = remove_claude_compatible(&CLAUDE_SETTINGS);
+        assert!(matches!(status.state, AgentHookInstallState::NotInstalled));
+        let next = read_settings_for_mutation(&config_path).unwrap();
+        assert!(next["hooks"]["Stop"].to_string().contains("echo keep"));
+        assert!(!next.to_string().contains("agent-hooks/claude-hook"));
+        assert!(!managed_script_path(&CLAUDE_SETTINGS).unwrap().exists());
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn gemini_install_sweeps_stale_event_and_preserves_user_hook() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        write_settings(
+            scope._dir.path(),
+            ".gemini",
+            r#"{"hooks":{"BeforeAgent":[{"hooks":[{"command":"echo keep"}]}],"PreToolUse":[{"hooks":[{"command":"/old/agent-hooks/gemini-hook.sh"}]}]}}"#,
+        );
+
+        let status = agent_hooks_gemini::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        let config =
+            read_settings_for_mutation(&scope._dir.path().join(".gemini").join("settings.json"))
+                .unwrap();
+        assert!(config["hooks"]["PreToolUse"].is_null());
+        assert!(config["hooks"]["BeforeAgent"]
+            .to_string()
+            .contains("echo keep"));
+        for event in ["BeforeAgent", "AfterAgent", "AfterTool", "BeforeTool"] {
+            assert!(config["hooks"][event].to_string().contains("gemini-hook"));
+            assert!(config["hooks"][event].to_string().contains("10000"));
+        }
+        let script = scope
+            ._dir
+            .path()
+            .join(".pebble")
+            .join("agent-hooks")
+            .join(if cfg!(windows) {
+                "gemini-hook.cmd"
+            } else {
+                "gemini-hook.sh"
+            });
+        let script_body = fs::read_to_string(script).unwrap();
+        assert!(if cfg!(windows) {
+            script_body.starts_with("@echo off\r\nsetlocal\r\necho {}")
+        } else {
+            script_body.starts_with("#!/bin/sh\nprintf \"{}\\n\"")
+        });
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn gemini_remove_preserves_unrelated_definitions() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        assert!(matches!(
+            agent_hooks_gemini::apply(true).state,
+            AgentHookInstallState::Installed
+        ));
+        let path = scope._dir.path().join(".gemini").join("settings.json");
+        let mut config = read_settings_for_mutation(&path).unwrap();
+        config["hooks"]["BeforeAgent"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({"hooks":[{"command":"echo keep"}]}));
+        write_json_atomically(&path, &config).unwrap();
+
+        let status = agent_hooks_gemini::apply(false);
+        assert!(matches!(status.state, AgentHookInstallState::NotInstalled));
+        let next = read_settings_for_mutation(&path).unwrap();
+        assert!(next.to_string().contains("echo keep"));
+        assert!(!next.to_string().contains("gemini-hook"));
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn cursor_install_uses_top_level_schema_and_sweeps_stale_entries() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let cursor_dir = scope._dir.path().join(".cursor");
+        fs::create_dir_all(&cursor_dir).unwrap();
+        fs::write(
+            cursor_dir.join("hooks.json"),
+            r#"{"custom":true,"hooks":{"beforeSubmitPrompt":[{"command":"echo keep"},{"command":"/old/agent-hooks/cursor-hook.sh"}],"retiredEvent":[{"hooks":[{"command":"/old/agent-hooks/cursor-hook.sh"}]},{"command":"echo retired-user"}]}}"#,
+        )
+        .unwrap();
+
+        let status = agent_hooks_cursor::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        let config = read_settings_for_mutation(&cursor_dir.join("hooks.json")).unwrap();
+        assert_eq!(config["version"], 1);
+        assert_eq!(config["custom"], true);
+        assert!(config["hooks"]["retiredEvent"]
+            .to_string()
+            .contains("echo retired-user"));
+        assert!(!config["hooks"]["retiredEvent"]
+            .to_string()
+            .contains("cursor-hook"));
+        for event in [
+            "beforeSubmitPrompt",
+            "stop",
+            "preToolUse",
+            "postToolUse",
+            "postToolUseFailure",
+            "beforeShellExecution",
+            "beforeMCPExecution",
+            "afterAgentResponse",
+        ] {
+            let definitions = config["hooks"][event].as_array().unwrap();
+            let managed = definitions
+                .iter()
+                .find(|definition| definition["command"].to_string().contains("cursor-hook"))
+                .unwrap();
+            assert_eq!(managed["timeout"], 10);
+            assert!(managed.get("hooks").is_none());
+        }
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn cursor_remove_keeps_user_commands() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        assert!(matches!(
+            agent_hooks_cursor::apply(true).state,
+            AgentHookInstallState::Installed
+        ));
+        let path = scope._dir.path().join(".cursor").join("hooks.json");
+        let mut config = read_settings_for_mutation(&path).unwrap();
+        config["hooks"]["stop"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({"command":"echo keep","timeout":3}));
+        write_json_atomically(&path, &config).unwrap();
+
+        let status = agent_hooks_cursor::apply(false);
+        assert!(matches!(status.state, AgentHookInstallState::NotInstalled));
+        let next = read_settings_for_mutation(&path).unwrap();
+        assert!(next.to_string().contains("echo keep"));
+        assert!(!next.to_string().contains("cursor-hook"));
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn droid_install_uses_factory_schema_and_reports_global_disable() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        write_settings(
+            scope._dir.path(),
+            ".factory",
+            r#"{"hooksDisabled":true,"hooks":{"Stop":[{"hooks":[{"command":"echo keep"}]}]}}"#,
+        );
+
+        let status = agent_hooks_droid::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Partial));
+        assert_eq!(
+            status.detail.as_deref(),
+            Some("Droid hooks are disabled in Factory settings")
+        );
+        let path = scope._dir.path().join(".factory").join("settings.json");
+        let config = read_settings_for_mutation(&path).unwrap();
+        assert!(config["hooks"]["Stop"].to_string().contains("echo keep"));
+        for event in [
+            "SessionStart",
+            "UserPromptSubmit",
+            "Stop",
+            "SubagentStop",
+            "PreToolUse",
+            "PostToolUse",
+            "PermissionRequest",
+            "Notification",
+        ] {
+            assert!(config["hooks"][event].to_string().contains("droid-hook"));
+        }
+        for event in ["PreToolUse", "PostToolUse", "PermissionRequest"] {
+            assert!(config["hooks"][event]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|definition| definition["matcher"] == "*"));
+        }
+        assert!(config["hooks"]["UserPromptSubmit"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|definition| definition.to_string().contains("droid-hook"))
+            .all(|definition| definition.get("matcher").is_none()));
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn droid_remove_preserves_user_hooks() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        assert!(matches!(
+            agent_hooks_droid::apply(true).state,
+            AgentHookInstallState::Installed
+        ));
+        let path = scope._dir.path().join(".factory").join("settings.json");
+        let mut config = read_settings_for_mutation(&path).unwrap();
+        config["hooks"]["Stop"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({"hooks":[{"command":"echo keep"}]}));
+        write_json_atomically(&path, &config).unwrap();
+
+        let status = agent_hooks_droid::apply(false);
+        assert!(matches!(status.state, AgentHookInstallState::NotInstalled));
+        let next = read_settings_for_mutation(&path).unwrap();
+        assert!(next.to_string().contains("echo keep"));
+        assert!(!next.to_string().contains("droid-hook"));
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn command_code_install_preserves_recovery_script_and_event_schema() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let status = agent_hooks_command_code::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        let path = scope._dir.path().join(".commandcode").join("settings.json");
+        let config = read_settings_for_mutation(&path).unwrap();
+        for event in ["PreToolUse", "PostToolUse", "Stop"] {
+            assert!(config["hooks"][event]
+                .to_string()
+                .contains("command-code-hook"));
+        }
+        assert_eq!(config["hooks"]["PreToolUse"][0]["matcher"], ".*");
+        assert_eq!(config["hooks"]["PostToolUse"][0]["matcher"], ".*");
+        assert!(config["hooks"]["Stop"][0].get("matcher").is_none());
+        let script = scope
+            ._dir
+            .path()
+            .join(".pebble")
+            .join("agent-hooks")
+            .join(if cfg!(windows) {
+                "command-code-hook.cmd"
+            } else {
+                "command-code-hook.sh"
+            });
+        let body = fs::read_to_string(&script).unwrap();
+        assert!(
+            body.contains("sourceEndpointByPort") || body.contains("__pebble_read_ancestor_var")
+        );
+        assert!(body.contains("PEBBLE_AGENT_HOOK_PORT"));
+        assert!(body.contains("endpoint"));
+        #[cfg(unix)]
+        assert!(std::process::Command::new("/bin/sh")
+            .arg("-n")
+            .arg(script)
+            .status()
+            .unwrap()
+            .success());
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn command_code_remove_keeps_user_hook() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        assert!(matches!(
+            agent_hooks_command_code::apply(true).state,
+            AgentHookInstallState::Installed
+        ));
+        let path = scope._dir.path().join(".commandcode").join("settings.json");
+        let mut config = read_settings_for_mutation(&path).unwrap();
+        config["hooks"]["Stop"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({"hooks":[{"command":"echo keep"}]}));
+        write_json_atomically(&path, &config).unwrap();
+        let status = agent_hooks_command_code::apply(false);
+        assert!(matches!(status.state, AgentHookInstallState::NotInstalled));
+        let next = read_settings_for_mutation(&path).unwrap();
+        assert!(next.to_string().contains("echo keep"));
+        assert!(!next.to_string().contains("command-code-hook"));
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn grok_install_uses_dedicated_global_hook_file() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let path = scope
+            ._dir
+            .path()
+            .join(".grok")
+            .join("hooks")
+            .join("pebble-status.json");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            r#"{"owner":"user","hooks":{"Notification":[{"hooks":[{"command":"echo keep"}]}]}}"#,
+        )
+        .unwrap();
+
+        let status = agent_hooks_grok::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        assert_eq!(status.config_path, path.display().to_string());
+        let config = read_settings_for_mutation(&path).unwrap();
+        assert_eq!(config["owner"], "user");
+        assert!(config["hooks"]["Notification"]
+            .to_string()
+            .contains("echo keep"));
+        for event in [
+            "SessionStart",
+            "UserPromptSubmit",
+            "Stop",
+            "SessionEnd",
+            "PreToolUse",
+            "PostToolUse",
+            "PostToolUseFailure",
+            "Notification",
+        ] {
+            assert!(config["hooks"][event].to_string().contains("grok-hook"));
+        }
+        for event in ["PreToolUse", "PostToolUse", "PostToolUseFailure"] {
+            assert!(config["hooks"][event]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|definition| definition["matcher"] == "*"));
+        }
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn grok_remove_preserves_user_definition() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        assert!(matches!(
+            agent_hooks_grok::apply(true).state,
+            AgentHookInstallState::Installed
+        ));
+        let path = scope
+            ._dir
+            .path()
+            .join(".grok")
+            .join("hooks")
+            .join("pebble-status.json");
+        let mut config = read_settings_for_mutation(&path).unwrap();
+        config["hooks"]["Notification"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({"hooks":[{"command":"echo keep"}]}));
+        write_json_atomically(&path, &config).unwrap();
+        let status = agent_hooks_grok::apply(false);
+        assert!(matches!(status.state, AgentHookInstallState::NotInstalled));
+        let next = read_settings_for_mutation(&path).unwrap();
+        assert!(next.to_string().contains("echo keep"));
+        assert!(!next.to_string().contains("grok-hook"));
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn devin_install_parses_jsonc_and_surfaces_default_claude_import() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let path = if cfg!(windows) {
+            scope
+                ._dir
+                .path()
+                .join("AppData")
+                .join("Roaming")
+                .join("devin")
+                .join("config.json")
+        } else {
+            scope
+                ._dir
+                .path()
+                .join(".config")
+                .join("devin")
+                .join("config.json")
+        };
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            "{\n // user comment\n permissions: { mode: 'normal', },\n hooks: {},\n}\n",
+        )
+        .unwrap();
+
+        let status = agent_hooks_devin::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        assert!(status.detail.unwrap().contains("read_config_from.claude"));
+        let config = read_settings_for_mutation(&path).unwrap();
+        assert_eq!(config["permissions"]["mode"], "normal");
+        for event in [
+            "SessionStart",
+            "UserPromptSubmit",
+            "Stop",
+            "PostCompaction",
+            "SessionEnd",
+            "PreToolUse",
+            "PostToolUse",
+            "PermissionRequest",
+        ] {
+            assert!(config["hooks"][event].to_string().contains("devin-hook"));
+            assert!(config["hooks"][event][0].get("matcher").is_none());
+        }
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn devin_explicitly_disabled_claude_import_has_no_overlap_detail() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let path = if cfg!(windows) {
+            scope
+                ._dir
+                .path()
+                .join("AppData")
+                .join("Roaming")
+                .join("devin")
+                .join("config.json")
+        } else {
+            scope
+                ._dir
+                .path()
+                .join(".config")
+                .join("devin")
+                .join("config.json")
+        };
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, r#"{"read_config_from":{"claude":false},"hooks":{}}"#).unwrap();
+        let status = agent_hooks_devin::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        assert!(status.detail.is_none());
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn kimi_install_converges_to_one_managed_toml_block() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let kimi_home = scope._dir.path().join(".kimi-code");
+        std::env::set_var("KIMI_CODE_HOME", &kimi_home);
+        fs::create_dir_all(&kimi_home).unwrap();
+        let path = kimi_home.join("config.toml");
+        let user_config =
+            "default_model = \"kimi-k2.6\"\n\n[providers.mine]\napi_key = \"secret\"\n";
+        fs::write(&path, user_config).unwrap();
+
+        assert!(matches!(
+            agent_hooks_kimi::apply(true).state,
+            AgentHookInstallState::Installed
+        ));
+        assert!(matches!(
+            agent_hooks_kimi::apply(true).state,
+            AgentHookInstallState::Installed
+        ));
+        let installed = fs::read_to_string(&path).unwrap();
+        assert_eq!(installed.matches("pebble-managed-kimi-hooks (").count(), 1);
+        for event in [
+            "UserPromptSubmit",
+            "PreToolUse",
+            "PostToolUse",
+            "PostToolUseFailure",
+            "PermissionRequest",
+            "Stop",
+            "StopFailure",
+        ] {
+            assert!(installed.contains(&format!("event = \"{event}\"")));
+        }
+        assert!(installed.contains("api_key = \"secret\""));
+        assert!(path.with_extension("toml.bak").exists());
+        std::env::remove_var("KIMI_CODE_HOME");
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn kimi_remove_restores_user_toml() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let kimi_home = scope._dir.path().join(".kimi-code");
+        std::env::set_var("KIMI_CODE_HOME", &kimi_home);
+        fs::create_dir_all(&kimi_home).unwrap();
+        let path = kimi_home.join("config.toml");
+        let user_config = "default_model = \"kimi-k2.6\"\n";
+        fs::write(&path, user_config).unwrap();
+        agent_hooks_kimi::apply(true);
+
+        let status = agent_hooks_kimi::apply(false);
+        assert!(matches!(status.state, AgentHookInstallState::NotInstalled));
+        assert_eq!(fs::read_to_string(path).unwrap(), user_config);
+        std::env::remove_var("KIMI_CODE_HOME");
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn amp_install_writes_complete_bounded_plugin() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let _scope = scope();
+        let status = agent_hooks_amp::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        let source = fs::read_to_string(status.config_path).unwrap();
+        for handler in [
+            "session.start",
+            "agent.start",
+            "tool.call",
+            "tool.result",
+            "agent.end",
+        ] {
+            assert!(source.contains(&format!("amp.on('{handler}'")));
+        }
+        assert!(source.contains("MAX_PENDING_POSTS = 50"));
+        assert!(source.contains("postQueue.shift()"));
+        assert!(source.contains("PEBBLE_AGENT_HOOK_ENDPOINT"));
+        assert!(source.contains("return { action: 'allow' }"));
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn amp_never_overwrites_or_removes_user_plugin() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let path = scope
+            ._dir
+            .path()
+            .join(".config")
+            .join("amp")
+            .join("plugins")
+            .join("pebble-agent-status.ts");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, "export default function userPlugin() {}\n").unwrap();
+        let installed = agent_hooks_amp::apply(true);
+        assert!(matches!(installed.state, AgentHookInstallState::Partial));
+        let removed = agent_hooks_amp::apply(false);
+        assert!(matches!(removed.state, AgentHookInstallState::Partial));
+        assert_eq!(
+            fs::read_to_string(path).unwrap(),
+            "export default function userPlugin() {}\n"
+        );
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn copilot_install_writes_all_events_and_preserves_user_hook() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let config_path = scope._dir.path().join(".copilot/hooks/pebble.json");
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+        fs::write(
+            &config_path,
+            r#"{"hooks":{"SessionStart":[{"type":"command","bash":"user-hook"}]}}"#,
+        )
+        .unwrap();
+
+        let status = agent_hooks_copilot::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        let config: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        let hooks = config["hooks"].as_object().unwrap();
+        assert_eq!(hooks.len(), 13);
+        assert!(hooks["SessionStart"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|definition| definition["bash"] == "user-hook"));
+        assert!(fs::read_to_string(
+            scope
+                ._dir
+                .path()
+                .join(".pebble/agent-hooks/copilot-hook.sh")
+        )
+        .unwrap()
+        .contains("/hook/copilot"));
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn copilot_remove_deletes_only_managed_definitions() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        agent_hooks_copilot::apply(true);
+        let config_path = scope._dir.path().join(".copilot/hooks/pebble.json");
+        let mut config: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        config["hooks"]["CustomEvent"] =
+            serde_json::json!([{ "type": "command", "bash": "user-hook" }]);
+        fs::write(&config_path, serde_json::to_vec_pretty(&config).unwrap()).unwrap();
+
+        let status = agent_hooks_copilot::apply(false);
+        assert!(matches!(status.state, AgentHookInstallState::NotInstalled));
+        let config: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(config_path).unwrap()).unwrap();
+        assert_eq!(config["hooks"]["CustomEvent"][0]["bash"], "user-hook");
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn antigravity_install_uses_bundle_specific_event_schemas() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let path = scope._dir.path().join(".gemini/config/hooks.json");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            r#"{"user-bundle":{"Stop":[{"type":"command","command":"user-hook"}]}}"#,
+        )
+        .unwrap();
+
+        let status = agent_hooks_antigravity::apply(true);
+        assert!(matches!(status.state, AgentHookInstallState::Installed));
+        let config: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(config["user-bundle"]["Stop"][0]["command"], "user-hook");
+        let bundle = config["pebble-status"].as_object().unwrap();
+        assert_eq!(bundle.len(), 4);
+        assert_eq!(bundle["PostToolUse"][0]["matcher"], "*");
+        assert!(bundle["PostToolUse"][0]["hooks"][0]["command"]
+            .as_str()
+            .unwrap()
+            .contains("PEBBLE_ANTIGRAVITY_EVENT='PostToolUse'"));
+        let script = fs::read_to_string(
+            scope
+                ._dir
+                .path()
+                .join(".pebble/agent-hooks/antigravity-hook.sh"),
+        )
+        .unwrap();
+        assert!(script.contains("Stop) printf '{\"decision\":\"\"}"));
+        assert!(script.contains("/hook/antigravity"));
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn antigravity_remove_preserves_user_bundle() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        agent_hooks_antigravity::apply(true);
+        let path = scope._dir.path().join(".gemini/config/hooks.json");
+        let mut config: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        config["pebble-status"]["Custom"] =
+            serde_json::json!([{ "type": "command", "command": "user-hook" }]);
+        fs::write(&path, serde_json::to_vec_pretty(&config).unwrap()).unwrap();
+
+        let status = agent_hooks_antigravity::apply(false);
+        assert!(matches!(status.state, AgentHookInstallState::NotInstalled));
+        let config: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+        assert_eq!(config["pebble-status"]["Custom"][0]["command"], "user-hook");
+        std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
+    }
+
+    #[test]
+    fn antigravity_install_sweeps_only_legacy_managed_bundle_entries() {
+        let _lock = ENV_GUARD.lock().unwrap();
+        let scope = scope();
+        let path = scope._dir.path().join(".gemini/config/hooks.json");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            r#"{"orca-status":{"Stop":[{"command":"if [ -x '/home/u/.orca/agent-hooks/antigravity-hook.sh' ]; then ORCA_ANTIGRAVITY_EVENT='Stop' /bin/sh '/home/u/.orca/agent-hooks/antigravity-hook.sh'; fi"}],"Custom":[{"command":"user-hook"}]}}"#,
+        )
+        .unwrap();
+
+        agent_hooks_antigravity::apply(true);
+        let config: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+        assert!(config["orca-status"].get("Stop").is_none());
+        assert_eq!(config["orca-status"]["Custom"][0]["command"], "user-hook");
+        assert!(config.get("pebble-status").is_some());
         std::env::remove_var("PEBBLE_AGENT_HOOKS_HOME");
     }
 
