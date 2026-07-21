@@ -15,7 +15,7 @@
  *     [--iterations 3] [--linger-ms 15000] [--timeout-ms 240000]
  *     [--exe <path-to-packaged-Pebble.exe>]
  *
- * Prereq (when not using --exe): `pnpm build:electron-vite` so out/ exists.
+ * Prereq (when not using --exe): `pnpm parity:electron:build` so out/ exists.
  * Results: tools/benchmarks/results/daemon-coldstart-<label>-<timestamp>.json
  */
 import { spawn, spawnSync } from 'node:child_process'
@@ -293,7 +293,7 @@ async function main() {
   ensureFixture(fixtureDir)
 
   if (!args.exe && !existsSync(join(repoRoot, 'out', 'main', 'index.js'))) {
-    throw new Error('out/main/index.js missing — run `pnpm build:electron-vite` first')
+    throw new Error('out/main/index.js missing — run `pnpm parity:electron:build` first')
   }
 
   // A live unrelated process whose pid the stale pid files point at — the

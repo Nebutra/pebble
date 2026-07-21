@@ -8,10 +8,10 @@ on:
       - reopened
       - ready_for_review
     paths:
-      - 'mobile/**'
+      - 'apps/mobile/**'
       # Why: the mobile terminal link parsers are conformance-tested against
       # these shared fixtures; desktop-side fixture edits must re-run this suite.
-      - 'src/shared/terminal-file-link-conformance.ts'
+      - 'packages/product-core/shared/terminal-file-link-conformance.ts'
 
 jobs:
   verify:
@@ -35,7 +35,7 @@ jobs:
         with:
           run_install: false
 
-      # Why: the mobile typecheck imports shared types from ../src/shared, and
+      # Why: the mobile typecheck imports shared types from ../packages/product-core/shared, and
       # some of those files import runtime deps (tweetnacl, ws) resolved from
       # the repo-root node_modules. Without a root install, tsc fails with
       # "Cannot find module 'tweetnacl'/'ws'". Mobile is a separate pnpm project

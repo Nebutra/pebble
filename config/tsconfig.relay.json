@@ -1,14 +1,15 @@
 {
-  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "extends": "./tsconfig.base.json",
   "include": [
-    "../src/relay/**/*",
-    "../src/main/pty/overlay-mirror.ts",
-    "../src/main/pty/shell-startup-env.ts"
+    "../packages/product-core/relay/**/*",
+    "../packages/product-core/shared/pty-overlay-mirror.ts",
+    "../packages/product-core/shared/shell-startup-environment.ts"
   ],
-  "exclude": ["../src/relay/integration.test.ts"],
+  "exclude": ["../packages/product-core/relay/integration.test.ts"],
   "compilerOptions": {
     "composite": true,
-    "rootDir": "../src",
+    "types": ["node"],
+    "rootDir": "../packages/product-core",
     "outDir": "../out/relay"
   }
 }

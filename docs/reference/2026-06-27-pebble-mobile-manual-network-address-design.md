@@ -6,7 +6,7 @@
 
 ## Problem
 
-`src/renderer/src/components/settings/MobileNetworkInterfaceSection.tsx` lets the user pick the network address that gets baked into the mobile-pairing QR code. Today the only options come from `networkInterfaces`, which is the list returned by the main process enumerating OS network interfaces (`en0`, `tailscale0`, etc.). If a user wants a tailnet address that the OS hasn't surfaced yet — a Tailscale MagicDNS hostname, a ZeroTier-assigned address not yet visible to the OS, or a manual LAN IP — they have no way to type one in. The QR ends up pointing at an interface the phone cannot actually reach.
+`packages/product-core/renderer/src/components/settings/MobileNetworkInterfaceSection.tsx` lets the user pick the network address that gets baked into the mobile-pairing QR code. Today the only options come from `networkInterfaces`, which is the list returned by the main process enumerating OS network interfaces (`en0`, `tailscale0`, etc.). If a user wants a tailnet address that the OS hasn't surfaced yet — a Tailscale MagicDNS hostname, a ZeroTier-assigned address not yet visible to the OS, or a manual LAN IP — they have no way to type one in. The QR ends up pointing at an interface the phone cannot actually reach.
 
 ## Decision summary
 
@@ -18,27 +18,27 @@ Replace the inner `Select` of `MobileNetworkInterfaceSection` with a `Popover + 
 - No `helpers`/`utils`/`misc` file names; use concrete names.
 - No `eslint-disable max-lines`; split files instead.
 - Prefer `.ts` over `.d.ts`.
-- UI work follows `docs/STYLEGUIDE.md` and uses shadcn primitives from `src/renderer/src/components/ui/`.
-- The renderer ↔ shared boundary is `src/shared/`; pure logic that may be reused outside the renderer goes there.
+- UI work follows `docs/STYLEGUIDE.md` and uses shadcn primitives from `packages/product-core/renderer/src/components/ui/`.
+- The renderer ↔ shared boundary is `packages/product-core/shared/`; pure logic that may be reused outside the renderer goes there.
 - Comments explain *why*, briefly.
 
 ## Files
 
 | Path | Change |
 | --- | --- |
-| `src/shared/network/manual-address.ts` | **New.** Pure `parseManualNetworkAddress(input)` returning a discriminated union. |
-| `src/shared/network/manual-address.test.ts` | **New.** Vitest cases for IPv4 and MagicDNS hostname validation. |
-| `src/renderer/src/components/settings/mobile-network-interface-selection.ts` | Replace `mergeForSelect` with `buildComboboxEntries(interfaces, customAddress)` returning the entry list the UI maps over. |
-| `src/renderer/src/components/settings/mobile-network-interface-selection.test.ts` | Replace `mergeForSelect` tests with `buildComboboxEntries` tests. |
-| `src/renderer/src/components/settings/MobileNetworkInterfaceSection.tsx` | Swap `Select` for `Popover + Command`; add `open`/`query`/`customAddress` state. |
-| `src/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx` | **New.** Render tests via `@testing-library/react`. |
+| `packages/product-core/shared/network/manual-address.ts` | **New.** Pure `parseManualNetworkAddress(input)` returning a discriminated union. |
+| `packages/product-core/shared/network/manual-address.test.ts` | **New.** Vitest cases for IPv4 and MagicDNS hostname validation. |
+| `packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.ts` | Replace `mergeForSelect` with `buildComboboxEntries(interfaces, customAddress)` returning the entry list the UI maps over. |
+| `packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.test.ts` | Replace `mergeForSelect` tests with `buildComboboxEntries` tests. |
+| `packages/product-core/renderer/src/components/settings/MobileNetworkInterfaceSection.tsx` | Swap `Select` for `Popover + Command`; add `open`/`query`/`customAddress` state. |
+| `packages/product-core/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx` | **New.** Render tests via `@testing-library/react`. |
 
-No changes to: `mobile/app/pair-scan.tsx`, `MobilePairingQrSection.tsx`, `use-mobile-install-qr.ts`, or any main-process code. The QR generation pipeline already consumes `selectedAddress: string`, which is all the new flow produces.
+No changes to: `apps/mobile/app/pair-scan.tsx`, `MobilePairingQrSection.tsx`, `use-mobile-install-qr.ts`, or any main-process code. The QR generation pipeline already consumes `selectedAddress: string`, which is all the new flow produces.
 
 ## Module 1: `parseManualNetworkAddress`
 
 ```ts
-// src/shared/network/manual-address.ts
+// packages/product-core/shared/network/manual-address.ts
 export type ParseManualAddressResult =
   | { ok: true; address: string }
   | { ok: false; error: string }
@@ -60,7 +60,7 @@ Pure function, no React, no I/O. Unit-testable in isolation.
 ## Module 2: `buildComboboxEntries`
 
 ```ts
-// src/renderer/src/components/settings/mobile-network-interface-selection.ts
+// packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.ts
 export type MobileNetworkInterface = { name: string; address: string }
 
 export type ComboboxEntry =
@@ -116,7 +116,7 @@ For the custom selection the rendered iface is `{ name: 'custom', address: custo
   - Optional visual separator (e.g., `CommandSeparator`) before the `use-query` entry.
   - One `CommandItem` for `kind: 'use-query'` (only present when query is valid). Label: `Use "<query>"`. `onSelect` calls `onSelectedAddressChange(address)`, `setCustomAddress(address)`, `setQuery('')`, `setOpen(false)`.
 
-**Controlled cmdk selection:** Copy the controlled-`commandValue` pattern from `src/renderer/src/components/agent/AgentCombobox.tsx` (imports `createAgentComboboxCommandState`, `resolveAgentComboboxCommandState`, `updateAgentComboboxCommandValue` from `@/components/agent/agent-combobox-command-state`, plus the `Command`, `CommandEmpty`, `CommandInput`, `CommandItem`, `CommandList` primitives from `@/components/ui/command`) so that hovering the footer doesn't leave a stale highlight on a list item. The exact state shape will be minimal — only one list, no footer-group complexity — so the borrowed helpers are sufficient. No new helpers are introduced in this design.
+**Controlled cmdk selection:** Copy the controlled-`commandValue` pattern from `packages/product-core/renderer/src/components/agent/AgentCombobox.tsx` (imports `createAgentComboboxCommandState`, `resolveAgentComboboxCommandState`, `updateAgentComboboxCommandValue` from `@/components/agent/agent-combobox-command-state`, plus the `Command`, `CommandEmpty`, `CommandInput`, `CommandItem`, `CommandList` primitives from `@/components/ui/command`) so that hovering the footer doesn't leave a stale highlight on a list item. The exact state shape will be minimal — only one list, no footer-group complexity — so the borrowed helpers are sufficient. No new helpers are introduced in this design.
 
 **Validation feedback:**
 
@@ -155,7 +155,7 @@ The parent of `MobileNetworkInterfaceSection` (whichever Settings tab owns it) a
 
 ## Testing
 
-**`src/shared/network/manual-address.test.ts`**
+**`packages/product-core/shared/network/manual-address.test.ts`**
 
 - Accepts: `0.0.0.0`, `255.255.255.255`, `192.168.1.24`, `100.64.1.20`.
 - Rejects: `''`, `'   '`, `'1.2.3'`, `'1.2.3.4.5'`, `'256.0.0.1'`, `'01.02.03.04'` (leading zeros), `'192.168.1.24 '` (trailing space).
@@ -183,7 +183,7 @@ The parent of `MobileNetworkInterfaceSection` (whichever Settings tab owns it) a
 
 - Persistent storage of manual addresses across sessions (user explicitly chose session-scoped).
 - IPv6, port suffixes, non-Tailscale hostnames (rejected by the parser).
-- Mobile-side endpoint override (separate flow; see `mobile/app/pair-scan.tsx`).
+- Mobile-side endpoint override (separate flow; see `apps/mobile/app/pair-scan.tsx`).
 - Main-process changes — the renderer has enough information already.
 
 ## Open questions for reviewer

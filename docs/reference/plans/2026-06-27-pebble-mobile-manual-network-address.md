@@ -6,7 +6,7 @@
 
 **Architecture:** Replace the inner `Select` of `MobileNetworkInterfaceSection` with a `Popover + Command` ("combobox") pattern modeled on the existing `AgentCombobox`. A new shared pure function `parseManualNetworkAddress` enforces the input grammar; a new helper `buildComboboxEntries` builds the row list (filtered interfaces + an optional `Use "<query>"` row). The custom selection is session-scoped.
 
-**Tech Stack:** TypeScript, React 18, shadcn/ui primitives (`Command`, `Popover`, `Button`) from `src/renderer/src/components/ui/`, vitest, `@testing-library/react`. No new dependencies.
+**Tech Stack:** TypeScript, React 18, shadcn/ui primitives (`Command`, `Popover`, `Button`) from `packages/product-core/renderer/src/components/ui/`, vitest, `@testing-library/react`. No new dependencies.
 
 **Spec:** [`docs/reference/2026-06-27-pebble-mobile-manual-network-address-design.md`](../2026-06-27-pebble-mobile-manual-network-address-design.md)
 
@@ -15,44 +15,44 @@
 ## File map
 
 **Create:**
-- `src/shared/network/manual-address.ts` — pure parser.
-- `src/shared/network/manual-address.test.ts` — parser unit tests.
-- `src/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx` — UI render tests.
+- `packages/product-core/shared/network/manual-address.ts` — pure parser.
+- `packages/product-core/shared/network/manual-address.test.ts` — parser unit tests.
+- `packages/product-core/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx` — UI render tests.
 
 **Modify:**
-- `src/renderer/src/components/settings/mobile-network-interface-selection.ts` — swap `mergeForSelect` for `buildComboboxEntries` (or add `buildComboboxEntries` and keep the old one if other call sites exist; confirm with grep before deleting).
-- `src/renderer/src/components/settings/mobile-network-interface-selection.test.ts` — replace `mergeForSelect` tests with `buildComboboxEntries` tests.
-- `src/renderer/src/components/settings/MobileNetworkInterfaceSection.tsx` — swap `Select` for `Popover + Command`.
+- `packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.ts` — swap `mergeForSelect` for `buildComboboxEntries` (or add `buildComboboxEntries` and keep the old one if other call sites exist; confirm with grep before deleting).
+- `packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.test.ts` — replace `mergeForSelect` tests with `buildComboboxEntries` tests.
+- `packages/product-core/renderer/src/components/settings/MobileNetworkInterfaceSection.tsx` — swap `Select` for `Popover + Command`.
 
 **Reference (read-only, do not modify):**
-- `src/renderer/src/components/ui/command.tsx` — `Command`, `CommandEmpty`, `CommandInput`, `CommandItem`, `CommandList`, `CommandSeparator`.
-- `src/renderer/src/components/ui/popover.tsx` — `Popover`, `PopoverTrigger`, `PopoverContent`.
-- `src/renderer/src/components/ui/button.tsx` — `Button`.
-- `src/renderer/src/components/agent/AgentCombobox.tsx` — full reference implementation of the controlled cmdk pattern.
-- `src/renderer/src/components/agent/agent-combobox-command-state.ts` — `createAgentComboboxCommandState`, `resolveAgentComboboxCommandState`, `updateAgentComboboxCommandValue`.
-- `src/renderer/src/components/settings/MobilePairingQrSection.tsx` — consumer of `selectedAddress`; unchanged.
+- `packages/product-core/renderer/src/components/ui/command.tsx` — `Command`, `CommandEmpty`, `CommandInput`, `CommandItem`, `CommandList`, `CommandSeparator`.
+- `packages/product-core/renderer/src/components/ui/popover.tsx` — `Popover`, `PopoverTrigger`, `PopoverContent`.
+- `packages/product-core/renderer/src/components/ui/button.tsx` — `Button`.
+- `packages/product-core/renderer/src/components/agent/AgentCombobox.tsx` — full reference implementation of the controlled cmdk pattern.
+- `packages/product-core/renderer/src/components/agent/agent-combobox-command-state.ts` — `createAgentComboboxCommandState`, `resolveAgentComboboxCommandState`, `updateAgentComboboxCommandValue`.
+- `packages/product-core/renderer/src/components/settings/MobilePairingQrSection.tsx` — consumer of `selectedAddress`; unchanged.
 
-**Out of scope:** mobile-side endpoint override (`mobile/app/pair-scan.tsx`); main-process code; persistent storage of custom addresses; IPv6, ports, non-Tailscale hostnames.
+**Out of scope:** mobile-side endpoint override (`apps/mobile/app/pair-scan.tsx`); main-process code; persistent storage of custom addresses; IPv6, ports, non-Tailscale hostnames.
 
 ---
 
 ## Task 1: Add `parseManualNetworkAddress` (TDD)
 
 **Files:**
-- Create: `src/shared/network/manual-address.ts`
-- Create: `src/shared/network/manual-address.test.ts`
+- Create: `packages/product-core/shared/network/manual-address.ts`
+- Create: `packages/product-core/shared/network/manual-address.test.ts`
 
 - [ ] **Step 1: Confirm no existing call site for `mergeForSelect`**
 
   Run:
   ```bash
-  grep -rn "mergeForSelect" src/ docs/ 2>/dev/null
+  grep -rn "mergeForSelect" packages/product-core/ docs/ 2>/dev/null
   ```
   Expected: no matches. (If there are matches, stop and update Task 2 to keep `mergeForSelect` and only add `buildComboboxEntries` alongside it.)
 
 - [ ] **Step 2: Write the failing tests**
 
-  Create `src/shared/network/manual-address.test.ts` with this exact content:
+  Create `packages/product-core/shared/network/manual-address.test.ts` with this exact content:
 
   ```ts
   import { describe, it, expect } from 'vitest'
@@ -142,13 +142,13 @@
 
   Run from repo root:
   ```bash
-  pnpm vitest run src/shared/network/manual-address.test.ts
+  pnpm vitest run packages/product-core/shared/network/manual-address.test.ts
   ```
   Expected: error like `Cannot find module './manual-address'`. This is the failing-test step — do not skip it.
 
 - [ ] **Step 4: Implement `parseManualNetworkAddress`**
 
-  Create `src/shared/network/manual-address.ts` with this exact content:
+  Create `packages/product-core/shared/network/manual-address.ts` with this exact content:
 
   ```ts
   // Why: pure shared helper so the same validation runs in renderer
@@ -195,14 +195,14 @@
 
   Run:
   ```bash
-  pnpm vitest run src/shared/network/manual-address.test.ts
+  pnpm vitest run packages/product-core/shared/network/manual-address.test.ts
   ```
   Expected: all tests pass.
 
 - [ ] **Step 6: Lint and typecheck**
 
   ```bash
-  pnpm lint src/shared/network/
+  pnpm lint packages/product-core/shared/network/
   pnpm typecheck
   ```
   Expected: no errors. Fix any and re-run before continuing.
@@ -210,7 +210,7 @@
 - [ ] **Step 7: Commit**
 
   ```bash
-  git add src/shared/network/manual-address.ts src/shared/network/manual-address.test.ts
+  git add packages/product-core/shared/network/manual-address.ts packages/product-core/shared/network/manual-address.test.ts
   git commit -m "feat(mobile-pairing): add parseManualNetworkAddress validator"
   ```
 
@@ -219,14 +219,14 @@
 ## Task 2: Replace `mergeForSelect` with `buildComboboxEntries` (TDD)
 
 **Files:**
-- Modify: `src/renderer/src/components/settings/mobile-network-interface-selection.ts`
-- Modify: `src/renderer/src/components/settings/mobile-network-interface-selection.test.ts`
+- Modify: `packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.ts`
+- Modify: `packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.test.ts`
 
 - [ ] **Step 1: Read the current contents of both files**
 
   Read the full source of:
-  - `src/renderer/src/components/settings/mobile-network-interface-selection.ts`
-  - `src/renderer/src/components/settings/mobile-network-interface-selection.test.ts`
+  - `packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.ts`
+  - `packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.test.ts`
 
   Confirm: `mergeForSelect` is the only exported function besides the `MobileNetworkInterface` type and `selectRefreshedNetworkAddress`. If `selectRefreshedNetworkAddress` is called from `MobileNetworkInterfaceSection.tsx`, keep it.
 
@@ -321,7 +321,7 @@
 - [ ] **Step 3: Run the test file to verify the new tests fail**
 
   ```bash
-  pnpm vitest run src/renderer/src/components/settings/mobile-network-interface-selection.test.ts
+  pnpm vitest run packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.test.ts
   ```
   Expected: `buildComboboxEntries is not a function` (or import error) for the new block; the `selectRefreshedNetworkAddress` block still passes.
 
@@ -407,22 +407,22 @@
 - [ ] **Step 5: Run the test file to verify everything passes**
 
   ```bash
-  pnpm vitest run src/renderer/src/components/settings/mobile-network-interface-selection.test.ts
+  pnpm vitest run packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.test.ts
   ```
   Expected: all tests pass.
 
 - [ ] **Step 6: Lint and typecheck**
 
   ```bash
-  pnpm lint src/renderer/src/components/settings/mobile-network-interface-selection.ts
+  pnpm lint packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.ts
   pnpm typecheck
   ```
 
 - [ ] **Step 7: Commit**
 
   ```bash
-  git add src/renderer/src/components/settings/mobile-network-interface-selection.ts \
-          src/renderer/src/components/settings/mobile-network-interface-selection.test.ts
+  git add packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.ts \
+          packages/product-core/renderer/src/components/settings/mobile-network-interface-selection.test.ts
   git commit -m "feat(mobile-pairing): buildComboboxEntries for network interface combobox"
   ```
 
@@ -431,12 +431,12 @@
 ## Task 3: Rewrite `MobileNetworkInterfaceSection` UI to use Popover + Command
 
 **Files:**
-- Modify: `src/renderer/src/components/settings/MobileNetworkInterfaceSection.tsx`
-- Create: `src/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx`
+- Modify: `packages/product-core/renderer/src/components/settings/MobileNetworkInterfaceSection.tsx`
+- Create: `packages/product-core/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx`
 
 - [ ] **Step 1: Read `AgentCombobox.tsx` end-to-end**
 
-  Read `src/renderer/src/components/agent/AgentCombobox.tsx` and `agent-combobox-command-state.ts` in full. You will be borrowing:
+  Read `packages/product-core/renderer/src/components/agent/AgentCombobox.tsx` and `agent-combobox-command-state.ts` in full. You will be borrowing:
   - The `Popover` + `Command` + `CommandInput` + `CommandList` + `CommandItem` JSX structure.
   - The controlled `commandState`/`commandValue` pattern that mirrors `AgentCombobox`.
   - The `setInputNode`/`focusSearchInput` pattern for keyboard accessibility.
@@ -462,7 +462,7 @@
 
 - [ ] **Step 3: Write the failing render tests**
 
-  Create `src/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx`:
+  Create `packages/product-core/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx`:
 
   ```tsx
   import React from 'react'
@@ -541,7 +541,7 @@
 - [ ] **Step 4: Run the test file to verify it fails**
 
   ```bash
-  pnpm vitest run src/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx
+  pnpm vitest run packages/product-core/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx
   ```
   Expected: failures on every assertion — the component still uses `Select`. This is the failing-test step.
 
@@ -866,7 +866,7 @@
 - [ ] **Step 6: Run the new test file**
 
   ```bash
-  pnpm vitest run src/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx
+  pnpm vitest run packages/product-core/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx
   ```
   Expected: all six tests pass.
 
@@ -878,7 +878,7 @@
 - [ ] **Step 7: Run the full test suite for the settings folder**
 
   ```bash
-  pnpm vitest run src/renderer/src/components/settings/
+  pnpm vitest run packages/product-core/renderer/src/components/settings/
   ```
   Expected: all green. Confirm nothing else broke (e.g. `MobilePairingQrSection.test.tsx` if it exists).
 
@@ -894,8 +894,8 @@
 - [ ] **Step 9: Commit**
 
   ```bash
-  git add src/renderer/src/components/settings/MobileNetworkInterfaceSection.tsx \
-          src/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx
+  git add packages/product-core/renderer/src/components/settings/MobileNetworkInterfaceSection.tsx \
+          packages/product-core/renderer/src/components/settings/MobileNetworkInterfaceSection.test.tsx
   git commit -m "feat(mobile-pairing): combobox with manual address entry"
   ```
 

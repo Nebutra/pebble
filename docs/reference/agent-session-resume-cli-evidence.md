@@ -26,11 +26,11 @@ Issue #1796 is accurate about current behavior. The issue says sleep loses agent
 
 Verified current code path:
 
-- Sleep calls terminal shutdown with identifiers preserved, not provider conversation metadata. See `src/renderer/src/components/sidebar/sleep-worktree-flow.ts`.
-- `shutdownWorktreeTerminals(worktreeId, { keepIdentifiers: true })` preserves terminal IDs/layout wake hints, then calls `dropAgentStatusByWorktree(worktreeId)`. See `src/renderer/src/store/slices/terminals.ts`.
-- `agentStatusByPaneKey` is explicitly documented as "Real-time only - lives in renderer memory, not persisted to disk." See `src/renderer/src/store/slices/agent-status.ts`.
-- `WorkspaceSessionState` persists terminal/browser/editor/SSH state, including terminal layouts and remote relay PTY IDs, but no sleeping-agent records. See `src/shared/types.ts`, `src/renderer/src/lib/workspace-session.ts`, and `src/shared/workspace-session-schema.ts`.
-- `AgentStatusEntry` has `state`, `prompt`, timestamps, `agentType`, pane/tab/worktree attribution, tool previews, assistant preview, and orchestration context. It has no provider session ID or resume command field. See `src/shared/agent-status-types.ts`.
+- Sleep calls terminal shutdown with identifiers preserved, not provider conversation metadata. See `packages/product-core/renderer/src/components/sidebar/sleep-worktree-flow.ts`.
+- `shutdownWorktreeTerminals(worktreeId, { keepIdentifiers: true })` preserves terminal IDs/layout wake hints, then calls `dropAgentStatusByWorktree(worktreeId)`. See `packages/product-core/renderer/src/store/slices/terminals.ts`.
+- `agentStatusByPaneKey` is explicitly documented as "Real-time only - lives in renderer memory, not persisted to disk." See `packages/product-core/renderer/src/store/slices/agent-status.ts`.
+- `WorkspaceSessionState` persists terminal/browser/editor/SSH state, including terminal layouts and remote relay PTY IDs, but no sleeping-agent records. See `packages/product-core/shared/types.ts`, `packages/product-core/renderer/src/lib/workspace-session.ts`, and `packages/product-core/shared/workspace-session-schema.ts`.
+- `AgentStatusEntry` has `state`, `prompt`, timestamps, `agentType`, pane/tab/worktree attribution, tool previews, assistant preview, and orchestration context. It has no provider session ID or resume command field. See `packages/product-core/shared/agent-status-types.ts`.
 
 The existing sleep persistence is terminal-resume metadata. The feature needs provider-conversation-resume metadata.
 
@@ -38,9 +38,9 @@ The existing sleep persistence is terminal-resume metadata. The feature needs pr
 
 The current local and SSH hook wire shapes drop provider IDs:
 
-- `AgentHookEventPayload` in `src/shared/agent-hook-listener.ts` includes pane/tab/worktree, prompt cache fields, hook event name, Claude tool/subagent IDs, and normalized `payload`. It has no provider session ID field.
-- `AgentHookRelayEnvelope` in `src/shared/agent-hook-relay.ts` mirrors that normalized shape for SSH. Its comment states the relay normalizes before sending the envelope. Therefore remote/SSH events lose provider IDs at the relay boundary too unless the new field is added to the shared envelope.
-- `ParsedAgentStatusPayload` in `src/shared/agent-status-types.ts` includes only status fields: `state`, `prompt`, `agentType`, `toolName`, `toolInput`, `lastAssistantMessage`, `interrupted`.
+- `AgentHookEventPayload` in `packages/product-core/shared/agent-hook-listener.ts` includes pane/tab/worktree, prompt cache fields, hook event name, Claude tool/subagent IDs, and normalized `payload`. It has no provider session ID field.
+- `AgentHookRelayEnvelope` in `packages/product-core/shared/agent-hook-relay.ts` mirrors that normalized shape for SSH. Its comment states the relay normalizes before sending the envelope. Therefore remote/SSH events lose provider IDs at the relay boundary too unless the new field is added to the shared envelope.
+- `ParsedAgentStatusPayload` in `packages/product-core/shared/agent-status-types.ts` includes only status fields: `state`, `prompt`, `agentType`, `toolName`, `toolInput`, `lastAssistantMessage`, `interrupted`.
 
 Implementation implication: provider-session metadata must be extracted before normalization completes and must be carried through both the local HTTP path and the SSH relay path.
 
@@ -157,7 +157,7 @@ Verified:
 
 - Local `opencode --help` shows `--continue` and `--session`.
 - Official OpenCode docs list `--session` as the session ID to continue.
-- Cloned OpenCode source `packages/opencode/src/cli/cmd/tui/thread.ts` defines `--session` and passes it into TUI args as `sessionID`.
+- Cloned OpenCode source `packages/opencode/packages/product-core/cli/cmd/tui/thread.ts` defines `--session` and passes it into TUI args as `sessionID`.
 - Cloned OpenCode source `validate-session.ts` validates the supplied session ID through the OpenCode client.
 - Pebble's managed OpenCode plugin reads `event.properties?.sessionID`.
 
@@ -304,20 +304,20 @@ This is the extraction map that is supported by the evidence above:
 
 Local Pebble source:
 
-- `src/shared/agent-hook-listener.ts`
-- `src/shared/agent-hook-relay.ts`
-- `src/shared/agent-status-types.ts`
-- `src/shared/types.ts`
-- `src/shared/tui-agent-config.ts`
-- `src/renderer/src/store/slices/terminals.ts`
-- `src/renderer/src/store/slices/agent-status.ts`
-- `src/renderer/src/lib/workspace-session.ts`
-- `src/shared/workspace-session-schema.ts`
-- `src/main/opencode/hook-service.ts`
-- `src/main/amp/hook-service.ts`
-- `src/main/hermes/hook-service.ts`
-- `src/main/pi/agent-status-extension-source.ts`
-- `src/main/cursor/hook-service.ts`
+- `packages/product-core/shared/agent-hook-listener.ts`
+- `packages/product-core/shared/agent-hook-relay.ts`
+- `packages/product-core/shared/agent-status-types.ts`
+- `packages/product-core/shared/types.ts`
+- `packages/product-core/shared/tui-agent-config.ts`
+- `packages/product-core/renderer/src/store/slices/terminals.ts`
+- `packages/product-core/renderer/src/store/slices/agent-status.ts`
+- `packages/product-core/renderer/src/lib/workspace-session.ts`
+- `packages/product-core/shared/workspace-session-schema.ts`
+- `migration/electron-reference/src/main/opencode/hook-service.ts`
+- `packages/product-core/agent-hooks/amp/hook-service.ts`
+- `packages/product-core/agent-hooks/hermes/hook-service.ts`
+- `migration/electron-reference/src/main/pi/agent-status-extension-source.ts`
+- `packages/product-core/agent-hooks/cursor/hook-service.ts`
 
 Cloned source:
 

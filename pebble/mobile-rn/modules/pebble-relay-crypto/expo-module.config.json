@@ -1,9 +1,0 @@
-{
-  "platforms": ["ios", "android"],
-  "ios": {
-    "modules": ["PebbleRelayCryptoModule"]
-  },
-  "android": {
-    "modules": ["nebutra.pebble.relaycrypto.PebbleRelayCryptoModule"]
-  }
-}

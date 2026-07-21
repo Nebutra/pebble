@@ -13,8 +13,8 @@ import {
 } from './helpers/terminal'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/pebble-restart'
-import { PROTOCOL_VERSION } from '../../src/main/daemon/types'
-import { PTY_SESSION_ID_SEPARATOR } from '../../src/shared/pty-session-id-format'
+import { LEGACY_DAEMON_PROTOCOL_VERSION } from './helpers/legacy-daemon-protocol'
+import { PTY_SESSION_ID_SEPARATOR } from '../../packages/product-core/shared/pty-session-id-format'
 
 // Why: longer than FIRST_WINDOW_STARTUP_SERVICE_TIMEOUT_MS (12s) so the first
 // window fails open before the daemon provider exists — the exact race that
@@ -24,7 +24,7 @@ const DAEMON_INIT_DELAY_MS = 15_000
 
 function readDaemonPid(userDataDir: string): number {
   const raw = readFileSync(
-    path.join(userDataDir, 'daemon', `daemon-v${PROTOCOL_VERSION}.pid`),
+    path.join(userDataDir, 'daemon', `daemon-v${LEGACY_DAEMON_PROTOCOL_VERSION}.pid`),
     'utf8'
   )
   const parsed = JSON.parse(raw) as { pid?: unknown }

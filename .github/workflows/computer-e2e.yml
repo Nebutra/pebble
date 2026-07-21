@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/computer-e2e.yml'
-      - 'config/electron-builder.config.cjs'
+      - 'apps/desktop/src-tauri/**'
       - 'config/scripts/build-computer-macos.mjs'
       - 'config/scripts/computer-e2e-workflow.test.mjs'
       - 'config/scripts/computer-use-skill-guidance.test.mjs'
@@ -15,12 +15,12 @@ on:
       - 'native/computer-use-linux/**'
       - 'native/computer-use-windows/**'
       - 'skills/computer-use/SKILL.md'
-      - 'src/cli/**'
-      - 'src/main/computer/**'
-      - 'src/main/runtime/rpc/dispatcher.ts'
-      - 'src/main/runtime/rpc/errors.ts'
-      - 'src/main/runtime/rpc/methods/computer*.ts'
-      - 'src/shared/computer-use-*.ts'
+      - 'packages/product-core/cli/**'
+      - 'migration/electron-reference/src/main/computer/**'
+      - 'migration/electron-reference/src/main/runtime/rpc/dispatcher.ts'
+      - 'migration/electron-reference/src/main/runtime/rpc/errors.ts'
+      - 'migration/electron-reference/src/main/runtime/rpc/methods/computer*.ts'
+      - 'packages/product-core/shared/computer-use-*.ts'
       - 'tests/e2e/computer-linux.e2e.ts'
       - 'tests/e2e/computer-mac.e2e.ts'
       - 'tests/e2e/computer-mac-safari.e2e.ts'
@@ -67,37 +67,36 @@ jobs:
           config/scripts/computer-e2e-workflow.test.mjs
           config/scripts/computer-use-skill-guidance.test.mjs
           config/scripts/computer-use-smoke.test.mjs
-          src/main/computer/computer-provider-lifecycle.test.ts
-          src/main/computer/computer-provider-unavailable-message.test.ts
-          src/main/computer/sidecar-client.test.ts
-          src/main/computer/macos-native-provider-client.test.ts
-          src/main/computer/macos-native-provider-socket.test.ts
-          src/main/computer/macos-computer-use-permissions.test.ts
-          src/main/computer/macos-computer-use-permission-status.test.ts
-          src/main/computer/desktop-script-provider-client.test.ts
-          src/main/computer/desktop-script-provider-cache.test.ts
-          src/main/computer/desktop-script-provider-actions.test.ts
-          src/main/computer/desktop-script-provider-cache-lifecycle.test.ts
-          src/main/computer/desktop-script-provider-errors.test.ts
-          src/main/computer/desktop-script-provider-action-errors.test.ts
-          src/shared/computer-use-error-recovery.test.ts
-          src/shared/computer-use-key-spec.test.ts
-          src/cli/format.test.ts
-          src/cli/handlers/computer.test.ts
-          src/cli/handlers/computer-action-routing.test.ts
-          src/cli/handlers/computer-action-validation.test.ts
-          src/cli/handlers/computer-state-formatting.test.ts
-          src/cli/specs/computer.test.ts
-          src/cli/index.test.ts
-          src/main/runtime/rpc/dispatcher-computer-errors.test.ts
-          src/main/runtime/rpc/errors.test.ts
-          src/main/runtime/rpc/methods/computer.test.ts
-          src/main/runtime/rpc/methods/computer-actions.test.ts
-          src/cli/runtime/envelope-schema.test.ts
-          src/shared/remote-runtime-client.test.ts
+          migration/electron-reference/src/main/computer/computer-provider-lifecycle.test.ts
+          migration/electron-reference/src/main/computer/computer-provider-unavailable-message.test.ts
+          migration/electron-reference/src/main/computer/sidecar-client.test.ts
+          migration/electron-reference/src/main/computer/macos-native-provider-client.test.ts
+          migration/electron-reference/src/main/computer/macos-native-provider-socket.test.ts
+          migration/electron-reference/src/main/computer/macos-computer-use-permissions.test.ts
+          migration/electron-reference/src/main/computer/macos-computer-use-permission-status.test.ts
+          migration/electron-reference/src/main/computer/desktop-script-provider-client.test.ts
+          migration/electron-reference/src/main/computer/desktop-script-provider-cache.test.ts
+          migration/electron-reference/src/main/computer/desktop-script-provider-actions.test.ts
+          migration/electron-reference/src/main/computer/desktop-script-provider-cache-lifecycle.test.ts
+          migration/electron-reference/src/main/computer/desktop-script-provider-errors.test.ts
+          migration/electron-reference/src/main/computer/desktop-script-provider-action-errors.test.ts
+          packages/product-core/shared/computer-use-error-recovery.test.ts
+          packages/product-core/shared/computer-use-key-spec.test.ts
+          packages/product-core/cli/format.test.ts
+          packages/product-core/cli/handlers/computer.test.ts
+          packages/product-core/cli/handlers/computer-action-routing.test.ts
+          packages/product-core/cli/handlers/computer-action-validation.test.ts
+          packages/product-core/cli/handlers/computer-state-formatting.test.ts
+          packages/product-core/cli/specs/computer.test.ts
+          packages/product-core/cli/index.test.ts
+          migration/electron-reference/src/main/runtime/rpc/dispatcher-computer-errors.test.ts
+          migration/electron-reference/src/main/runtime/rpc/errors.test.ts
+          migration/electron-reference/src/main/runtime/rpc/methods/computer.test.ts
+          migration/electron-reference/src/main/runtime/rpc/methods/computer-actions.test.ts
+          packages/product-core/cli/runtime/envelope-schema.test.ts
+          packages/product-core/shared/remote-runtime-client.test.ts
       - run: pnpm verify:computer-native
       - run: pnpm build:cli
-      - run: pnpm build:electron-vite
       - if: runner.os == 'Linux'
         env:
           PEBBLE_COMPUTER_E2E: '1'
@@ -127,7 +126,6 @@ jobs:
       - run: pnpm build:computer-macos
       - run: pnpm verify:computer-native
       - run: pnpm build:cli
-      - run: pnpm build:electron-vite
       - run: pnpm test:e2e:computer --reporter=verbose tests/e2e/computer-mac.e2e.ts tests/e2e/computer-mac-safari.e2e.ts
 
   linux:
@@ -154,7 +152,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify:computer-native
       - run: pnpm build:cli
-      - run: pnpm build:electron-vite
       - run: xvfb-run --auto-servernum dbus-run-session -- pnpm test:e2e:computer --reporter=verbose tests/e2e/computer-linux.e2e.ts
 
   windows:
@@ -173,5 +170,4 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify:computer-native
       - run: pnpm build:cli
-      - run: pnpm build:electron-vite
       - run: pnpm test:e2e:computer --reporter=verbose tests/e2e/computer-windows.e2e.ts tests/e2e/computer-windows-store.e2e.ts

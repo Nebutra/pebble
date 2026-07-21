@@ -51,15 +51,15 @@ describe('computer-use e2e workflow', () => {
         'config/scripts/computer-use-smoke.mjs',
         'config/scripts/computer-use-smoke.test.mjs',
         'skills/computer-use/SKILL.md',
-        'src/main/computer/**',
-        'src/main/runtime/rpc/dispatcher.ts',
-        'src/main/runtime/rpc/errors.ts',
-        'src/main/runtime/rpc/methods/computer*.ts',
-        'src/shared/computer-use-*.ts',
+        'migration/electron-reference/src/main/computer/**',
+        'migration/electron-reference/src/main/runtime/rpc/dispatcher.ts',
+        'migration/electron-reference/src/main/runtime/rpc/errors.ts',
+        'migration/electron-reference/src/main/runtime/rpc/methods/computer*.ts',
+        'packages/product-core/shared/computer-use-*.ts',
         'tests/e2e/vitest.config.ts'
       ])
     )
-    expect(triggerPaths).not.toContain('src/shared/runtime-types.ts')
+    expect(triggerPaths).not.toContain('packages/product-core/shared/runtime-types.ts')
   })
 
   it('runs focused computer-use regression tests in the PR native-smoke job', () => {
@@ -74,34 +74,34 @@ describe('computer-use e2e workflow', () => {
       'config/scripts/computer-e2e-workflow.test.mjs',
       'config/scripts/computer-use-skill-guidance.test.mjs',
       'config/scripts/computer-use-smoke.test.mjs',
-      'src/main/computer/computer-provider-lifecycle.test.ts',
-      'src/main/computer/computer-provider-unavailable-message.test.ts',
-      'src/main/computer/sidecar-client.test.ts',
-      'src/main/computer/macos-native-provider-client.test.ts',
-      'src/main/computer/macos-native-provider-socket.test.ts',
-      'src/main/computer/macos-computer-use-permissions.test.ts',
-      'src/main/computer/macos-computer-use-permission-status.test.ts',
-      'src/main/computer/desktop-script-provider-client.test.ts',
-      'src/main/computer/desktop-script-provider-cache.test.ts',
-      'src/main/computer/desktop-script-provider-actions.test.ts',
-      'src/main/computer/desktop-script-provider-cache-lifecycle.test.ts',
-      'src/main/computer/desktop-script-provider-errors.test.ts',
-      'src/main/computer/desktop-script-provider-action-errors.test.ts',
-      'src/shared/computer-use-error-recovery.test.ts',
-      'src/shared/computer-use-key-spec.test.ts',
-      'src/cli/format.test.ts',
-      'src/cli/handlers/computer.test.ts',
-      'src/cli/handlers/computer-action-routing.test.ts',
-      'src/cli/handlers/computer-action-validation.test.ts',
-      'src/cli/handlers/computer-state-formatting.test.ts',
-      'src/cli/specs/computer.test.ts',
-      'src/cli/index.test.ts',
-      'src/main/runtime/rpc/dispatcher-computer-errors.test.ts',
-      'src/main/runtime/rpc/errors.test.ts',
-      'src/main/runtime/rpc/methods/computer.test.ts',
-      'src/main/runtime/rpc/methods/computer-actions.test.ts',
-      'src/cli/runtime/envelope-schema.test.ts',
-      'src/shared/remote-runtime-client.test.ts'
+      'migration/electron-reference/src/main/computer/computer-provider-lifecycle.test.ts',
+      'migration/electron-reference/src/main/computer/computer-provider-unavailable-message.test.ts',
+      'migration/electron-reference/src/main/computer/sidecar-client.test.ts',
+      'migration/electron-reference/src/main/computer/macos-native-provider-client.test.ts',
+      'migration/electron-reference/src/main/computer/macos-native-provider-socket.test.ts',
+      'migration/electron-reference/src/main/computer/macos-computer-use-permissions.test.ts',
+      'migration/electron-reference/src/main/computer/macos-computer-use-permission-status.test.ts',
+      'migration/electron-reference/src/main/computer/desktop-script-provider-client.test.ts',
+      'migration/electron-reference/src/main/computer/desktop-script-provider-cache.test.ts',
+      'migration/electron-reference/src/main/computer/desktop-script-provider-actions.test.ts',
+      'migration/electron-reference/src/main/computer/desktop-script-provider-cache-lifecycle.test.ts',
+      'migration/electron-reference/src/main/computer/desktop-script-provider-errors.test.ts',
+      'migration/electron-reference/src/main/computer/desktop-script-provider-action-errors.test.ts',
+      'packages/product-core/shared/computer-use-error-recovery.test.ts',
+      'packages/product-core/shared/computer-use-key-spec.test.ts',
+      'packages/product-core/cli/format.test.ts',
+      'packages/product-core/cli/handlers/computer.test.ts',
+      'packages/product-core/cli/handlers/computer-action-routing.test.ts',
+      'packages/product-core/cli/handlers/computer-action-validation.test.ts',
+      'packages/product-core/cli/handlers/computer-state-formatting.test.ts',
+      'packages/product-core/cli/specs/computer.test.ts',
+      'packages/product-core/cli/index.test.ts',
+      'migration/electron-reference/src/main/runtime/rpc/dispatcher-computer-errors.test.ts',
+      'migration/electron-reference/src/main/runtime/rpc/errors.test.ts',
+      'migration/electron-reference/src/main/runtime/rpc/methods/computer.test.ts',
+      'migration/electron-reference/src/main/runtime/rpc/methods/computer-actions.test.ts',
+      'packages/product-core/cli/runtime/envelope-schema.test.ts',
+      'packages/product-core/shared/remote-runtime-client.test.ts'
     ]
 
     expect(regressionRun).toBeTruthy()
@@ -126,7 +126,7 @@ describe('computer-use e2e workflow', () => {
     )
   })
 
-  it('builds Electron main output before every computer-use e2e run', () => {
+  it('does not build the Electron reference for native computer-use e2e', () => {
     const workflow = parse(
       readFileSync(join(projectDir, '.github/workflows/computer-e2e.yml'), 'utf8')
     )
@@ -135,20 +135,10 @@ describe('computer-use e2e workflow', () => {
       const runs = workflow.jobs[jobName].steps
         .map((step) => step.run)
         .filter((run) => typeof run === 'string')
-      const buildIndex = runs.indexOf('pnpm build:electron-vite')
-      const e2eIndexes = runs
-        .map((run, index) => (run.includes('test:e2e:computer') ? index : -1))
-        .filter((index) => index >= 0)
 
-      expect(
-        buildIndex,
-        `${jobName} should build out/main before computer e2e`
-      ).toBeGreaterThanOrEqual(0)
-      for (const e2eIndex of e2eIndexes) {
-        expect(buildIndex, `${jobName} should build out/main before computer e2e`).toBeLessThan(
-          e2eIndex
-        )
-      }
+      expect(runs, `${jobName} should use the CLI/native runtime directly`).not.toContain(
+        'pnpm parity:electron:build'
+      )
     }
   })
 

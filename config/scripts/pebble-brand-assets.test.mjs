@@ -12,8 +12,8 @@ const freeformIconAssets = [
   'resources/icon-dev.png',
   'resources/app-icons/pebble-watercolor.png',
   'resources/app-icons/pebble-blue.png',
-  'mobile/assets/adaptive-icon.png',
-  'mobile/assets/favicon.png'
+  'apps/mobile/assets/adaptive-icon.png',
+  'apps/mobile/assets/favicon.png'
 ]
 
 function readPngAsset(relativePath) {

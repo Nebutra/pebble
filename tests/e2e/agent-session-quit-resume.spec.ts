@@ -13,13 +13,13 @@ import {
 } from './helpers/terminal'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/pebble-restart'
-import { PROTOCOL_VERSION } from '../../src/main/daemon/types'
+import { LEGACY_DAEMON_PROTOCOL_VERSION } from './helpers/legacy-daemon-protocol'
 
 const PROVIDER_SESSION_ID = 'e2e-quit-resume-session'
 
 function readDaemonPid(userDataDir: string): number {
   const raw = readFileSync(
-    path.join(userDataDir, 'daemon', `daemon-v${PROTOCOL_VERSION}.pid`),
+    path.join(userDataDir, 'daemon', `daemon-v${LEGACY_DAEMON_PROTOCOL_VERSION}.pid`),
     'utf8'
   )
   const parsed = JSON.parse(raw) as { pid?: unknown }

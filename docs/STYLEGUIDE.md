@@ -1,6 +1,6 @@
 # Pebble UI Style Guide
 
-This is the **UI/visual design** doc for Pebble — color tokens, typography, component selection, and UX rules. It is _not_ an architecture doc; for system-level design see code and inline comments. Token values live in `src/renderer/src/assets/main.css` (canonical); this file documents the _roles and rules_ for using them.
+This is the **UI/visual design** doc for Pebble — color tokens, typography, component selection, and UX rules. It is _not_ an architecture doc; for system-level design see code and inline comments. Token values live in `packages/product-core/renderer/src/assets/main.css` (canonical); this file documents the _roles and rules_ for using them.
 
 ## Overview
 
@@ -16,9 +16,9 @@ When in doubt:
 
 | Concern                                       | Canonical location                                    |
 | --------------------------------------------- | ----------------------------------------------------- |
-| Color tokens                                  | `src/renderer/src/assets/main.css` (`:root`, `.dark`) |
+| Color tokens                                  | `packages/product-core/renderer/src/assets/main.css` (`:root`, `.dark`) |
 | Tailwind theme bindings                       | Same file, `@theme inline { … }` block                |
-| Component primitives                          | `src/renderer/src/components/ui/` (shadcn-style)      |
+| Component primitives                          | `packages/product-core/renderer/src/components/ui/` (shadcn-style)      |
 | App typography / scrollbars / titlebar chrome | Same `main.css`                                       |
 
 Never hardcode a hex value in component code if a variable already covers it. If a new token is needed, add it to `main.css` (both `:root` and `.dark`), expose it in the `@theme inline` block, then use it.
@@ -108,7 +108,7 @@ Don't add a fourth level. If something needs more emphasis than "floating," you'
 
 ## Components
 
-Use the shadcn primitives in `src/renderer/src/components/ui/` before writing anything custom. The shadcn-style wrappers in this folder follow a consistent pattern:
+Use the shadcn primitives in `packages/product-core/renderer/src/components/ui/` before writing anything custom. The shadcn-style wrappers in this folder follow a consistent pattern:
 
 - Most carry a `data-slot="<name>"` attribute on their root for CSS targeting — do not strip it. (The non-shadcn helpers in this folder — `sonner`, `repo-multi-combobox`, `team-multi-combobox` — don't follow this pattern and shouldn't be modeled when adding new primitives that should.)
 - Use `cn()` for class merging. Pass user `className` last so callers can override.
@@ -131,7 +131,7 @@ Sizes: `default` (36px), `sm` (32px), `xs` (24px), `lg` (40px), plus `icon`, `ic
 
 ### Other primitives in this repo
 
-Browse `src/renderer/src/components/ui/` for the full list. Most wrap a Radix UI primitive — exceptions are `command` (wraps `cmdk`), `sonner` (wraps `sonner`), and the visual-only wrappers (`badge`, `button-group`, `card`, `input`) which apply tokens and Tailwind utilities directly. Never reimplement headless behavior; extend the existing wrapper.
+Browse `packages/product-core/renderer/src/components/ui/` for the full list. Most wrap a Radix UI primitive — exceptions are `command` (wraps `cmdk`), `sonner` (wraps `sonner`), and the visual-only wrappers (`badge`, `button-group`, `card`, `input`) which apply tokens and Tailwind utilities directly. Never reimplement headless behavior; extend the existing wrapper.
 
 ### Picking the right primitive
 
@@ -191,7 +191,7 @@ Icons come from **`lucide-react`**. Don't import a second icon library.
 
 ### Keyboard shortcut chips
 
-Use **`<ShortcutKeyCombo />`** from `src/renderer/src/components/ShortcutKeyCombo.tsx`. It renders a consistent key-cap style and inserts a `+` separator on Windows/Linux (Mac shows adjacent glyphs, no separator). It does **not** transform key strings — the _caller_ picks the platform-appropriate labels and passes them in:
+Use **`<ShortcutKeyCombo />`** from `packages/product-core/renderer/src/components/ShortcutKeyCombo.tsx`. It renders a consistent key-cap style and inserts a `+` separator on Windows/Linux (Mac shows adjacent glyphs, no separator). It does **not** transform key strings — the _caller_ picks the platform-appropriate labels and passes them in:
 
 ```tsx
 const isMac = navigator.userAgent.includes('Mac')
@@ -212,7 +212,7 @@ See `Landing.tsx` for the canonical pattern. Don't roll a one-off `<kbd>` — kb
 
 ### Form anatomy
 
-The pattern in `src/renderer/src/components/settings/SettingsFormControls.tsx` is the house style for any label + control + helper text. Match it for new forms:
+The pattern in `packages/product-core/renderer/src/components/settings/SettingsFormControls.tsx` is the house style for any label + control + helper text. Match it for new forms:
 
 - **Outer stack:** `space-y-3` for full-section forms (`ThemePicker`); `space-y-2` for compact single-control fields (`ColorField`, `NumberField`). Pick by density, not preference.
 - **Label group:** `space-y-1` containing `<Label>` and a description in `text-xs text-muted-foreground`.
@@ -234,6 +234,19 @@ Apply one of these to overflow containers; don't write a fourth style.
 These are the rules a contributor will most often get wrong if they're working in isolation. They apply to every UI change.
 
 **UI copy must not overclaim.** Never imply the app has taken an action, made a decision, or observed a fact unless the code has real state or result data to support it. Use neutral process language while work is pending, and reserve result verbs like "skipped", "protected", "found", "verified", or "deleted" for actual results.
+
+### Product language
+
+Pebble should describe parallel agent work without making users learn Git implementation terms.
+
+- **平行宇宙** is the Chinese product term for a Pebble-managed workspace/worktree: an isolated, Git-backed line of agent work. Use it in navigation, creation flows, filters, empty states, notifications, and settings.
+- **项目** is the stable repository or product boundary that contains parallel universes.
+- **会话** is the continuing agent or terminal interaction inside a parallel universe.
+- **浮动工作台** is the detachable Pebble surface. **文件夹空间** is the non-Git folder mode.
+- Keep third-party nouns intact. Linear workspaces, OpenCode Go workspace IDs, and provider API workspaces remain **工作区** because Pebble does not own those concepts.
+- Internal identifiers, protocol fields, Git commands, diagnostics, and developer documentation may retain `worktree` where technical precision matters. Do not expose that implementation name as general Chinese UI copy.
+
+This vocabulary is a UX contract: professional Git isolation remains available, while the common workflow reads as a small set of stable product concepts.
 
 ### Screen UX review rubric
 
@@ -308,7 +321,7 @@ Pebble runs on macOS, Linux, and Windows. Every UI change must hold up on all th
 
 If you have a UI question this doc doesn't answer:
 
-1. Look at adjacent code in `src/renderer/src/components/` for the closest sibling, and follow its lead.
-2. Check `src/renderer/src/components/ui/` for a primitive that already encodes the pattern.
+1. Look at adjacent code in `packages/product-core/renderer/src/components/` for the closest sibling, and follow its lead.
+2. Check `packages/product-core/renderer/src/components/ui/` for a primitive that already encodes the pattern.
 3. If it's a token question, `main.css` is canonical — use what's there, or add a new one in both light and dark.
 4. If none of those resolve it, ask the user before inventing.

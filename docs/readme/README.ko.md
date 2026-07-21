@@ -210,7 +210,7 @@ diff의 어느 줄에든 코멘트를 남기고 에이전트에게 바로 보내
 ### 데스크톱 — macOS, Windows, Linux
 
 - **[nebutra.com/pebble에서 다운로드](https://www.nebutra.com/pebble/download)**
-- 또는 빌드를 직접 받기: [macOS Apple Silicon](https://github.com/nebutra/pebble/releases/latest/download/pebble-macos-arm64.dmg) · [macOS Intel](https://github.com/nebutra/pebble/releases/latest/download/pebble-macos-x64.dmg) · [Windows (.exe)](https://github.com/nebutra/pebble/releases/latest/download/pebble-windows-setup.exe) · [Linux AppImage](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux.AppImage) · [전체 빌드](https://github.com/nebutra/pebble/releases/latest)
+- 또는 빌드를 직접 받기: [macOS Universal](https://github.com/nebutra/pebble/releases/latest/download/pebble-macos-universal.dmg) · [Windows (.exe)](https://github.com/nebutra/pebble/releases/latest/download/pebble-windows-x86_64-setup.exe) · [Linux x64 AppImage](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux-x86_64.AppImage) · [Linux arm64 AppImage](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux-aarch64.AppImage) · [전체 빌드](https://github.com/nebutra/pebble/releases/latest)
 
 _또는 패키지 매니저로 설치:_
 

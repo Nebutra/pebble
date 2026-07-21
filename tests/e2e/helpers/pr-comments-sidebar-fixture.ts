@@ -1,5 +1,5 @@
 import type { Page } from '@nebutra/playwright-test'
-import type { PRComment, PRInfo } from '../../../src/shared/types'
+import type { PRComment, PRInfo } from '../../../packages/product-core/shared/types'
 
 export type PRCommentsSidebarSeed = {
   worktreeId: string
@@ -16,7 +16,7 @@ export const FIXTURE_COMMENTS: PRComment[] = [
     createdAt: '2026-05-14T10:00:00.000Z',
     url: 'https://github.com/acme/pebble/pull/73#discussion_r101',
     threadId: 'thread-open',
-    path: 'src/handler.ts',
+    path: 'packages/product-core/handler.ts',
     isResolved: false
   },
   {
@@ -35,7 +35,7 @@ export const FIXTURE_COMMENTS: PRComment[] = [
     createdAt: '2026-05-13T09:00:00.000Z',
     url: 'https://github.com/acme/pebble/pull/73#discussion_r103',
     threadId: 'thread-resolved',
-    path: 'src/legacy.ts',
+    path: 'packages/product-core/legacy.ts',
     isResolved: true
   }
 ]

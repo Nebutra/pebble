@@ -1,0 +1,2105 @@
+package runtimehttp
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/nebutra/pebble/runtime/go/internal/runtimecore"
+)
+
+const maxJSONBodyBytes int64 = 16 * 1024 * 1024
+
+type Server struct {
+	manager     *runtimecore.Manager
+	mux         *http.ServeMux
+	bearerToken string
+	// hookToken authorizes /hook/{source} ingest posts, which carry
+	// X-Pebble-Agent-Hook-Token instead of a bearer header.
+	hookToken              string
+	nestedScanMu           sync.Mutex
+	nestedScanCancels      map[string]*nestedScanCancellation
+	localhostLabels        *localhostLabelProxy
+	browserScreencasts     *browserScreencastFrameRegistry
+	remoteWorkspaceWatches *remoteWorkspaceWatchRegistry
+}
+
+type ServerOptions struct {
+	BearerToken string
+	// HookToken overrides the agent-hook ingest token; defaults to BearerToken.
+	HookToken string
+}
+
+func NewServer(manager *runtimecore.Manager) *Server {
+	return NewServerWithOptions(manager, ServerOptions{})
+}
+
+func NewServerWithOptions(manager *runtimecore.Manager, options ServerOptions) *Server {
+	hookToken := strings.TrimSpace(options.HookToken)
+	if hookToken == "" {
+		hookToken = strings.TrimSpace(options.BearerToken)
+	}
+	server := &Server{
+		manager:                manager,
+		mux:                    http.NewServeMux(),
+		bearerToken:            strings.TrimSpace(options.BearerToken),
+		hookToken:              hookToken,
+		nestedScanCancels:      make(map[string]*nestedScanCancellation),
+		localhostLabels:        newLocalhostLabelProxy(),
+		browserScreencasts:     newBrowserScreencastFrameRegistry(),
+		remoteWorkspaceWatches: newRemoteWorkspaceWatchRegistry(manager),
+	}
+	server.routes()
+	return server
+}
+
+type nestedScanCancellation struct {
+	cancel context.CancelFunc
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if s.localhostLabels.serve(w, r) {
+		return
+	}
+	if !s.authorize(r) {
+		writeError(w, http.StatusUnauthorized, "missing or invalid bearer token")
+		return
+	}
+	if s.relayRemoteProviderRequest(w, r) {
+		return
+	}
+	s.mux.ServeHTTP(w, r)
+}
+
+func (s *Server) authorize(r *http.Request) bool {
+	if s.bearerToken == "" {
+		return true
+	}
+	if r.URL.Path == "/v1/mobile-relay" && isWebSocketUpgrade(r) {
+		return true
+	}
+	if r.URL.Path == "/v1/shared-control" && isWebSocketUpgrade(r) {
+		return true
+	}
+	// Hook scripts authenticate with X-Pebble-Agent-Hook-Token inside the
+	// ingest handler; they never hold the runtime bearer token.
+	if strings.HasPrefix(r.URL.Path, "/hook/") {
+		return true
+	}
+	token := bearerTokenFromHeader(r.Header.Get("Authorization"))
+	if token == "" || len(token) != len(s.bearerToken) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(token), []byte(s.bearerToken)) == 1
+}
+
+func (s *Server) routes() {
+	s.mux.HandleFunc("/v1/status", s.handleStatus)
+	s.mux.HandleFunc("/v1/browser/screencasts/", s.handleBrowserScreencastFrame)
+	s.mux.HandleFunc("/v1/stats/summary", s.handleStatsSummary)
+	s.mux.HandleFunc("/v1/skills/discover", s.handleSkillDiscovery)
+	s.mux.HandleFunc("/v1/projects", s.handleProjects)
+	s.mux.HandleFunc("/v1/projects/create-on-host", s.handleProjectCreateOnHost)
+	s.mux.HandleFunc("/v1/projects/clone", s.handleProjectClone)
+	s.mux.HandleFunc("/v1/projects/clone/abort", s.handleProjectCloneAbort)
+	s.mux.HandleFunc("/v1/projects/", s.handleProjectByID)
+	s.mux.HandleFunc("/v1/project-host-setups", s.handleProjectHostSetups)
+	s.mux.HandleFunc("/v1/project-host-setups/", s.handleProjectHostSetupByID)
+	s.mux.HandleFunc("/v1/project-groups", s.handleProjectGroups)
+	s.mux.HandleFunc("/v1/project-groups/move-project", s.handleProjectGroupMoveProject)
+	s.mux.HandleFunc("/v1/project-groups/scan-nested", s.handleProjectGroupScanNested)
+	s.mux.HandleFunc("/v1/project-groups/scan-nested/cancel", s.handleProjectGroupScanNestedCancel)
+	s.mux.HandleFunc("/v1/project-groups/import-nested", s.handleProjectGroupImportNested)
+	s.mux.HandleFunc("/v1/project-groups/remote-nested-scans", s.handleRemoteNestedRepoScans)
+	s.mux.HandleFunc("/v1/project-groups/import-remote-nested", s.handleProjectGroupImportRemoteNested)
+	s.mux.HandleFunc("/v1/project-groups/", s.handleProjectGroupByID)
+	s.mux.HandleFunc("/v1/folder-workspaces", s.handleFolderWorkspaces)
+	s.mux.HandleFunc("/v1/folder-workspaces/path-status", s.handleFolderWorkspacePathStatus)
+	s.mux.HandleFunc("/v1/folder-workspaces/", s.handleFolderWorkspaceByID)
+	s.mux.HandleFunc("/v1/worktrees", s.handleWorktrees)
+	s.mux.HandleFunc("/v1/worktrees/branches/force-delete", s.handleForceDeletePreservedBranch)
+	s.mux.HandleFunc("/v1/worktrees/branches/remote-removals", s.handleRemotePreservedBranchRemovals)
+	s.mux.HandleFunc("/v1/worktrees/remote-removals", s.handleRemoteWorktreeRemovals)
+	s.mux.HandleFunc("/v1/worktrees/", s.handleWorktreeByID)
+	s.mux.HandleFunc("/v1/sessions", s.handleSessions)
+	s.mux.HandleFunc("/v1/workspace-ports", s.handleWorkspacePorts)
+	s.mux.HandleFunc("/v1/workspace-ports/kill", s.handleWorkspacePortKill)
+	s.mux.HandleFunc("/v1/sparse-presets", s.handleSparsePresets)
+	s.mux.HandleFunc("/v1/workspace-space/analyze", s.handleWorkspaceSpaceAnalyze)
+	s.mux.HandleFunc("/v1/workspace-space/cancel", s.handleWorkspaceSpaceCancel)
+	s.mux.HandleFunc("/v1/ephemeral-vm/recipes", s.handleEphemeralVMRecipes)
+	s.mux.HandleFunc("/v1/ephemeral-vm/recipe-catalog", s.handleEphemeralVMRecipeCatalog)
+	s.mux.HandleFunc("/v1/ephemeral-vm/doctor", s.handleEphemeralVMDoctor)
+	s.mux.HandleFunc("/v1/ephemeral-vm/runtimes", s.handleEphemeralVMRuntimes)
+	s.mux.HandleFunc("/v1/ephemeral-vm/provision", s.handleEphemeralVMProvision)
+	s.mux.HandleFunc("/v1/ephemeral-vm/cancel", s.handleEphemeralVMCancel)
+	s.mux.HandleFunc("/v1/ephemeral-vm/attach", s.handleEphemeralVMAction)
+	s.mux.HandleFunc("/v1/ephemeral-vm/connection", s.handleEphemeralVMAction)
+	s.mux.HandleFunc("/v1/ephemeral-vm/suspend", s.handleEphemeralVMAction)
+	s.mux.HandleFunc("/v1/ephemeral-vm/resume", s.handleEphemeralVMAction)
+	s.mux.HandleFunc("/v1/ephemeral-vm/cleanup", s.handleEphemeralVMAction)
+	s.mux.HandleFunc("/v1/ephemeral-vm/cleanup-command", s.handleEphemeralVMAction)
+	s.mux.HandleFunc("/v1/usage/claude/", s.handleClaudeUsage)
+	s.mux.HandleFunc("/v1/usage/codex/", s.handleCodexUsage)
+	s.mux.HandleFunc("/v1/usage/opencode/", s.handleOpenCodeUsage)
+	s.mux.HandleFunc("/v1/notebook/run-python-cell", s.handleNotebookRunPythonCell)
+	s.mux.HandleFunc("/v1/workspace-cleanup/scan", s.handleWorkspaceCleanupScan)
+	s.mux.HandleFunc("/v1/workspace-cleanup/processes", s.handleWorkspaceCleanupProcesses)
+	s.mux.HandleFunc("/v1/remote-workspace/get", s.handleRemoteWorkspaceGet)
+	s.mux.HandleFunc("/v1/remote-workspace/patch", s.handleRemoteWorkspacePatch)
+	s.mux.HandleFunc("/v1/remote-workspace/presence", s.handleRemoteWorkspacePresence)
+	s.mux.HandleFunc("/v1/remote-workspace/watch", s.handleRemoteWorkspaceWatch)
+	s.mux.HandleFunc("/v1/localhost-worktree-labels/register", s.handleLocalhostLabelRegister)
+	s.mux.HandleFunc("/v1/sessions/", s.handleSessionByID)
+	s.mux.HandleFunc("/v1/session-tab-layouts/", s.handleSessionTabLayoutByWorktree)
+	s.mux.HandleFunc("/v1/agents", s.handleAgents)
+	s.mux.HandleFunc("/v1/agents/profiles", s.handleAgentProfiles)
+	s.mux.HandleFunc("/v1/agents/profiles/", s.handleAgentProfileByID)
+	s.mux.HandleFunc("/v1/agents/runs", s.handleAgentRuns)
+	s.mux.HandleFunc("/v1/agents/runs/", s.handleAgentRunByID)
+	s.mux.HandleFunc("/v1/orchestration/messages", s.handleMessages)
+	s.mux.HandleFunc("/v1/orchestration/messages/", s.handleMessageByID)
+	s.mux.HandleFunc("/v1/orchestration/tasks", s.handleTasks)
+	s.mux.HandleFunc("/v1/orchestration/tasks/", s.handleTaskByID)
+	s.mux.HandleFunc("/v1/orchestration/dispatches", s.handleDispatches)
+	s.mux.HandleFunc("/v1/orchestration/dispatch-preamble", s.handleDispatchPreamble)
+	s.mux.HandleFunc("/v1/orchestration/dispatches/", s.handleDispatchByID)
+	s.mux.HandleFunc("/v1/automations", s.handleAutomations)
+	s.mux.HandleFunc("/v1/automations/renderer-ready", s.handleAutomationRendererReady)
+	s.mux.HandleFunc("/v1/automations/workspaces/snapshot-name", s.handleAutomationWorkspaceNameSnapshot)
+	s.mux.HandleFunc("/v1/automations/evaluate", s.handleAutomationEvaluate)
+	s.mux.HandleFunc("/v1/automations/runs", s.handleAutomationRuns)
+	s.mux.HandleFunc("/v1/automations/runs/", s.handleAutomationRunByID)
+	s.mux.HandleFunc("/v1/automations/", s.handleAutomationByID)
+	s.mux.HandleFunc("/hook/", s.handleAgentHookIngest)
+	s.mux.HandleFunc("/v1/external-tasks", s.handleExternalTasks)
+	s.mux.HandleFunc("/v1/external-tasks/", s.handleExternalTaskByID)
+	s.mux.HandleFunc("/v1/files/tree", s.handleFileTree)
+	s.mux.HandleFunc("/v1/files/read", s.handleFileRead)
+	s.mux.HandleFunc("/v1/files/read-chunk", s.handleFileReadChunk)
+	s.mux.HandleFunc("/v1/files/write", s.handleFileWrite)
+	s.mux.HandleFunc("/v1/files/write-base64", s.handleFileWriteBase64)
+	s.mux.HandleFunc("/v1/files/create-file", s.handleFileCreate)
+	s.mux.HandleFunc("/v1/files/create-dir", s.handleFileCreateDir)
+	s.mux.HandleFunc("/v1/files/rename", s.handleFileRename)
+	s.mux.HandleFunc("/v1/files/copy", s.handleFileCopy)
+	s.mux.HandleFunc("/v1/files/commit-upload", s.handleFileCommitUpload)
+	s.mux.HandleFunc("/v1/files/delete", s.handleFileDelete)
+	s.mux.HandleFunc("/v1/files/stat", s.handleFileStat)
+	s.mux.HandleFunc("/v1/files/list", s.handleFileListAll)
+	s.mux.HandleFunc("/v1/files/search", s.handleFileSearch)
+	s.mux.HandleFunc("/v1/files/watch-snapshot", s.handleFileWatchSnapshot)
+	s.mux.HandleFunc("/v1/files/terminal-artifact/grant", s.handleTerminalArtifactGrant)
+	s.mux.HandleFunc("/v1/files/terminal-artifact/read", s.handleTerminalArtifactRead)
+	s.mux.HandleFunc("/v1/files/terminal-artifact/preview", s.handleTerminalArtifactPreview)
+	s.mux.HandleFunc("/v1/files/terminal-artifact/write", s.handleTerminalArtifactWrite)
+	s.mux.HandleFunc("/v1/ssh-targets/clipboard-image", s.handleSshClipboardImage)
+	s.mux.HandleFunc("/v1/git/base-refs/default", s.handleGitBaseRefDefault)
+	s.mux.HandleFunc("/v1/git/base-refs/search", s.handleGitBaseRefSearch)
+	s.mux.HandleFunc("/v1/git/review-start", s.handleGitReviewStart)
+	s.mux.HandleFunc("/v1/files/markdown", s.handleFileMarkdownDocuments)
+	s.mux.HandleFunc("/v1/files/browse-dir", s.handleFileBrowseServerDir)
+	s.mux.HandleFunc("/v1/files/tree-snapshots", s.handleFileTreeSnapshots)
+	s.mux.HandleFunc("/v1/files/content-snapshots", s.handleFileContentSnapshots)
+	s.mux.HandleFunc("/v1/releases", s.handleReleases)
+	s.mux.HandleFunc("/v1/releases/", s.handleReleaseByID)
+	s.mux.HandleFunc("/v1/settings", s.handleSettings)
+	s.mux.HandleFunc("/v1/accounts/snapshot", s.handleAccountsSnapshot)
+	s.mux.HandleFunc("/v1/ai-vault/sessions", s.handleAiVaultSessions)
+	s.mux.HandleFunc("/v1/settings/keybindings", s.handleKeybindings)
+	s.mux.HandleFunc("/v1/source-control", s.handleSourceControl)
+	s.mux.HandleFunc("/v1/source-control/projections", s.handleSourceControlProjectionUpdates)
+	s.mux.HandleFunc("/v1/source-control/diff", s.handleGitDiff)
+	s.mux.HandleFunc("/v1/source-control/file-diff", s.handleGitFileDiff)
+	s.mux.HandleFunc("/v1/source-control/ref-file-diff", s.handleGitRefFileDiff)
+	s.mux.HandleFunc("/v1/source-control/mutate", s.handleGitMutation)
+	s.mux.HandleFunc("/v1/source-control/local-branches", s.handleGitLocalBranches)
+	s.mux.HandleFunc("/v1/source-control/checkout", s.handleGitCheckout)
+	s.mux.HandleFunc("/v1/source-control/check-ignored", s.handleGitCheckIgnored)
+	s.mux.HandleFunc("/v1/source-control/huge-folders", s.handleGitHugeFolders)
+	s.mux.HandleFunc("/v1/source-control/append-gitignore", s.handleGitAppendGitignore)
+	s.mux.HandleFunc("/v1/source-control/submodule-status", s.handleGitSubmoduleStatus)
+	s.mux.HandleFunc("/v1/source-control/remote-file-url", s.handleGitRemoteFileURL)
+	s.mux.HandleFunc("/v1/source-control/remote-commit-url", s.handleGitRemoteCommitURL)
+	s.mux.HandleFunc("/v1/source-control/repository-identity", s.handleGitRepositoryIdentity)
+	s.mux.HandleFunc("/v1/source-control/fork-sync", s.handleGitForkSync)
+	s.mux.HandleFunc("/v1/source-control/branch-compare", s.handleGitBranchCompare)
+	s.mux.HandleFunc("/v1/source-control/commit-compare", s.handleGitCommitCompare)
+	s.mux.HandleFunc("/v1/source-control/history", s.handleGitHistory)
+	s.mux.HandleFunc("/v1/source-control/base-status", s.handleGitBaseStatus)
+	s.mux.HandleFunc("/v1/source-control/status", s.handleGitStatus)
+	s.mux.HandleFunc("/v1/browser/tabs", s.handleBrowserTabs)
+	s.mux.HandleFunc("/v1/browser/tabs/", s.handleBrowserTabByID)
+	s.mux.HandleFunc("/v1/browser/drivers", s.handleBrowserDrivers)
+	s.mux.HandleFunc("/v1/browser/profiles", s.handleBrowserProfiles)
+	s.mux.HandleFunc("/v1/browser/profiles/", s.handleBrowserProfileByID)
+	s.mux.HandleFunc("/v1/browser/permissions", s.handleBrowserPermissions)
+	s.mux.HandleFunc("/v1/browser/downloads", s.handleBrowserDownloads)
+	s.mux.HandleFunc("/v1/browser/downloads/", s.handleBrowserDownloadByID)
+	s.mux.HandleFunc("/v1/browser/status", s.handleSubsystem("browser"))
+	s.mux.HandleFunc("/v1/computer/actions", s.handleComputerActions)
+	s.mux.HandleFunc("/v1/computer/actions/claim", s.handleComputerActionClaim)
+	s.mux.HandleFunc("/v1/computer/actions/", s.handleComputerActionByID)
+	s.mux.HandleFunc("/v1/computer/status", s.handleSubsystem("computer"))
+	s.mux.HandleFunc("/v1/emulator/devices", s.handleEmulatorDevices)
+	s.mux.HandleFunc("/v1/emulator/devices/", s.handleEmulatorDeviceByID)
+	s.mux.HandleFunc("/v1/emulator/sessions", s.handleEmulatorSessions)
+	s.mux.HandleFunc("/v1/emulator/sessions/", s.handleEmulatorSessionByID)
+	s.mux.HandleFunc("/v1/emulator/status", s.handleSubsystem("emulator"))
+	s.mux.HandleFunc("/v1/ssh-targets", s.handleSshTargets)
+	s.mux.HandleFunc("/v1/ssh-targets/import", s.handleSshTargetImport)
+	s.mux.HandleFunc("/v1/ssh-targets/", s.handleSshTargetByID)
+	s.mux.HandleFunc("/v1/providers", s.handleNativeProviders)
+	s.mux.HandleFunc("/v1/providers/github/pulls", s.handleProviderGitHubPRs)
+	s.mux.HandleFunc("/v1/providers/github/pulls/for-branch", s.handleProviderGitHubPRForBranch)
+	s.mux.HandleFunc("/v1/providers/github/issues", s.handleProviderGitHubIssues)
+	s.mux.HandleFunc("/v1/providers/github/work-items", s.handleProviderGitHubWorkItems)
+	s.mux.HandleFunc("/v1/providers/github/work-item", s.handleProviderGitHubWorkItem)
+	s.mux.HandleFunc("/v1/providers/github/issues/create", s.handleProviderGitHubIssueCreate)
+	s.mux.HandleFunc("/v1/providers/github/issues/update", s.handleProviderGitHubIssueUpdate)
+	s.mux.HandleFunc("/v1/providers/github/work-items/count", s.handleProviderGitHubWorkItemCount)
+	s.mux.HandleFunc("/v1/providers/github/labels", s.handleProviderGitHubLabels)
+	s.mux.HandleFunc("/v1/providers/github/assignable-users", s.handleProviderGitHubAssignableUsers)
+	s.mux.HandleFunc("/v1/providers/github/work-item-details", s.handleProviderGitHubWorkItemDetails)
+	s.mux.HandleFunc("/v1/providers/github/pulls/file-contents", s.handleProviderGitHubPRFileContents)
+	s.mux.HandleFunc("/v1/providers/github/pulls/comments", s.handleProviderGitHubPRComments)
+	s.mux.HandleFunc("/v1/providers/github/rate-limit", s.handleProviderGitHubRateLimit)
+	s.mux.HandleFunc("/v1/providers/github/viewer", s.handleProviderGitHubViewer)
+	s.mux.HandleFunc("/v1/providers/github/auth-diagnostic", s.handleProviderGitHubAuthDiagnostic)
+	s.mux.HandleFunc("/v1/providers/github/projects/resolve", s.handleProviderGitHubProjectResolve)
+	s.mux.HandleFunc("/v1/providers/github/projects", s.handleProviderGitHubProjects)
+	s.mux.HandleFunc("/v1/providers/github/projects/views", s.handleProviderGitHubProjectViews)
+	s.mux.HandleFunc("/v1/providers/github/projects/view-table", s.handleProviderGitHubProjectViewTable)
+	s.mux.HandleFunc("/v1/providers/github/projects/repository/labels", s.handleProviderGitHubProjectLabels)
+	s.mux.HandleFunc("/v1/providers/github/projects/repository/assignees", s.handleProviderGitHubProjectAssignees)
+	s.mux.HandleFunc("/v1/providers/github/projects/repository/issue-types", s.handleProviderGitHubProjectIssueTypes)
+	s.mux.HandleFunc("/v1/providers/github/projects/repository/work-item-details", s.handleProviderGitHubProjectWorkItemDetails)
+	s.mux.HandleFunc("/v1/providers/github/projects/repository/issue/update", s.handleProviderGitHubProjectIssueUpdate)
+	s.mux.HandleFunc("/v1/providers/github/projects/repository/pull/update", s.handleProviderGitHubProjectPullUpdate)
+	s.mux.HandleFunc("/v1/providers/github/projects/repository/comments", s.handleProviderGitHubProjectComments)
+	s.mux.HandleFunc("/v1/providers/github/projects/fields", s.handleProviderGitHubProjectFields)
+	s.mux.HandleFunc("/v1/providers/github/projects/repository/issue-type", s.handleProviderGitHubProjectIssueTypeUpdate)
+	s.mux.HandleFunc("/v1/providers/github/pulls/detail", s.handleProviderGitHubPRDetail)
+	s.mux.HandleFunc("/v1/providers/github/pulls/checks", s.handleProviderGitHubPRChecks)
+	s.mux.HandleFunc("/v1/providers/github/pulls/check-details", s.handleProviderGitHubPRCheckDetails)
+	s.mux.HandleFunc("/v1/providers/github/pulls/checks/rerun", s.handleProviderGitHubPRChecksRerun)
+	s.mux.HandleFunc("/v1/providers/gitlab/merge-requests", s.handleProviderGitLabMRs)
+	s.mux.HandleFunc("/v1/providers/gitlab/project-ref", s.handleProviderGitLabProjectRef)
+	s.mux.HandleFunc("/v1/providers/gitlab/merge-request", s.handleProviderGitLabMR)
+	s.mux.HandleFunc("/v1/providers/gitlab/merge-request-for-branch", s.handleProviderGitLabMRForBranch)
+	s.mux.HandleFunc("/v1/providers/gitlab/issue", s.handleProviderGitLabIssue)
+	s.mux.HandleFunc("/v1/providers/gitlab/assignable-users", s.handleProviderGitLabAssignableUsers)
+	s.mux.HandleFunc("/v1/providers/gitlab/issues", s.handleProviderGitLabIssues)
+	s.mux.HandleFunc("/v1/providers/gitlab/work-items", s.handleProviderGitLabWorkItems)
+	s.mux.HandleFunc("/v1/providers/gitlab/labels", s.handleProviderGitLabLabels)
+	s.mux.HandleFunc("/v1/providers/gitlab/todos", s.handleProviderGitLabTodos)
+	s.mux.HandleFunc("/v1/providers/gitlab/work-item-details", s.handleProviderGitLabWorkItemDetails)
+	s.mux.HandleFunc("/v1/providers/gitlab/work-item-by-path", s.handleProviderGitLabWorkItemByPath)
+	s.mux.HandleFunc("/v1/providers/gitlab/issues/create", s.handleProviderGitLabIssueCreate)
+	s.mux.HandleFunc("/v1/providers/gitlab/issues/update", s.handleProviderGitLabIssueUpdate)
+	s.mux.HandleFunc("/v1/providers/gitlab/issues/comment", s.handleProviderGitLabIssueComment)
+	s.mux.HandleFunc("/v1/providers/gitlab/rate-limit", s.handleProviderGitLabRateLimit)
+	s.mux.HandleFunc("/v1/providers/gitlab/viewer", s.handleProviderGitLabViewer)
+	s.mux.HandleFunc("/v1/providers/gitlab/auth-diagnostic", s.handleProviderGitLabAuthDiagnostic)
+	s.mux.HandleFunc("/v1/providers/gitlab/jobs/trace", s.handleProviderGitLabJobTrace)
+	s.mux.HandleFunc("/v1/providers/gitlab/jobs/retry", s.handleProviderGitLabJobRetry)
+	s.mux.HandleFunc("/v1/providers/bitbucket/pulls", s.handleReviewWorkItems("bitbucket"))
+	s.mux.HandleFunc("/v1/providers/azure-devops/pulls", s.handleReviewWorkItems("azure-devops"))
+	s.mux.HandleFunc("/v1/providers/gitea/pulls", s.handleReviewWorkItems("gitea"))
+	s.mux.HandleFunc("/v1/providers/reviews", s.handleProviderReviewCreate)
+	s.mux.HandleFunc("/v1/providers/reviews/update", s.handleProviderReviewUpdate)
+	s.mux.HandleFunc("/v1/providers/reviews/merge", s.handleProviderReviewMerge)
+	s.mux.HandleFunc("/v1/providers/reviews/auto-merge", s.handleProviderReviewAutoMerge)
+	s.mux.HandleFunc("/v1/providers/reviews/comments", s.handleProviderReviewComment)
+	s.mux.HandleFunc("/v1/providers/reviews/inline-comments", s.handleProviderInlineReviewComment)
+	s.mux.HandleFunc("/v1/providers/reviews/comment-replies", s.handleProviderReviewCommentReply)
+	s.mux.HandleFunc("/v1/providers/reviews/threads/resolve", s.handleProviderReviewThreadResolve)
+	s.mux.HandleFunc("/v1/providers/reviews/files/viewed", s.handleProviderReviewFileViewed)
+	s.mux.HandleFunc("/v1/providers/review-capabilities", s.handleProviderReviewCapabilities)
+	s.mux.HandleFunc("/v1/providers/text-generation/execute", s.handleProviderTextGenerationExecute)
+	s.mux.HandleFunc("/v1/providers/text-generation/cancel", s.handleProviderTextGenerationCancel)
+	s.mux.HandleFunc("/v1/mobile-relay/status", s.handleMobileRelayStatus)
+	s.mux.HandleFunc("/v1/mobile-relay/pairing-codes", s.handleMobileRelayPairingCodes)
+	s.mux.HandleFunc("/v1/mobile-relay/pairings", s.handleMobileRelayPairings)
+	s.mux.HandleFunc("/v1/mobile-relay/pairings/", s.handleMobileRelayPairingByDeviceID)
+	s.mux.HandleFunc("/v1/mobile-relay/projection", s.handleMobileRelayProjection)
+	s.mux.HandleFunc("/v1/mobile-relay", s.handleMobileRelay)
+	s.mux.HandleFunc("/v1/shared-control/pairing", s.handleLegacySharedControlPairing)
+	s.mux.HandleFunc("/v1/shared-control/pairings", s.handleLegacySharedControlPairings)
+	s.mux.HandleFunc("/v1/shared-control/pairings/", s.handleLegacySharedControlPairingByDeviceID)
+	s.mux.HandleFunc("/v1/shared-control", s.handleLegacySharedControl)
+	s.mux.HandleFunc("/v1/events", s.handleEvents)
+	s.mux.HandleFunc("/v1/notifications/dispatch", s.handleNotificationDispatch)
+	s.mux.HandleFunc("/v1/host/terminal-capabilities", s.handleHostTerminalCapabilities)
+	s.mux.HandleFunc("/v1/remote-hosts/agent-detections", s.handleRemoteAgentDetections)
+}
+
+func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.manager.Status())
+}
+
+func (s *Server) handleProjects(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListProjects())
+	case http.MethodPost:
+		var req runtimecore.CreateProjectRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		project, err := s.manager.CreateProjectWithMainWorktree(r.Context(), req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, project)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleProjectClone(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.CloneProjectRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	project, err := s.manager.CloneProject(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, project)
+}
+
+func (s *Server) handleProjectCreateOnHost(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var request struct {
+		ParentPath string `json:"parentPath"`
+		Name       string `json:"name"`
+		Kind       string `json:"kind"`
+	}
+	if !decodeJSON(w, r, &request) {
+		return
+	}
+	project, err := s.manager.CreateProjectOnHost(r.Context(), request.ParentPath, request.Name, request.Kind)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, project)
+}
+
+func (s *Server) handleProjectCloneAbort(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"aborted": s.manager.CancelClone()})
+}
+
+func (s *Server) handleProjectByID(w http.ResponseWriter, r *http.Request) {
+	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/v1/projects/"), "/")
+	id, action, _ := strings.Cut(path, "/")
+	if id == "" {
+		writeError(w, http.StatusNotFound, "project not found")
+		return
+	}
+	if id == "reorder" {
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		var req runtimecore.PersistProjectSortOrderRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		if err := s.manager.PersistProjectSortOrder(req.OrderedIDs); err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "applied"})
+		return
+	}
+	if r.Method == http.MethodGet && action == "git-username" {
+		username, err := s.manager.ProjectGitUsername(id)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"username": username})
+		return
+	}
+	if action != "" {
+		writeError(w, http.StatusNotFound, "project action not found")
+		return
+	}
+	switch r.Method {
+	case http.MethodPatch:
+		var req runtimecore.UpdateProjectRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		project, err := s.manager.UpdateProject(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, project)
+	case http.MethodDelete:
+		project, err := s.manager.DeleteProject(id)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, project)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleWorktrees(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListWorktrees(r.URL.Query().Get("projectId")))
+	case http.MethodPost:
+		var req runtimecore.CreateWorktreeRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		worktree, err := s.manager.CreateWorktree(r.Context(), req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, worktree)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleWorktreeByID(w http.ResponseWriter, r *http.Request) {
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/v1/worktrees/"), "/")
+	if id == "" {
+		writeError(w, http.StatusNotFound, "worktree not found")
+		return
+	}
+	if id == "sort-order" {
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		var req runtimecore.PersistWorktreeSortOrderRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		if err := s.manager.PersistWorktreeSortOrder(req.OrderedIDs); err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "applied"})
+		return
+	}
+	if id == "lineage" {
+		if r.Method != http.MethodGet {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		writeJSON(w, http.StatusOK, s.manager.ListWorktreeLineage())
+		return
+	}
+	if r.Method == http.MethodPatch {
+		var req runtimecore.UpdateWorktreeRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		worktree, err := s.manager.UpdateWorktree(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, worktree)
+		return
+	}
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.DeleteWorktreeRequest
+	if r.ContentLength != 0 {
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+	}
+	worktree, err := s.manager.DeleteWorktree(r.Context(), id, req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, worktree)
+}
+
+func (s *Server) handleForceDeletePreservedBranch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.ForceDeletePreservedBranchRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.ForceDeletePreservedBranch(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListSessions())
+	case http.MethodPost:
+		var req runtimecore.StartSessionRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		session, err := s.manager.StartSession(r.Context(), req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, session)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleWorkspacePorts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.manager.ScanWorkspacePorts(r.Context(), r.URL.Query().Get("repoId")))
+}
+
+func (s *Server) handleWorkspacePortKill(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.WorkspacePortKillRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	writeJSON(w, http.StatusOK, s.manager.KillWorkspacePort(r.Context(), req))
+}
+
+func (s *Server) handleSparsePresets(w http.ResponseWriter, r *http.Request) {
+	repoID := strings.TrimSpace(r.URL.Query().Get("repoId"))
+	if repoID == "" {
+		writeError(w, http.StatusBadRequest, "repoId is required")
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		presets, err := s.manager.ListSparsePresets(repoID)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, presets)
+	case http.MethodPost:
+		var req runtimecore.SaveSparsePresetRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		preset, err := s.manager.SaveSparsePreset(repoID, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, preset)
+	case http.MethodDelete:
+		presetID := strings.TrimSpace(r.URL.Query().Get("presetId"))
+		if presetID == "" {
+			writeError(w, http.StatusBadRequest, "presetId is required")
+			return
+		}
+		if err := s.manager.RemoveSparsePreset(repoID, presetID); err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"removed": true})
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleWorkspaceSpaceAnalyze(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.manager.AnalyzeWorkspaceSpace(r.Context()))
+}
+
+func (s *Server) handleWorkspaceSpaceCancel(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"cancelled": s.manager.CancelWorkspaceSpaceAnalysis()})
+}
+
+func (s *Server) handleNotebookRunPythonCell(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.NotebookRunPythonCellRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.RunNotebookPythonCell(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleWorkspaceCleanupScan(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.WorkspaceCleanupScanRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	writeJSON(w, http.StatusOK, s.manager.ScanWorkspaceCleanup(r.Context(), req))
+}
+
+func (s *Server) handleWorkspaceCleanupProcesses(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.WorkspaceCleanupLocalProcessRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	writeJSON(w, http.StatusOK, s.manager.HasWorkspaceCleanupProcesses(req))
+}
+
+func (s *Server) handleSessionByID(w http.ResponseWriter, r *http.Request) {
+	id, action := splitSessionPath(r.URL.Path)
+	if id == "" {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	switch {
+	case r.Method == http.MethodPost && action == "input":
+		var req runtimecore.SessionInputRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		if err := s.manager.WriteSessionFromClient(id, req, runtimecore.SessionInputSource(req.Source), ""); err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "accepted"})
+	case r.Method == http.MethodPost && action == "resize":
+		var req runtimecore.SessionResizeRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		// Presence-lock defense-in-depth: while mobile drives, desktop-side
+		// resizes (auto-fit, split drag) must not reach the PTY.
+		if !s.manager.SessionResizeAllowedFor(id, runtimecore.SessionInputSource(req.Source)) {
+			writeRuntimeError(w, runtimecore.ErrSessionInputLocked)
+			return
+		}
+		var session runtimecore.Session
+		var err error
+		if runtimecore.SessionInputSource(req.Source) == runtimecore.SessionInputSourceMobile && strings.TrimSpace(req.ClientID) != "" {
+			session, _, err = s.manager.ApplyMobileSessionFit(id, strings.TrimSpace(req.ClientID), req.Cols, req.Rows)
+		} else {
+			session, err = s.manager.ResizeSession(id, req)
+		}
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, session)
+	case r.Method == http.MethodPost && action == "signal":
+		var req runtimecore.SessionSignalRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		if err := s.manager.SignalSession(id, req); err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "accepted"})
+	case r.Method == http.MethodGet && action == "driver":
+		writeJSON(w, http.StatusOK, s.manager.GetSessionDriver(id))
+	case r.Method == http.MethodPost && action == "reclaim-desktop":
+		reclaimed, err := s.manager.ReclaimSessionFitForDesktop(id)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"reclaimed": reclaimed})
+	case r.Method == http.MethodGet && action == "status":
+		// Dedicated status read: resolves the terminal foreground process via a
+		// single bounded ps probe, kept off the cheap list-poll path.
+		session, err := s.manager.SessionStatus(id)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, session)
+	case r.Method == http.MethodGet && action == "tail":
+		limit := 200
+		if raw := r.URL.Query().Get("limit"); raw != "" {
+			if parsed, err := strconv.Atoi(raw); err == nil {
+				limit = parsed
+			}
+		}
+		tail, err := s.manager.TailSession(id, limit)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, tail)
+	case r.Method == http.MethodGet && action == "transcript":
+		limit := 0
+		if raw := r.URL.Query().Get("limit"); raw != "" {
+			limit, _ = strconv.Atoi(raw)
+		}
+		var cursor *uint64
+		if raw := r.URL.Query().Get("cursor"); raw != "" {
+			parsed, err := strconv.ParseUint(raw, 10, 64)
+			if err != nil {
+				writeRuntimeError(w, errors.New("terminal cursor must be a non-negative integer"))
+				return
+			}
+			cursor = &parsed
+		}
+		read, err := s.manager.ReadSessionTranscript(id, cursor, limit)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, read)
+	case r.Method == http.MethodPatch && action == "":
+		var req runtimecore.UpdateSessionPlacementRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		session, err := s.manager.UpdateSessionPlacement(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, session)
+	case r.Method == http.MethodPost && action == "hook-status":
+		var req runtimecore.SessionHookStatusRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		session, err := s.manager.ReportSessionHookStatus(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, session)
+	case r.Method == http.MethodPost && action == "wait":
+		var req runtimecore.SessionWaitRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		// r.Context() aborts the long-poll when the caller disconnects.
+		wait, err := s.manager.WaitSession(r.Context(), id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, wait)
+	case r.Method == http.MethodPost && action == "clear-buffer":
+		session, err := s.manager.ClearSessionBuffer(id)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, session)
+	case r.Method == http.MethodDelete && action == "":
+		session, err := s.manager.StopSession(id)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, session)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleAgents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"profiles": s.manager.ListAgentProfiles(),
+		"runs":     s.manager.ListAgentRuns(),
+	})
+}
+
+func (s *Server) handleAgentProfiles(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListAgentProfiles())
+	case http.MethodPost:
+		var req runtimecore.CreateAgentProfileRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		profile, err := s.manager.CreateAgentProfile(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, profile)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleAgentProfileByID(w http.ResponseWriter, r *http.Request) {
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/v1/agents/profiles/"), "/")
+	if id == "" {
+		writeError(w, http.StatusNotFound, "agent profile not found")
+		return
+	}
+	switch r.Method {
+	case http.MethodPatch:
+		var req runtimecore.UpdateAgentProfileRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		profile, err := s.manager.UpdateAgentProfile(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, profile)
+	case http.MethodDelete:
+		profile, err := s.manager.DeleteAgentProfile(id)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, profile)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleAgentRuns(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListAgentRuns())
+	case http.MethodPost:
+		var req runtimecore.StartAgentRunRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		run, err := s.manager.StartAgentRun(r.Context(), req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, run)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleAgentRunByID(w http.ResponseWriter, r *http.Request) {
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/v1/agents/runs/"), "/")
+	if id == "" {
+		writeError(w, http.StatusNotFound, "agent run not found")
+		return
+	}
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	run, err := s.manager.StopAgentRun(id)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}
+
+func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListTasks())
+	case http.MethodPost:
+		var req runtimecore.CreateTaskRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		task, err := s.manager.CreateTask(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, task)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleTaskByID(w http.ResponseWriter, r *http.Request) {
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/v1/orchestration/tasks/"), "/")
+	if id == "" {
+		writeError(w, http.StatusNotFound, "task not found")
+		return
+	}
+	if r.Method != http.MethodPatch {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.UpdateTaskRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	task, err := s.manager.UpdateTask(id, req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, task)
+}
+
+func (s *Server) handleMessages(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListMessages(
+			r.URL.Query().Get("to"),
+			r.URL.Query().Get("unread") == "true",
+		))
+	case http.MethodPost:
+		var req runtimecore.SendMessageRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		message, err := s.manager.SendMessage(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, message)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleMessageByID(w http.ResponseWriter, r *http.Request) {
+	id, action := splitOrchestrationPath(r.URL.Path, "/v1/orchestration/messages/")
+	if id == "" {
+		writeError(w, http.StatusNotFound, "message not found")
+		return
+	}
+	if r.Method != http.MethodPost || action != "reply" {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.SendMessageRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	message, err := s.manager.ReplyMessage(id, req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, message)
+}
+
+func (s *Server) handleDispatches(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListDispatches(r.URL.Query().Get("taskId")))
+	case http.MethodPost:
+		var req runtimecore.DispatchTaskRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		dispatch, err := s.manager.DispatchTask(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, dispatch)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleDispatchPreamble(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	preamble, err := s.manager.PreviewDispatchPreamble(
+		r.URL.Query().Get("taskId"),
+		r.URL.Query().Get("from"),
+		r.URL.Query().Get("devMode") == "true",
+	)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"preamble": preamble})
+}
+
+func (s *Server) handleDispatchByID(w http.ResponseWriter, r *http.Request) {
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/v1/orchestration/dispatches/"), "/")
+	if id == "" {
+		writeError(w, http.StatusNotFound, "dispatch not found")
+		return
+	}
+	if r.Method != http.MethodPatch {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.UpdateDispatchRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	dispatch, err := s.manager.UpdateDispatch(id, req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, dispatch)
+}
+
+func (s *Server) handleSourceControl(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	projections := s.manager.ListSourceControlProjections(runtimecore.SourceControlProjectionFilter{
+		ProjectID:   r.URL.Query().Get("projectId"),
+		WorkspaceID: r.URL.Query().Get("workspaceId"),
+	})
+	writeJSON(w, http.StatusOK, projections)
+}
+
+func (s *Server) handleSourceControlProjectionUpdates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.UpdateSourceControlProjectionRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	projection, err := s.manager.UpdateSourceControlProjection(req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, projection)
+}
+
+func (s *Server) handleGitStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	projectID := r.URL.Query().Get("projectId")
+	status, err := s.manager.GitStatus(r.Context(), projectID)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, status)
+}
+
+func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	diff, err := s.manager.GitDiff(
+		r.Context(),
+		r.URL.Query().Get("projectId"),
+		r.URL.Query().Get("path"),
+		r.URL.Query().Get("cached") == "true",
+	)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, diff)
+}
+
+func (s *Server) handleGitFileDiff(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitFileDiffRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	diff, err := s.manager.GitFileDiff(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, diff)
+}
+
+func (s *Server) handleGitRefFileDiff(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitRefFileDiffRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	diff, err := s.manager.GitRefFileDiff(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, diff)
+}
+
+func (s *Server) handleGitMutation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitMutationRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.MutateGit(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitLocalBranches(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitLocalBranchesRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitLocalBranches(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitCheckout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitCheckoutRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitCheckoutBranch(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitBaseStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitBaseStatusRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitBaseStatus(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitCheckIgnored(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitCheckIgnoredRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitCheckIgnored(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitHugeFolders(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitHugeFolderRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitFindHugeFoldersToIgnore(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitAppendGitignore(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitHugeFolderRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	written, err := s.manager.GitAppendHugeFolderToIgnore(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, written)
+}
+
+func (s *Server) handleGitSubmoduleStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitSubmoduleStatusRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitSubmoduleStatus(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitRemoteFileURL(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitRemoteFileURLRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitRemoteFileURL(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitRemoteCommitURL(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitRemoteCommitURLRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitRemoteCommitURL(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitRepositoryIdentity(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitRepositoryIdentityRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitRepositoryIdentity(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitForkSync(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitForkSyncRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitForkSync(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitBranchCompare(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitBranchCompareRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitBranchCompare(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitCommitCompare(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitCommitCompareRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitCommitCompare(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGitHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.GitHistoryRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.manager.GitHistory(r.Context(), req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleBrowserTabs(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListBrowserTabs())
+	case http.MethodPost:
+		var req runtimecore.CreateBrowserTabRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		tab, err := s.manager.CreateBrowserTab(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, tab)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleBrowserDrivers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	drivers := s.manager.GetAllBrowserDrivers()
+	result := make([]map[string]interface{}, 0, len(drivers))
+	for browserPageID, driver := range drivers {
+		result = append(result, map[string]interface{}{
+			"browserPageId": browserPageID,
+			"driver":        driver,
+		})
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleBrowserTabByID(w http.ResponseWriter, r *http.Request) {
+	id, action := splitBrowserTabPath(r.URL.Path)
+	if id == "" {
+		writeError(w, http.StatusNotFound, "browser tab not found")
+		return
+	}
+	switch r.Method {
+	case http.MethodPatch:
+		if action != "" {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		var req runtimecore.UpdateBrowserTabRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		tab, err := s.manager.UpdateBrowserTab(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, tab)
+	case http.MethodDelete:
+		if action != "" {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		tab, err := s.manager.DeleteBrowserTab(id)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, tab)
+	case http.MethodPost:
+		if action == "reclaim-desktop" {
+			reclaimed, err := s.manager.ReclaimBrowserForDesktop(id)
+			if err != nil {
+				writeRuntimeError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]bool{"reclaimed": reclaimed})
+			return
+		}
+		if action != "commands" {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		var req runtimecore.BrowserCommandRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		computerAction, err := s.manager.QueueBrowserCommand(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, computerAction)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleBrowserProfiles(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListBrowserProfiles())
+	case http.MethodPost:
+		var req runtimecore.CreateBrowserProfileRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		profile, err := s.manager.CreateBrowserProfile(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, profile)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleBrowserProfileByID(w http.ResponseWriter, r *http.Request) {
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/v1/browser/profiles/"), "/")
+	if id == "" {
+		writeError(w, http.StatusNotFound, "browser profile not found")
+		return
+	}
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	profile, err := s.manager.DeleteBrowserProfile(id)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, profile)
+}
+
+func (s *Server) handleBrowserPermissions(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListBrowserPermissions(
+			r.URL.Query().Get("profileId"),
+			r.URL.Query().Get("origin"),
+		))
+	case http.MethodPost:
+		var req runtimecore.SetBrowserPermissionRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		permission, err := s.manager.SetBrowserPermission(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, permission)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleBrowserDownloads(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListBrowserDownloads(r.URL.Query().Get("tabId")))
+	case http.MethodPost:
+		var req runtimecore.CreateBrowserDownloadRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		download, err := s.manager.CreateBrowserDownload(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, download)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleBrowserDownloadByID(w http.ResponseWriter, r *http.Request) {
+	id, action := splitBrowserDownloadPath(r.URL.Path)
+	if id == "" {
+		writeError(w, http.StatusNotFound, "browser download not found")
+		return
+	}
+	switch r.Method {
+	case http.MethodPatch:
+		if action != "" {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		var req runtimecore.UpdateBrowserDownloadRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		download, err := s.manager.UpdateBrowserDownload(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, download)
+	case http.MethodPost:
+		if action != "commands/start" {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		computerAction, err := s.manager.QueueBrowserDownload(id)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, computerAction)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleComputerActions(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		status := runtimecore.ComputerActionStatus(r.URL.Query().Get("status"))
+		if status != "" && !isHTTPComputerActionStatus(status) {
+			writeError(w, http.StatusBadRequest, "invalid computer action status")
+			return
+		}
+		writeJSON(w, http.StatusOK, s.manager.ListComputerActions(
+			status,
+			r.URL.Query().Get("kindPrefix"),
+		))
+	case http.MethodPost:
+		var req runtimecore.CreateComputerActionRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		action, err := s.manager.CreateComputerAction(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, action)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func isHTTPComputerActionStatus(status runtimecore.ComputerActionStatus) bool {
+	switch status {
+	case runtimecore.ComputerActionQueued, runtimecore.ComputerActionRunning, runtimecore.ComputerActionCompleted, runtimecore.ComputerActionFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *Server) handleComputerActionClaim(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.ClaimComputerActionsRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	actions, err := s.manager.ClaimComputerActions(req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, actions)
+}
+
+func (s *Server) handleComputerActionByID(w http.ResponseWriter, r *http.Request) {
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/v1/computer/actions/"), "/")
+	if id == "" {
+		writeError(w, http.StatusNotFound, "computer action not found")
+		return
+	}
+	if r.Method != http.MethodPatch {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.UpdateComputerActionRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	action, err := s.manager.UpdateComputerAction(id, req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, action)
+}
+
+func (s *Server) handleEmulatorDevices(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListEmulatorDevices())
+	case http.MethodPost:
+		var req runtimecore.RegisterEmulatorDeviceRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		device, err := s.manager.RegisterEmulatorDevice(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, device)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleEmulatorDeviceByID(w http.ResponseWriter, r *http.Request) {
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/v1/emulator/devices/"), "/")
+	if id == "" {
+		writeError(w, http.StatusNotFound, "emulator device not found")
+		return
+	}
+	if r.Method != http.MethodPatch {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var req runtimecore.UpdateEmulatorDeviceRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	device, err := s.manager.UpdateEmulatorDevice(id, req)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, device)
+}
+
+func (s *Server) handleEmulatorSessions(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListEmulatorSessions())
+	case http.MethodPost:
+		var req runtimecore.AttachEmulatorRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		session, err := s.manager.AttachEmulator(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, session)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleEmulatorSessionByID(w http.ResponseWriter, r *http.Request) {
+	id, action := splitEmulatorSessionPath(r.URL.Path)
+	if id == "" {
+		writeError(w, http.StatusNotFound, "emulator session not found")
+		return
+	}
+	if r.Method == http.MethodPost && action == "commands" {
+		var req runtimecore.EmulatorCommandRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		computerAction, err := s.manager.QueueEmulatorCommand(id, req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, computerAction)
+		return
+	}
+	if r.Method != http.MethodDelete || action != "" {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	session, err := s.manager.DetachEmulatorSession(id)
+	if err != nil {
+		writeRuntimeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, session)
+}
+
+func (s *Server) handleSubsystem(name string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		writeJSON(w, http.StatusOK, s.manager.SubsystemStatus(name))
+	}
+}
+
+func (s *Server) handleNativeProviders(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, s.manager.ListNativeProviders(r.URL.Query().Get("subsystem")))
+	case http.MethodPost:
+		var req runtimecore.RegisterNativeProviderRequest
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		provider, err := s.manager.RegisterNativeProvider(req)
+		if err != nil {
+			writeRuntimeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, provider)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "streaming unsupported")
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	topicFilter := strings.TrimSpace(r.URL.Query().Get("topic"))
+	id, ch := s.manager.Subscribe(128)
+	defer s.manager.Unsubscribe(id)
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+	// Keep idle connections (and any proxy in the SSH path) alive when no events flow.
+	heartbeat := time.NewTicker(eventStreamHeartbeatInterval)
+	defer heartbeat.Stop()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-heartbeat.C:
+			_, _ = io.WriteString(w, ": heartbeat\n\n")
+			flusher.Flush()
+		case event, ok := <-ch:
+			if !ok {
+				return
+			}
+			if topicFilter != "" && event.Topic != topicFilter {
+				continue
+			}
+			content, err := json.Marshal(event)
+			if err != nil {
+				continue
+			}
+			_, _ = fmt.Fprintf(w, "id: %s\n", event.ID)
+			_, _ = fmt.Fprintf(w, "event: %s\n", event.Topic)
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", content)
+			flusher.Flush()
+		}
+	}
+}
+
+func splitSessionPath(path string) (string, string) {
+	trimmed := strings.TrimPrefix(path, "/v1/sessions/")
+	parts := strings.Split(strings.Trim(trimmed, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return "", ""
+	}
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], strings.Join(parts[1:], "/")
+}
+
+func splitBrowserTabPath(path string) (string, string) {
+	trimmed := strings.TrimPrefix(path, "/v1/browser/tabs/")
+	parts := strings.Split(strings.Trim(trimmed, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return "", ""
+	}
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], strings.Join(parts[1:], "/")
+}
+
+func splitBrowserDownloadPath(path string) (string, string) {
+	trimmed := strings.TrimPrefix(path, "/v1/browser/downloads/")
+	parts := strings.Split(strings.Trim(trimmed, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return "", ""
+	}
+	if len(parts) == 3 && parts[1] == "commands" {
+		return parts[0], "commands/" + parts[2]
+	}
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], strings.Join(parts[1:], "/")
+}
+
+func splitEmulatorSessionPath(path string) (string, string) {
+	trimmed := strings.TrimPrefix(path, "/v1/emulator/sessions/")
+	parts := strings.Split(strings.Trim(trimmed, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return "", ""
+	}
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], strings.Join(parts[1:], "/")
+}
+
+func splitOrchestrationPath(path string, prefix string) (string, string) {
+	trimmed := strings.TrimPrefix(path, prefix)
+	parts := strings.Split(strings.Trim(trimmed, "/"), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return "", ""
+	}
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], strings.Join(parts[1:], "/")
+}
+
+func decodeJSON(w http.ResponseWriter, r *http.Request, target interface{}) bool {
+	defer r.Body.Close()
+	// Runtime writes can carry file contents; cap JSON bodies without making file edits unusable.
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxJSONBodyBytes))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return false
+	}
+	var trailing interface{}
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		writeError(w, http.StatusBadRequest, "request body must contain a single JSON value")
+		return false
+	}
+	return true
+}
+
+func writeJSON(w http.ResponseWriter, status int, value interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(value)
+}
+
+func writeRuntimeError(w http.ResponseWriter, err error) {
+	// Archive-hook vetoes are a distinct, renderer-visible condition: surface a
+	// stable code plus the captured hook output instead of a bare message.
+	var archiveHookErr *runtimecore.ArchiveHookError
+	if errors.As(err, &archiveHookErr) {
+		writeJSON(w, http.StatusConflict, map[string]string{
+			"error":      archiveHookErr.Error(),
+			"code":       "archive-hook-failed",
+			"hookOutput": archiveHookErr.Output,
+		})
+		return
+	}
+	status := http.StatusBadRequest
+	if errors.Is(err, runtimecore.ErrSessionInputLocked) {
+		// 423 Locked: distinguishes the mobile presence lock from bad input.
+		writeError(w, http.StatusLocked, err.Error())
+		return
+	}
+	if errors.Is(err, runtimecore.ErrNotFound) ||
+		errors.Is(err, runtimecore.ErrSessionNotFound) ||
+		errors.Is(err, runtimecore.ErrSessionTabLayoutNotFound) ||
+		errors.Is(err, runtimecore.ErrBranchNotFound) {
+		status = http.StatusNotFound
+	}
+	writeError(w, status, err.Error())
+}
+
+func writeError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, map[string]string{"error": message})
+}
+
+func bearerTokenFromHeader(value string) string {
+	const prefix = "Bearer "
+	if !strings.HasPrefix(value, prefix) {
+		return ""
+	}
+	return strings.TrimSpace(strings.TrimPrefix(value, prefix))
+}
+
+func Start(ctx context.Context, listen string, manager *runtimecore.Manager) error {
+	return StartWithOptions(ctx, listen, manager, ServerOptions{})
+}
+
+func StartWithOptions(ctx context.Context, listen string, manager *runtimecore.Manager, options ServerOptions) error {
+	// Hook scripts refuse to post without a token, so mint one when the
+	// runtime itself is running tokenless (localhost trust model).
+	if strings.TrimSpace(options.HookToken) == "" {
+		options.HookToken = strings.TrimSpace(options.BearerToken)
+	}
+	if options.HookToken == "" {
+		options.HookToken = randomAgentHookToken()
+	}
+	listener, err := net.Listen("tcp", listen)
+	if err != nil {
+		return err
+	}
+	// Sessions spawned by the manager stamp this endpoint into PTY env so
+	// managed agent hook scripts reach the /hook ingest route.
+	if addr, ok := listener.Addr().(*net.TCPAddr); ok {
+		manager.ConfigureSessionHookEndpoint(addr.Port, options.HookToken)
+	}
+	server := &http.Server{Handler: NewServerWithOptions(manager, options)}
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- server.Serve(listener)
+	}()
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+		return ctx.Err()
+	case err := <-errCh:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	}
+}
+
+// randomAgentHookToken returns a fresh per-process hook ingest token. On the
+// (practically impossible) rand failure it returns "", which keeps ingest in
+// the same open localhost-trust mode as a tokenless bearer config.
+func randomAgentHookToken() string {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(buf)
+}

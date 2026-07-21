@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Why: this regression spec keeps the deterministic IPC fakes, setup-state seeding, and frame-level flash monitor together so the flicker contract is auditable in one place. */
 import type { ElectronApplication, Page } from '@nebutra/playwright-test'
-import type { SkillDiscoveryResult } from '../../src/shared/skills'
+import type { SkillDiscoveryResult } from '../../packages/product-core/shared/skills'
 import { test, expect } from './helpers/pebble-app'
 import { getStoreState, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 

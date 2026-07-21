@@ -31,7 +31,7 @@ Merged related product hardening:
 - [#7054](https://github.com/nebutra/pebble/pull/7054), `Prevent hidden terminal TUI overlap`: merged on 2026-07-01 with `verify`, Wayland terminal input, golden Linux E2E, golden mac E2E, and community tracking checks passing. This fixes the hidden regular-terminal TUI overlap class by scheduling bounded post-parse WebGL atlas recovery for risky hidden TUI redraws while keeping hidden bytes on the background write path.
 - [#7133](https://github.com/nebutra/pebble/pull/7133), `Fix stale terminal frames on worktree return`: merged on 2026-07-02 as a high-priority regression fix, root-caused on a live repro. Hidden-output restore skipped the destructive clear for alternate-screen snapshots, `?1049h` is a no-op on a pane already on the alt screen, and serialized frames skip blank cells, so the pre-hide frame bled through the final frame until a select or resize. The fix writes an alt-only `\x1b[?1049h\x1b[2J\x1b[H` preamble before alt-screen snapshot data (normal-buffer scrollback untouched, still no `3J`) and hardens the WebGL reveal path: dispose-on-bail with a single-addon invariant, refresh-always atlas reset, and a settled-frame pane-scoped repaint on tab reveal, worktree resume, and window wake. It supersedes the reverted #7058 approach and closes the alt-screen hole that #7054's hidden-output skip machinery made load-bearing. Its deterministic tests — the alt-only-clear-before-snapshot assertions in `pty-connection.test.ts`, plus `pane-webgl-renderer.test.ts`, `pane-reveal-repaint.test.ts`, and `terminal-visibility-resume.test.ts` — are the seed assertions for `terminal-output.scrollback-restore` and the WebGL side of `xterm-addon.boundary-containment` once the stack rebases.
 
-- [#7148](https://github.com/nebutra/pebble/pull/7148), `Match main terminal mirror character widths to the renderer`: merged on 2026-07-02, hours after #7133. Root cause of the residual post-#7133 bottom-row tears: the renderer xterm measures with Unicode 11 + ZWJ joining while the daemon headless mirror used default-width tables, so every positioned write after an emoji lands shifted and the tears are baked into the very mirror that restores replay — #7133's clear made restores faithful to the mirror and exposed it. The fix moves the unicode provider to `src/shared/terminal-unicode-provider.ts` and activates it in the headless emulator. Its red-green width test, `src/main/daemon/headless-emulator-unicode-width.test.ts` on main, is the seed assertion for the new `terminal-mirror.parser-parity` gate, and the shared provider plus `pane-terminal-options.ts` are the shared-construction seams that gate must assert on. #7148 also touches `pane-lifecycle.ts`, which both this worktree and #7004's branch modify — another confirmed rebase-conflict site.
+- [#7148](https://github.com/nebutra/pebble/pull/7148), `Match main terminal mirror character widths to the renderer`: merged on 2026-07-02, hours after #7133. Root cause of the residual post-#7133 bottom-row tears: the renderer xterm measures with Unicode 11 + ZWJ joining while the daemon headless mirror used default-width tables, so every positioned write after an emoji lands shifted and the tears are baked into the very mirror that restores replay — #7133's clear made restores faithful to the mirror and exposed it. The fix moves the unicode provider to `packages/product-core/shared/terminal-unicode-provider.ts` and activates it in the headless emulator. Its red-green width test, `migration/electron-reference/src/main/daemon/headless-emulator-unicode-width.test.ts` on main, is the seed assertion for the new `terminal-mirror.parser-parity` gate, and the shared provider plus `pane-terminal-options.ts` are the shared-construction seams that gate must assert on. #7148 also touches `pane-lifecycle.ts`, which both this worktree and #7004's branch modify — another confirmed rebase-conflict site.
 - [#7173](https://github.com/nebutra/pebble/pull/7173), `Fix Codex pane output tearing after app occlusion`: merged on 2026-07-03. A delayed background-origin Codex chunk carrying a stateful query could take the hidden live-write path after a newer snapshot restore had already rebuilt the renderer, overwriting newer state; an adversarial review pass added seq-restart guards so revived sessions (hibernation wake, kill plus cold-restore under the same PTY id) cannot silently freeze hidden output against a stale seq high-water mark. Its three red-proven tests in `pty-connection.test.ts` on main — reference-parse buffer equality over the ordered raw stream plus both revival guards — are exactly the exactness-oracle shape this plan prescribes and seed the hidden/live interleaving slice of `terminal-output.scrollback-restore`.
 - [#7192](https://github.com/nebutra/pebble/pull/7192), `Keep runtime mirror sized with desktop terminal resizes`: merged on 2026-07-03. Desktop `pty:resize` updated the PTY and renderer but never the runtime mirror, so the mirror parsed all subsequent bytes at its birth width, soft-wrapped TUI repaints into a corrupted ladder, and baked that corruption into every restore snapshot; the fix fans accepted desktop resizes to the mirror and serializes mirror reflow with queued output writes on the per-PTY write chain. This exposed a plan gap now fixed: the runtime mirror is a geometry authority in its own right, and renderer-vs-mirror convergence checks cannot see corruption upstream of the mirror. Its red-proven tests in `pebble-runtime.test.ts` and `pty.test.ts` on main seed the mirror-geometry slice of `terminal-geometry.visible-convergence`.
 
@@ -86,12 +86,12 @@ Recommended split:
 
 Mapping to the open stack and file assignment:
 
-The six split items and the five open child PRs overlap; this mapping is authoritative. Every working-tree file must land in exactly one PR below. Four files contain changes from multiple reliability classes and must be split by hunk, with the earlier PR in the merge order owning its hunks first: `config/reliability-gates.jsonc` (per-entry ownership), `src/main/ipc/pty.ts` and its test, `src/renderer/src/components/terminal-pane/pty-connection.ts` and its test, and `src/renderer/src/store/slices/terminals.ts`.
+The six split items and the five open child PRs overlap; this mapping is authoritative. Every working-tree file must land in exactly one PR below. Four files contain changes from multiple reliability classes and must be split by hunk, with the earlier PR in the merge order owning its hunks first: `config/reliability-gates.jsonc` (per-entry ownership), `migration/electron-reference/src/main/ipc/pty.ts` and its test, `packages/product-core/renderer/src/components/terminal-pane/pty-connection.ts` and its test, and `packages/product-core/renderer/src/store/slices/terminals.ts`.
 
 1. #7001 (split item 1, manifest and plan docs): `config/scripts/check-reliability-gates.mjs`, `config/scripts/check-reliability-gates.test.mjs`, `docs/reference/reliability-gates-implementation-plan.md`, and the manifest restricted to gates whose test files exist on `origin/main` plus commandless gap entries.
-2. #7008 (split item 2, provider ownership and replay safety): `src/renderer/src/lib/resume-sleeping-agent-session.ts` and test, plus its ownership slice of `terminals.ts`. Reset the branch from the worktree slice; keep the PR number for review continuity.
-3. #7005 (snapshot freshness and targeted renderer liveness): `terminal-dead-session-reconcile.ts` and test, `use-terminal-pane-lifecycle.ts` and test, `use-terminal-pane-global-effects.test.ts`, and the `pty.hasPty` preload/API plumbing (`src/preload/api-types.ts`, `src/preload/index.ts`, `src/renderer/src/web/web-preload-api.ts`, the `hasPty` slice of `src/main/ipc/pty.ts`).
-4. New PR (split item 3, startup hydration, provider contracts, no-hot listing): `hydrate-local-pty-registry.ts` and test, `daemon-pty-adapter.ts` and test, `daemon-pty-router.ts` and test, `degraded-daemon-pty-provider.ts` and test, `pty-session-id.test.ts`, `src/shared/pty-session-id-format.ts`, `src/main/providers/ssh-pty-provider.ts`, `ResourceUsageStatusSegment.tsx`, `resource-manager-session-polling.test.ts` (currently untracked), `store-session-cascades.test.ts`, and the SSH/liveness slices of `pty.ts`, `pty-connection.ts`, and `terminals.ts`.
+2. #7008 (split item 2, provider ownership and replay safety): `packages/product-core/renderer/src/lib/resume-sleeping-agent-session.ts` and test, plus its ownership slice of `terminals.ts`. Reset the branch from the worktree slice; keep the PR number for review continuity.
+3. #7005 (snapshot freshness and targeted renderer liveness): `terminal-dead-session-reconcile.ts` and test, `use-terminal-pane-lifecycle.ts` and test, `use-terminal-pane-global-effects.test.ts`, and the `pty.hasPty` preload/API plumbing (`migration/electron-reference/src/preload/api-types.ts`, `migration/electron-reference/src/preload/index.ts`, `packages/product-core/renderer/src/web/web-preload-api.ts`, the `hasPty` slice of `migration/electron-reference/src/main/ipc/pty.ts`).
+4. New PR (split item 3, startup hydration, provider contracts, no-hot listing): `hydrate-local-pty-registry.ts` and test, `daemon-pty-adapter.ts` and test, `daemon-pty-router.ts` and test, `degraded-daemon-pty-provider.ts` and test, `pty-session-id.test.ts`, `packages/product-core/shared/pty-session-id-format.ts`, `migration/electron-reference/src/main/providers/ssh-pty-provider.ts`, `ResourceUsageStatusSegment.tsx`, `resource-manager-session-polling.test.ts` (currently untracked), `store-session-cascades.test.ts`, and the SSH/liveness slices of `pty.ts`, `pty-connection.ts`, and `terminals.ts`.
 5. New PR (split item 4, lifecycle observability): `terminal-lifecycle-diagnostics.ts` and `terminal-lifecycle-diagnostics.test.ts` (currently untracked).
 6. New PR (split item 5, PTY output/IPC/perf hardening): `daemon-stream-data-batcher.ts` and test, `terminal-output-batching.test.ts`, `terminal-subscribe-buffer.test.ts`, and the pending-output-cap and replay/ACK slices of `pty.ts` and `pty-connection.ts`.
 7. #7004 (xterm addon containment, outside the six split items): keep as its own PR; reset `pane-lifecycle.ts` and test from the worktree versions, and adopt fresh main's renamed WebGL test files during rebase.
@@ -246,9 +246,9 @@ Local validation evidence from this review pass:
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts \
-  src/renderer/src/lib/resume-sleeping-agent-session.test.ts \
-  src/renderer/src/components/terminal-pane/pty-connection.test.ts
+  packages/product-core/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts \
+  packages/product-core/renderer/src/lib/resume-sleeping-agent-session.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/pty-connection.test.ts
 ```
 
 Result on 2026-07-01: 3 test files passed, 292 tests passed, duration 6.04s. This asserts the current deterministic lifecycle/unit layer is healthy in this worktree; it does not prove the broader live/platform/provider/perf gaps.
@@ -257,7 +257,7 @@ The provider-session ownership gate now includes the queued/pending resume bridg
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/renderer/src/lib/resume-sleeping-agent-session.test.ts
+  packages/product-core/renderer/src/lib/resume-sleeping-agent-session.test.ts
 ```
 
 Result on 2026-07-01: 1 test file passed, 34 tests passed, duration 7.86s. This focused command asserts repeat activation or replayed sleeping records do not launch a second resume for the same provider session while the first resume is still pending, queued pending-startup provider-session ids are read once per activation rather than once per replayed record, a live hook for the same provider session owns the replay, and a wrong-session hook does not. It does not yet prove real hook timing through Electron or a full Electron workspace activation loop.
@@ -326,10 +326,10 @@ The visible geometry gate now has its first deterministic renderer/main contract
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts \
-  src/renderer/src/components/terminal-pane/split-right-white-screen.test.ts \
-  src/renderer/src/components/terminal-pane/pty-connection.test.ts \
-  src/main/ipc/pty.test.ts
+  packages/product-core/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/split-right-white-screen.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/pty-connection.test.ts \
+  migration/electron-reference/src/main/ipc/pty.test.ts
 ```
 
 Result on 2026-07-02: 4 test files passed, 481 tests passed, duration 5.98s. This focused command asserts delayed hidden split-layout settles are forwarded instead of stopping on a fixed frame budget, unmeasurable frames do not count as settled, visible 0x0 split-right panes get a nonzero recovery size while hidden background 0x0 panes are not forced to desktop size, `pty:getSize` reports applied size when a provider can expose it, and visibility resume reasserts only real PTY/xterm drift without falling back to `listSessions`. It does not yet prove shell-visible `stty`, SSH/remote geometry, Windows ConPTY geometry/readback, or full Electron geometry under real split/tab/app-restart workflows.
@@ -337,7 +337,7 @@ Result on 2026-07-02: 4 test files passed, 481 tests passed, duration 5.98s. Thi
 The live local PTY gate now has its first executable Electron slice:
 
 ```sh
-pnpm run ensure:electron-runtime && npx playwright test \
+pnpm run parity:electron:ensure-runtime && npx playwright test \
   tests/e2e/terminal-live-pty-liveness.spec.ts \
   --config tests/playwright.config.ts --project electron-headless --workers=1
 ```
@@ -348,9 +348,9 @@ The IME/native-text gate now has its first deterministic renderer-unit slice:
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/renderer/src/components/terminal-pane/terminal-ime-native-text-forwarder.test.ts \
-  src/renderer/src/components/terminal-pane/terminal-ime-input-source.test.ts \
-  src/renderer/src/components/terminal-pane/terminal-paste-runtime.test.ts
+  packages/product-core/renderer/src/components/terminal-pane/terminal-ime-native-text-forwarder.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/terminal-ime-input-source.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/terminal-paste-runtime.test.ts
 ```
 
 Result on 2026-07-02: 3 test files passed, 63 tests passed, duration 887ms. This registers existing native-text, input-source, and paste/runtime forwarding contracts as a reliability gate slice. It does not prove real OS IME automation, Windows ConPTY post-agent keyboard reset, Arabic/RTL, JIS-yen, or the full CJK/Vietnamese/platform matrix.
@@ -359,11 +359,11 @@ The xterm addon containment gate now has its first deterministic renderer-unit s
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/renderer/src/lib/pane-manager/pane-lifecycle.test.ts \
-  src/renderer/src/lib/pane-manager/terminal-link-provider-guard.test.ts \
-  src/renderer/src/components/terminal-search-safe-find.test.ts \
-  src/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts \
-  src/renderer/src/components/terminal-pane/terminal-webgl-paste-recovery.test.ts
+  packages/product-core/renderer/src/lib/pane-manager/pane-lifecycle.test.ts \
+  packages/product-core/renderer/src/lib/pane-manager/terminal-link-provider-guard.test.ts \
+  packages/product-core/renderer/src/components/terminal-search-safe-find.test.ts \
+  packages/product-core/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/terminal-webgl-paste-recovery.test.ts
 ```
 
 Result on 2026-07-02: 5 test files passed, 39 tests passed, duration 370ms. This focused command asserts a core addon `loadAddon` throw is pane-scoped and later addons still load, link provider throws degrade to no-link results, search decoration positive-integer crashes return `false` instead of escaping, and WebGL attach/refresh/recovery failures stay contained. It does not yet prove typed PTY input/output survives a live addon failure in Electron, nor WebGL dispose/reset throws across active, hidden, and resumed panes.
@@ -372,9 +372,9 @@ The runtime/mobile stream budget gate now has its first deterministic runtime-RP
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/main/runtime/rpc/terminal-subscribe-buffer.test.ts \
-  src/main/runtime/rpc/terminal-output-batching.test.ts \
-  src/main/runtime/rpc/terminal-multiplex.test.ts
+  migration/electron-reference/src/main/runtime/rpc/terminal-subscribe-buffer.test.ts \
+  migration/electron-reference/src/main/runtime/rpc/terminal-output-batching.test.ts \
+  migration/electron-reference/src/main/runtime/rpc/terminal-multiplex.test.ts
 ```
 
 Result on 2026-07-02: 3 test files passed, 29 tests passed, duration 2.78s. The covered contracts assert mobile initial snapshots downgrade until they fit the 512KB budget, requested binary snapshots downgrade until they fit the 2MB budget, binary live output queued while the initial snapshot is serializing stays within 256KB while preserving the newest tail, large binary output is split into 48KB-or-smaller frames, output bursts are coalesced before emission, aborted subscribes do not register stale listeners, and stale mobile resize re-stream completions are dropped. It does not yet decide JSON subscribe fallback parity/deprecation.
@@ -383,7 +383,7 @@ The replay/scrollback gate now has its first executable slice:
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/renderer/src/components/terminal-pane/pty-connection.test.ts
+  packages/product-core/renderer/src/components/terminal-pane/pty-connection.test.ts
 ```
 
 Result on 2026-07-02: 1 test file passed as part of the focused pty-connection validation, with 255 tests in that file. The relevant replay assertions cover four replay invariants: remote replay payloads that overlap before parsing starts intentionally coalesce to the latest payload, a replay whose xterm parsing has already started is not overwritten by a newer replay, multiple replay notifications accepted after parsing starts drain FIFO, and burst tails are bounded while keeping the newest snapshot. It does not yet prove fresh-main `clearBeforeReplay` metadata, metadata-only replay, or hidden-output/live-output interleaving.
@@ -392,11 +392,11 @@ The no-hot-`listSessions` gate now has its first executable slice and product ha
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts \
-  src/renderer/src/components/terminal-pane/use-terminal-pane-lifecycle.test.ts \
-  src/renderer/src/components/terminal-pane/pty-connection.test.ts \
-  src/renderer/src/components/status-bar/resource-manager-session-polling.test.ts \
-  src/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.test.ts
+  packages/product-core/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/use-terminal-pane-lifecycle.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/pty-connection.test.ts \
+  packages/product-core/renderer/src/components/status-bar/resource-manager-session-polling.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/use-terminal-pane-global-effects.test.ts
 ```
 
 Result on 2026-07-02: 5 test files passed, 321 tests passed, duration 6.34s. The focused no-hot command asserts visibility resume prefers targeted `hasPty` even when `listSessions` is available, first input after visibility resume calls targeted `hasPty` once, resize re-assertion after visibility resume uses `getSize`/`resize` without `listSessions`, light tab switches and visible active-state resume avoid `listSessions`/`hasPty`/`getSize` fanout while still allowing the active PTY scheduler hint, SSH/remote broad listing is skipped, Resource Manager broad session inventory polling is scoped to the open popover, panes close only on authoritative `false`, and unknown liveness keeps panes alive. It does not yet count raw focus, workspace switch, render, high-session typing, or real provider fanout in Electron.
@@ -405,7 +405,7 @@ The store/git hot-path gate now has its first boot-hydration counter slice. This
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/main/memory/hydrate-local-pty-registry.test.ts
+  migration/electron-reference/src/main/memory/hydrate-local-pty-registry.test.ts
 ```
 
 Result on 2026-07-02: 1 test file passed, 8 tests passed, duration 0.342s. The focused command asserts provider-unavailable hydration does not scan repos/worktrees/providers and remains retryable, SSH repos are skipped before worktree enumeration, local daemon sessions are registered with debug counters for repo/worktree/adapter/session/register/skip/duration fields, recoverable adapter-list failures are counted without failing the whole hydration pass, fatal hydration failures record failed phase and error message, router-backed hydration records multi-adapter fanout counts, pre-existing pid rows are not clobbered, and large daemon session lists hydrate without spreading into argument-limit failures. It does not yet count store recomputes, git status requests, provider listings, focus, typing, tab switch, workspace switch, render, or high-session Electron fanout.
@@ -414,9 +414,9 @@ The degraded-daemon provider contract now has its first executable slice and pro
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/main/daemon/degraded-daemon-pty-provider.test.ts \
-  src/main/daemon/daemon-pty-adapter.test.ts \
-  src/main/daemon/daemon-pty-router.test.ts
+  migration/electron-reference/src/main/daemon/degraded-daemon-pty-provider.test.ts \
+  migration/electron-reference/src/main/daemon/daemon-pty-adapter.test.ts \
+  migration/electron-reference/src/main/daemon/daemon-pty-router.test.ts
 ```
 
 Result on 2026-07-02: 3 test files passed, 107 tests passed, duration 2.54s. Focused provider validation asserts discovered daemon sessions route to the daemon, fresh degraded-mode PTYs route to fallback only when marked new, router spawn discovers uncached existing sessions before choosing an adapter, router spawn fails closed instead of falling through to current when legacy ownership cannot be listed or a known session has exited, targeted `hasPty` discovery caches legacy ownership before later operations, real daemon adapter `listProcesses()` discovery seeds targeted `hasPty` liveness, folder and floating terminal workspace ids survive startup reconcile when valid, restored worktree-scoped and legacy/non-scoped ids do not fall back through spawn after ownership is lost or unknown, unknown or exited existing ids fail closed for routing operations, startup reconcile can dry-run orphan detection without killing live daemon sessions, and process inspection returns benign defaults for unknown ownership. It does not yet prove production startup reconcile wiring, prior-worktree aliases, or real daemon process restart behavior.
@@ -425,10 +425,10 @@ The SSH/remote provider contract now has its first executable provider/main/rend
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/main/providers/ssh-pty-provider.test.ts \
-  src/main/ipc/pty.test.ts \
-  src/renderer/src/components/terminal-pane/pty-connection.test.ts \
-  src/renderer/src/store/slices/store-session-cascades.test.ts
+  migration/electron-reference/src/main/providers/ssh-pty-provider.test.ts \
+  migration/electron-reference/src/main/ipc/pty.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/pty-connection.test.ts \
+  packages/product-core/renderer/src/store/slices/store-session-cascades.test.ts
 ```
 
 Result on 2026-07-02: 4 test files passed, 546 tests passed, duration 6.48s. Focused validation asserts store wake-hint metadata for disconnected SSH relay ids, provider attach/expired-attach behavior, main-process ownership and targeted-liveness failure semantics including async provider rejection, mocked-renderer deferred SSH attach/transient-failure/expired-relay fallback, and deferred SSH no-result cleanup that clears the pending serializer without consuming the saved restore id. It does not yet prove WSL, remote-runtime mirror polling, a live SSH relay, pending-vs-attached UI status, or real network reconnect timing.
@@ -446,9 +446,9 @@ The output-backpressure budget gate now has a deterministic provider/IPC/rendere
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/main/daemon/daemon-stream-data-batcher.test.ts \
-  src/main/ipc/pty.test.ts \
-  src/renderer/src/components/terminal-pane/pty-connection.test.ts
+  migration/electron-reference/src/main/daemon/daemon-stream-data-batcher.test.ts \
+  migration/electron-reference/src/main/ipc/pty.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/pty-connection.test.ts
 ```
 
 Result on 2026-07-02: 3 test files passed, 469 tests passed, duration 9.35s. The focused command asserts daemon socket `write(false)`/`drain` ordering, cross-session interactive output priority, pure-backpressure cleanup, bounded daemon queued bytes, main pending renderer caps, active pending-output protection, replay/backlog slices, and ACK-gated in-flight bounds. It does not yet prove live hidden-output floods, renderer parse pressure, event-loop delay, active key latency, or full Electron perf artifacts.
@@ -457,12 +457,12 @@ Combined focused terminal/provider validation:
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/main/daemon/degraded-daemon-pty-provider.test.ts \
-  src/main/ipc/pty.test.ts \
-  src/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts \
-  src/renderer/src/components/terminal-pane/use-terminal-pane-lifecycle.test.ts \
-  src/renderer/src/components/terminal-pane/pty-connection.test.ts \
-  src/renderer/src/lib/resume-sleeping-agent-session.test.ts
+  migration/electron-reference/src/main/daemon/degraded-daemon-pty-provider.test.ts \
+  migration/electron-reference/src/main/ipc/pty.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/use-terminal-pane-lifecycle.test.ts \
+  packages/product-core/renderer/src/components/terminal-pane/pty-connection.test.ts \
+  packages/product-core/renderer/src/lib/resume-sleeping-agent-session.test.ts
 ```
 
 Result on 2026-07-01: 8 test files passed, 625 tests passed, duration 6.55s. This was focused terminal/provider validation, not structural manifest validation.
@@ -494,16 +494,16 @@ The lifecycle breadcrumb gate now has its first executable slice:
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/renderer/src/components/terminal-pane/terminal-lifecycle-diagnostics.test.ts
+  packages/product-core/renderer/src/components/terminal-pane/terminal-lifecycle-diagnostics.test.ts
 ```
 
 Result on 2026-07-02: 1 test file passed, 2 tests passed, duration 0.593s. The focused command asserts `warnTerminalLifecycleAnomaly` preserves its console warning, records a compact `terminal_lifecycle_anomaly` renderer crash breadcrumb with terminal identity/provider/PTY/reason fields, and dedupes repeated anomalies by lifecycle identity. It does not yet prove a full pane lifecycle trace buffer, diagnostics-bundle export, or forbidden-transition assertions across live Electron/provider flows.
 
 Specific current-source evidence checked in this pass:
 
-- Fresh `origin/main` has queued provider-session protections in `src/renderer/src/lib/resume-sleeping-agent-session.ts`: `resumeProviderSession`, `claimAutomaticAgentResume`, and `automaticAgentResumeClaimsByTabId`.
-- Fresh `origin/main` has exact liveness reconciliation in `src/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.ts` and the `pty:hasPty` IPC handler in `src/main/ipc/pty.ts`.
-- Fresh `origin/main` still uses a single `pendingReplayData` slot in `src/renderer/src/components/terminal-pane/pty-connection.ts` (re-verified after #7133 merged; #7133 changed the same file's `applyMainBufferSnapshot` alt-screen restore path, not replay draining). This branch changes replay draining to coalesce snapshots before xterm parsing starts, queue accepted snapshots FIFO once parsing is in progress, and coalesce burst tails to the newest snapshot once the in-flight queue is full. The broader scrollback gate still needs metadata-only replay, `clearBeforeReplay`, and hidden/live-output interleaving coverage.
+- Fresh `origin/main` has queued provider-session protections in `packages/product-core/renderer/src/lib/resume-sleeping-agent-session.ts`: `resumeProviderSession`, `claimAutomaticAgentResume`, and `automaticAgentResumeClaimsByTabId`.
+- Fresh `origin/main` has exact liveness reconciliation in `packages/product-core/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.ts` and the `pty:hasPty` IPC handler in `migration/electron-reference/src/main/ipc/pty.ts`.
+- Fresh `origin/main` still uses a single `pendingReplayData` slot in `packages/product-core/renderer/src/components/terminal-pane/pty-connection.ts` (re-verified after #7133 merged; #7133 changed the same file's `applyMainBufferSnapshot` alt-screen restore path, not replay draining). This branch changes replay draining to coalesce snapshots before xterm parsing starts, queue accepted snapshots FIFO once parsing is in progress, and coalesce burst tails to the newest snapshot once the in-flight queue is full. The broader scrollback gate still needs metadata-only replay, `clearBeforeReplay`, and hidden/live-output interleaving coverage.
 - Fresh `origin/main` still has `DaemonPtyAdapter.reconcileOnStartup` with the explicit note that it has no production caller yet. This branch adds a dry-run mode so future startup wiring can audit would-kill sessions before destructive cleanup, but production startup-persistence remains a real gap until wired with prior-worktree aliases or tracked as an accepted gap with a gate.
 - Fresh `origin/main` still lets `DegradedDaemonPtyProvider.providerFor()` fall back to local when an existing-looking session id is unmapped and not rediscovered by `hasPty`. This branch changes existing-session operation paths and restored worktree-scoped plus legacy/non-scoped spawn paths to fail closed, adds contract tests, and makes real daemon adapter `listProcesses()` discovery seed targeted `hasPty` liveness. Startup reconcile wiring and live daemon-restart validation are still required before the full provider lifecycle is covered.
 - Fresh `origin/main` let the daemon router spawn an unknown existing `sessionId` on the current daemon when routing cache/discovery missed its real owner. This branch now probes/discovers all adapters first, requires `isNewSession` for intentional replacement after an authoritative exit event, and fails closed if legacy ownership cannot be listed or the known id has exited, so a stale existing id cannot silently mint over another daemon's history on current.
@@ -538,7 +538,7 @@ Promotion split for existing E2Es:
 The first live PTY gate is deliberately small:
 
 - File: `tests/e2e/terminal-live-pty-liveness.spec.ts`.
-- Command: `pnpm run ensure:electron-runtime && npx playwright test tests/e2e/terminal-live-pty-liveness.spec.ts --config tests/playwright.config.ts --project electron-headless --workers=1`.
+- Command: `pnpm run parity:electron:ensure-runtime && npx playwright test tests/e2e/terminal-live-pty-liveness.spec.ts --config tests/playwright.config.ts --project electron-headless --workers=1`.
 - Invariant: a newly opened local terminal has one active PTY id listed exactly once, accepts real keyboard input through focused xterm, delivers process output visibly, keeps the same PTY id through repeated workspace hide/restore cycles, accepts input after restore, applies an actual size change, and exits without leaving a stale binding.
 - Oracle: start a deterministic Node raw-mode probe, wait for `LIVE_PTY_READY_<runId>`, require the active PTY id to appear exactly once in `pty:listSessions`, type through `.xterm-helper-textarea`, require ordered per-key markers in serialized terminal content, switch to another worktree and back twice, require the active pane to keep the original PTY id, type again after each restore, resize and require `pty:getSize` to change plus a matching process-visible size marker, then exit the probe and shell and require the old PTY id to disappear from `pty:listSessions`.
 - Wait rule: no blind sleeps. Wait only on PTY binding, active worktree changes, ready marker, key markers, resize marker, and list-session absence.
@@ -703,8 +703,8 @@ Run the first two gate tests:
 
 ```sh
 pnpm exec vitest run --config config/vitest.config.ts \
-  src/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts \
-  src/renderer/src/lib/resume-sleeping-agent-session.test.ts
+  packages/product-core/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts \
+  packages/product-core/renderer/src/lib/resume-sleeping-agent-session.test.ts
 ```
 
 Run the existing terminal perf report gate before promoting terminal lifecycle gates to blocking:

@@ -294,20 +294,20 @@ the expensive primitive was the problem.
 
 ## Relevant Code Areas
 
-- CLI terminal send: `src/cli/handlers/terminal.ts`
-- Runtime terminal send/focus/write: `src/main/runtime/pebble-runtime.ts`
-- Runtime PTY data handling: `onPtyData`, `trackHeadlessTerminalData`, hidden-output serialization in `src/main/runtime/pebble-runtime.ts`
-- Daemon request routing: `src/main/daemon/daemon-server.ts`
-- Daemon session write/resize/output handling: `src/main/daemon/session.ts`
-- Daemon-side headless terminal state: `src/main/daemon/headless-emulator.ts`
-- Daemon adapter: `src/main/daemon/daemon-pty-adapter.ts`
-- Main IPC PTY controller: `src/main/ipc/pty.ts`
-- Renderer terminal resume: `src/renderer/src/components/terminal-pane/terminal-visibility-resume.ts`
-- Renderer PTY connection and resume size reassertion: `src/renderer/src/components/terminal-pane/pty-connection.ts`
-- Renderer output scheduler: `src/renderer/src/lib/pane-manager/pane-terminal-output-scheduler.ts`
-- Existing-session reattach snapshot: `TerminalHost.createOrAttach` in `src/main/daemon/terminal-host.ts`
-- Session snapshot serialization: `TerminalSession.getSnapshot()` in `src/main/daemon/session.ts`
-- Snapshot cost benchmark: `src/main/daemon/headless-emulator-snapshot-cost.bench.test.ts`
+- CLI terminal send: `packages/product-core/cli/handlers/terminal.ts`
+- Runtime terminal send/focus/write: `migration/electron-reference/src/main/runtime/pebble-runtime.ts`
+- Runtime PTY data handling: `onPtyData`, `trackHeadlessTerminalData`, hidden-output serialization in `migration/electron-reference/src/main/runtime/pebble-runtime.ts`
+- Daemon request routing: `migration/electron-reference/src/main/daemon/daemon-server.ts`
+- Daemon session write/resize/output handling: `migration/electron-reference/src/main/daemon/session.ts`
+- Daemon-side headless terminal state: `migration/electron-reference/src/main/daemon/headless-emulator.ts`
+- Daemon adapter: `migration/electron-reference/src/main/daemon/daemon-pty-adapter.ts`
+- Main IPC PTY controller: `migration/electron-reference/src/main/ipc/pty.ts`
+- Renderer terminal resume: `packages/product-core/renderer/src/components/terminal-pane/terminal-visibility-resume.ts`
+- Renderer PTY connection and resume size reassertion: `packages/product-core/renderer/src/components/terminal-pane/pty-connection.ts`
+- Renderer output scheduler: `packages/product-core/renderer/src/lib/pane-manager/pane-terminal-output-scheduler.ts`
+- Existing-session reattach snapshot: `TerminalHost.createOrAttach` in `migration/electron-reference/src/main/daemon/terminal-host.ts`
+- Session snapshot serialization: `TerminalSession.getSnapshot()` in `migration/electron-reference/src/main/daemon/session.ts`
+- Snapshot cost benchmark: `migration/electron-reference/src/main/daemon/headless-emulator-snapshot-cost.bench.test.ts`
 
 ## Current Root-Cause Theory
 

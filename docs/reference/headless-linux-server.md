@@ -4,7 +4,7 @@ Use this guide when you want to run `pebble serve` on a Linux machine without a
 desktop session, such as an Ubuntu VPS or a remote build box.
 
 `pebble serve` starts the Pebble runtime without opening the desktop window. On
-Linux, the packaged AppImage still needs the libraries that Electron expects at
+Linux, the packaged AppImage still needs the WebKitGTK libraries that Tauri expects at
 startup. Current Pebble builds can start Xvfb automatically for `pebble serve` when
 no `DISPLAY` is set, but Xvfb must be installed first. When `DISPLAY` is set,
 Pebble uses that display instead of starting a competing Xvfb process.
@@ -22,9 +22,9 @@ Download and make the AppImage executable:
 
 ```bash
 sudo mkdir -p /opt/pebble
-sudo curl -L https://github.com/nebutra/pebble/releases/latest/download/pebble-linux.AppImage \
-  -o /opt/pebble/pebble-linux.AppImage
-sudo chmod +x /opt/pebble/pebble-linux.AppImage
+sudo curl -L https://github.com/nebutra/pebble/releases/latest/download/pebble-linux-x86_64.AppImage \
+  -o /opt/pebble/pebble-linux-x86_64.AppImage
+sudo chmod +x /opt/pebble/pebble-linux-x86_64.AppImage
 ```
 
 If `Xvfb` was installed somewhere other than `/usr/bin`, confirm systemd can
@@ -39,14 +39,14 @@ command -v Xvfb
 Start with a foreground run before creating a service:
 
 ```bash
-LIBGL_ALWAYS_SOFTWARE=1 /opt/pebble/pebble-linux.AppImage serve --port 6768
+LIBGL_ALWAYS_SOFTWARE=1 /opt/pebble/pebble-linux-x86_64.AppImage serve --port 6768
 ```
 
 For remote clients, pass the address they should use to reach this server. A
 Tailscale address is usually the safest option for private servers:
 
 ```bash
-LIBGL_ALWAYS_SOFTWARE=1 /opt/pebble/pebble-linux.AppImage serve \
+LIBGL_ALWAYS_SOFTWARE=1 /opt/pebble/pebble-linux-x86_64.AppImage serve \
   --port 6768 \
   --pairing-address 100.64.1.20
 ```
@@ -78,7 +78,7 @@ Type=simple
 User=pebble
 WorkingDirectory=/home/pebble
 Environment=LIBGL_ALWAYS_SOFTWARE=1
-ExecStart=/opt/pebble/pebble-linux.AppImage serve --port 6768 --pairing-address 100.64.1.20
+ExecStart=/opt/pebble/pebble-linux-x86_64.AppImage serve --port 6768 --pairing-address 100.64.1.20
 Restart=on-failure
 RestartSec=5
 
@@ -137,7 +137,7 @@ User=pebble
 WorkingDirectory=/home/pebble
 Environment=DISPLAY=:99
 Environment=LIBGL_ALWAYS_SOFTWARE=1
-ExecStart=/opt/pebble/pebble-linux.AppImage serve --port 6768 --pairing-address 100.64.1.20
+ExecStart=/opt/pebble/pebble-linux-x86_64.AppImage serve --port 6768 --pairing-address 100.64.1.20
 Restart=on-failure
 RestartSec=5
 
@@ -158,7 +158,7 @@ On a headless host, you do not need to open the desktop UI just to run the
 server. Invoke the AppImage directly:
 
 ```bash
-/opt/pebble/pebble-linux.AppImage serve --help
+/opt/pebble/pebble-linux-x86_64.AppImage serve --help
 ```
 
 If you later install the desktop CLI from Pebble settings, use that CLI for normal
@@ -179,5 +179,5 @@ depend on an interactive shell profile.
 - Clients cannot connect: make sure `--pairing-address` is an address reachable
   from the client, and make sure firewalls allow the selected `--port`.
 - Diagnosing other missing libraries: extract the AppImage without launching it
-  with `./pebble-linux.AppImage --appimage-extract`, then run
+  with `./pebble-linux-x86_64.AppImage --appimage-extract`, then run
   `ldd squashfs-root/pebble` to list any shared libraries the host is missing.

@@ -107,7 +107,7 @@ raster output is only for exploration, hero scenes, texture, and variant icons.
 
 These colors are brand asset colors, not application UI token replacements.
 When brand assets are embedded inside the app, prefer existing product tokens
-from `src/renderer/src/assets/main.css`.
+from `packages/product-core/renderer/src/assets/main.css`.
 
 | Token | Hex | Role |
 |---|---|---|

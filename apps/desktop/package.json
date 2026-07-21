@@ -1,0 +1,39 @@
+{
+  "name": "@pebble/desktop",
+  "version": "1.4.124-rc.8",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5174",
+    "build": "vite build",
+    "postbuild": "node scripts/verify-settings-bundle-boundary.mjs",
+    "preview:optimized:renderer": "vite preview --host 127.0.0.1 --port 4175 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "verify:mainline": "node ../../config/scripts/verify-pebble-repository-layout.mjs && node ../../config/scripts/verify-tauri-mainline.mjs && cd ../.. && node config/scripts/verify-tauri-preload-coverage.mjs && node config/scripts/verify-tauri-runtime-method-coverage.mjs",
+    "tauri:dev": "tauri dev",
+    "tauri:dev:optimized": "node scripts/run-optimized-tauri-dev.mjs",
+    "tauri:dev:optimized:reuse": "node scripts/run-optimized-tauri-dev.mjs --reuse-build",
+    "tauri:optimized:shell": "tauri dev --no-watch --config config/tauri.optimized.conf.json",
+    "tauri:parity:shell": "tauri dev --no-watch --config config/tauri.parity.conf.json",
+    "tauri:functional:shell": "tauri dev --no-watch --config config/tauri.functional.conf.json",
+    "tauri:build": "tauri build --ci --bundles app && node scripts/finalize-macos-app-bundle.mjs",
+    "tauri:build:all": "tauri build --ci",
+    "tauri:build:no-bundle": "tauri build --ci --no-bundle"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
+    "lucide-react": "^0.475.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6"
+  }
+}

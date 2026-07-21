@@ -51,14 +51,14 @@
       "invariant": "A local or daemon liveness snapshot requested before a pane binds a PTY cannot prove that newer binding dead or route it through exit teardown.",
       "oracle": "The decision layer rejects reconciliation when ptyBoundAt is greater than or equal to snapshotRequestedAt, still reconciles genuinely absent older local ids, and treats rejected provider listing as unknown.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts"
+        "pnpm exec vitest run --config config/vitest.config.ts packages/product-core/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts"
       ],
       "testFiles": [
-        "src/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts"
+        "packages/product-core/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts"
       ],
       "assertionRefs": [
         {
-          "file": "src/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts",
+          "file": "packages/product-core/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts",
           "assertions": [
             "a newborn pane bound after the snapshot was requested is not reconciled (boundAt >= requestedAt freshness guard)",
             "a rejected listSessions is treated as unknown and reconciles nothing",
@@ -72,7 +72,7 @@
           "date": "2026-07-03",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts packages/product-core/renderer/src/components/terminal-pane/terminal-dead-session-reconcile.test.ts",
           "result": "passed",
           "durationSeconds": 1.5,
           "summary": "1 test file(s) passed, 17 tests passed on main@1282f5c2d in a clean checkout."
@@ -145,14 +145,14 @@
       "invariant": "Workspace activation, launch, restore, sleep, hibernate, dedupe, clearing, and reconnect code must not replay or resume a provider session id already owned, queued, pending, or live in that workspace.",
       "oracle": "The current renderer-state slice asserts provider-session claim keys are owned by preserved active tabs, inactive split leaves, visible non-focused split groups, live records, quit records, worktree-sleep records, queued startup payloads, time-bounded resume bridge claims, and same-session live hook evidence; duplicates clear without launching a second resume command. The provider list is the risk scope, not proof that every provider has a live integration gate.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/lib/resume-sleeping-agent-session.test.ts"
+        "pnpm exec vitest run --config config/vitest.config.ts packages/product-core/renderer/src/lib/resume-sleeping-agent-session.test.ts"
       ],
       "testFiles": [
-        "src/renderer/src/lib/resume-sleeping-agent-session.test.ts"
+        "packages/product-core/renderer/src/lib/resume-sleeping-agent-session.test.ts"
       ],
       "assertionRefs": [
         {
-          "file": "src/renderer/src/lib/resume-sleeping-agent-session.test.ts",
+          "file": "packages/product-core/renderer/src/lib/resume-sleeping-agent-session.test.ts",
           "assertions": [
             "preserved panes claim their provider session and only stale duplicates are cleared",
             "one launch per provider session: skipped duplicates are cleared instead of relaunched",
@@ -166,7 +166,7 @@
           "date": "2026-07-03",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/lib/resume-sleeping-agent-session.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts packages/product-core/renderer/src/lib/resume-sleeping-agent-session.test.ts",
           "result": "passed",
           "durationSeconds": 1.9,
           "summary": "1 test file(s) passed, 30 tests passed on main@1282f5c2d in a clean checkout."
@@ -228,7 +228,7 @@
         "macos"
       ],
       "coveredProviders": [],
-      "coverageNotes": "Local macOS evidence on main@1282f5c2d, including #7192's runtime-mirror geometry authority slice. Shell-visible size, SSH/remote geometry, Windows ConPTY readback, and resume-time reassertion coverage arrive with the pending stack and #7006.",
+      "coverageNotes": "Renderer tests cover hidden/visible and initially unmeasurable panes; canonical Go tests prove accepted PTY resize precedes mirror geometry and rejected resize changes neither mirror nor session. Shell-visible size, SSH/remote geometry, and Windows ConPTY readback remain gaps.",
       "motivatingLinks": [
         "https://github.com/nebutra/pebble/pull/6644",
         "https://github.com/nebutra/pebble/pull/6649",
@@ -239,19 +239,20 @@
         "https://github.com/nebutra/pebble/pull/7192"
       ],
       "invariant": "A visible desktop-owned terminal cannot trust 0x0, stale requested size, or renderer-only size; xterm, fit/proposed size, applied PTY size, shell-visible size, and the runtime mirror's parse dimensions must converge or enter explicit degraded state, and mirror resize reflow must stay ordered with queued output writes.",
-      "oracle": "The current executable slice uses deterministic frame schedulers and fake providers to force 0x0 first fit, delayed layout settle, dropped resize/readback drift, and hidden-to-visible activation, then asserts the renderer forwards a usable size, pty:getSize reports applied rather than merely requested size where available, and visibility resume reasserts real drift without hot listSessions. Shell-visible stty/echo-wrap convergence remains a live-gate follow-up.",
+      "oracle": "The renderer slice uses deterministic frame schedulers to force 0x0 first fit, delayed layout settle, readback drift, and hidden-to-visible activation. The Go slice asserts a PTY must accept dimensions before the runtime mirror and session state advance, while rejected dimensions leave both unchanged; screen tests assert resize dimensions and alternate-screen state survive snapshotting.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts src/renderer/src/components/terminal-pane/split-right-white-screen.test.ts src/main/ipc/pty.test.ts src/main/runtime/pebble-runtime.test.ts"
+        "pnpm exec vitest run --config config/vitest.config.ts packages/product-core/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts packages/product-core/renderer/src/components/terminal-pane/split-right-white-screen.test.ts",
+        "node config/scripts/run-go-reliability-package.mjs runtime/go/internal/runtimecore runtime/go/internal/runtimecore/process_session_resize_test.go runtime/go/internal/runtimecore/terminal_screen_test.go"
       ],
       "testFiles": [
-        "src/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts",
-        "src/renderer/src/components/terminal-pane/split-right-white-screen.test.ts",
-        "src/main/ipc/pty.test.ts",
-        "src/main/runtime/pebble-runtime.test.ts"
+        "packages/product-core/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts",
+        "packages/product-core/renderer/src/components/terminal-pane/split-right-white-screen.test.ts",
+        "runtime/go/internal/runtimecore/process_session_resize_test.go",
+        "runtime/go/internal/runtimecore/terminal_screen_test.go"
       ],
       "assertionRefs": [
         {
-          "file": "src/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts",
+          "file": "packages/product-core/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts",
           "assertions": [
             "hidden delayed narrow settle is forwarded instead of stopping on a fixed frame budget",
             "unmeasurable frames do not count as settled",
@@ -259,7 +260,7 @@
           ]
         },
         {
-          "file": "src/renderer/src/components/terminal-pane/split-right-white-screen.test.ts",
+          "file": "packages/product-core/renderer/src/components/terminal-pane/split-right-white-screen.test.ts",
           "assertions": [
             "0x0 split-right spawn recovers when the container becomes measurable",
             "visible permanently-unmeasurable 0x0 pane gets a nonzero safe fallback",
@@ -267,34 +268,34 @@
           ]
         },
         {
-          "file": "src/main/ipc/pty.test.ts",
+          "file": "runtime/go/internal/runtimecore/process_session_resize_test.go",
           "assertions": [
-            "accepted desktop resizes fan out to the runtime after provider resize",
-            "rejected desktop resizes do not fan out to the runtime"
+            "accepted dimensions reach the PTY before the Go mirror advances",
+            "rejected PTY dimensions change neither mirror nor session geometry"
           ]
         },
         {
-          "file": "src/main/runtime/pebble-runtime.test.ts",
+          "file": "runtime/go/internal/runtimecore/terminal_screen_test.go",
           "assertions": [
-            "the headless mirror resizes after an accepted desktop PTY resize (#7192)",
-            "headless mirror resizes are ordered behind queued PTY writes (#7192)"
+            "the Go mirror reports authoritative resized dimensions (#7192)",
+            "alternate-screen content remains isolated through mirror resize"
           ]
         }
       ],
       "evidenceRuns": [
         {
-          "date": "2026-07-03",
+          "date": "2026-07-20",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/pty-size-reconcile.test.ts src/renderer/src/components/terminal-pane/split-right-white-screen.test.ts src/main/ipc/pty.test.ts src/main/runtime/pebble-runtime.test.ts",
+          "command": "node config/scripts/run-go-reliability-package.mjs runtime/go/internal/runtimecore runtime/go/internal/runtimecore/process_session_resize_test.go runtime/go/internal/runtimecore/terminal_screen_test.go",
           "result": "passed",
-          "durationSeconds": 8.4,
-          "summary": "4 test file(s) passed, 777 tests passed on main@1282f5c2d in a clean checkout."
+          "durationSeconds": 21.9,
+          "summary": "The full Go runtimecore package passed with authoritative PTY-before-mirror resize coverage."
         }
       ],
       "runtimeBudget": {
         "p95Seconds": 60,
-        "scope": "provider-contract or focused Electron test"
+        "scope": "renderer geometry contract plus focused Go runtime package"
       },
       "flakeHistory": {
         "status": "unknown",
@@ -302,7 +303,7 @@
       },
       "redGreenEvidence": {
         "status": "partial",
-        "evidence": "#7192 proved the mirror slice red before its fix (snapshot stayed 80x24, queued write parsed at the wrong width). The renderer 0x0/settle slices do not have recorded red runs."
+        "evidence": "#7192 proved stale mirror dimensions red in the former shell. The Go assertions now fail if mirror/session geometry advances before PTY acceptance or after rejection; renderer 0x0/settle slices still lack recorded red runs."
       },
       "performanceBudget": {
         "required": true,
@@ -313,8 +314,8 @@
         "Keep stress variants non-blocking until runtime and flake history are known."
       ],
       "knownGaps": [
-        "No live Electron geometry command yet beyond the local live PTY resize slice.",
-        "The runtime mirror geometry slice is unregistered: #7192's red tests (pebble-runtime.test.ts headless-mirror resize and ordering, pty.test.ts desktop resize fan-out) exist on fresh main but not at this branch's merge-base, so they can only be registered during the rebase.",
+        "No live Tauri geometry command yet beyond Go PTY integration and renderer contracts.",
+        "The Go mirror serializes write and resize operations with one lock, but a deterministic concurrent queued-write/resize fault hook is not yet registered.",
         "Does not yet prove shell-visible size, provider-applied size, and xterm size converge across SSH/remote paths.",
         "Does not yet prove Windows ConPTY geometry/readback.",
         "Current command uses deterministic fake providers for the main/renderer contracts, not a real remote PTY."
@@ -359,63 +360,63 @@
       "invariant": "Search, link, WebGL, decoration, input-protocol, or keyboard-navigation errors must not unmount the terminal surface, crash React/window, break focus, or stop PTY input/output.",
       "oracle": "The current executable slice injects a core addon load throw and asserts pane opening continues through later addons, covers link provider throws as pane-scoped no-link results, covers search decoration positive-integer failures as false results instead of renderer crashes, and covers WebGL attach/refresh/recovery containment. Focused typed input echo after addon failure still needs a live/component follow-up.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/lib/pane-manager/terminal-link-provider-guard.test.ts src/renderer/src/components/terminal-search-safe-find.test.ts src/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts src/renderer/src/components/terminal-pane/terminal-webgl-atlas-recovery.test.ts src/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts src/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts src/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts"
+        "pnpm exec vitest run --config config/vitest.config.ts packages/product-core/renderer/src/lib/pane-manager/terminal-link-provider-guard.test.ts packages/product-core/renderer/src/components/terminal-search-safe-find.test.ts packages/product-core/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts packages/product-core/renderer/src/components/terminal-pane/terminal-webgl-atlas-recovery.test.ts packages/product-core/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts packages/product-core/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts packages/product-core/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts packages/product-core/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts"
       ],
       "testFiles": [
-        "src/renderer/src/lib/pane-manager/terminal-link-provider-guard.test.ts",
-        "src/renderer/src/components/terminal-search-safe-find.test.ts",
-        "src/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts",
-        "src/renderer/src/components/terminal-pane/terminal-webgl-atlas-recovery.test.ts",
-        "src/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts",
-        "src/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts",
-        "src/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts",
-        "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts"
+        "packages/product-core/renderer/src/lib/pane-manager/terminal-link-provider-guard.test.ts",
+        "packages/product-core/renderer/src/components/terminal-search-safe-find.test.ts",
+        "packages/product-core/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts",
+        "packages/product-core/renderer/src/components/terminal-pane/terminal-webgl-atlas-recovery.test.ts",
+        "packages/product-core/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts",
+        "packages/product-core/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts",
+        "packages/product-core/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts",
+        "packages/product-core/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts"
       ],
       "assertionRefs": [
         {
-          "file": "src/renderer/src/lib/pane-manager/terminal-link-provider-guard.test.ts",
+          "file": "packages/product-core/renderer/src/lib/pane-manager/terminal-link-provider-guard.test.ts",
           "assertions": [
             "link-provider throws are reproduced and contained without escaping the surface"
           ]
         },
         {
-          "file": "src/renderer/src/components/terminal-search-safe-find.test.ts",
+          "file": "packages/product-core/renderer/src/components/terminal-search-safe-find.test.ts",
           "assertions": [
             "the xterm positive-integers decoration crash is swallowed while unrelated errors re-throw"
           ]
         },
         {
-          "file": "src/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts",
+          "file": "packages/product-core/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts",
           "assertions": [
             "WebGL teardown/refresh lifecycle stays pane-scoped and cancels on dispose"
           ]
         },
         {
-          "file": "src/renderer/src/components/terminal-pane/terminal-webgl-atlas-recovery.test.ts",
+          "file": "packages/product-core/renderer/src/components/terminal-pane/terminal-webgl-atlas-recovery.test.ts",
           "assertions": [
             "risky-output atlas recovery is bounded, coalesced, and survives a throwing manager"
           ]
         },
         {
-          "file": "src/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts",
+          "file": "packages/product-core/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts",
           "assertions": [
             "failed attach backs off and context-lost panes recover on the next rendering resume"
           ]
         },
         {
-          "file": "src/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts",
+          "file": "packages/product-core/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts",
           "assertions": [
             "attach bail disposes the addon instead of orphaning it (#7133 single-addon invariant)"
           ]
         },
         {
-          "file": "src/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts",
+          "file": "packages/product-core/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts",
           "assertions": [
             "reveal repaint waits for a settled frame and keeps repainting when one pane throws (#7133)"
           ]
         },
         {
-          "file": "src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts",
+          "file": "packages/product-core/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts",
           "assertions": [
             "tab reveal, heavy reveal, and window wake schedule pane-scoped repaint (#7133)"
           ]
@@ -426,7 +427,7 @@
           "date": "2026-07-03",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/lib/pane-manager/terminal-link-provider-guard.test.ts src/renderer/src/components/terminal-search-safe-find.test.ts src/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts src/renderer/src/components/terminal-pane/terminal-webgl-atlas-recovery.test.ts src/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts src/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts src/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts src/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts packages/product-core/renderer/src/lib/pane-manager/terminal-link-provider-guard.test.ts packages/product-core/renderer/src/components/terminal-search-safe-find.test.ts packages/product-core/renderer/src/lib/pane-manager/pane-webgl-refresh-lifecycle.test.ts packages/product-core/renderer/src/components/terminal-pane/terminal-webgl-atlas-recovery.test.ts packages/product-core/renderer/src/lib/pane-manager/pane-webgl-context-recovery.test.ts packages/product-core/renderer/src/lib/pane-manager/pane-webgl-renderer.test.ts packages/product-core/renderer/src/lib/pane-manager/pane-reveal-repaint.test.ts packages/product-core/renderer/src/components/terminal-pane/terminal-visibility-resume.test.ts",
           "result": "passed",
           "durationSeconds": 0.8,
           "summary": "8 test file(s) passed, 33 tests passed on main@1282f5c2d in a clean checkout."
@@ -821,7 +822,7 @@
         "macos"
       ],
       "coveredProviders": [],
-      "coverageNotes": "Local macOS evidence over the main-process pending-output caps that exist on main@1282f5c2d. Daemon stream write(false)/drain contracts, cross-session drain priority, and bounded queued tails arrive with the pending perf slice; live flood/latency artifacts remain gaps.",
+      "coverageNotes": "Canonical Go output events coalesce on a <=1ms window and retain a UTF-8-valid newest tail capped at 32KB with explicit dropped-byte accounting. Renderer scheduler tests cap hidden queue bytes/chunks, rotate background terminals, prioritize foreground output, and yield within frame budgets. Live flood/latency artifacts remain gaps.",
       "motivatingLinks": [
         "https://github.com/nebutra/pebble/pull/6836",
         "https://github.com/nebutra/pebble/pull/6858",
@@ -829,32 +830,42 @@
         "https://github.com/nebutra/pebble/pull/7054"
       ],
       "invariant": "High-volume terminal output must stay bounded across daemon socket writes, main-to-renderer in-flight bytes, renderer scheduler queues, and hidden-output restore without starving focused input.",
-      "oracle": "The current executable slice injects daemon socket backpressure and main-process renderer backlog pressure, then asserts write(false)/drain ordering, bounded queued daemon bytes, per-PTY and total pending-output caps, preserved sequenced-tail metadata, active-pending protection ahead of background trimming, and ACK-gated in-flight bounds. The live Electron perf oracle adds hidden-output floods, renderer scheduler queue depth, dropped-output-zero normal scenarios, and active key latency budgets before promotion.",
+      "oracle": "The Go slice floods the event coalescer and asserts bounded newest-tail bytes, UTF-8-safe truncation, dropped-byte accounting, rapid chunk coalescing, immediate exit flush, and a <=1ms interactive window. The renderer slice asserts bounded hidden bytes/chunks, fair background rotation, foreground priority, recovery after drops, preserved order, and frame-budget yielding.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts src/main/ipc/pty.test.ts"
+        "node config/scripts/run-go-reliability-package.mjs runtime/go/internal/runtimecore runtime/go/internal/runtimecore/session_output_events_test.go",
+        "pnpm exec vitest run --config config/vitest.config.ts packages/product-core/renderer/src/lib/pane-manager/pane-terminal-output-scheduler.test.ts"
       ],
       "testFiles": [
-        "src/main/ipc/pty.test.ts"
+        "runtime/go/internal/runtimecore/session_output_events_test.go",
+        "packages/product-core/renderer/src/lib/pane-manager/pane-terminal-output-scheduler.test.ts"
       ],
       "assertionRefs": [
         {
-          "file": "src/main/ipc/pty.test.ts",
+          "file": "runtime/go/internal/runtimecore/session_output_events_test.go",
           "assertions": [
-            "total renderer in-flight output is capped across many PTYs",
-            "active PTY pending output is prioritized during renderer backpressure",
-            "combined pending output exceeding the interactive size limit is batched"
+            "rapid PTY chunks coalesce into bounded 32KB newest-tail events",
+            "truncation preserves valid UTF-8 and reports every dropped byte",
+            "interactive batching delay stays <=1ms and exit flush drains synchronously"
+          ]
+        },
+        {
+          "file": "packages/product-core/renderer/src/lib/pane-manager/pane-terminal-output-scheduler.test.ts",
+          "assertions": [
+            "hidden backlog bytes and chunk counts are capped with recovery instead of unbounded flush",
+            "foreground output is prioritized without reordering queued output for the same terminal",
+            "background terminals rotate fairly and high-priority drains yield at the frame budget"
           ]
         }
       ],
       "evidenceRuns": [
         {
-          "date": "2026-07-03",
+          "date": "2026-07-20",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/ipc/pty.test.ts",
+          "command": "node config/scripts/run-go-reliability-package.mjs runtime/go/internal/runtimecore runtime/go/internal/runtimecore/session_output_events_test.go",
           "result": "passed",
-          "durationSeconds": 1.5,
-          "summary": "1 test file(s) passed, 209 tests passed on main@1282f5c2d in a clean checkout."
+          "durationSeconds": 21.9,
+          "summary": "The full Go runtimecore package passed with bounded UTF-8 event coalescing; the renderer scheduler suite also passed."
         }
       ],
       "runtimeBudget": {
@@ -867,7 +878,7 @@
       },
       "redGreenEvidence": {
         "status": "partial",
-        "evidence": "Tests assert daemon stream writes pause after socket write(false), later stream data queues behind the pressured socket, flush-immediate output from another session is prioritized ahead of unrelated queued background backlog on drain while preserving per-session order, queued lines resume on drain, global cleanup clears clients that only have backpressured writes, queued daemon stream bytes are bounded by keeping priority output and the newest tail under sustained pressure, main pending renderer output is capped per PTY and in total, total-pressure trimming prefers background pending output before active pending output, trimmed pending tails preserve seq/rawLength metadata, and ACK-gated in-flight output remains bounded. Existing renderer tests cover replay/backlog slices. Needs intentional-break proof and broader hidden-output/input-latency perf artifacts before promotion."
+        "evidence": "Go tests fail if coalescing is removed, payloads exceed their cap, UTF-8 is cut mid-rune, dropped bytes are unreported, or the interactive delay exceeds 1ms. Renderer tests cover queue caps, fairness, priority, ordering, recovery, and drain budgets. Native bridge queue depth and live input-latency artifacts still need intentional-break evidence."
       },
       "performanceBudget": {
         "required": true,
@@ -879,9 +890,9 @@
         "Keep stress variants non-blocking until stable runtime history exists."
       ],
       "knownGaps": [
-        "Current command asserts daemon stream write(false)/drain/cleanup at the batcher contract layer and main pending renderer caps at the IPC contract layer.",
-        "Current command does not prove renderer parse pressure, scheduler queue depth, event-loop delay, or active key latency.",
-        "Live hidden-output pressure, active input latency, and full Electron perf artifacts remain unproved."
+        "The native Tauri event bridge does not yet expose an ACK/in-flight byte metric, so its queue bound is not directly asserted.",
+        "Current commands do not prove live xterm parse pressure, event-loop delay, or active key latency.",
+        "Live hidden-output pressure and cross-platform perf artifacts remain unproved."
       ],
       "demotionRule": "Cannot promote without metric artifacts and bounded-byte assertions."
     },
@@ -1192,29 +1203,29 @@
       "invariant": "Composition, native text forwarding, synthetic input, paste, and platform keyboard bypass paths must not send preedit/control bytes before commit and must commit text exactly once to the intended PTY.",
       "oracle": "The current renderer-unit slice asserts native text commits route to the intended PTY once, composition/preedit bookkeeping does not leak premature text, input-source classification handles synthetic/native paths, and paste/runtime forwarding avoids duplicate terminal payloads for covered fixtures. Real IME paths and the full CJK/Vietnamese/Arabic/JIS-yen matrix run in follow-up platform soak where automation is possible.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/terminal-ime-native-text-forwarder.test.ts src/renderer/src/components/terminal-pane/terminal-ime-input-source.test.ts src/renderer/src/components/terminal-pane/terminal-paste-runtime.test.ts"
+        "pnpm exec vitest run --config config/vitest.config.ts packages/product-core/renderer/src/components/terminal-pane/terminal-ime-native-text-forwarder.test.ts packages/product-core/renderer/src/components/terminal-pane/terminal-ime-input-source.test.ts packages/product-core/renderer/src/components/terminal-pane/terminal-paste-runtime.test.ts"
       ],
       "testFiles": [
-        "src/renderer/src/components/terminal-pane/terminal-ime-native-text-forwarder.test.ts",
-        "src/renderer/src/components/terminal-pane/terminal-ime-input-source.test.ts",
-        "src/renderer/src/components/terminal-pane/terminal-paste-runtime.test.ts"
+        "packages/product-core/renderer/src/components/terminal-pane/terminal-ime-native-text-forwarder.test.ts",
+        "packages/product-core/renderer/src/components/terminal-pane/terminal-ime-input-source.test.ts",
+        "packages/product-core/renderer/src/components/terminal-pane/terminal-paste-runtime.test.ts"
       ],
       "assertionRefs": [
         {
-          "file": "src/renderer/src/components/terminal-pane/terminal-ime-native-text-forwarder.test.ts",
+          "file": "packages/product-core/renderer/src/components/terminal-pane/terminal-ime-native-text-forwarder.test.ts",
           "assertions": [
             "native text commits route once to the intended PTY",
             "composition/preedit bookkeeping does not leak premature text"
           ]
         },
         {
-          "file": "src/renderer/src/components/terminal-pane/terminal-ime-input-source.test.ts",
+          "file": "packages/product-core/renderer/src/components/terminal-pane/terminal-ime-input-source.test.ts",
           "assertions": [
             "synthetic and native input-source paths are classified for covered fixtures"
           ]
         },
         {
-          "file": "src/renderer/src/components/terminal-pane/terminal-paste-runtime.test.ts",
+          "file": "packages/product-core/renderer/src/components/terminal-pane/terminal-paste-runtime.test.ts",
           "assertions": [
             "paste/runtime forwarding avoids duplicate terminal payloads"
           ]
@@ -1225,7 +1236,7 @@
           "date": "2026-07-03",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/terminal-ime-native-text-forwarder.test.ts src/renderer/src/components/terminal-pane/terminal-ime-input-source.test.ts src/renderer/src/components/terminal-pane/terminal-paste-runtime.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts packages/product-core/renderer/src/components/terminal-pane/terminal-ime-native-text-forwarder.test.ts packages/product-core/renderer/src/components/terminal-pane/terminal-ime-input-source.test.ts packages/product-core/renderer/src/components/terminal-pane/terminal-paste-runtime.test.ts",
           "result": "passed",
           "durationSeconds": 0.9,
           "summary": "3 test file(s) passed, 63 tests passed on main@1282f5c2d in a clean checkout."
@@ -1682,14 +1693,14 @@
       "invariant": "Hidden-output restore, snapshot replay, metadata-only replay, and clear-before-replay must preserve order and never overlay stale bytes on newer live terminal output; restoring a snapshot onto an already-dirty pane must yield a buffer exactly equal to the snapshot frame.",
       "oracle": "Apply snapshots onto adversarially dirty pane states (already on the alternate screen, stale content occupying cells the new frame leaves blank, scrollback present, wide glyphs, revived sessions with restarted PTY seq counters) and assert exact buffer equality with the snapshot frame; fault injection interleaves hidden chunks, live output, metadata-only replay, and clear-before-replay, then asserts ordered terminal buffer content, clear decisions, and replay diagnostics. Marker-presence checks are not acceptable evidence on restore paths.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/pty-connection.test.ts"
+        "pnpm exec vitest run --config config/vitest.config.ts packages/product-core/renderer/src/components/terminal-pane/pty-connection.test.ts"
       ],
       "testFiles": [
-        "src/renderer/src/components/terminal-pane/pty-connection.test.ts"
+        "packages/product-core/renderer/src/components/terminal-pane/pty-connection.test.ts"
       ],
       "assertionRefs": [
         {
-          "file": "src/renderer/src/components/terminal-pane/pty-connection.test.ts",
+          "file": "packages/product-core/renderer/src/components/terminal-pane/pty-connection.test.ts",
           "assertions": [
             "restoring an alternate-screen snapshot clears only the alternate screen (#7133)",
             "hidden Codex output is restored when the pty seq counter restarts, with or without an observed exit (#7173)",
@@ -1703,7 +1714,7 @@
           "date": "2026-07-03",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/renderer/src/components/terminal-pane/pty-connection.test.ts",
+          "command": "pnpm exec vitest run --config config/vitest.config.ts packages/product-core/renderer/src/components/terminal-pane/pty-connection.test.ts",
           "result": "passed",
           "durationSeconds": 8.4,
           "summary": "1 test file(s) passed, 311 tests passed on main@1282f5c2d in a clean checkout."
@@ -1834,56 +1845,63 @@
         "macos"
       ],
       "coveredProviders": [],
-      "coverageNotes": "Local macOS evidence over the runtime-RPC stream budgets on main@1282f5c2d. The pending stack adds byte-exact 512KB/2MB/256KB/48KB budget assertions; legacy JSON subscribe parity remains undecided.",
+      "coverageNotes": "The canonical Go shared-control path takes its bounded 512KB tail before registering the live subscription, emits snapshots and live output in UTF-8-safe <=48KB frames, and the mobile client rejects stale stream ids after reconnect. Cross-event output coalescing and live platform soak evidence remain gaps.",
       "motivatingLinks": [
         "https://github.com/nebutra/pebble/pull/6951",
         "https://github.com/nebutra/pebble/pull/6955",
         "https://github.com/nebutra/pebble/pull/7009"
       ],
-      "invariant": "Runtime and mobile terminal subscriptions must cap initial snapshots, live output buffered while snapshots load, chunk sizes, and batch sizes, while preserving output order, input locks, resize/driver events, and fallback parity or explicit fallback deprecation.",
-      "oracle": "The current executable slice asserts mobile initial snapshots downgrade until they fit <=512KB, requested binary snapshots downgrade until they fit <=2MB, binary live output queued while the initial snapshot loads stays <=256KB while preserving the newest tail, large binary output is split into <=48KB frames, output bursts are coalesced before emit, aborts do not register stale listeners, and stale mobile resize re-stream completions are dropped. JSON fallback parity/deprecation remains an explicit gap.",
+      "invariant": "Runtime and mobile terminal subscriptions must cap initial snapshots and every live binary frame while preserving UTF-8 bytes, output order, input, resize/reflow events, reconnect ownership, and explicit JSON fallback behavior.",
+      "oracle": "The executable Go slice asserts the initial mobile snapshot remains <=512KB with a valid UTF-8 suffix, snapshot and live-output frames remain <=48KB without splitting multibyte text, encrypted binary input reaches the PTY, and resize produces an authoritative resized event plus bounded reflow snapshot. The mobile slice proves reconnect re-subscribes exactly once and rejects output from stale stream ids.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/rpc/terminal-subscribe-buffer.test.ts src/main/runtime/rpc/terminal-output-batching.test.ts src/main/runtime/rpc/terminal-multiplex.test.ts"
+        "node config/scripts/run-go-reliability-package.mjs runtime/go/internal/runtimehttp runtime/go/internal/runtimehttp/terminal_stream_protocol_test.go runtime/go/internal/runtimehttp/legacy_shared_control_test.go",
+        "pnpm exec vitest run --config apps/mobile/vitest.config.ts apps/mobile/src/transport/rpc-client-terminal-reconnect.test.ts apps/mobile/src/transport/rpc-client-terminal-binary-frame.test.ts"
       ],
       "testFiles": [
-        "src/main/runtime/rpc/terminal-subscribe-buffer.test.ts",
-        "src/main/runtime/rpc/terminal-output-batching.test.ts",
-        "src/main/runtime/rpc/terminal-multiplex.test.ts"
+        "runtime/go/internal/runtimehttp/terminal_stream_protocol_test.go",
+        "runtime/go/internal/runtimehttp/legacy_shared_control_test.go",
+        "apps/mobile/src/transport/rpc-client-terminal-reconnect.test.ts",
+        "apps/mobile/src/transport/rpc-client-terminal-binary-frame.test.ts"
       ],
       "assertionRefs": [
         {
-          "file": "src/main/runtime/rpc/terminal-subscribe-buffer.test.ts",
+          "file": "runtime/go/internal/runtimehttp/terminal_stream_protocol_test.go",
           "assertions": [
-            "legacy binary output queued during initial snapshot serialization stays bounded",
-            "stale mobile resize re-stream completions are dropped for legacy binary streams",
-            "aborted stream signals do not register stale listeners"
+            "mobile snapshots stay within 512KB and retain a valid UTF-8 suffix",
+            "large live output splits into <=48KB frames without changing byte order",
+            "snapshot truncation does not begin inside terminal escape sequences"
           ]
         },
         {
-          "file": "src/main/runtime/rpc/terminal-output-batching.test.ts",
+          "file": "runtime/go/internal/runtimehttp/legacy_shared_control_test.go",
           "assertions": [
-            "desktop output bursts coalesce before stream emission",
-            "large binary output is encoded lazily before the first output frame"
+            "encrypted binary terminal input reaches the Go PTY",
+            "mobile resize emits authoritative dimensions and a bounded reflow snapshot"
           ]
         },
         {
-          "file": "src/main/runtime/rpc/terminal-multiplex.test.ts",
+          "file": "apps/mobile/src/transport/rpc-client-terminal-reconnect.test.ts",
           "assertions": [
-            "requested snapshots fall back smaller when serialized data exceeds the send budget",
-            "oversized live output frames are bounded for subscribed binary streams",
-            "multibyte live output flushes when encoded bytes reach the batch budget"
+            "active terminal subscriptions replay once after reconnect",
+            "output from a stale pre-reconnect stream id is ignored"
+          ]
+        },
+        {
+          "file": "apps/mobile/src/transport/rpc-client-terminal-binary-frame.test.ts",
+          "assertions": [
+            "validated terminal metadata frames route to the owning stream"
           ]
         }
       ],
       "evidenceRuns": [
         {
-          "date": "2026-07-03",
+          "date": "2026-07-20",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/runtime/rpc/terminal-subscribe-buffer.test.ts src/main/runtime/rpc/terminal-output-batching.test.ts src/main/runtime/rpc/terminal-multiplex.test.ts",
+          "command": "node config/scripts/run-go-reliability-package.mjs runtime/go/internal/runtimehttp runtime/go/internal/runtimehttp/terminal_stream_protocol_test.go runtime/go/internal/runtimehttp/legacy_shared_control_test.go",
           "result": "passed",
-          "durationSeconds": 3.8,
-          "summary": "3 test file(s) passed, 28 tests passed on main@1282f5c2d in a clean checkout."
+          "durationSeconds": 72.2,
+          "summary": "Go runtimehttp package passed with bounded snapshot/live binary frame and encrypted PTY integration coverage."
         }
       ],
       "runtimeBudget": {
@@ -1892,11 +1910,11 @@
       },
       "flakeHistory": {
         "status": "unknown",
-        "evidence": "Focused runtime RPC contract tests passed locally on 2026-07-02; needs soak history before promotion."
+        "evidence": "Focused Go and mobile contracts pass locally; needs cross-platform soak history before promotion."
       },
       "redGreenEvidence": {
         "status": "partial",
-        "evidence": "Tests cover mobile initial snapshot byte downgrade, requested binary snapshot byte downgrade, pending live-output cap while snapshot loads, output chunk size, output coalescing, abort cleanup, and stale resize re-stream suppression. Needs intentional-break proof plus JSON fallback coverage before promotion."
+        "evidence": "Tests cover the canonical pre-subscription bounded snapshot, UTF-8-safe live frame cap, encrypted PTY input/resize/reflow, and stale reconnect stream rejection. Needs intentional-break proof, cross-event coalescing budget, and JSON fallback coverage before promotion."
       },
       "performanceBudget": {
         "required": true,
@@ -1908,18 +1926,18 @@
         "Record byte counts and order/cursor artifacts on failure."
       ],
       "knownGaps": [
-        "Current command covers binary runtime/mobile stream contracts only.",
+        "Cross-event live-output coalescing and an end-to-end active-input latency budget are not yet registered.",
         "Legacy JSON subscribe parity is undecided."
       ],
       "demotionRule": "Cannot promote while a supported stream path has uncapped snapshot or live-output buffering."
     },
     {
       "id": "terminal-mirror.parser-parity",
-      "title": "Renderer xterm and main headless mirror parse identical bytes into identical cells",
+      "title": "Go terminal mirror preserves renderer-compatible Unicode cell positioning",
       "maturity": "experimental",
       "protection": "partial",
       "owner": "terminal-rendering",
-      "layer": "renderer-main-parity-contract",
+      "layer": "renderer-go-runtime-parity-contract",
       "surfaces": [
         "main mirror buffer",
         "snapshot restore",
@@ -1943,37 +1961,38 @@
         "macos"
       ],
       "coveredProviders": [],
-      "coverageNotes": "Local macOS evidence over #7148's width-parity oracle on main@1282f5c2d. A broader byte corpus, a shared parser-construction assertion over terminal-unicode-provider.ts/pane-terminal-options.ts, and recorded agent-session corpora remain gaps.",
+      "coverageNotes": "The canonical Go mirror uses a grapheme-aware cell model and executes #7148's renderer-compatible emoji and ZWJ positioned-overwrite oracles. A cross-engine recorded byte corpus and platform soak remain gaps.",
       "motivatingLinks": [
         "https://github.com/nebutra/pebble/pull/7148",
         "https://github.com/nebutra/pebble/pull/7133"
       ],
-      "invariant": "The main-process headless terminal mirror and the renderer xterm must parse identical byte streams into cell-identical buffers (unicode width tables, joining behavior, modes, and addon-visible semantics), so snapshots, restores, reads, and mobile streams never encode a frame the renderer would not have produced.",
-      "oracle": "Feed identical byte corpora (emoji/ZWJ/wide glyphs, positioned overwrites after wide characters, alternate-screen transitions, wrapped lines) to both parser configurations and assert cell-identical visible buffers; both parsers must be constructed from one shared configuration module so one-sided drift fails the gate.",
+      "invariant": "The Go runtime mirror and renderer xterm must agree on Unicode cell widths and joined graphemes so snapshots, restores, reads, and mobile streams never shift positioned writes.",
+      "oracle": "The executable Go slice writes emoji and ZWJ grapheme clusters followed by absolute cursor overwrites and asserts renderer-compatible visible rows. It also covers styled UTF-8 snapshots, alternate-screen isolation, resize, cursor restoration, and stale-cell clearing.",
       "commands": [
-        "pnpm exec vitest run --config config/vitest.config.ts src/main/daemon/headless-emulator-unicode-width.test.ts"
+        "node config/scripts/run-go-reliability-package.mjs runtime/go/internal/runtimecore runtime/go/internal/runtimecore/terminal_screen_test.go"
       ],
       "testFiles": [
-        "src/main/daemon/headless-emulator-unicode-width.test.ts"
+        "runtime/go/internal/runtimecore/terminal_screen_test.go"
       ],
       "assertionRefs": [
         {
-          "file": "src/main/daemon/headless-emulator-unicode-width.test.ts",
+          "file": "runtime/go/internal/runtimecore/terminal_screen_test.go",
           "assertions": [
-            "emoji advance two cells in the headless mirror so positioned writes land like the renderer (#7148)",
-            "ZWJ emoji join into one wide pair like the renderer provider (#7148)"
+            "emoji advance two cells in the Go mirror so positioned writes land like the renderer (#7148)",
+            "ZWJ emoji remain one wide grapheme pair when a later absolute write targets column three (#7148)",
+            "styled UTF-8, alternate-screen state, resize, cursor restoration, and clear-before-snapshot semantics survive serialization"
           ]
         }
       ],
       "evidenceRuns": [
         {
-          "date": "2026-07-03",
+          "date": "2026-07-20",
           "runner": "local",
           "platform": "macos",
-          "command": "pnpm exec vitest run --config config/vitest.config.ts src/main/daemon/headless-emulator-unicode-width.test.ts",
+          "command": "node config/scripts/run-go-reliability-package.mjs runtime/go/internal/runtimecore runtime/go/internal/runtimecore/terminal_screen_test.go",
           "result": "passed",
-          "durationSeconds": 0.7,
-          "summary": "1 test file(s) passed, 2 tests passed on main@1282f5c2d in a clean checkout."
+          "durationSeconds": 17.0,
+          "summary": "The full Go runtimecore package passed, including grapheme-aware mirror and snapshot serialization coverage."
         }
       ],
       "runtimeBudget": {
@@ -1986,21 +2005,20 @@
       },
       "redGreenEvidence": {
         "status": "partial",
-        "evidence": "#7148 proved this red before its fix (positioned overwrite after emoji landed shifted in the mirror). Intentional-drift proof for the shared provider is still missing."
+        "evidence": "The Go port reproduced both failures under vt10x: a plain emoji consumed one cell and a ZWJ sequence split across cells. The grapheme-aware emulator makes both renderer-compatible oracles pass."
       },
       "performanceBudget": {
         "required": true,
         "evidence": "Shared parser construction must not add renderer or emulator startup cost; the corpus stays a bounded unit fixture."
       },
       "promotionCriteria": [
-        "Register #7148's merged width test (src/main/daemon/headless-emulator-unicode-width.test.ts) plus a shared-construction assertion over src/shared/terminal-unicode-provider.ts and pane-terminal-options.ts as the first command during the stack rebase.",
-        "Extend the corpus with recorded real agent-session byte streams.",
+        "Run one recorded agent-session byte corpus through both xterm and the Go mirror and compare visible cells.",
+        "Extend the corpus across CJK, combining marks, keycaps, flags, skin tones, wrapping, and erase operations.",
         "Promote only on aggregated reliability-gates CI history."
       ],
       "knownGaps": [
-        "No manifest command yet; the seed test exists on fresh main but not at this branch's merge-base.",
-        "Width parity is protected only by #7148's single test; no broader corpus or shared-construction assertion covers the other parser-config axes.",
-        "Corpus does not yet include recorded live agent sessions.",
+        "The current command checks the Go mirror against renderer-derived behavioral oracles, not a live xterm cell-by-cell differential runner.",
+        "The corpus does not yet include recorded live agent sessions or the full Unicode edge-case matrix.",
         "Parity at identical configuration cannot catch state-synchronization divergence such as #7192's stale-width mirror; geometry fan-out and reflow ordering are owned by terminal-geometry.visible-convergence."
       ],
       "demotionRule": "Cannot promote without cell-exact parity assertions over a wide-glyph corpus and shared-construction proof."

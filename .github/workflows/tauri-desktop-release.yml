@@ -1,6 +1,17 @@
 name: Tauri Desktop Release
 
 on:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      release_tag:
+        required: true
+        type: string
+      upload_to_github_release:
+        required: true
+        type: boolean
   workflow_dispatch:
     inputs:
       ref:
@@ -16,9 +27,6 @@ on:
         required: true
         type: boolean
         default: false
-  push:
-    tags:
-      - 'v*'
 
 permissions:
   contents: write
@@ -33,26 +41,38 @@ jobs:
         include:
           - label: macos-universal
             os: macos-latest
-            args: --target universal-apple-darwin --bundles app
+            platform: macos
+            target_triple: universal-apple-darwin
+            args: --target universal-apple-darwin --bundles app,dmg
             rust_targets: aarch64-apple-darwin x86_64-apple-darwin
+            asset_pattern: pebble-macos-universal[ext]
           - label: linux-x64
             os: ubuntu-22.04
-            args: ''
+            platform: linux
+            target_triple: x86_64-unknown-linux-gnu
+            args: --bundles deb
             rust_targets: ''
+            asset_pattern: pebble-linux-x86_64[ext]
           - label: linux-arm64
             os: ubuntu-24.04-arm
-            args: ''
+            platform: linux
+            target_triple: aarch64-unknown-linux-gnu
+            args: --bundles deb
             rust_targets: ''
+            asset_pattern: pebble-linux-aarch64[ext]
           - label: windows-x64
             os: windows-2022
-            args: ''
+            platform: windows
+            target_triple: x86_64-pc-windows-msvc
+            args: --bundles nsis,msi
             rust_targets: ''
+            asset_pattern: pebble-windows-x86_64[setup][ext]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+          ref: ${{ inputs.ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -65,6 +85,21 @@ jobs:
           node-version-file: package.json
           cache: pnpm
 
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: runtime/go/go.mod
+          cache-dependency-path: runtime/go/go.sum
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      - name: Test Zig system layer
+        working-directory: native/zig-system
+        run: zig build test
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -76,11 +111,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            pebble/desktop-tauri/src-tauri -> target
+            apps/desktop/src-tauri -> target
 
       - name: Install Linux Tauri dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+        run: sudo apt-get update && sudo apt-get install -y at-spi2-core dbus-x11 gir1.2-atspi-2.0 libwebkit2gtk-4.1-dev libappindicator3-dev python3-gi librsvg2-dev patchelf xvfb
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -88,19 +123,157 @@ jobs:
       - name: Verify Tauri mainline contract
         run: pnpm verify:tauri-mainline
 
+      - name: Test Tauri renderer bridge
+        run: pnpm --filter @pebble/desktop typecheck && pnpm --filter @pebble/desktop exec vitest run
+
+      - name: Test Go runtime
+        working-directory: runtime/go
+        run: go test ./...
+
+      - name: Test native Tauri host
+        # Why: cfg-gated platform code must execute on its release runner;
+        # compilation alone cannot catch platform-only startup regressions.
+        run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --no-default-features
+
+      - name: Exercise real Tauri runtime on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum dbus-run-session -- pnpm verify:tauri-real-runtime
+
+      - name: Exercise real Tauri runtime on macOS and Windows
+        if: runner.os != 'Linux'
+        run: pnpm verify:tauri-real-runtime
+
+      - name: Exercise pixel and settings-performance parity on macOS
+        if: matrix.platform == 'macos'
+        env:
+          PEBBLE_PIXEL_PERF_EVIDENCE_DIR: artifacts/tauri-pixel-performance
+        run: pnpm verify:tauri-pixel-performance:capture
+
+      - name: Upload pixel and settings-performance evidence
+        if: ${{ always() && matrix.platform == 'macos' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: tauri-pixel-performance-${{ matrix.label }}
+          path: artifacts/tauri-pixel-performance
+          if-no-files-found: error
+
+      - name: Import Windows release certificate
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: ./config/scripts/import-tauri-windows-certificate.ps1
+
+      - name: Prepare signed updater configuration
+        env:
+          TAURI_RELEASE_PLATFORM: ${{ matrix.platform }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_RELEASE_VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
+        run: node config/scripts/prepare-tauri-release-config.mjs
+
+      - name: Verify release signing and sidecar preflight
+        env:
+          APPLE_CERTIFICATE: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS_PASSWORD || '' }}
+          APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
+        run: node config/scripts/verify-tauri-release-preflight.mjs ${{ matrix.platform }}
+
       - name: Build Tauri desktop bundle
+        id: tauri-build
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PEBBLE_BUILD_IDENTITY: ${{ contains(github.event_name == 'push' && github.ref_name || inputs.release_tag, '-rc.') && 'rc' || 'stable' }}
+          PEBBLE_POSTHOG_WRITE_KEY: ${{ secrets.PEBBLE_POSTHOG_WRITE_KEY }}
+          PEBBLE_DIAGNOSTICS_TOKEN_URL: https://www.nebutra.com/pebble/diagnostics/token
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS_PASSWORD || '' }}
+          APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
         with:
-          projectPath: pebble/desktop-tauri
+          projectPath: apps/desktop
           tauriScript: pnpm exec tauri
           args: ${{ matrix.args }}
           includeDebug: false
+          uploadUpdaterJson: true
           uploadWorkflowArtifacts: true
-          releaseAssetNamePattern: pebble-tauri-[platform]-[arch][ext]
-          tagName: ${{ github.event_name == 'push' && github.ref_name || (inputs.upload_to_github_release && inputs.release_tag || '') }}
+          releaseAssetNamePattern: ${{ matrix.asset_pattern }}
+          tagName: ${{ inputs.upload_to_github_release && inputs.release_tag || '' }}
           releaseName: Pebble ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
           releaseDraft: true
           prerelease: ${{ contains(github.event_name == 'push' && github.ref_name || inputs.release_tag, '-rc.') }}
           retryAttempts: 2
+
+      - name: Inspect signed release artifacts and sidecars
+        env:
+          APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+          PEBBLE_WINDOWS_EXPECTED_SIGNERS: ${{ vars.PEBBLE_WINDOWS_EXPECTED_SIGNERS }}
+          PEBBLE_WINDOWS_EXPECTED_THUMBPRINTS: ${{ matrix.platform == 'windows' && env.TAURI_WINDOWS_CERTIFICATE_THUMBPRINT || vars.PEBBLE_WINDOWS_EXPECTED_THUMBPRINTS }}
+        run: >-
+          node config/scripts/verify-tauri-release-artifacts.mjs
+          --platform ${{ matrix.platform }}
+          --target-triple ${{ matrix.target_triple }}
+          --output artifacts/tauri-release/${{ matrix.label }}.json
+
+      - name: Upload release inspection evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: tauri-release-inspection-${{ matrix.label }}
+          path: artifacts/tauri-release/${{ matrix.label }}.json
+          if-no-files-found: error
+
+  verify-updater-manifest:
+    name: Verify merged updater manifest
+    needs: build
+    if: github.event_name == 'push' || inputs.upload_to_github_release
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Verify published signed platform matrix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
+          TAURI_REQUIRED_UPDATER_PLATFORMS: darwin-aarch64,darwin-x86_64,windows-x86_64
+          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+        run: node config/scripts/verify-tauri-updater-manifest.mjs
+
+  verify-release-evidence:
+    name: Verify release artifact evidence matrix
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Download release inspection evidence
+        uses: actions/download-artifact@v8
+        with:
+          pattern: tauri-release-inspection-*
+          path: artifacts/tauri-release-inspection
+
+      - name: Verify complete release evidence matrix
+        run: node config/scripts/verify-tauri-release-evidence.mjs artifacts/tauri-release-inspection

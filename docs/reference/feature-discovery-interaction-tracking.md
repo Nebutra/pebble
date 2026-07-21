@@ -10,7 +10,7 @@ Do not upload this state as broad analytics. Product analytics should continue t
 
 ## Rules
 
-- Add a `FeatureInteractionId` in `src/shared/feature-interactions.ts` before using it.
+- Add a `FeatureInteractionId` in `packages/product-core/shared/feature-interactions.ts` before using it.
 - Preserve `firstInteractedAt`, and increment `interactionCount` on each later meaningful interaction.
 - Prefer explicit actions over passive visibility.
 - Passive visibility is acceptable only when opening the surface is itself the product use, such as opening Tasks.

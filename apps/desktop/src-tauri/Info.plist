@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSCameraUsageDescription</key>
+  <string>Pebble allows a website you approve to use the camera in its browser tab.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Pebble allows a website you approve to use the microphone in its browser tab.</string>
+</dict>
+</plist>

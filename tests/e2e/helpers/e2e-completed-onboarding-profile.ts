@@ -1,6 +1,6 @@
-import { ONBOARDING_FINAL_STEP, ONBOARDING_FLOW_VERSION } from '../../../src/shared/constants'
-import { FEATURE_INTERACTION_IDS } from '../../../src/shared/feature-interactions'
-import { FEATURE_TIP_IDS } from '../../../src/shared/feature-tips'
+import { ONBOARDING_FINAL_STEP, ONBOARDING_FLOW_VERSION } from '../../../packages/product-core/shared/constants'
+import { FEATURE_INTERACTION_IDS } from '../../../packages/product-core/shared/feature-interactions'
+import { FEATURE_TIP_IDS } from '../../../packages/product-core/shared/feature-tips'
 
 const SEEN_FIRST_RUN_CONTEXTUAL_TOUR_IDS = [
   'workspace-board',

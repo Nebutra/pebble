@@ -210,7 +210,7 @@ Funciona con **cualquier agente CLI** — si corre en una terminal, corre en Peb
 ### Escritorio — macOS, Windows, Linux
 
 - **[Descarga desde nebutra.com/pebble](https://www.nebutra.com/pebble/download)**
-- O descarga un build directamente: [macOS Apple Silicon](https://github.com/nebutra/pebble/releases/latest/download/pebble-macos-arm64.dmg) · [macOS Intel](https://github.com/nebutra/pebble/releases/latest/download/pebble-macos-x64.dmg) · [Windows (.exe)](https://github.com/nebutra/pebble/releases/latest/download/pebble-windows-setup.exe) · [Linux AppImage](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux.AppImage) · [Todos los builds](https://github.com/nebutra/pebble/releases/latest)
+- O descarga un build directamente: [macOS Universal](https://github.com/nebutra/pebble/releases/latest/download/pebble-macos-universal.dmg) · [Windows (.exe)](https://github.com/nebutra/pebble/releases/latest/download/pebble-windows-x86_64-setup.exe) · [Linux x64 AppImage](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux-x86_64.AppImage) · [Linux arm64 AppImage](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux-aarch64.AppImage) · [Todos los builds](https://github.com/nebutra/pebble/releases/latest)
 
 _O mediante un gestor de paquetes:_
 

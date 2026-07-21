@@ -3,7 +3,7 @@ import type {
   ComputerActionResult,
   ComputerListWindowsResult,
   ComputerSnapshotResult
-} from '../../src/shared/runtime-types'
+} from '../../packages/product-core/shared/runtime-types'
 import {
   closeSafariDraftFixture,
   ensurePebbleRuntimeLaunched,

@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Page } from '@nebutra/playwright-test'
-import { WINDOWS_GIT_BASH_SHELL } from '../../src/shared/windows-terminal-shell'
+import { WINDOWS_GIT_BASH_SHELL } from '../../packages/product-core/shared/windows-terminal-shell'
 import { test, expect } from './helpers/pebble-app'
 import {
   focusActiveTerminalInput,

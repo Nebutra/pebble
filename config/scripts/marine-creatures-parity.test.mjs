@@ -8,8 +8,8 @@ function readCreatureNames(path) {
 
 describe('marine creature corpus mirrors', () => {
   it('keeps the mobile mirror in parity with the shared corpus', () => {
-    const sharedNames = readCreatureNames('src/shared/marine-creatures.ts')
-    const mobileNames = readCreatureNames('mobile/src/constants/marine-creatures.ts')
+    const sharedNames = readCreatureNames('packages/product-core/shared/marine-creatures.ts')
+    const mobileNames = readCreatureNames('apps/mobile/src/constants/marine-creatures.ts')
 
     expect(mobileNames).toEqual(sharedNames)
   })

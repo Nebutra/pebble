@@ -13,8 +13,8 @@ import {
 } from './helpers/terminal'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/pebble-restart'
-import { PROTOCOL_VERSION } from '../../src/main/daemon/types'
-import { PTY_SESSION_ID_SEPARATOR } from '../../src/shared/pty-session-id-format'
+import { LEGACY_DAEMON_PROTOCOL_VERSION } from './helpers/legacy-daemon-protocol'
+import { PTY_SESSION_ID_SEPARATOR } from '../../packages/product-core/shared/pty-session-id-format'
 
 // Why: must land after the relaunched app's 3s daemon health check has timed
 // out (so the unhealthy guard runs) but before the guard's 5s client hello
@@ -23,7 +23,7 @@ const RESUME_DAEMON_AFTER_MS = 6_500
 
 function readDaemonPid(userDataDir: string): number {
   const raw = readFileSync(
-    path.join(userDataDir, 'daemon', `daemon-v${PROTOCOL_VERSION}.pid`),
+    path.join(userDataDir, 'daemon', `daemon-v${LEGACY_DAEMON_PROTOCOL_VERSION}.pid`),
     'utf8'
   )
   const parsed = JSON.parse(raw) as { pid?: unknown }

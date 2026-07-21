@@ -217,10 +217,10 @@ Never include:
 
 ## Implementation Plan
 
-1. Extend `contextual_tour_outcome` schema in `src/shared/telemetry-events.ts` with optional `furthest_step_index` and `defined_step_count`.
+1. Extend `contextual_tour_outcome` schema in `packages/product-core/shared/telemetry-events.ts` with optional `furthest_step_index` and `defined_step_count`.
 2. Track the highest reached defined tour step in `ContextualTourOverlay.tsx` alongside the existing `steps_seen` set.
-3. Add setup-guide event schemas and bounded enums in `src/shared/telemetry-events.ts`.
-4. Add a setup-guide telemetry helper in `src/renderer/src/lib/feature-education-telemetry.ts` or a dedicated setup-guide telemetry module.
+3. Add setup-guide event schemas and bounded enums in `packages/product-core/shared/telemetry-events.ts`.
+4. Add a setup-guide telemetry helper in `packages/product-core/renderer/src/lib/feature-education-telemetry.ts` or a dedicated setup-guide telemetry module.
 5. Emit `setup_guide_opened` and `setup_guide_closed` from `SetupGuideModal.tsx`.
 6. Emit `setup_guide_step_completed` from a small hook that observes visible setup-guide progress transitions, persists emitted step ids locally, and ignores hidden/background completions except as local baseline state.
 7. Add `terminal_pane_split` only if no existing telemetry captures successful terminal splits.

@@ -13,11 +13,11 @@ import {
 } from './helpers/terminal'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { attachRepoAndOpenTerminal, createRestartSession } from './helpers/pebble-restart'
-import { PROTOCOL_VERSION } from '../../src/main/daemon/types'
-import { PTY_SESSION_ID_SEPARATOR } from '../../src/shared/pty-session-id-format'
+import { LEGACY_DAEMON_PROTOCOL_VERSION } from './helpers/legacy-daemon-protocol'
+import { PTY_SESSION_ID_SEPARATOR } from '../../packages/product-core/shared/pty-session-id-format'
 
 function daemonPidPath(userDataDir: string): string {
-  return path.join(userDataDir, 'daemon', `daemon-v${PROTOCOL_VERSION}.pid`)
+  return path.join(userDataDir, 'daemon', `daemon-v${LEGACY_DAEMON_PROTOCOL_VERSION}.pid`)
 }
 
 function readDaemonPid(userDataDir: string): number {

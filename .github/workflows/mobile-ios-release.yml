@@ -130,5 +130,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: pebble-mobile-ipa
-          path: mobile/build/*.ipa
+          path: apps/mobile/build/*.ipa
           if-no-files-found: ignore

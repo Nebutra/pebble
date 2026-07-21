@@ -47,7 +47,7 @@ async function collectSourceFiles(root, dir) {
 }
 
 async function collectUnstyledScrollbarReports(root) {
-  const sourceRoot = path.join(root, 'src', 'renderer', 'src')
+  const sourceRoot = path.join(root, 'packages', 'product-core', 'renderer', 'src')
   const files = await collectSourceFiles(root, sourceRoot)
   const reports = []
 

@@ -16,8 +16,8 @@ cask "pebble" do
     strategy :github_latest
   end
 
-  # Why: electron-updater (src/main/updater.ts) handles in-place updates by
-  # writing a new Pebble.app into /Applications. Marking the cask auto_updates
+  # Why: Pebble's signed Tauri updater handles in-place application updates.
+  # Marking the cask auto_updates
   # tells Homebrew not to compete with the in-app updater — `brew upgrade`
   # becomes a no-op unless the user passes --greedy, and brew's version
   # metadata stays aligned with whatever the app has swapped itself to.
@@ -35,7 +35,7 @@ cask "pebble" do
   binary "#{appdir}/Pebble.app/Contents/Resources/bin/pebble"
 
   # Why: Pebble writes user data under ~/.pebble (worktrees, agent state) and
-  # Electron's standard userData directories. Zap removes everything the app
+  # Pebble's standard application-data directories. Zap removes everything the app
   # creates during normal use so `brew uninstall --zap` is a clean slate.
   zap trash: [
     "~/.pebble",

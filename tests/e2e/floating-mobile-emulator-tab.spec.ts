@@ -1,7 +1,7 @@
 import type { Page, TestInfo } from '@nebutra/playwright-test'
 import { test, expect } from './helpers/pebble-app'
 
-// Why: mirrors FLOATING_TERMINAL_WORKTREE_ID in src/shared/constants.ts.
+// Why: mirrors FLOATING_TERMINAL_WORKTREE_ID in packages/product-core/shared/constants.ts.
 // E2E specs avoid importing renderer/shared modules into the Playwright runner.
 const FLOATING_WORKTREE_ID = 'global-floating-terminal'
 const PANEL_SELECTOR = '[data-floating-terminal-panel]'

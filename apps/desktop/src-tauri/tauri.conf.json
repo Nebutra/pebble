@@ -1,0 +1,67 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Pebble",
+  "version": "1.4.124-rc.8",
+  "identifier": "nebutra.pebble",
+  "build": {
+    "beforeDevCommand": "node scripts/prepare-go-sidecars.mjs && npm run dev",
+    "beforeBuildCommand": "node scripts/prepare-go-sidecars.mjs && npm run build",
+    "beforeBundleCommand": "node scripts/stage-macos-speech-libraries.mjs",
+    "devUrl": "http://127.0.0.1:5174",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Pebble",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 600,
+        "minHeight": 400,
+        "resizable": true,
+        "maximized": false,
+        "visible": false,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "externalBin": ["binaries/pebble-runtime", "binaries/pebble-relay-worker"],
+    "resources": {
+      "binaries/relay-workers": "binaries/relay-workers",
+      "../../../native/computer-use-linux/runtime.py": "computer-use-linux/runtime.py",
+      "../../../native/computer-use-windows/runtime.ps1": "computer-use-windows/runtime.ps1",
+      "../../../node_modules/serve-sim/bin/serve-sim-bin": "serve-sim/serve-sim-bin"
+    },
+    "macOS": {
+      "hardenedRuntime": true,
+      "frameworks": [
+        "staged-macos-libraries/libonnxruntime.1.17.1.dylib",
+        "staged-macos-libraries/libsherpa-onnx-c-api.dylib"
+      ]
+    },
+    "icon": [
+      "../../../resources/build/icon.png",
+      "../../../resources/build/icon.icns",
+      "../../../resources/build/icon.ico"
+    ]
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["pebble"]
+      }
+    },
+    "updater": {
+      "endpoints": ["https://github.com/nebutra/pebble/releases/latest/download/latest.json"],
+      "pubkey": "UlNJRzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
+    }
+  }
+}

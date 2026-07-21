@@ -11,8 +11,8 @@
 import { test, expect } from './helpers/pebble-app'
 import { waitForSessionReady } from './helpers/store'
 import type { Page } from '@nebutra/playwright-test'
-import type { GlobalSettings, TuiAgent } from '../../src/shared/types'
-import { ONBOARDING_FINAL_STEP } from '../../src/shared/constants'
+import type { GlobalSettings, TuiAgent } from '../../packages/product-core/shared/types'
+import { ONBOARDING_FINAL_STEP } from '../../packages/product-core/shared/constants'
 
 type OnboardingState = {
   closedAt: number | null

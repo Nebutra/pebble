@@ -1,5 +1,0 @@
-@import '../../../src/renderer/src/assets/main.css';
-
-/* Why: Pebble's Vite root is outside src/renderer, so Tailwind v4's automatic
-   source detection cannot see Pebble's component tree unless we add it here. */
-@source '../../../src/renderer/src';

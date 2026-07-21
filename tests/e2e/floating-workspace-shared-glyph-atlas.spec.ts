@@ -3,13 +3,13 @@ import { test, expect } from './helpers/pebble-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { sendToTerminal, waitForActivePanePtyId } from './helpers/terminal'
 
-// Why: mirrors FLOATING_TERMINAL_WORKTREE_ID in src/shared/constants.ts.
+// Why: mirrors FLOATING_TERMINAL_WORKTREE_ID in packages/product-core/shared/constants.ts.
 // e2e specs avoid importing renderer/shared modules into the Playwright runner.
 const FLOATING_WORKTREE_ID = 'global-floating-terminal'
 const PANEL_SELECTOR = '[data-floating-terminal-panel]'
 
 // Why: the floating panel toggles via this window event
-// (src/renderer/src/lib/floating-terminal.ts); dispatching it exercises the
+// (packages/product-core/renderer/src/lib/floating-terminal.ts); dispatching it exercises the
 // same code path as the status bar button and the keyboard shortcut.
 const TOGGLE_EVENT = 'pebble-toggle-floating-terminal'
 

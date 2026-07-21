@@ -3,31 +3,16 @@
 import { pathToFileURL } from 'node:url'
 
 const API_VERSION = '2022-11-28'
+const STABLE_DIRECT_DOWNLOAD_ASSETS = [
+  'pebble-linux-aarch64.deb',
+  'pebble-linux-x86_64.deb',
+  'pebble-macos-universal.dmg',
+  'pebble-windows-x86_64-setup.exe',
+  'pebble-windows-x86_64.msi'
+]
 
-export function getRequiredReleaseAssetNames(tag) {
-  const version = tag.replace(/^v/i, '')
-  return [
-    'latest-linux.yml',
-    'latest-linux-arm64.yml',
-    'latest-mac.yml',
-    'latest.yml',
-    'pebble-linux.AppImage',
-    'pebble-linux-arm64.AppImage',
-    `pebble-ide_${version}_amd64.deb`,
-    `pebble-ide_${version}_arm64.deb`,
-    `pebble-ide-${version}.x86_64.rpm`,
-    `pebble-ide-${version}.aarch64.rpm`,
-    'pebble-windows-setup.exe',
-    'pebble-windows-setup.exe.blockmap',
-    `Pebble-${version}-mac.zip`,
-    `Pebble-${version}-mac.zip.blockmap`,
-    `Pebble-${version}-arm64-mac.zip`,
-    `Pebble-${version}-arm64-mac.zip.blockmap`,
-    'pebble-macos-x64.dmg',
-    'pebble-macos-x64.dmg.blockmap',
-    'pebble-macos-arm64.dmg',
-    'pebble-macos-arm64.dmg.blockmap'
-  ]
+export function getRequiredReleaseAssetNames() {
+  return ['latest.json', ...STABLE_DIRECT_DOWNLOAD_ASSETS]
 }
 
 export function extractManifestAssetNames(manifestText) {
@@ -45,6 +30,18 @@ export function extractManifestAssetNames(manifestText) {
     }
   }
   return [...names]
+}
+
+export function extractTauriManifestAssetNames(manifestText) {
+  const manifest = JSON.parse(manifestText)
+  const platforms = manifest?.platforms
+  if (!platforms || typeof platforms !== 'object' || Array.isArray(platforms)) {
+    throw new Error('Tauri latest.json is missing its platforms object')
+  }
+  return Object.values(platforms).flatMap((entry) => {
+    if (!entry || typeof entry !== 'object' || typeof entry.url !== 'string') return []
+    return extractManifestAssetNames(`url: ${entry.url}`)
+  })
 }
 
 async function githubFetch(url, token, accept = 'application/vnd.github+json') {
@@ -90,20 +87,11 @@ export async function verifyRequiredReleaseAssets({ repo, tag, token }) {
   const assetsByName = new Map(release.assets.map((asset) => [asset.name, asset]))
 
   const requiredNames = new Set(getRequiredReleaseAssetNames(tag))
-  const manifestNames = [
-    'latest-linux.yml',
-    'latest-linux-arm64.yml',
-    'latest-mac.yml',
-    'latest.yml'
-  ]
 
-  for (const manifestName of manifestNames) {
-    const manifestAsset = assetsByName.get(manifestName)
-    if (!manifestAsset) {
-      continue
-    }
-    const manifestText = await fetchAssetText(repo, manifestAsset, token)
-    for (const referencedName of extractManifestAssetNames(manifestText)) {
+  const tauriManifestAsset = assetsByName.get('latest.json')
+  if (tauriManifestAsset) {
+    const manifestText = await fetchAssetText(repo, tauriManifestAsset, token)
+    for (const referencedName of extractTauriManifestAssetNames(manifestText)) {
       requiredNames.add(referencedName)
     }
   }

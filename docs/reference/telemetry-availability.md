@@ -2,7 +2,7 @@
 
 Append-only reference for dashboard authors. Use this file to answer: "From what date is this event or property trustworthy enough to chart?"
 
-This file records operational availability. Event contracts still live in `src/shared/telemetry-events.ts`, and dashboard/query examples live with the dashboard work that introduced them.
+This file records operational availability. Event contracts still live in `packages/product-core/shared/telemetry-events.ts`, and dashboard/query examples live with the dashboard work that introduced them.
 
 ## How To Use
 
@@ -88,7 +88,7 @@ Dashboard caveats:
 
 ### 2026-05-09 - Onboarding Cohort Injection
 
-Scope: `cohort` on onboarding events. Current schemas declare it on `onboarding_started`, `onboarding_step_viewed`, `onboarding_step_completed`, `onboarding_step_skipped`, `onboarding_tour_outcome`, `onboarding_step4_path_clicked`, `onboarding_step4_path_failed`, `onboarding_task_sources_snapshot`, `onboarding_windows_terminal_snapshot`, `onboarding_completed`, `onboarding_dismissed`, `onboarding_agent_picked`, onboarding import/setup events, `onboarding_feature_setup_toggled`, `onboarding_feature_setup_run`, `onboarding_feature_setup_terminal_opened`, and `onboarding_feature_setup_terminal_interacted`. See `src/shared/telemetry-events.ts` for the exact current roster.
+Scope: `cohort` on onboarding events. Current schemas declare it on `onboarding_started`, `onboarding_step_viewed`, `onboarding_step_completed`, `onboarding_step_skipped`, `onboarding_tour_outcome`, `onboarding_step4_path_clicked`, `onboarding_step4_path_failed`, `onboarding_task_sources_snapshot`, `onboarding_windows_terminal_snapshot`, `onboarding_completed`, `onboarding_dismissed`, `onboarding_agent_picked`, onboarding import/setup events, `onboarding_feature_setup_toggled`, `onboarding_feature_setup_run`, `onboarding_feature_setup_terminal_opened`, and `onboarding_feature_setup_terminal_interacted`. See `packages/product-core/shared/telemetry-events.ts` for the exact current roster.
 
 The original `#1608` rollout covered `onboarding_started`, `onboarding_step_viewed`, `onboarding_step_completed`, `onboarding_step_skipped`, `onboarding_step4_path_clicked`, `onboarding_step4_path_failed`, `onboarding_completed`, `onboarding_dismissed`, `onboarding_agent_picked`, and onboarding import events. Later onboarding events joined the roster by declaring `cohort` in their schemas.
 

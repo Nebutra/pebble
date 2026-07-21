@@ -96,5 +96,10 @@
       }
     }
   ],
-  "ignorePatterns": ["**/node_modules", "**/dist", "**/out"]
+  "ignorePatterns": [
+    "**/node_modules",
+    "**/dist",
+    "**/out",
+    "apps/desktop/src/react-devtools-install-hook.js"
+  ]
 }

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import type { ComputerActionResult, ComputerSnapshotResult } from '../../src/shared/runtime-types'
+import type { ComputerActionResult, ComputerSnapshotResult } from '../../packages/product-core/shared/runtime-types'
 import {
   ensurePebbleRuntimeLaunched,
   ensureGeditLaunched,

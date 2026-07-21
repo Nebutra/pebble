@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  extractManifestAssetNames,
+  extractTauriManifestAssetNames,
   getRequiredReleaseAssetNames,
   verifyRequiredReleaseAssets
 } from './verify-release-required-assets.mjs'
@@ -33,103 +33,93 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('getRequiredReleaseAssetNames', () => {
-  it('includes both mac updater ZIP names for the tag version', () => {
-    expect(getRequiredReleaseAssetNames('v1.4.27')).toEqual(
-      expect.arrayContaining([
-        'Pebble-1.4.27-mac.zip',
-        'Pebble-1.4.27-mac.zip.blockmap',
-        'Pebble-1.4.27-arm64-mac.zip',
-        'Pebble-1.4.27-arm64-mac.zip.blockmap'
-      ])
-    )
+describe('Tauri release asset gate', () => {
+  it('requires every stable direct-download installer in addition to the updater manifest', () => {
+    expect(getRequiredReleaseAssetNames('v1.4.27')).toEqual([
+      'latest.json',
+      'pebble-linux-aarch64.deb',
+      'pebble-linux-x86_64.deb',
+      'pebble-macos-universal.dmg',
+      'pebble-windows-x86_64-setup.exe',
+      'pebble-windows-x86_64.msi'
+    ])
   })
 
-  it('includes x64 and arm64 Linux assets', () => {
-    expect(getRequiredReleaseAssetNames('v1.4.27')).toEqual(
-      expect.arrayContaining([
-        'latest-linux-arm64.yml',
-        'pebble-linux.AppImage',
-        'pebble-linux-arm64.AppImage',
-        'pebble-ide_1.4.27_amd64.deb',
-        'pebble-ide_1.4.27_arm64.deb',
-        'pebble-ide-1.4.27.x86_64.rpm',
-        'pebble-ide-1.4.27.aarch64.rpm'
-      ])
-    )
-  })
-})
-
-describe('extractManifestAssetNames', () => {
-  it('extracts relative and absolute manifest asset names', () => {
+  it('extracts every platform updater payload from latest.json', () => {
     expect(
-      extractManifestAssetNames(
-        [
-          'files:',
-          '  - url: Pebble-1.4.27-arm64-mac.zip',
-          '  - url: https://example.com/downloads/pebble-windows-setup.exe',
-          'path: pebble-linux.AppImage'
-        ].join('\n')
+      extractTauriManifestAssetNames(
+        JSON.stringify({
+          platforms: {
+            'darwin-aarch64': { url: 'https://example.com/pebble-macos.tar.gz' },
+            'windows-x86_64': { url: 'pebble-windows.nsis.zip' }
+          }
+        })
       )
-    ).toEqual(['Pebble-1.4.27-arm64-mac.zip', 'pebble-windows-setup.exe', 'pebble-linux.AppImage'])
+    ).toEqual(['pebble-macos.tar.gz', 'pebble-windows.nsis.zip'])
   })
-})
 
-describe('verifyRequiredReleaseAssets', () => {
-  it('fails when a manifest-referenced asset has not been uploaded', async () => {
+  it('rejects a manifest-referenced updater payload that was not uploaded', async () => {
     const tag = 'v1.4.27'
-    const required = getRequiredReleaseAssetNames(tag)
-    const assets = required.filter((name) => name !== 'Pebble-1.4.27-arm64-mac.zip')
-    const release = releaseWithAssets(tag, assets)
-    const latestMacAsset = release.assets.find((asset) => asset.name === 'latest-mac.yml')
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse([release]))
-      .mockResolvedValueOnce(
-        jsonResponse(
-          [
-            'version: 1.4.27',
-            'files:',
-            '  - url: Pebble-1.4.27-arm64-mac.zip',
-            '    sha512: test',
-            'path: Pebble-1.4.27-arm64-mac.zip'
-          ].join('\n')
+    const release = releaseWithAssets(tag, [
+      ...getRequiredReleaseAssetNames(tag),
+      'pebble-macos.tar.gz'
+    ])
+    const latestJson = release.assets.find(({ name }) => name === 'latest.json')
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse([release]))
+        .mockImplementation((url) =>
+          url.endsWith(`/assets/${latestJson.id}`)
+            ? jsonResponse({
+                platforms: {
+                  'darwin-aarch64': { url: 'pebble-macos.tar.gz' },
+                  'windows-x86_64': { url: 'pebble-windows.nsis.zip' }
+                }
+              })
+            : jsonResponse({})
         )
-      )
-      .mockResolvedValue(jsonResponse('version: 1.4.27\n'))
-    vi.stubGlobal('fetch', fetchMock)
+    )
 
     await expect(
       verifyRequiredReleaseAssets({ repo: 'nebutra/pebble', tag, token: 'token' })
-    ).rejects.toThrow('Missing: Pebble-1.4.27-arm64-mac.zip')
-    expect(latestMacAsset).toBeTruthy()
+    ).rejects.toThrow('Missing: pebble-windows.nsis.zip')
   })
 
-  it('checks assets referenced by the Linux arm64 updater manifest', async () => {
+  it('accepts a complete non-empty Tauri updater payload set', async () => {
     const tag = 'v1.4.27'
-    const required = getRequiredReleaseAssetNames(tag)
-    const release = releaseWithAssets(tag, required)
-    const arm64Manifest = release.assets.find((asset) => asset.name === 'latest-linux-arm64.yml')
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse([release]))
-      .mockResolvedValueOnce(jsonResponse('version: 1.4.27\n'))
-      .mockResolvedValueOnce(
-        jsonResponse(
-          [
-            'version: 1.4.27',
-            'files:',
-            '  - url: pebble-linux-arm64.AppImage.blockmap',
-            'path: pebble-linux-arm64.AppImage'
-          ].join('\n')
+    const release = releaseWithAssets(tag, [
+      ...getRequiredReleaseAssetNames(tag),
+      'pebble-macos.tar.gz',
+      'pebble-windows.nsis.zip'
+    ])
+    const latestJson = release.assets.find(({ name }) => name === 'latest.json')
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse([release]))
+        .mockImplementation((url) =>
+          url.endsWith(`/assets/${latestJson.id}`)
+            ? jsonResponse({
+                platforms: {
+                  'darwin-aarch64': { url: 'pebble-macos.tar.gz' },
+                  'windows-x86_64': { url: 'pebble-windows.nsis.zip' }
+                }
+              })
+            : jsonResponse({})
         )
-      )
-      .mockResolvedValue(jsonResponse('version: 1.4.27\n'))
-    vi.stubGlobal('fetch', fetchMock)
+    )
 
     await expect(
       verifyRequiredReleaseAssets({ repo: 'nebutra/pebble', tag, token: 'token' })
-    ).rejects.toThrow('Missing: pebble-linux-arm64.AppImage.blockmap')
-    expect(arm64Manifest).toBeTruthy()
+    ).resolves.toMatchObject({
+      checked: [
+        ...getRequiredReleaseAssetNames(tag),
+        'pebble-macos.tar.gz',
+        'pebble-windows.nsis.zip'
+      ].sort()
+    })
   })
 })

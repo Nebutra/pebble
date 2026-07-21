@@ -1,6 +1,6 @@
 import { test, expect } from './helpers/pebble-app'
 import type { Page } from '@nebutra/playwright-test'
-import type { TerminalPaneLayoutNode } from '../../src/shared/types'
+import type { TerminalPaneLayoutNode } from '../../packages/product-core/shared/types'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { worktreeRow } from './worktree-row-locators'
 

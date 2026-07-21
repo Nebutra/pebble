@@ -10,7 +10,7 @@
 import type { CDPSession, Locator, Page } from '@nebutra/playwright-test'
 import { test, expect } from './helpers/pebble-app'
 import { getStoreState, waitForSessionReady } from './helpers/store'
-import type { Repo } from '../../src/shared/types'
+import type { Repo } from '../../packages/product-core/shared/types'
 
 async function openRepoSettings(page: Page, repoId: string): Promise<void> {
   await page.evaluate((repoId) => {

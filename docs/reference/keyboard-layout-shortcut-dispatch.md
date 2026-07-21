@@ -11,7 +11,7 @@ other non-US layouts, and it also makes user keybinding overrides impossible to 
 
 Pebble app shortcuts dispatch by logical key by default.
 
-The shared keybinding registry in `src/shared/keybindings.ts` is the source of truth for
+The shared keybinding registry in `packages/product-core/shared/keybindings.ts` is the source of truth for
 app commands, configurable commands, shortcut recording, labels, conflict detection, browser
 guest forwarding, and terminal pane commands. Code handling a user-facing app command must
 call `keybindingMatchesAction`, `keybindingMatchesInput`, or a policy function built on those

@@ -3,7 +3,7 @@ import type {
   ComputerActionResult,
   ComputerListAppsResult,
   ComputerSnapshotResult
-} from '../../src/shared/runtime-types'
+} from '../../packages/product-core/shared/runtime-types'
 import {
   activateFinder,
   ensurePebbleRuntimeLaunched,

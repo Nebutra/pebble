@@ -1083,7 +1083,7 @@
     "ko": "pr-view"
   },
   "auto.components.feature.wall.ReviewNotesAnimatedVisual.1eee3a397e": {
-    "ko": "src/server/migrate.ts (diff)"
+    "ko": "packages/product-core/server/migrate.ts (diff)"
   },
   "auto.components.feature.wall.ReviewNotesAnimatedVisual.5cb213f967": {
     "ko": "AI 메모"
@@ -4482,7 +4482,7 @@
     "ko": "끔"
   },
   "auto.components.sparse.SparseCheckoutPresetSelect.ddbcaef7be": {
-    "ko": "src/renderer packages/ui"
+    "ko": "packages/product-core/renderer packages/ui"
   },
   "auto.components.star.nag.StarNagToastHost.body": {
     "ko": "Pebble가 마음에 드신다면 GitHub 별표가 다른 개발자가 Pebble를 발견하는 데 도움이 됩니다."

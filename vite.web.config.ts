@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  root: resolve('src/renderer'),
+  root: resolve('packages/product-core/renderer'),
   // Why: pairing URLs may live under a reverse-proxy path prefix like
   // /pebble/web-index.html, so built assets must resolve relative to the page.
   base: './',
@@ -14,15 +14,15 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@renderer': resolve('src/renderer/src'),
-      '@': resolve('src/renderer/src')
+      '@renderer': resolve('packages/product-core/renderer/src'),
+      '@': resolve('packages/product-core/renderer/src')
     }
   },
   build: {
     outDir: resolve('out/web'),
     emptyOutDir: true,
     rollupOptions: {
-      input: resolve('src/renderer/web-index.html')
+      input: resolve('packages/product-core/renderer/web-index.html')
     }
   },
   worker: {

@@ -41,22 +41,22 @@ platforms that require an opaque mobile icon.
 
 | Role | Path | Consumers |
 |---|---|---|
-| Classic app icon | `resources/icon.png` | `src/main/app-icon.ts`, settings preview, tray/window icon. |
+| Classic app icon | `resources/icon.png` | `migration/electron-reference/src/main/app-icon.ts`, settings preview, tray/window icon. |
 | Watercolor variant | `resources/app-icons/pebble-watercolor.png` | Runtime selectable icon. Keep ID `watercolor` for preference compatibility. |
 | Blue/mineral variant | `resources/app-icons/pebble-blue.png` | Runtime selectable icon. Keep ID `blue` for preference compatibility. |
-| Option metadata | `src/shared/app-icon.ts` | Labels and stable app icon IDs. |
-| Main process mapping | `src/main/app-icon.ts` | Imports PNG assets and persists macOS custom Dock icons. |
-| Settings selector | `src/renderer/src/components/settings/AppIconSelector.tsx` | Imports preview URLs. |
+| Option metadata | `packages/product-core/shared/app-icon.ts` | Labels and stable app icon IDs. |
+| Main process mapping | `migration/electron-reference/src/main/app-icon.ts` | Imports PNG assets and persists macOS custom Dock icons. |
+| Settings selector | `packages/product-core/renderer/src/components/settings/AppIconSelector.tsx` | Imports preview URLs. |
 
 ### Mobile Assets
 
 | Role | Path | Target spec |
 |---|---|---|
-| Expo app icon | `mobile/assets/icon.png` | 1024 x 1024 PNG. |
-| Android adaptive foreground | `mobile/assets/adaptive-icon.png` | 1024 x 1024 PNG, safe center content. |
-| Mobile splash mark | `mobile/assets/splash-icon.png` | 400 x 255 PNG, centered mark on transparent or solid-safe background. |
-| Web/mobile favicon | `mobile/assets/favicon.png` | 48 x 48 PNG, must read at tiny size. |
-| React Native vector logo | `mobile/src/components/PebbleLogo.tsx` | Should use the same Pebble SVG geometry as desktop. |
+| Expo app icon | `apps/mobile/assets/icon.png` | 1024 x 1024 PNG. |
+| Android adaptive foreground | `apps/mobile/assets/adaptive-icon.png` | 1024 x 1024 PNG, safe center content. |
+| Mobile splash mark | `apps/mobile/assets/splash-icon.png` | 400 x 255 PNG, centered mark on transparent or solid-safe background. |
+| Web/mobile favicon | `apps/mobile/assets/favicon.png` | 48 x 48 PNG, must read at tiny size. |
+| React Native vector logo | `apps/mobile/src/components/PebbleLogo.tsx` | Should use the same Pebble SVG geometry as desktop. |
 | Expo config colors | `mobile/app.json` | Splash and adaptive backgrounds use Pebble Mist `#f4f0ea`. |
 
 ### Documentation And Onboarding Media
@@ -73,8 +73,8 @@ platforms that require an opaque mobile icon.
 
 | Consumer | Path | Asset dependency |
 |---|---|---|
-| Electron builder | `config/electron-builder.config.cjs` | Uses `resources/build/icon.icns` as mac icon and `resources/build` as build resources. |
-| Tauri desktop package | `pebble/desktop-tauri/src-tauri/tauri.conf.json` | Uses the same `resources/build/icon.*` family. |
+| Electron builder | `migration/electron-reference/config/electron-builder.config.cjs` | Uses `resources/build/icon.icns` as mac icon and `resources/build` as build resources. |
+| Tauri desktop package | `apps/desktop/src-tauri/tauri.conf.json` | Uses the same `resources/build/icon.*` family. |
 | Native macOS helper app | `native/computer-use-macos` build scripts | Copies `resources/build/icon.icns`. |
 | Homebrew casks | `Casks/pebble.rb`, `Casks/pebble@rc.rb` | Naming/release URLs, not visual assets. |
 
@@ -85,7 +85,7 @@ platforms that require an opaque mobile icon.
 1. Primary Pebble vector mark:
    - `resources/icon-source/icon.icon/Assets/logo.svg`
    - `resources/logo.svg`
-   - `mobile/src/components/PebbleLogo.tsx`
+   - `apps/mobile/src/components/PebbleLogo.tsx`
 
 2. Generated platform icons:
    - `resources/build/icon.icns`
@@ -97,13 +97,13 @@ platforms that require an opaque mobile icon.
 3. Runtime selectable variants:
    - `resources/app-icons/pebble-watercolor.png`
    - `resources/app-icons/pebble-blue.png`
-   - `src/shared/app-icon.ts` labels if the variant names change.
+   - `packages/product-core/shared/app-icon.ts` labels if the variant names change.
 
 4. Mobile assets:
-   - `mobile/assets/icon.png`
-   - `mobile/assets/adaptive-icon.png`
-   - `mobile/assets/splash-icon.png`
-   - `mobile/assets/favicon.png`
+   - `apps/mobile/assets/icon.png`
+   - `apps/mobile/assets/adaptive-icon.png`
+   - `apps/mobile/assets/splash-icon.png`
+   - `apps/mobile/assets/favicon.png`
 
 5. Public docs:
    - README brand copy and icon alt text.

@@ -5,9 +5,9 @@ name: Homebrew Cask Bump
 #   - workflow_call → release-cut.yml finished publishing a stable tag
 #   - workflow_dispatch → manual backfill for a specific tag
 #
-# The job computes the sha256 of pebble-macos-arm64.dmg + pebble-macos-x64.dmg
-# from the release, templates the channel-specific cask in this repo with the
-# new version and hashes, then PRs the result into nebutra/homebrew-pebble.
+# The job computes the universal Tauri DMG sha256, templates the channel-specific
+# cask in this repo with the new version and hash, then PRs the result into
+# nebutra/homebrew-pebble.
 # Stable tags update Casks/pebble.rb; RC tags update Casks/pebble@rc.rb.
 #
 # Why no `release.published` trigger: other products shipped from this repo
@@ -91,7 +91,7 @@ jobs:
           echo "branch=bump/${branch_token}-${VERSION}" >>"$GITHUB_OUTPUT"
           echo "title=${token} ${VERSION}" >>"$GITHUB_OUTPUT"
 
-      - name: Download DMGs and compute sha256
+      - name: Download universal DMG and compute sha256
         id: hash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -101,36 +101,19 @@ jobs:
           mkdir -p dmgs
           gh release download "$TAG" \
             --repo "${{ github.repository }}" \
-            --pattern 'pebble-macos-arm64.dmg' \
-            --pattern 'pebble-macos-x64.dmg' \
+            --pattern 'pebble-macos-universal.dmg' \
             --dir dmgs
-          arm=$(sha256sum dmgs/pebble-macos-arm64.dmg | awk '{print $1}')
-          intel=$(sha256sum dmgs/pebble-macos-x64.dmg  | awk '{print $1}')
-          echo "arm=$arm"     >>"$GITHUB_OUTPUT"
-          echo "intel=$intel" >>"$GITHUB_OUTPUT"
+          sha=$(sha256sum dmgs/pebble-macos-universal.dmg | awk '{print $1}')
+          echo "sha=$sha" >>"$GITHUB_OUTPUT"
 
       - name: Render updated cask file
         env:
           VERSION: ${{ steps.tag.outputs.version }}
-          ARM_SHA: ${{ steps.hash.outputs.arm }}
-          INTEL_SHA: ${{ steps.hash.outputs.intel }}
+          UNIVERSAL_SHA: ${{ steps.hash.outputs.sha }}
           CASK_PATH: ${{ steps.cask.outputs.path }}
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import os, re, pathlib
-          p = pathlib.Path(os.environ["CASK_PATH"])
-          src = p.read_text()
-          src = re.sub(r'version "[^"]+"',
-                       f'version "{os.environ["VERSION"]}"', src, count=1)
-          src = re.sub(r'sha256 arm:\s*"[0-9a-f]+",\s*\n\s*intel:\s*"[0-9a-f]+"',
-                       'sha256 arm:   "{arm}",\n         intel: "{intel}"'.format(
-                           arm=os.environ["ARM_SHA"],
-                           intel=os.environ["INTEL_SHA"]),
-                       src, count=1)
-          p.write_text(src)
-          print(src)
-          PY
+          node config/scripts/render-tauri-homebrew-cask.mjs "$CASK_PATH"
 
       # Why: reuse the existing buf0-bot GitHub App (also used by
       # track-community-prs.yaml) instead of minting a new PAT. The app is

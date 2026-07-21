@@ -40,7 +40,7 @@ Use this to suppress tips or tours that would teach a feature the user has alrea
 
 ## Rules
 
-- Define every trackable feature in `src/shared/feature-interactions.ts`.
+- Define every trackable feature in `packages/product-core/shared/feature-interactions.ts`.
 - The `interaction` text must clearly state what counts as "used." Avoid vague labels like "seen" or "visited" unless passive visibility is truly the intended signal.
 - Record only the first interaction. Repeated opens should not churn the user-data file.
 - Record interactions only after persisted UI state is hydrated, so startup defaults cannot overwrite real user data.

@@ -30,7 +30,7 @@ test.describe('Diff note delete', () => {
     const worktreeId = await waitForActiveWorktree(pebblePage)
 
     // Why: modify a tracked file so opening a diff shows real added/removed
-    // content rather than an empty "no changes" state. `src/index.ts` is
+    // content rather than an empty "no changes" state. `packages/product-core/index.ts` is
     // seeded by global-setup with a single line, so rewriting it produces a
     // diff the modified Monaco editor will render against.
     const { relativePath } = await pebblePage.evaluate(async (wId) => {

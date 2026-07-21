@@ -11,7 +11,7 @@ import {
   waitForSessionReady
 } from './helpers/store'
 import { getTerminalContent, waitForActiveTerminalManager } from './helpers/terminal'
-import { BACKGROUND_MOUNT_TERMINAL_WORKTREE_EVENT } from '../../src/renderer/src/constants/terminal'
+import { BACKGROUND_MOUNT_TERMINAL_WORKTREE_EVENT } from '../../packages/product-core/renderer/src/constants/terminal'
 
 type HiddenOutputDebugSnapshot = {
   hiddenRendererSkipCount: number

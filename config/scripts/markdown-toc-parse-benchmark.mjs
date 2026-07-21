@@ -36,7 +36,7 @@ for (const [name, value] of [
 }
 
 // Mirror of buildMarkdownTableOfContents()'s parse + heading walk
-// (src/renderer/src/components/editor/markdown-table-of-contents.ts). Kept inline
+// (packages/product-core/renderer/src/components/editor/markdown-table-of-contents.ts). Kept inline
 // so the benchmark exercises the real remark pipeline without bundling the TS.
 function buildMarkdownTableOfContentsLike(markdown) {
   const tree = unified()

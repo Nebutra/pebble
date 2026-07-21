@@ -1,6 +1,6 @@
 import type { Page } from '@nebutra/playwright-test'
 import { expect } from './pebble-app'
-import type { CommitMessageAiSettings } from '../../../src/shared/types'
+import type { CommitMessageAiSettings } from '../../../packages/product-core/shared/types'
 
 // Why: these specs create worktrees via raw `git worktree add`, which bypasses
 // Pebble's own add/remove path — the one thing that invalidates the main-process

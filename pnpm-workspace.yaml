@@ -1,3 +1,4 @@
 packages:
   - .
-  - pebble/desktop-tauri
+  - apps/desktop
+  - packages/product-core

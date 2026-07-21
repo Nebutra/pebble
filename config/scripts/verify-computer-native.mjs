@@ -266,7 +266,26 @@ function verifyNativeArgumentGuardrails() {
     failures.push('Linux restore must accept the selected window target')
   }
   if (!linux.includes('Atspi.Component.grab_focus(component)')) {
-    failures.push('Linux restore must try AT-SPI focus on the selected window before PID fallback')
+    failures.push('Linux restore must try AT-SPI focus on the selected window')
+  }
+  for (const hostTool of ['xdotool', 'wl-copy', 'wl-paste', 'xclip', 'xsel']) {
+    if (linux.includes(hostTool)) {
+      failures.push(`Linux provider must not depend on host desktop tool ${hostTool}`)
+    }
+  }
+  if (
+    !linux.includes('Atspi.KeySynthType.PRESS)') ||
+    !linux.includes('Atspi.KeySynthType.RELEASE)') ||
+    !linux.includes('for keyval in reversed(pressed)')
+  ) {
+    failures.push('Linux hotkeys must synthesize and release modifiers through AT-SPI')
+  }
+  if (
+    !linux.includes('Gtk.Clipboard.get_for_display') ||
+    !linux.includes('clipboard.wait_for_text()') ||
+    !linux.includes('clipboard.store()')
+  ) {
+    failures.push('Linux paste must use the desktop GTK clipboard without host utilities')
   }
   if (/restore_window\(app\)(?!:)/.test(linux)) {
     failures.push('Linux restore call sites must pass the selected window target')

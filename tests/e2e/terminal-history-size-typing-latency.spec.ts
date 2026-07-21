@@ -53,7 +53,7 @@ const interrupt = String.fromCharCode(3)
 function agentLine(i) {
   const color = 30 + (i % 8)
   if (i % 3 === 0) {
-    return '\\x1b[1;' + color + 'm\\u25cf Tool call ' + i + '\\x1b[0m (src/example/file-' + (i % 97) + '.ts)\\r\\n'
+    return '\\x1b[1;' + color + 'm\\u25cf Tool call ' + i + '\\x1b[0m (packages/product-core/example/file-' + (i % 97) + '.ts)\\r\\n'
   }
   if (i % 3 === 1) {
     return '\\x1b[' + color + 'm\\u2502\\x1b[0m  ' + 'response token '.repeat(1 + (i % 5)) + '#' + i + '\\r\\n'

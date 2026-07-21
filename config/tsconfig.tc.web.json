@@ -1,22 +1,18 @@
 {
   "extends": "./tsconfig.web.json",
   "include": [
-    "../src/renderer/src/env.d.ts",
-    "../src/renderer/src/**/*",
-    "../src/renderer/src/**/*.tsx",
-    "../src/preload/api-types.ts",
-    "../src/shared/**/*",
-    "../src/main/ipc/worktree-branch-name.ts",
-    "../src/main/ipc/worktree-logic.ts",
-    "../src/main/ipc/worktree-linked-work-item-metadata.ts",
-    "../src/main/ipc/worktree-metadata-merge.ts",
-    "../src/main/wsl.ts"
+    "../packages/product-core/renderer/src/env.d.ts",
+    "../packages/product-core/renderer/src/**/*",
+    "../packages/product-core/renderer/src/**/*.tsx",
+    "../packages/product-core/shared/preload-api-types.ts",
+    "../packages/product-core/shared/**/*",
+    "../packages/product-core/shared/windows-subsystem-linux.ts"
   ],
   "compilerOptions": {
     "baseUrl": null,
     "paths": {
-      "@renderer/*": ["../src/renderer/src/*"],
-      "@/*": ["../src/renderer/src/*"]
+      "@renderer/*": ["../packages/product-core/renderer/src/*"],
+      "@/*": ["../packages/product-core/renderer/src/*"]
     }
   }
 }

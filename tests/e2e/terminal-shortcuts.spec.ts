@@ -17,7 +17,7 @@
 
 import { test, expect } from './helpers/pebble-app'
 import type { ElectronApplication, Page } from '@nebutra/playwright-test'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../../src/shared/constants'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../packages/product-core/shared/constants'
 import {
   execInTerminal,
   countVisibleTerminalPanes,

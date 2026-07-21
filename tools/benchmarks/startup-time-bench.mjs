@@ -23,7 +23,7 @@
  * kill while holding the inherited stdio pipe — the exact mechanism that
  * turns a 2.5s execSync timeout into a minutes-long main-thread stall.
  *
- * Prereq (when not using --exe): `pnpm build:electron-vite` so out/ exists.
+ * Prereq (when not using --exe): `pnpm parity:electron:build` so out/ exists.
  * Results: tools/benchmarks/results/startup-<label>-<timestamp>.json
  */
 import { spawn, spawnSync } from 'node:child_process'
@@ -594,7 +594,7 @@ async function main() {
   })
 
   if (!args.exe && !existsSync(join(repoRoot, 'out', 'main', 'index.js'))) {
-    throw new Error('out/main/index.js missing — run `pnpm build:electron-vite` first')
+    throw new Error('out/main/index.js missing — run `pnpm parity:electron:build` first')
   }
 
   const iterations = []

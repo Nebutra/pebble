@@ -3585,32 +3585,16 @@ private func peerProcessId(_ fd: Int32) -> pid_t? {
 }
 
 private func isAuthorizedAgentPeer(_ pid: pid_t) -> Bool {
-    guard let command = processCommand(pid),
-          command.contains("/out/main/computer-sidecar.js")
-              || command.contains("/Contents/Resources/app.asar.unpacked/out/main/computer-sidecar.js")
-    else {
-        return false
-    }
-    if isTrustedPebbleApplication(pid) {
-        return true
-    }
-    guard let parentPid = parentProcessId(pid) else { return false }
-    return isTrustedPebbleApplication(parentPid)
+    let parentBundleIdentifier = parentProcessId(pid).flatMap(processBundleIdentifier)
+    return isAuthorizedPebbleAgentPeer(
+        peerBundleIdentifier: processBundleIdentifier(pid),
+        parentBundleIdentifier: parentBundleIdentifier,
+        command: processCommand(pid)
+    )
 }
 
-private func isTrustedPebbleApplication(_ pid: pid_t) -> Bool {
-    guard let app = NSRunningApplication(processIdentifier: pid),
-          let bundleId = app.bundleIdentifier
-    else {
-        return false
-    }
-    // Why: dev validation runs from per-worktree wrapper apps with stable
-    // Pebble-owned bundle ids; the sidecar peer check must still authorize them.
-    return bundleId == "nebutra.pebble" ||
-        bundleId.hasPrefix("nebutra.pebble.dev.") ||
-        bundleId == "com.nebutra.pebble" ||
-        bundleId.hasPrefix("com.nebutra.pebble.dev.") ||
-        bundleId == "com.github.Electron"
+private func processBundleIdentifier(_ pid: pid_t) -> String? {
+    NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
 }
 
 private func parentProcessId(_ pid: pid_t) -> pid_t? {

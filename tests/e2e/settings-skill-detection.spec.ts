@@ -5,8 +5,8 @@ import type {
   DiscoveredSkill,
   SkillDiscoveryResult,
   SkillSourceKind
-} from '../../src/shared/skills'
-import { ORCHESTRATION_ENABLED_STORAGE_KEY } from '../../src/renderer/src/lib/orchestration-setup-state'
+} from '../../packages/product-core/shared/skills'
+import { ORCHESTRATION_ENABLED_STORAGE_KEY } from '../../packages/product-core/renderer/src/lib/orchestration-setup-state'
 
 type MockSkillDiscoveryGlobal = typeof globalThis & {
   __pebbleSettingsSkillDiscoveryResult?: SkillDiscoveryResult

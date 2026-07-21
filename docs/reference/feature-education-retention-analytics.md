@@ -33,7 +33,7 @@ Emitted once when a contextual tour first renders a measured target.
 Payload:
 
 - `tour_id`: `workspace-board`, `workspace-agent-sessions`, `browser`, `tasks`, `automations`, or `workspace-creation`
-- `source`: bounded source enum from `src/shared/feature-education-telemetry.ts`
+- `source`: bounded source enum from `packages/product-core/shared/feature-education-telemetry.ts`
 - `was_feature_previously_interacted`: boolean from local education state at the moment the tour is shown
 
 ### `contextual_tour_outcome`

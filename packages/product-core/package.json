@@ -1,0 +1,6 @@
+{
+  "name": "@pebble/product-core",
+  "version": "1.4.124-rc.8",
+  "private": true,
+  "description": "Canonical Pebble renderer, contracts, CLI, relay, and managed agent hooks"
+}

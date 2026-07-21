@@ -9,8 +9,8 @@ on:
       - 'tests/e2e/fixtures/terminal-emoji-table.md'
       - 'tests/e2e/helpers/**'
       - 'tests/e2e/terminal-raw-emoji-table-scroll-restore.spec.ts'
-      - 'src/renderer/src/components/sidebar/SidebarHeader.tsx'
-      - 'src/renderer/src/lib/pane-manager/**'
+      - 'packages/product-core/renderer/src/components/sidebar/SidebarHeader.tsx'
+      - 'packages/product-core/renderer/src/lib/pane-manager/**'
   workflow_dispatch:
     inputs:
       ref:
@@ -72,7 +72,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Electron app for E2E
-        run: npx electron-vite build --mode e2e
+        run: npx electron-vite build --config migration/electron-reference/electron.vite.config.ts --mode e2e
 
       - name: Run golden E2E tests on Linux
         if: runner.os == 'Linux'

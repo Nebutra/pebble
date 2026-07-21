@@ -7,7 +7,7 @@ const env = {
   PEBBLE_E2E_SSH_DOCKER: '1'
 }
 
-const runtime = spawnSync(pnpm, ['run', 'ensure:electron-runtime'], {
+const runtime = spawnSync(pnpm, ['run', 'parity:electron:ensure-runtime'], {
   stdio: 'inherit',
   env
 })

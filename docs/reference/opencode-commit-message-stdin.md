@@ -6,12 +6,12 @@ OpenCode's preset Source Control AI path passes the full generated prompt as the
 
 Verified current code:
 
-- `src/shared/commit-message-agent-spec.ts:24-32` defines `promptDelivery` as the argv/stdin contract for large diffs.
-- `src/shared/commit-message-agent-spec.ts:322-337` sets OpenCode to `promptDelivery: 'argv'` and appends `prompt`.
-- `src/shared/commit-message-plan.ts:108-123` already routes `promptDelivery === 'stdin'` into `stdinPayload`.
-- `src/main/text-generation/commit-message-text-generation.ts:470-601` pipes local `stdinPayload` to child stdin.
-- `src/main/providers/ssh-git-provider.ts:122-140` forwards `stdinPayload` as relay `stdin`; `src/relay/agent-exec-handler.ts:160-303` writes it to the remote child.
-- `src/shared/commit-message-plan.test.ts:36` currently locks in the broken OpenCode argv behavior.
+- `packages/product-core/shared/commit-message-agent-spec.ts:24-32` defines `promptDelivery` as the argv/stdin contract for large diffs.
+- `packages/product-core/shared/commit-message-agent-spec.ts:322-337` sets OpenCode to `promptDelivery: 'argv'` and appends `prompt`.
+- `packages/product-core/shared/commit-message-plan.ts:108-123` already routes `promptDelivery === 'stdin'` into `stdinPayload`.
+- `migration/electron-reference/src/main/text-generation/commit-message-text-generation.ts:470-601` pipes local `stdinPayload` to child stdin.
+- `migration/electron-reference/src/main/providers/ssh-git-provider.ts:122-140` forwards `stdinPayload` as relay `stdin`; `packages/product-core/relay/agent-exec-handler.ts:160-303` writes it to the remote child.
+- `packages/product-core/shared/commit-message-plan.test.ts:36` currently locks in the broken OpenCode argv behavior.
 
 ## Feasibility Gate
 
@@ -81,8 +81,8 @@ This fix removes the prompt from process argv only. It does not reduce prompt me
 
 ## Test Plan
 
-- `src/shared/commit-message-agent-spec.test.ts`: add OpenCode coverage asserting `promptDelivery === 'stdin'`, no prompt or empty placeholder in `buildArgs`, variant preservation, and no variant when absent.
-- `src/shared/commit-message-plan.test.ts`: update OpenCode expectations so `stdinPayload` receives the prompt and argv excludes it; include an OpenCode command-override case.
+- `packages/product-core/shared/commit-message-agent-spec.test.ts`: add OpenCode coverage asserting `promptDelivery === 'stdin'`, no prompt or empty placeholder in `buildArgs`, variant preservation, and no variant when absent.
+- `packages/product-core/shared/commit-message-plan.test.ts`: update OpenCode expectations so `stdinPayload` receives the prompt and argv excludes it; include an OpenCode command-override case.
 - Because `planCommitMessageGeneration(...)` is reused by commit-message, PR-field, and branch-name generation, the plan tests are the main regression coverage for the shared blast radius.
 - Keep existing Codex stdin, custom-command stdin, local child stdin, SSH provider, and relay stdin tests passing.
 - Run targeted Vitest for the touched shared tests, plus `pnpm typecheck` and `pnpm lint` for the implementation branch.

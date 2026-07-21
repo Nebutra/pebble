@@ -2,7 +2,7 @@ import { rmSync, writeFileSync } from 'node:fs'
 import type { Page } from '@nebutra/playwright-test'
 import { test, expect } from './helpers/pebble-app'
 import { waitForSessionReady } from './helpers/store'
-import { getLargeDiffRenderLimit } from '../../src/shared/large-diff-render-limit'
+import { getLargeDiffRenderLimit } from '../../packages/product-core/shared/large-diff-render-limit'
 import {
   buildLargeTypeScriptFile,
   createIsolatedLargeDiffRepo,

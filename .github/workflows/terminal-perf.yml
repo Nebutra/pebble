@@ -88,7 +88,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Electron app for terminal perf
-        run: npx electron-vite build --mode e2e
+        run: npx electron-vite build --config migration/electron-reference/electron.vite.config.ts --mode e2e
 
       - name: Run terminal scale perf report gate
         env:

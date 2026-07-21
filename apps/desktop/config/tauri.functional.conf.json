@@ -1,0 +1,27 @@
+{
+  "productName": "Pebble Functional Gate",
+  "identifier": "nebutra.pebble.functional-gate",
+  "build": {
+    "beforeDevCommand": {
+      "script": "node -e \"process.exit(0)\"",
+      "wait": true
+    },
+    "devUrl": "http://127.0.0.1:4175"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "optimized",
+        "title": "Pebble Functional Gate",
+        "width": 1200,
+        "height": 800,
+        "visible": true,
+        "focus": true,
+        "alwaysOnTop": true,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ]
+  }
+}

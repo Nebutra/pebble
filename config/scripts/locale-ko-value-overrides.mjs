@@ -194,7 +194,7 @@ export const KO_VALUE_OVERRIDES = {
   'Daily change review': '일일 변경 리뷰',
   'Release readiness review': '출시 준비 리뷰',
   'Recurring review': '반복 리뷰',
-  'review src/auth': 'src/auth 리뷰',
+  'review packages/product-core/auth': 'packages/product-core/auth 리뷰',
   'review auth edge cases': '인증 예외 사례 리뷰',
   Launch: '실행',
   'Launch:': '실행:',

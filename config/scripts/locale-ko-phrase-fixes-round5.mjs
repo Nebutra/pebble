@@ -35,7 +35,7 @@ export const KO_PHRASE_FIXES_ROUND5 = [
     replacement: '변경 사항을 리뷰',
     whenEnIncludes: 'review changes'
   },
-  { pattern: /소스\/인증 검토/g, replacement: 'src/auth 리뷰', whenEnIncludes: 'review src/auth' },
+  { pattern: /소스\/인증 검토/g, replacement: 'packages/product-core/auth 리뷰', whenEnIncludes: 'review packages/product-core/auth' },
   {
     pattern: /인증 예외 사례 검토/g,
     replacement: '인증 예외 사례 리뷰',

@@ -54,8 +54,7 @@ fi
 
 ARCH="$(uname -m)"
 case "$ARCH" in
-  arm64) ASSET="pebble-macos-arm64.dmg" ;;
-  x86_64) ASSET="pebble-macos-x64.dmg" ;;
+  arm64|x86_64) ASSET="pebble-macos-universal.dmg" ;;
   *)
     echo "Unsupported macOS architecture: $ARCH" >&2
     exit 2
@@ -287,6 +286,7 @@ run_launchservices_probe() {
       --env PEBBLE_STARTUP_DIAGNOSTICS=trace \
       --env PEBBLE_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
       --env PEBBLE_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
+      --env PEBBLE_NATIVE_SESSION_RECOVERY_DISABLED=launch-diagnostics \
       --env "$extra_env_name=$extra_env_value" \
       "$APP_DIR" &
   else
@@ -297,6 +297,7 @@ run_launchservices_probe() {
       --env PEBBLE_STARTUP_DIAGNOSTICS=trace \
       --env PEBBLE_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
       --env PEBBLE_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
+      --env PEBBLE_NATIVE_SESSION_RECOVERY_DISABLED=launch-diagnostics \
       "$APP_DIR" &
   fi
   local runner_pid="$!"
@@ -325,6 +326,7 @@ run_direct_exec_probe() {
     PEBBLE_STARTUP_DIAGNOSTICS=trace \
     PEBBLE_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
     PEBBLE_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
+    PEBBLE_NATIVE_SESSION_RECOVERY_DISABLED=launch-diagnostics \
     "$APP_DIR/Contents/MacOS/Pebble" >"$stdout_file" 2>"$stderr_file" &
   local runner_pid="$!"
   wait_for_probe "$runner_pid" "$label"

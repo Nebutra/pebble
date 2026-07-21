@@ -2,7 +2,7 @@
  * E2E test for newly-added worktrees sorting correctly in "Recent" mode.
  *
  * Why this exists:
- *   Before the fix in `src/main/ipc/worktrees.ts`, a worktree that existed
+ *   Before the fix in `migration/electron-reference/src/main/ipc/worktrees.ts`, a worktree that existed
  *   on disk but had no persisted WorktreeMeta (the case for folder-mode
  *   repos and pre-existing worktrees discovered when adding a new git repo)
  *   fell back to `lastActivityAt: 0`. "Recent" sort orders by

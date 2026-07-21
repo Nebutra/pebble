@@ -11,7 +11,6 @@ import json
 import math
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -24,10 +23,12 @@ gi.require_version("Atspi", "2.0")
 try:
     gi.require_version("Gdk", "3.0")
     gi.require_version("GdkPixbuf", "2.0")
-    from gi.repository import Gdk, GdkPixbuf
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gdk, GdkPixbuf, Gtk
 except (ImportError, ValueError):
     Gdk = None
     GdkPixbuf = None
+    Gtk = None
 from gi.repository import Atspi
 
 MAX_NODES = 1200
@@ -45,8 +46,6 @@ BLOCKED_APP_FRAGMENTS = (
     "nordpass",
     "proton pass",
 )
-CLIPBOARD_COMMAND_TIMEOUT_SECONDS = 2
-CLIPBOARD_OWNER_SETTLE_SECONDS = 0.05
 CLIPBOARD_PASTE_SETTLE_SECONDS = 0.15
 
 
@@ -164,17 +163,8 @@ def choose_window(app, window_id=None, window_index=None):
 def restore_window(app, window=None):
     target = window if window is not None else app
     component = attempt(target.get_component_iface)
-    if component is not None and attempt(lambda: Atspi.Component.grab_focus(component), False):
-        return
-    pid = pid_of(app)
-    if not pid or not shutil.which("xdotool"):
-        return
-    subprocess.run(
-        ["xdotool", "search", "--pid", str(pid), "windowactivate", "--sync"],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    if component is not None:
+        attempt(lambda: Atspi.Component.grab_focus(component), False)
 
 
 def require_keyboard_focus(window, operation):
@@ -696,8 +686,8 @@ def list_windows_response(query):
 
 def handshake_response():
     is_wayland = os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland"
-    has_hotkey = shutil.which("xdotool") is not None and not is_wayland
-    has_clipboard = any(shutil.which(command) for command in ("wl-copy", "xclip", "xsel"))
+    has_hotkey = Gdk is not None and not is_wayland
+    has_clipboard = Gtk is not None and Gdk is not None
     has_screenshot = Gdk is not None and GdkPixbuf is not None and not is_wayland
     return {
         "platform": "linux",
@@ -889,13 +879,35 @@ def press_key(raw):
 
 def hotkey(raw):
     key_spec = re.sub(r"(?i)commandorcontrol|cmdorctrl", "ctrl", str(raw))
-    xdotool = shutil.which("xdotool")
-    if xdotool:
-        subprocess.run([xdotool, "key", key_spec], check=True)
-        return
-    if "+" in key_spec:
-        raise RuntimeError("hotkey combinations require xdotool")
-    press_key(key_spec)
+    if Gdk is None:
+        raise RuntimeError("GDK is required for hotkey synthesis")
+    parts = [part.strip() for part in key_spec.split("+") if part.strip()]
+    if not parts:
+        raise RuntimeError("hotkey requires at least one key")
+    modifier_names = {
+        "ctrl": "Control_L",
+        "control": "Control_L",
+        "alt": "Alt_L",
+        "option": "Alt_L",
+        "shift": "Shift_L",
+        "super": "Super_L",
+        "command": "Super_L",
+        "cmd": "Super_L",
+        "meta": "Super_L",
+    }
+    modifiers = [modifier_names[part.lower()] for part in parts[:-1] if part.lower() in modifier_names]
+    if len(modifiers) != len(parts) - 1:
+        raise RuntimeError("hotkey modifiers must be ctrl, alt, shift, or super")
+    pressed = []
+    try:
+        for name in modifiers:
+            keyval = Gdk.keyval_from_name(name)
+            Atspi.generate_keyboard_event(keyval, None, Atspi.KeySynthType.PRESS)
+            pressed.append(keyval)
+        press_key(parts[-1])
+    finally:
+        for keyval in reversed(pressed):
+            Atspi.generate_keyboard_event(keyval, None, Atspi.KeySynthType.RELEASE)
 
 
 def type_text(value):
@@ -921,51 +933,25 @@ def paste_text(value):
 
 
 def read_clipboard():
-    for command in (["wl-paste"], ["xclip", "-selection", "clipboard", "-o"], ["xsel", "--clipboard", "--output"]):
-        if shutil.which(command[0]):
-            try:
-                result = subprocess.run(
-                    command,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    timeout=CLIPBOARD_COMMAND_TIMEOUT_SECONDS,
-                )
-            except subprocess.TimeoutExpired:
-                continue
-            if result.returncode == 0:
-                return result.stdout
-    return None
+    clipboard = desktop_clipboard()
+    return clipboard.wait_for_text()
 
 
 def write_clipboard(value):
-    if shutil.which("wl-copy"):
-        subprocess.run(
-            ["wl-copy"],
-            input=value,
-            check=True,
-            text=True,
-            timeout=CLIPBOARD_COMMAND_TIMEOUT_SECONDS,
-        )
-        return
-    for command in (["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]):
-        if not shutil.which(command[0]):
-            continue
-        process = subprocess.Popen(
-            command,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            text=True,
-        )
-        if process.stdin is not None:
-            process.stdin.write(value)
-            process.stdin.close()
-        time.sleep(CLIPBOARD_OWNER_SETTLE_SECONDS)
-        if process.poll() not in (None, 0):
-            raise RuntimeError(f"{command[0]} failed to set clipboard")
-        return
-    raise RuntimeError("paste_text requires wl-copy, xclip, or xsel")
+    clipboard = desktop_clipboard()
+    clipboard.set_text(str(value), -1)
+    # Why: the provider is a short-lived process; ask the desktop clipboard
+    # manager to retain restored content after this invocation exits.
+    clipboard.store()
+
+
+def desktop_clipboard():
+    if Gtk is None or Gdk is None:
+        raise RuntimeError("GTK clipboard support is unavailable")
+    display = Gdk.Display.get_default()
+    if display is None:
+        raise RuntimeError("GTK clipboard requires an active graphical desktop session")
+    return Gtk.Clipboard.get_for_display(display, Gdk.SELECTION_CLIPBOARD)
 
 
 def set_value(node, value):

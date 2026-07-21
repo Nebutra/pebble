@@ -2,7 +2,7 @@
 
 ## Problem
 
-The tab bar `+` menu only offers fixed actions: terminal, browser, new markdown, and open markdown in `src/renderer/src/components/tab-bar/TabBar.tsx`. It has no text entry point for a user who already knows the URL or file path they want.
+The tab bar `+` menu only offers fixed actions: terminal, browser, new markdown, and open markdown in `packages/product-core/renderer/src/components/tab-bar/TabBar.tsx`. It has no text entry point for a user who already knows the URL or file path they want.
 
 Quick Open already loads files for the active worktree through `listRuntimeFiles`, watches the active SSH target status, excludes nested linked worktrees, ranks via `prepareQuickOpenFiles`/`rankQuickOpenFiles`, and opens a selected match with `openFile`. That flow is modal and file-only. It does not live in the `+` menu, does not accept URLs, and cannot create a named new file from the typed query.
 
@@ -54,7 +54,7 @@ The behavior must work from both the titlebar tab strip and split-group tab stri
    - Empty after trim: reject inline.
    - Explicit URL: accept only `http://` and `https://` URLs with a parseable host.
    - Existing file: once the file-list snapshot is ready, normalize query separators for matching, prefer exact relative-path match, then exact basename match, then `rankQuickOpenFiles`. Before opening, `statRuntimePath` the matched absolute path and reject directories/stale missing matches instead of blindly opening stale list entries.
-   - Host-like URL: only after there is no existing file match, accept strict bare hosts such as `example.com`, `localhost:3000`, or `127.0.0.1:3000`, normalized to `https://...` when no scheme is present. Do not run host-like URL parsing for bare input containing `/` or `\`; `new URL('https://docs/readme.md')` parses, so parsing alone is not a path/file guard. Also reject common source/document filename extensions such as `md`, `ts`, `tsx`, `js`, `jsx`, `json`, `yml`, `yaml`, `toml`, `css`, `html`, and `py` so `README.md` and `src/foo.test.ts` stay file/create candidates.
+   - Host-like URL: only after there is no existing file match, accept strict bare hosts such as `example.com`, `localhost:3000`, or `127.0.0.1:3000`, normalized to `https://...` when no scheme is present. Do not run host-like URL parsing for bare input containing `/` or `\`; `new URL('https://docs/readme.md')` parses, so parsing alone is not a path/file guard. Also reject common source/document filename extensions such as `md`, `ts`, `tsx`, `js`, `jsx`, `json`, `yml`, `yaml`, `toml`, `css`, `html`, and `py` so `README.md` and `packages/product-core/foo.test.ts` stay file/create candidates.
    - New file: only after file listing has completed successfully with no existing-file match and no host-like URL match. Treat the query as a relative worktree path. If listing fails, allow explicit `http://` / `https://` URLs only; keep bare host-like inputs blocked because they cannot be disambiguated from files.
 
 6. Validate new file paths before joining:
@@ -99,7 +99,7 @@ The behavior must work from both the titlebar tab strip and split-group tab stri
 
 ## Test Plan
 
-- Unit test URL classification: schemes, host-like domains, localhost/IP ports, listed file named `example.com` winning over host-like normalization, `README.md`/`readme.md`, `src/foo.test.ts`, `docs/readme.md`, whitespace, and invalid schemes.
+- Unit test URL classification: schemes, host-like domains, localhost/IP ports, listed file named `example.com` winning over host-like normalization, `README.md`/`readme.md`, `packages/product-core/foo.test.ts`, `docs/readme.md`, whitespace, and invalid schemes.
 - Unit test path validation: Windows/POSIX absolute paths, UNC, `~`, traversal, empty segments, trailing slash, control characters, spaces, and separator normalization.
 - Unit test existing-file selection with `prepareQuickOpenFiles`/`rankQuickOpenFiles`: exact path beats basename, basename beats fuzzy, stale stat failure blocks open, directory stat blocks open.
 - Unit/helper test new-file creation with `RuntimeFileOperationArgs`, `createRuntimePath`, `statRuntimePath`, EEXIST stat-and-open, and SSH/runtime connection context.

@@ -1,0 +1,6 @@
+@import '../../../packages/product-core/renderer/src/assets/main.css' source(none);
+
+/* Why: Pebble's Vite root is outside packages/product-core/renderer, so Tailwind v4's automatic
+   source detection either misses the canonical renderer or scans heavy native
+   build artifacts. Keep Tauri dev CSS generation scoped to renderer code. */
+@source '../../../packages/product-core/renderer/src';

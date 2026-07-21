@@ -1,6 +1,6 @@
 import { test, expect } from './helpers/pebble-app'
 import { waitForSessionReady } from './helpers/store'
-import type { GlobalSettings } from '../../src/shared/types'
+import type { GlobalSettings } from '../../packages/product-core/shared/types'
 
 async function getSettings(
   page: Parameters<typeof waitForSessionReady>[0]

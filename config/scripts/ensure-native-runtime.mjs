@@ -103,7 +103,7 @@ function ensureElectronRuntime() {
     )
     printCheckError(initial)
   }
-  runNodeScript(['config/scripts/rebuild-native-deps.mjs'])
+  runNodeScript(['migration/electron-reference/scripts/rebuild-native-deps.mjs'])
 
   const final = runElectronCheck()
   if (!final.ok) {

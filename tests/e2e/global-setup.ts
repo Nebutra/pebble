@@ -30,8 +30,8 @@ export default function globalSetup(): void {
   } else {
     // Why: --mode e2e is the build-time signal that exposes window.__store;
     // the explicit env var keeps older local overrides working too.
-    console.log('[e2e] Building Electron app with electron-vite build --mode e2e...')
-    execSync('npx electron-vite build --mode e2e', {
+    console.log('[e2e] Building Electron app with electron-vite build --config migration/electron-reference/electron.vite.config.ts --mode e2e...')
+    execSync('npx electron-vite build --config migration/electron-reference/electron.vite.config.ts --mode e2e', {
       env: { ...process.env, VITE_EXPOSE_STORE: 'true' },
       cwd: root,
       stdio: 'inherit',

@@ -26,6 +26,29 @@
   <img src="docs/assets/readme-hero.jpg" alt="Pebble desktop app running agents in parallel worktrees, with the Pebble mobile companion app in the corner" width="960" />
 </p>
 
+## Repository Architecture
+
+Pebble is a Tauri product backed by native Go, Rust, and Zig services. The
+repository keeps shipping applications and runtime ownership visible at the
+top level:
+
+| Path                            | Ownership                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| `apps/desktop/`                 | Tauri desktop shell and native bridge                                     |
+| `apps/mobile/`                  | Expo/React Native companion app                                           |
+| `packages/product-core/`        | Canonical React UI, shared contracts, CLI, relay, and managed agent hooks |
+| `packages/contracts/`           | Versioned cross-language runtime contracts                                |
+| `runtime/go/`                   | Runtime control plane, orchestration, provider, and remote services       |
+| `native/rust-host/`             | Shared native host boundary and typed runtime client                      |
+| `native/zig-system/`            | Low-level process and platform primitives linked into Tauri               |
+| `docs/architecture/`            | Architecture and migration ownership                                      |
+| `migration/electron-reference/` | Non-shipping Electron parity reference pending final native evidence      |
+
+`migration/` contains temporary, non-shipping code that is still being folded
+into the canonical applications. It is not a second Pebble implementation.
+Electron main and preload code are isolated under `migration/electron-reference/`;
+the default start, build, and release paths target `apps/desktop/`.
+
 ## Features
 
 <table>
@@ -212,7 +235,7 @@ Works with **any CLI agent** — if it runs in a terminal, it runs in Pebble.
 ### Desktop — macOS, Windows, Linux
 
 - **[Download from nebutra.com/pebble](https://www.nebutra.com/pebble/download)**
-- Or grab a build directly: [macOS Apple Silicon](https://github.com/nebutra/pebble/releases/latest/download/pebble-macos-arm64.dmg) · [macOS Intel](https://github.com/nebutra/pebble/releases/latest/download/pebble-macos-x64.dmg) · [Windows (.exe)](https://github.com/nebutra/pebble/releases/latest/download/pebble-windows-setup.exe) · [Linux AppImage](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux.AppImage) · [All builds](https://github.com/nebutra/pebble/releases/latest)
+- Or grab a build directly: [macOS Universal](https://github.com/nebutra/pebble/releases/latest/download/pebble-macos-universal.dmg) · [Windows (.exe)](https://github.com/nebutra/pebble/releases/latest/download/pebble-windows-x86_64-setup.exe) · [Linux x64 AppImage](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux-x86_64.AppImage) · [Linux arm64 AppImage](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux-aarch64.AppImage) · [All builds](https://github.com/nebutra/pebble/releases/latest)
 - Running `pebble serve` on a headless Linux server? See the [headless Linux server guide](docs/reference/headless-linux-server.md).
 
 _Or via a package manager:_

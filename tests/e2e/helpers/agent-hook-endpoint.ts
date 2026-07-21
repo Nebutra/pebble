@@ -5,7 +5,7 @@ import {
   isAgentHookEndpointFileName,
   parseAgentHookEndpointFile,
   type AgentHookEndpoint
-} from '../../../src/shared/agent-hook-endpoint-file'
+} from '../../../packages/product-core/shared/agent-hook-endpoint-file'
 
 function findEndpointEnvFile(root: string): string | null {
   if (!existsSync(root)) {

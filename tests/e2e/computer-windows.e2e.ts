@@ -4,7 +4,7 @@ import type {
   ComputerListAppsResult,
   ComputerListWindowsResult,
   ComputerSnapshotResult
-} from '../../src/shared/runtime-types'
+} from '../../packages/product-core/shared/runtime-types'
 import {
   ensurePebbleRuntimeLaunched,
   ensureNotepadLaunched,

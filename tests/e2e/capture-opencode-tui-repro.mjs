@@ -43,7 +43,7 @@ const harnessPath = path.join(opencodePackagePath, 'pebble-opencode-tui-repro.ts
 
 const harnessSource = String.raw`import { BoxRenderable, createCliRenderer, RGBA, TextRenderable } from "@opentui/core"
 import { SpinnerRenderable } from "opentui-spinner"
-import { createColors, createFrames } from "./src/cli/cmd/tui/ui/spinner"
+import { createColors, createFrames } from "./packages/product-core/cli/cmd/tui/ui/spinner"
 
 const renderer = await createCliRenderer({
   externalOutputMode: "passthrough",

@@ -62,7 +62,7 @@ jobs:
       # Playwright globalSetup, which otherwise contends for CPU/RAM on OSS
       # runners before the sharded tests even start.
       - name: Build Electron app for E2E
-        run: npx electron-vite build --mode e2e
+        run: npx electron-vite build --config migration/electron-reference/electron.vite.config.ts --mode e2e
 
       - name: Upload E2E build output
         uses: actions/upload-artifact@v7
