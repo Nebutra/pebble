@@ -1,4 +1,4 @@
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import {
   execInTerminal,
@@ -448,7 +448,7 @@ test.describe('Terminal attention', () => {
         pane.terminal.blur()
       }, secondTabId)
 
-      // Why: xterm does not reliably answer DA1 writes in hidden Electron
+      // Why: xterm does not reliably answer DA1 writes in automated browser runs
       // windows, but focus-reporting leaks are emitted as part of the focus
       // task itself. Let that task settle, then inspect the captured bytes.
       await pebblePage.waitForTimeout(100)

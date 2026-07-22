@@ -943,7 +943,7 @@ function ErrorCardContent({
           <p className="text-xs leading-relaxed text-muted-foreground">
             {translate(
               'auto.components.UpdateCard.90559b14e3',
-              'This turns on a process-wide Electron networking switch after restart. Use it for corporate VPNs or proxies that reject HTTP/2 update downloads.'
+              'This turns on a process-wide desktop networking switch after restart. Use it for corporate VPNs or proxies that reject HTTP/2 update downloads.'
             )}
           </p>
         </div>

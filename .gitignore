@@ -6,11 +6,6 @@ tsconfig.*.tsbuildinfo
 # re-included below.
 packages/product-core/**/*.js
 packages/product-core/**/*.d.ts
-/electron.vite.config.js
-/electron.vite.config.d.ts
-!migration/electron-reference/src/main/types/hosted-git-info.d.ts
-!migration/electron-reference/src/preload/api-types.d.ts
-!migration/electron-reference/src/preload/index.d.ts
 !packages/product-core/renderer/src/env.d.ts
 !packages/product-core/renderer/src/mermaid.d.ts
 !packages/product-core/types/build-constants.d.ts
@@ -20,7 +15,6 @@ node_modules/
 
 # Build output
 dist/
-dist-electron/
 out/
 /build/
 release/

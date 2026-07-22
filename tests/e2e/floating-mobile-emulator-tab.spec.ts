@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@nebutra/playwright-test'
+import type { Page, TestInfo } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 
 // Why: mirrors FLOATING_TERMINAL_WORKTREE_ID in packages/product-core/shared/constants.ts.

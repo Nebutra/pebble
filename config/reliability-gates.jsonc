@@ -41,7 +41,7 @@
         "macos"
       ],
       "coveredProviders": [],
-      "coverageNotes": "Local macOS evidence over the reconcile guards that exist on main@1282f5c2d. Broader targeted-hasPty resume paths, no-hot listing counts, and live Electron survival arrive with the pending reliability stack.",
+      "coverageNotes": "Local macOS evidence over the reconcile guards that exist on main@1282f5c2d. Broader targeted-hasPty resume paths, no-hot listing counts, and live desktop survival arrive with the pending reliability stack.",
       "motivatingLinks": [
         "https://github.com/nebutra/pebble/issues/6773",
         "https://github.com/nebutra/pebble/pull/6514",
@@ -100,7 +100,7 @@
         "Add an integration/provider-contract follow-up that proves tab survival plus input/output after stale snapshot release."
       ],
       "knownGaps": [
-        "Current command asserts the pure decision and orchestration timestamp forwarding, not a full Electron tab-survival/input echo flow.",
+        "Current command asserts the pure decision and orchestration timestamp forwarding, not a full Tauri tab-survival/input echo flow.",
         "SSH and remote providers are intentionally unknown-liveness paths and need separate provider-contract gates."
       ],
       "demotionRule": "Demote or quarantine if the gate flakes once without a product bug or harness bug filed to the owner."
@@ -135,7 +135,7 @@
         "macos"
       ],
       "coveredProviders": [],
-      "coverageNotes": "Local macOS evidence over the ownership/dedupe suite on main@1282f5c2d. Queued/pending resume-claim indexing, same-session and wrong-session hook proofs, and Electron repeat-activation coverage arrive with the pending stack (#7008).",
+      "coverageNotes": "Local macOS evidence over the ownership/dedupe suite on main@1282f5c2d. Queued/pending resume-claim indexing, same-session and wrong-session hook proofs, and Tauri repeat-activation coverage arrive with the pending stack (#7008).",
       "motivatingLinks": [
         "https://github.com/nebutra/pebble/pull/6800",
         "https://github.com/nebutra/pebble/pull/5240",
@@ -195,8 +195,8 @@
       ],
       "knownGaps": [
         "Providers listed on this gate are affected identity surfaces; the current executable command is renderer-state coverage, not live local/daemon/SSH/WSL/remote-runtime coverage.",
-        "Current command models live same-session and wrong-session hook evidence, but does not run the real hook timing through Electron.",
-        "Current command does not run a real workspace activation loop repeatedly through Electron."
+        "Current command models live same-session and wrong-session hook evidence, but does not run the real hook timing through the native runtime.",
+        "Current command does not run a real workspace activation loop repeatedly through Tauri."
       ],
       "demotionRule": "Demote or quarantine if failures are non-actionable or if a duplicate resume escape occurs outside the modeled matrix."
     },
@@ -454,7 +454,7 @@
         "Prove input/output survives after boundary failure."
       ],
       "knownGaps": [
-        "Current command is renderer-unit containment, not live Electron typed input/output survival after addon failure.",
+        "Current command is renderer-unit containment, not live Tauri typed input/output survival after addon failure.",
         "Does not yet inject WebGL dispose/reset throws and active/hidden/resumed pane focus recovery in one component-level oracle."
       ],
       "demotionRule": "Cannot promote while it only checks visual rendering."
@@ -499,7 +499,7 @@
       "evidenceRuns": [],
       "runtimeBudget": {
         "p95Seconds": 120,
-        "scope": "focused Electron upgrade fixture"
+        "scope": "focused Tauri upgrade fixture"
       },
       "flakeHistory": {
         "status": "not-started",
@@ -525,11 +525,11 @@
     },
     {
       "id": "terminal-platform.live-pty-liveness",
-      "title": "A real Electron local PTY accepts input, survives workspace restore, resizes, and exits cleanly",
+      "title": "A real Tauri local PTY accepts input, survives workspace restore, resizes, and exits cleanly",
       "maturity": "experimental",
       "protection": "none",
       "owner": "terminal-runtime",
-      "layer": "electron-live-pty",
+      "layer": "tauri-live-pty",
       "surfaces": [
         "active terminal PTY binding",
         "xterm focus",
@@ -548,14 +548,14 @@
       ],
       "coveredPlatforms": [],
       "coveredProviders": [],
-      "coverageNotes": "Registered gap on main. The live Electron Playwright slice exists only on the pending reliability stack. It registers here with its owning split PR.",
+      "coverageNotes": "Registered gap on main. The live Tauri functional slice exists only on the pending reliability stack. It registers here with its owning split PR.",
       "motivatingLinks": [
         "https://github.com/nebutra/pebble/pull/6801",
         "https://github.com/nebutra/pebble/pull/6842",
         "https://github.com/nebutra/pebble/pull/6939",
         "https://github.com/nebutra/pebble/pull/6989"
       ],
-      "invariant": "An active local Electron terminal has one active PTY id listed exactly once, accepts real keyboard input through focused xterm, renders process output visibly, keeps the same live PTY across repeated workspace hide/restore cycles, applies an actual size change, and removes the old PTY from liveness state after exit.",
+      "invariant": "An active local Tauri terminal has one active PTY id listed exactly once, accepts real keyboard input through focused xterm, renders process output visibly, keeps the same live PTY across repeated workspace hide/restore cycles, applies an actual size change, and removes the old PTY from liveness state after exit.",
       "oracle": "A deterministic raw-mode probe prints a ready marker, ordered key markers from real keyboard input, the active PTY id appears exactly once in pty:listSessions, remains bound to the same PTY id across two worktree switch-away/switch-back cycles, accepts more keyboard input after each restore, changes pty:getSize after viewport resize, prints the same process-visible size, and prints an exit marker; after shell exit, pty:listSessions no longer contains the old id.",
       "commands": [],
       "testFiles": [],
@@ -563,7 +563,7 @@
       "evidenceRuns": [],
       "runtimeBudget": {
         "p95Seconds": 75,
-        "scope": "focused Electron live PTY gate including e2e build/setup"
+        "scope": "focused Tauri live PTY gate including e2e build/setup"
       },
       "flakeHistory": {
         "status": "unknown",
@@ -596,7 +596,7 @@
       "maturity": "experimental",
       "protection": "none",
       "owner": "terminal-platform",
-      "layer": "windows-electron-conpty",
+      "layer": "windows-tauri-conpty",
       "surfaces": [
         "Windows ConPTY",
         "PowerShell and cmd",
@@ -631,7 +631,7 @@
       "evidenceRuns": [],
       "runtimeBudget": {
         "p95Seconds": 90,
-        "scope": "Windows focused Electron ConPTY gate"
+        "scope": "Windows focused Tauri ConPTY gate"
       },
       "flakeHistory": {
         "status": "not-started",
@@ -646,7 +646,7 @@
         "evidence": "Must include input latency and no broad session listing while typing or switching terminals."
       },
       "promotionCriteria": [
-        "Start as Windows nightly/soak because Windows Electron E2E has been flaky.",
+        "Start as Windows nightly/soak until the Windows Tauri E2E history is stable.",
         "Use deterministic PTY markers for input/resize and reserve screenshots for repaint diagnostics.",
         "Split shell parity, keyboard reset, and CJK repaint into smaller gates if a combined gate is flaky."
       ],
@@ -699,7 +699,7 @@
       "evidenceRuns": [],
       "runtimeBudget": {
         "p95Seconds": 20,
-        "scope": "unit or focused Electron count gate"
+        "scope": "unit or focused Tauri count gate"
       },
       "flakeHistory": {
         "status": "unknown",
@@ -721,7 +721,7 @@
       "knownGaps": [
         "No executable coverage on main yet; the slice lives on the pending fix-terminal-reliability stack.",
         "Current command covers targeted visibility/first-input liveness, resize re-assertion on visibility resume, light tab/active-state resume, SSH/remote skip behavior, and closed Resource Manager session-poll avoidance, but not every hot interaction listed in the invariant.",
-        "No Electron or IPC-level high-session counter gate yet proves raw focus, workspace switch, render, or high-session typing stay at zero global listSessions calls."
+        "No Tauri bridge-level high-session counter gate yet proves raw focus, workspace switch, render, or high-session typing stay at zero global listSessions calls."
       ],
       "demotionRule": "Cannot promote if the test allows broad listing in any hot interaction path."
     },
@@ -789,7 +789,7 @@
         "No executable coverage on main yet; the slice lives on the pending fix-terminal-reliability stack.",
         "Current command records anomaly breadcrumbs only, not a full pane lifecycle state-machine trace.",
         "Current command does not prove crash/diagnostics bundle export includes the breadcrumb.",
-        "Current command does not assert forbidden transitions across live Electron/provider flows."
+        "Current command does not assert forbidden transitions across live Tauri/provider flows."
       ],
       "demotionRule": "Cannot promote if diagnostics are console-only, unbounded, or missing from support artifacts."
     },
@@ -1027,7 +1027,7 @@
         "The store coverage asserts recoverability metadata, not a live attached PTY or user-visible connected state.",
         "Live SSH/remote coverage remains environment-dependent.",
         "WSL and remote-runtime mirror polling contracts are not wired yet.",
-        "The deferred SSH coverage does not boot Electron against a real SSH relay or exercise real network reconnect timing."
+        "The deferred SSH coverage does not boot Tauri against a real SSH relay or exercise real network reconnect timing."
       ],
       "demotionRule": "Cannot promote if provider failure can close panes or if the oracle is screenshot-only."
     },
@@ -1275,7 +1275,7 @@
       "maturity": "experimental",
       "protection": "none",
       "owner": "terminal-platform",
-      "layer": "windows-electron-conpty",
+      "layer": "windows-tauri-conpty",
       "surfaces": [
         "Windows ConPTY",
         "keyboard protocol",
@@ -1306,7 +1306,7 @@
       "evidenceRuns": [],
       "runtimeBudget": {
         "p95Seconds": 60,
-        "scope": "Windows provider-contract or focused Electron gate"
+        "scope": "Windows provider-contract or focused Tauri gate"
       },
       "flakeHistory": {
         "status": "not-started",
@@ -1337,7 +1337,7 @@
       "maturity": "experimental",
       "protection": "none",
       "owner": "terminal-rendering",
-      "layer": "windows-electron-conpty",
+      "layer": "windows-tauri-conpty",
       "surfaces": [
         "Windows ConPTY",
         "CJK",
@@ -1370,7 +1370,7 @@
       "evidenceRuns": [],
       "runtimeBudget": {
         "p95Seconds": 90,
-        "scope": "Windows focused Electron render gate"
+        "scope": "Windows focused Tauri render gate"
       },
       "flakeHistory": {
         "status": "not-started",
@@ -1448,7 +1448,7 @@
         "evidence": "Required if resolution adds probing or PATH scans on hot startup paths."
       },
       "promotionCriteria": [
-        "Start with provider-contract fixtures before live Electron coverage.",
+        "Start with provider-contract fixtures before live Tauri coverage.",
         "Cover missing-shell fallback explicitly.",
         "Fail promotion on silent Windows environment skips."
       ],
@@ -1464,7 +1464,7 @@
       "maturity": "experimental",
       "protection": "none",
       "owner": "terminal-performance",
-      "layer": "electron-perf",
+      "layer": "tauri-perf",
       "surfaces": [
         "typing latency",
         "output throughput",
@@ -1581,8 +1581,8 @@
       ],
       "knownGaps": [
         "No executable coverage on main yet; the slice lives on the pending fix-terminal-reliability stack.",
-        "Current command is daemon batcher contract coverage, not live daemon/Electron perf.",
-        "Active input latency is not proven in live daemon/Electron perf."
+        "Current command is daemon batcher contract coverage, not live daemon/Tauri perf.",
+        "Active input latency is not proven in live daemon/Tauri perf."
       ],
       "demotionRule": "Cannot promote if backpressure is inferred only from renderer output success."
     },
@@ -1649,7 +1649,7 @@
       "knownGaps": [
         "No executable coverage on main yet; the slice lives on the pending fix-terminal-reliability stack.",
         "Current command covers boot hydration counters only, not interactive terminal hot paths.",
-        "No Electron count gate yet proves focus, typing, tab switch, workspace switch, render, or high-session provider fanout avoids broad store/git/provider scans."
+        "No Tauri bridge count gate yet proves focus, typing, tab switch, workspace switch, render, or high-session provider fanout avoids broad store/git/provider scans."
       ],
       "demotionRule": "Cannot promote without count budgets and actionable artifacts."
     },
@@ -2095,7 +2095,7 @@
       "maturity": "experimental",
       "protection": "none",
       "owner": "terminal-rendering",
-      "layer": "electron-visual-golden",
+      "layer": "tauri-visual-golden",
       "surfaces": [
         "WebGL rendering",
         "tab reveal",
@@ -2127,7 +2127,7 @@
       "evidenceRuns": [],
       "runtimeBudget": {
         "p95Seconds": 300,
-        "scope": "release-blocking golden Electron visual test"
+        "scope": "release-blocking golden Tauri visual test"
       },
       "flakeHistory": {
         "status": "not-started",

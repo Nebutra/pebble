@@ -20,7 +20,7 @@ test.describe('Tab Rename (Inline)', () => {
     await waitForSessionReady(pebblePage)
     await waitForActiveWorktree(pebblePage)
     await ensureTerminalVisible(pebblePage)
-    // Why: clear any custom titles left by a previous test (the Electron app
+    // Why: clear any custom titles left by a previous test (the browser harness
     // persists across tests in the worker) so tab locators key off the default
     // title, not a stale rename like "My Custom Title".
     await pebblePage.evaluate(() => {

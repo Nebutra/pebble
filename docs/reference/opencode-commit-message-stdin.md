@@ -1,5 +1,7 @@
 # OpenCode Commit Message Stdin Delivery
 
+> Archived migration record: referenced Electron paths document the implementation that existed when this note was written; those paths are intentionally absent from the current Tauri repository.
+
 ## Problem
 
 OpenCode's preset Source Control AI path passes the full generated prompt as the final `opencode run` argv positional. Commit-message prompts include branch, staged file summary, user instructions, and the staged patch. The patch is capped by `STAGED_DIFF_BYTE_BUDGET = 200_000`, but the implementation uses JavaScript string length, not encoded byte length, so argv can still be much larger than command-line limits on Windows and some POSIX/SSH wrapper paths before OpenCode starts.

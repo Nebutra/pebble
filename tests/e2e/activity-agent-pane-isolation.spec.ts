@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Activity E2E keeps the setup helpers beside the split-pane, split-group, and workspace-card routing assertions they support. */
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import {
   splitActiveTerminalPane,
@@ -263,7 +263,7 @@ test.describe('Activity Agent Pane Isolation', () => {
       .catch(() => false)
     test.skip(
       !hasPaneManager,
-      'Electron automation in this environment never mounts the live TerminalPane manager, so Activity pane isolation would only fail on harness setup.'
+      'The current browser harness did not mount the live TerminalPane manager, so Activity pane isolation would only fail on harness setup.'
     )
     await waitForPaneCount(pebblePage, 1, 30_000)
   })

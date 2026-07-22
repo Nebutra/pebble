@@ -124,7 +124,7 @@ Build **once**, snapshot, and every workspace boots from it in seconds instead o
 Provisioning + building takes a while (often ~20–30 min), so it runs behind a checkpoint. The script
 shape is §7a; key points:
 
-- Build the **headless Electron main only** (not the renderer) so it fits in plan RAM.
+- Build the **CLI and web assets only**; a workspace runtime does not need the desktop GUI bundle.
 - Use the VM image's package manager (`apt`/`dnf`/`apk`, per the base distro — not the provider brand).
 - Clone with the git token via `GIT_ASKPASS` (§5).
 - **Trap errors and remove the half-built sandbox** so a crash doesn't leave a paid resource running.
@@ -228,8 +228,8 @@ set -euo pipefail
 # resolve gh token: GH_TOKEN | GITHUB_TOKEN | `gh auth token`
 # 1. provision a sandbox (timeout/vcpus/published port/snapshot retention); trap: remove on error
 # 2. remote exec (long timeout): install pkgs + gh + corepack/pnpm + agent CLI;
-#    clone with GIT_ASKPASS(token); write headless main-only build config;
-#    dev setup; pnpm install; build CLI; build headless electron main; smoke-check tools
+#    clone with GIT_ASKPASS(token); dev setup; pnpm install;
+#    build CLI + web assets; smoke-check tools
 # 3. snapshot stopped sandbox; parse snapshot id (fail if unparseable)
 # 4. merge { baseName, snapshotId, projectRoot, repoUrl, repoRef, port, scope, project } into state
 # print only the state JSON to stdout
@@ -334,8 +334,7 @@ vercel sandbox create --name "$base" --runtime node24 --timeout 30m --vcpus 4 --
   --snapshot-expiration 30d --keep-last-snapshots 2 "${vercel_args[@]}" >&2
 # remote build (long timeout): install pkgs+gh+pnpm+agent CLI, clone with GIT_ASKPASS (write the helper
 # with LITERAL \$1/\$GH_TOKEN so they resolve at git-runtime, not write-time — see §5/§7f create — then
-# `rm -f /tmp/askpass.sh`), write the headless main-only build config (drop the renderer), dev setup,
-# build CLI + headless main, smoke-check
+# `rm -f /tmp/askpass.sh`), dev setup, build CLI + web assets, smoke-check
 vercel sandbox exec "$base" "${vercel_args[@]}" --timeout 25m --env "GH_TOKEN=$gh_token" … -- bash -lc '…build…' >&2
 # snapshot the STOPPED sandbox and parse the id from CLI output (fail if unparseable)
 out="$(vercel sandbox snapshot "$base" --stop --expiration 30d "${vercel_args[@]}" 2>&1)"; printf '%s\n' "$out" >&2
@@ -398,8 +397,7 @@ vercel sandbox exec "$name" "${vercel_args[@]}" --timeout 20m \
     git checkout -B "$PEBBLE_REPO_REF" FETCH_HEAD; \
     rm -f /tmp/askpass.sh; \
     c="$(git rev-parse HEAD)"; [ -f .pebble-built ] && [ "$(cat .pebble-built)" = "$c" ] || { \
-      pnpm install --prefer-offline && pnpm run build:cli && \
-      node migration/electron-reference/scripts/run-electron-vite-build.mjs --config config/electron-vite.vm-serve.config.ts && \
+      pnpm install --prefer-offline && pnpm run build:cli && pnpm run build:web && \
       printf "%s" "$c" > .pebble-built; }' >&2
 
 # 3. (remote) start pebble serve in the background, writing recipe JSON to a file; poll until it parses
@@ -686,7 +684,7 @@ startup-only `docker run` before the full clone/install path.
 
 - **Build exceeds plan timeout (e.g. Hobby 45m).** Use enough vCPUs and a timeout covering the build;
   else split work or use a higher plan. The cap also limits per-workspace runtime — surface it.
-- **Build exceeds plan RAM.** Build the **headless main only** (drop the renderer) — the biggest fitter.
+- **Build exceeds plan RAM.** Build only the CLI and web assets; skip the desktop GUI bundle.
 - **Private-repo clone hangs/fails.** Wrong/missing token. Use `GIT_ASKPASS` + `GIT_TERMINAL_PROMPT=0`
   so it fails fast instead of prompting.
 - **`GIT_ASKPASS` helper aborts the clone with "`$1: unbound variable`".** The `printf`/heredoc that writes

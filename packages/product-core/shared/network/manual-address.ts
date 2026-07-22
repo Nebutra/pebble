@@ -58,8 +58,7 @@ export function parseManualNetworkAddress(input: string): ParseManualAddressResu
   return { ok: false, error: ERROR_MESSAGE }
 }
 
-// Why: mirrors `parsePairingAddressOverride` in migration/electron-reference/src/main/runtime/runtime-rpc.ts
-// so the UI only accepts what the main process's pairing endpoint resolution
+// Why: mirrors the native runtime's pairing-address parser so the UI only accepts what endpoint resolution
 // can already handle. IPv6 stays out of scope (same as that function), so a
 // second colon is left in `host` and fails the grammar checks below instead
 // of being misparsed as a port.

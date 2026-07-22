@@ -20,7 +20,7 @@
  *
  * Reproduces reliably (always on the first mount) when run in isolation:
  *   SKIP_BUILD=1 npx playwright test --config tests/playwright.config.ts \
- *     tests/e2e/terminal-column-desync-repro.spec.ts --project electron-headless \
+ *     tests/e2e/terminal-column-desync-repro.spec.ts --project tauri-functional \
  *     -g "during initial mount"
  * Observed: the first terminal spawns its PTY at the full window width
  * (e.g. 203 cols) while xterm fits the pane to the real layout width (79 cols);
@@ -28,7 +28,7 @@
  * `-g "during initial mount"` test (serial, reload-looped) is the golden repro.
  */
 
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import {
   ensureTerminalVisible,

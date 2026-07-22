@@ -10,8 +10,7 @@ import (
 	"strings"
 )
 
-// gitForWindowsBashPattern matches a Git-for-Windows bash.exe, mirroring the
-// isGitForWindowsBashPath regex in migration/electron-reference/src/main/git-bash.ts. It rejects msys2/cygwin
+// gitForWindowsBashPattern matches a Git-for-Windows bash.exe. It rejects msys2/cygwin
 // bash so only the bundled Git shell is offered.
 var gitForWindowsBashPattern = regexp.MustCompile(`(?i)(?:^|\\)(?:git|portablegit)(?:\\usr)?\\bin\\bash\.exe$`)
 
@@ -62,8 +61,7 @@ func pushCandidate(candidates *[]string, seen map[string]bool, candidate string)
 	*candidates = append(*candidates, candidate)
 }
 
-// gitBashCandidatePaths mirrors getGitBashCandidatePaths in migration/electron-reference/src/main/git-bash.ts:
-// well-known install roots plus PATH entries that look like a Git install.
+// gitBashCandidatePaths checks well-known install roots plus PATH entries that look like a Git install.
 func gitBashCandidatePaths(env map[string]string) []string {
 	candidates := []string{}
 	seen := map[string]bool{}

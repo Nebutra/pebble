@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { Locator, Page } from '@nebutra/playwright-test'
+import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 
@@ -128,7 +128,7 @@ async function openRepoSettings(page: Page, repoId: string): Promise<Locator> {
 async function openImportedSetupSettingsFromToast(page: Page, repoId: string): Promise<Locator> {
   const viewInSettings = page.getByRole('button', { name: "project's settings", exact: true })
   await expect(viewInSettings).toBeAttached({ timeout: 10_000 })
-  // Why: in hidden Electron CI windows, the Sonner action can be laid out just
+  // Why: in CI browser windows, the Sonner action can be laid out just
   // outside Playwright's viewport even though the action is mounted and wired.
   await viewInSettings.evaluate((button) => (button as HTMLButtonElement).click())
   const setupCommand = page.locator(`[id="repo-${repoId}-local-commands"]`)

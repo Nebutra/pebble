@@ -302,9 +302,10 @@ async function callPebbleRuntimeMethod(
 ): Promise<RuntimeRpcResponse<unknown>> {
   const response = await callPebbleRuntimeMethodInner(method, params)
   const interactionId = response.ok ? runtimeFeatureInteractionId(method, params) : null
-  if (interactionId) {
+  const uiApi = globalThis.window?.api?.ui
+  if (interactionId && uiApi) {
     // Why: education telemetry is best-effort and must never turn a successful runtime RPC into a failure.
-    void window.api.ui.recordFeatureInteraction(interactionId).catch(() => {})
+    void uiApi.recordFeatureInteraction(interactionId).catch(() => {})
   }
   return response
 }

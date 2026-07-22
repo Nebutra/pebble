@@ -168,12 +168,12 @@ export const ZH_VALUE_OVERRIDES = {
     '自您上次批准以来已发生变化。运行前请重新评审',
   'Run the weekly dependency audit and summarize risky changes.':
     '每周运行依赖项审计并总结有风险的更改。',
-  'This turns on a process-wide Electron networking switch after restart. Use it for corporate VPNs or proxies that reject HTTP/2 update downloads.':
-    '这将在重启后启用进程级 Electron 网络开关。适用于拒绝 HTTP/2 更新下载的企业 VPN 或代理。',
-  'Use only when a corporate VPN or proxy breaks update downloads with HTTP/2 protocol errors. It affects all Electron networking after restart.':
-    '仅当企业 VPN 或代理因 HTTP/2 协议错误而中断更新下载时使用。重启后会影响所有 Electron 网络。',
-  'Use HTTP/1.1 for Electron networking when HTTP/2 fails behind a proxy.':
-    '当 HTTP/2 在代理后面失败时，使用 HTTP/1.1 进行 Electron 网络。',
+  'This turns on a process-wide desktop networking switch after restart. Use it for corporate VPNs or proxies that reject HTTP/2 update downloads.':
+    '这将在重启后启用进程级桌面网络开关。适用于拒绝 HTTP/2 更新下载的企业 VPN 或代理。',
+  'Use only when a corporate VPN or proxy breaks update downloads with HTTP/2 protocol errors. It affects desktop networking after restart.':
+    '仅当企业 VPN 或代理因 HTTP/2 协议错误而中断更新下载时使用。重启后会影响所有桌面网络。',
+  'Use HTTP/1.1 for desktop networking when HTTP/2 fails behind a proxy.':
+    '当 HTTP/2 在代理后面失败时，使用 HTTP/1.1 进行桌面网络。',
   'Proxy Bypass Rules': '代理绕过规则',
   'Hosts that should bypass the configured HTTP proxy.': '应绕过配置的 HTTP 代理的主机。',
   'Leave empty to use system proxy settings and inherited proxy environment variables.':

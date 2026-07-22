@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { Page, TestInfo } from '@nebutra/playwright-test'
+import type { Page, TestInfo } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import {
   ensureTerminalVisible,
@@ -471,7 +471,7 @@ test.describe('Terminal long table scroll restore repro', () => {
         (window as LongTableDebugWindow).__terminalPtyOutputDebug?.snapshot()
       )
       expect(hiddenDebug?.hiddenRendererSkipCount).toBe(0)
-      // Why: renderer cell metrics can land one column wider in headless runs;
+      // Why: browser renderer cell metrics can land one column wider in CI;
       // the content and screenshot assertions below cover the actual regression.
       expect(diagnostics.cols).toBeLessThanOrEqual(112)
       expect(diagnostics.cursorHidden).toBe(false)

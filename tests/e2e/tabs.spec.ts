@@ -14,12 +14,12 @@
  * E2E suite in #1193). The rule in tests/e2e/AGENTS.md is that the final
  * `expect()` must target user-observable DOM. Store calls are only used here
  * for *setup* (e.g. to guarantee >= N tabs exist) or when the real user-facing
- * action genuinely can't be driven via DOM in hidden-window Electron runs
+ * action genuinely cannot be driven through the browser DOM harness
  * (dnd-kit reorder); in those cases a DOM assertion still follows.
  */
 
 import { test, expect } from './helpers/pebble-app'
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import {
   waitForSessionReady,
   waitForActiveWorktree,
@@ -84,7 +84,7 @@ test.describe('Tabs', () => {
   test('clicking "+" then "New Terminal" creates a new terminal tab', async ({ pebblePage }) => {
     const tabsBefore = await countRenderedTabs(pebblePage)
 
-    // Why: hidden-window Electron can keep the animated terminal surface
+    // Why: an automated browser can keep the animated terminal surface
     // invalidating Playwright's "stable" actionability check even though the
     // tab-bar button is visible and enabled.
     await pebblePage.getByRole('button', { name: 'New tab' }).click({ force: true })
@@ -206,7 +206,7 @@ test.describe('Tabs', () => {
    * - dragging tabs around to reorder them
    *
    * Why the reorder is still store-driven: real dnd-kit pointer events are
-   * unreliable in the hidden-window Electron mode we run E2E in (pointer
+   * unreliable in the automated browser mode we run E2E in (pointer
    * capture + collision detection interact poorly with `window.show()` being
    * suppressed). We seed the post-drag state via `reorderUnifiedTabs` — the
    * same action dnd-kit calls on drop — and then assert the tab bar's DOM

@@ -32,7 +32,7 @@ Do not use orchestration merely because the user says "hand off", "handoff", "ha
 ## Preconditions
 
 - `pebble status --json` should show a running runtime.
-- `pebble` must be on PATH (`pebble-ide` on Linux).
+- `pebble` must be on PATH.
 - The orchestration experimental feature must be enabled in Settings > Experimental.
 - `pebble orchestration` commands are RPC calls to the running Pebble runtime.
 

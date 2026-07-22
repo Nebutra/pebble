@@ -1,5 +1,5 @@
-import type { Page, TestInfo } from '@nebutra/playwright-test'
-import { expect } from '@nebutra/playwright-test'
+import type { Page, TestInfo } from '@playwright/test'
+import { expect } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'

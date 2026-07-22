@@ -10,8 +10,8 @@
  * execution and transport-specific path translation (WSL).
  *
  * Why this module exists (design doc: docs/design/share-text-search.md):
- * Before extraction, the local (`migration/electron-reference/src/main/ipc/filesystem.ts`,
- * `filesystem-search-git.ts`) and relay (`packages/product-core/relay/fs-handler-utils.ts`,
+ * Before extraction, the local filesystem search and relay
+ * (`packages/product-core/relay/fs-handler-utils.ts`,
  * `fs-handler-git-fallback.ts`) search implementations had diverged on
  * rg arg construction, rg --json parsing, the git-grep submatch regex,
  * relative-path normalization, and — most consequentially — the relay's

@@ -1,10 +1,10 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-import { dirname, join, relative, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { join, relative, resolve } from 'node:path'
 
 import ts from 'typescript'
 
-const scriptDir = dirname(fileURLToPath(import.meta.url))
+const scriptDir = import.meta.dirname
 const repoRoot = resolve(scriptDir, '../..')
 const rendererRoot = join(repoRoot, 'packages/product-core/renderer/src')
 const tauriRendererRoot = join(repoRoot, 'apps/desktop/src')
@@ -18,7 +18,9 @@ function productionTypeScriptFiles(root) {
       files.push(...productionTypeScriptFiles(path))
       continue
     }
-    if (!/\.(?:ts|tsx)$/.test(entry) || /\.(?:test|spec)\.(?:ts|tsx)$/.test(entry)) continue
+    if (!/\.(?:ts|tsx)$/.test(entry) || /\.(?:test|spec)\.(?:ts|tsx)$/.test(entry)) {
+      continue
+    }
     files.push(path)
   }
   return files
@@ -37,7 +39,9 @@ function isWindowRuntimeCall(node) {
     return false
   }
   const runtime = node.expression.expression
-  if (!ts.isPropertyAccessExpression(runtime) || runtime.name.text !== 'runtime') return false
+  if (!ts.isPropertyAccessExpression(runtime) || runtime.name.text !== 'runtime') {
+    return false
+  }
   const api = runtime.expression
   return (
     ts.isPropertyAccessExpression(api) &&
@@ -48,7 +52,9 @@ function isWindowRuntimeCall(node) {
 }
 
 function objectMethodLiteral(node) {
-  if (!node || !ts.isObjectLiteralExpression(node)) return null
+  if (!node || !ts.isObjectLiteralExpression(node)) {
+    return null
+  }
   for (const property of node.properties) {
     if (
       ts.isPropertyAssignment(property) &&
@@ -62,7 +68,9 @@ function objectMethodLiteral(node) {
 }
 
 function comparedMethodLiteral(node) {
-  if (!ts.isBinaryExpression(node)) return null
+  if (!ts.isBinaryExpression(node)) {
+    return null
+  }
   if (
     node.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken &&
     node.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsToken &&
@@ -71,8 +79,12 @@ function comparedMethodLiteral(node) {
   ) {
     return null
   }
-  if (ts.isIdentifier(node.left) && node.left.text === 'method') return literalText(node.right)
-  if (ts.isIdentifier(node.right) && node.right.text === 'method') return literalText(node.left)
+  if (ts.isIdentifier(node.left) && node.left.text === 'method') {
+    return literalText(node.right)
+  }
+  if (ts.isIdentifier(node.right) && node.right.text === 'method') {
+    return literalText(node.left)
+  }
   return null
 }
 
@@ -119,10 +131,14 @@ export function collectDispatcherMethods(file) {
   const visit = (node) => {
     if (ts.isCaseClause(node)) {
       const method = literalText(node.expression)
-      if (method) methods.add(method)
+      if (method) {
+        methods.add(method)
+      }
     }
     const comparedMethod = comparedMethodLiteral(node)
-    if (comparedMethod) methods.add(comparedMethod)
+    if (comparedMethod) {
+      methods.add(comparedMethod)
+    }
     ts.forEachChild(node, visit)
   }
   visit(source)
@@ -139,7 +155,9 @@ export function findMissingRuntimeMethods(rendererMethods, dispatcherMethods) {
 function isRemoteOnlyRendererMethod(method) {
   // Jira/Linear adapters call their dedicated preload API locally and use
   // runtime RPC only when the selected owner is a paired environment.
-  if (method.startsWith('jira.') || method.startsWith('linear.')) return true
+  if (method.startsWith('jira.') || method.startsWith('linear.')) {
+    return true
+  }
   return new Set([
     'nativeChat.readSession',
     'terminal.restoreFit',
@@ -176,4 +194,6 @@ function run() {
   )
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) run()
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  run()
+}

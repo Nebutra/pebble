@@ -40,8 +40,8 @@ jobs:
       # the repo-root node_modules. Without a root install, tsc fails with
       # "Cannot find module 'tweetnacl'/'ws'". Mobile is a separate pnpm project
       # (not in the root workspace), so this is a distinct install.
-      # --ignore-scripts skips the root postinstall (Electron native-module
-      # rebuild) which is irrelevant to a type-only check and would only add
+      # --ignore-scripts skips root native setup, which is irrelevant to a
+      # type-only check and would only add
       # time and failure surface on this ubuntu mobile runner.
       - name: Install root dependencies
         working-directory: .

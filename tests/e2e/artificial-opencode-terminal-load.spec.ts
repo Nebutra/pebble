@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@nebutra/playwright-test'
+import type { Page, TestInfo } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -122,7 +122,7 @@ const MAX_WORST_KEY_LATENCY_MS = 300
 // a catastrophic-hang detector. Mirrors ssh-docker-relay-perf's 2s worst-key
 // tolerance and the hidden-pressure scenario's relaxed worst budget.
 const MAX_WORST_KEY_LATENCY_UNDER_LOAD_MS = 3_000
-// Why: GitHub's two-worker Electron shards can briefly starve renderer timers
+// Why: GitHub's two-worker desktop shards can briefly starve renderer timers
 // without visible typing lag. Keep this as a smoke gate, not a CPU lottery.
 const MAX_TIMER_DRIFT_MS = 250
 const MAX_SCROLL_LATENCY_MS = 150

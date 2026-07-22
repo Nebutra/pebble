@@ -109,7 +109,7 @@ test.describe('File Open & Markdown Preview', () => {
     // the clicked file's name); a store-only `activeTabType === 'editor'`
     // check would pass even if EditorPanel crashed on mount and the surface
     // is blank. Timeout is generous (20s) because EditorPanel is lazy-loaded
-    // the first time the editor opens in a session — headless Electron runs
+    // the first time the editor opens in a session; CI browser runs
     // routinely take 10s+ to hydrate that chunk plus the inner Monaco/Rich
     // Markdown chunks, during which the outer Suspense shows "Loading
     // editor…" and `.editor-header-path` is not yet in the DOM.
@@ -140,7 +140,7 @@ test.describe('File Open & Markdown Preview', () => {
     const expectedHeading = clickedFile?.endsWith('README.md')
       ? /Pebble E2E Test Repo/i
       : /CLAUDE\.md/i
-    // Why 25s: first-time markdown open in a headless Electron session waits
+    // Why 25s: first-time markdown open in the CI browser session waits
     // on two lazy chunks (EditorPanel → RichMarkdownEditor) plus ProseMirror
     // boot + file read. Real-run traces show the heading reliably paints
     // within ~10-15s but with enough variance that a 15s bound flakes. The

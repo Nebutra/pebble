@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { Page, TestInfo } from '@nebutra/playwright-test'
+import type { Page, TestInfo } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActiveTerminalManager } from './helpers/terminal'
@@ -697,10 +697,10 @@ async function captureQueuedMessageFrames(
 }
 
 test.describe('Codex terminal cursor jitter repro', () => {
-  test('keeps queued-message cursor out of the Working status row in native Windows Codex @headful', async ({
+  test('keeps queued-message cursor out of the Working status row in the Windows renderer fixture', async ({
     pebblePage
   }, testInfo) => {
-    test.skip(process.platform !== 'win32', 'native Windows cursor repro only runs on Windows')
+    test.skip(process.platform !== 'win32', 'Windows renderer cursor repro only runs on Windows')
 
     await waitForSessionReady(pebblePage)
     await waitForActiveWorktree(pebblePage)

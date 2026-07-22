@@ -27,10 +27,9 @@ describe('servePebbleApp', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     delete process.env.PEBBLE_APP_EXECUTABLE
-    delete process.env.PEBBLE_APP_EXECUTABLE_NEEDS_APP_ROOT
   })
 
-  it('pins the Electron child cwd to the app root instead of the caller cwd', async () => {
+  it('pins the desktop child cwd to the app root instead of the caller cwd', async () => {
     const child = {
       kill: vi.fn(),
       once: vi.fn(
@@ -95,9 +94,8 @@ describe('servePebbleApp', () => {
     )
   })
 
-  it('passes the app root before serve flags for dev Electron executables', async () => {
-    process.env.PEBBLE_APP_EXECUTABLE = '/repo/node_modules/.bin/electron'
-    process.env.PEBBLE_APP_EXECUTABLE_NEEDS_APP_ROOT = '1'
+  it('passes serve flags directly to development desktop executables', async () => {
+    process.env.PEBBLE_APP_EXECUTABLE = '/repo/apps/desktop/src-tauri/target/debug/pebble'
     const child = {
       kill: vi.fn(),
       once: vi.fn(
@@ -114,8 +112,8 @@ describe('servePebbleApp', () => {
     await expect(servePebbleApp({ json: true, port: '6768' })).resolves.toBe(0)
 
     expect(spawnMock).toHaveBeenCalledWith(
-      '/repo/node_modules/.bin/electron',
-      [resolve(__dirname, '../../..'), '--serve', '--serve-json', '--serve-port', '6768'],
+      '/repo/apps/desktop/src-tauri/target/debug/pebble',
+      ['--serve', '--serve-json', '--serve-port', '6768'],
       expect.objectContaining({
         cwd: resolve(__dirname, '../../..')
       })
@@ -163,10 +161,10 @@ describe('servePebbleApp', () => {
     expect(child.unref).toHaveBeenCalled()
   })
 
-  it('uses a shell when a Windows npm command shim is the Electron executable', async () => {
+  it('uses a shell when a Windows command shim is the desktop executable', async () => {
     const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')
     Object.defineProperty(process, 'platform', { value: 'win32' })
-    process.env.PEBBLE_APP_EXECUTABLE = 'C:\\repo\\node_modules\\.bin\\electron.cmd'
+    process.env.PEBBLE_APP_EXECUTABLE = 'C:\\repo\\bin\\pebble-dev.cmd'
     const child = {
       kill: vi.fn(),
       once: vi.fn(
@@ -183,7 +181,7 @@ describe('servePebbleApp', () => {
     try {
       await expect(servePebbleApp({ json: true })).resolves.toBe(0)
       expect(spawnMock).toHaveBeenCalledWith(
-        'C:\\repo\\node_modules\\.bin\\electron.cmd',
+        'C:\\repo\\bin\\pebble-dev.cmd',
         ['--serve', '--serve-json'],
         expect.objectContaining({
           shell: true
@@ -205,7 +203,6 @@ describe('launchPebbleApp', () => {
   afterEach(() => {
     delete process.env.PEBBLE_OPEN_COMMAND
     delete process.env.PEBBLE_APP_EXECUTABLE
-    delete process.env.PEBBLE_APP_EXECUTABLE_NEEDS_APP_ROOT
   })
 
   it('handles asynchronous detached spawn errors without throwing', async () => {

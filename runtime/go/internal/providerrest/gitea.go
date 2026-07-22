@@ -10,8 +10,7 @@ import (
 	"strings"
 )
 
-// GiteaConfig mirrors migration/electron-reference/src/main/gitea/client.ts: optional base-URL override and
-// a `token` Authorization scheme.
+// GiteaConfig supports an optional base-URL override and a `token` Authorization scheme.
 type GiteaConfig struct {
 	APIBaseURL string
 	Token      string
@@ -33,8 +32,7 @@ const giteaCredentialHint = "set PEBBLE_GITEA_TOKEN (and PEBBLE_GITEA_API_BASE_U
 
 var giteaAPIV1SuffixPattern = regexp.MustCompile(`(?i)/api/v1$`)
 
-// normalizeGiteaAPIBaseURL mirrors normalizeGiteaApiBaseUrl in
-// migration/electron-reference/src/main/gitea/client.ts: append /api/v1 unless already present.
+// normalizeGiteaAPIBaseURL appends /api/v1 unless already present.
 func normalizeGiteaAPIBaseURL(value string) string {
 	trimmed := strings.TrimRight(strings.TrimSpace(value), "/")
 	if giteaAPIV1SuffixPattern.MatchString(trimmed) {
@@ -50,8 +48,7 @@ func (c GiteaConfig) authHeaders() map[string]string {
 	return map[string]string{"Authorization": "token " + c.Token}
 }
 
-// knownNonGiteaHosts mirrors KNOWN_NON_GITEA_HOSTS in
-// migration/electron-reference/src/main/gitea/repository-ref.ts: Gitea is the fallback provider for
+// knownNonGiteaHosts excludes major providers because Gitea is the fallback provider for
 // self-hosted remotes, so remotes on the majors are excluded.
 var knownNonGiteaHosts = map[string]bool{
 	"github.com":        true,
@@ -69,8 +66,7 @@ type giteaRepoRef struct {
 
 var giteaSCPLikePattern = regexp.MustCompile(`^(?:[^@/:]+@)?([^:\s/]+):(\S+?)(?:\.git)?$`)
 
-// parseGiteaRepoRef mirrors parseGiteaRepoRef in
-// migration/electron-reference/src/main/gitea/repository-ref.ts, including subpath-hosted instances.
+// parseGiteaRepoRef supports subpath-hosted instances.
 func parseGiteaRepoRef(remoteURL string) *giteaRepoRef {
 	trimmed := strings.TrimSpace(remoteURL)
 	if !urlSchemePattern.MatchString(trimmed) {
@@ -251,8 +247,7 @@ func mapGiteaPR(raw *giteaPRRaw) ReviewWorkItem {
 	}
 }
 
-// mapGiteaPRState mirrors mapGiteaPullRequest's state derivation in
-// migration/electron-reference/src/main/gitea/pull-request-mappers.ts (merged > closed > draft > open).
+// mapGiteaPRState applies merged > closed > draft > open precedence.
 func mapGiteaPRState(raw *giteaPRRaw) string {
 	if raw.Merged {
 		return "merged"

@@ -17,9 +17,25 @@ The macOS leg also requires:
 
 - `MAC_CERTS`
 - `MAC_CERTS_PASSWORD`
+- `APPLE_TEAM_ID`
+
+Configure exactly one notarization mode. The preferred App Store Connect team
+API-key mode requires:
+
+- `APPLE_API_KEY` (key ID)
+- `APPLE_API_ISSUER` (issuer UUID)
+- `APPLE_API_KEY_P8` (private `.p8` key contents)
+
+The fallback Apple ID mode requires:
+
 - `APPLE_ID`
 - `APPLE_APP_SPECIFIC_PASSWORD`
-- `APPLE_TEAM_ID`
+
+Do not configure partial or mixed modes. On the macOS runner, the workflow
+writes `APPLE_API_KEY_P8` only to an owner-readable file under `RUNNER_TEMP`,
+exports its path as `APPLE_API_KEY_PATH`, and passes the key ID, issuer, and
+path to Tauri. The private key contents are never passed to Tauri or written to
+the repository.
 
 The Windows leg requires `WINDOWS_CERTIFICATE` and
 `WINDOWS_CERTIFICATE_PASSWORD`. Maintainers should also configure the
@@ -33,8 +49,9 @@ clients. Do not rotate it as routine secret maintenance. Rotation requires an
 explicit compatibility and rollout plan that preserves upgrades for existing
 installations, followed by coordinated private-key custody changes.
 
-Release preflight rejects missing or placeholder updater values and incomplete
-Apple credentials before packaging. On macOS, Tauri stages and signs the
+Release preflight rejects missing or placeholder updater values and missing,
+partial, or mixed Apple notarization credentials before packaging. On macOS,
+Tauri stages and signs the
 computer-use helper before sealing the outer app, applies the repository-owned
 main and helper entitlements, and notarizes the app and DMG. Artifact inspection
 then requires Developer ID signatures, hardened runtime, embedded entitlements,

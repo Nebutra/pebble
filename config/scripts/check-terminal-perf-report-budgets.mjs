@@ -13,8 +13,8 @@ if (reportPaths.length === 0) {
   process.exit(1)
 }
 
-// Why: these mirror the e2e regression ceilings so saved JSON reports can fail
-// in automation without rerunning Electron or changing the human summary table.
+// Why: these mirror the E2E regression ceilings so saved JSON reports can fail
+// in automation without rerunning the native shell or changing the human summary table.
 const BUDGETS = {
   maxMedianKeyLatencyMs: 75,
   maxWorstKeyLatencyMs: 300,

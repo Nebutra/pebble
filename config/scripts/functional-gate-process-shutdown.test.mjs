@@ -8,7 +8,9 @@ test('waits for the complete Unix process group after graceful termination', asy
   let probes = 0
   const kill = (pid, signal) => {
     calls.push([pid, signal])
-    if (signal === 0 && ++probes > 1) throw missingProcess()
+    if (signal === 0 && ++probes > 1) {
+      throw missingProcess()
+    }
   }
 
   await stopFunctionalGateProcess(runningChild(41), {
@@ -30,8 +32,12 @@ test('cleans a surviving Unix process group after its wrapper exits', async () =
   const signals = []
   let probes = 0
   const kill = (_pid, signal) => {
-    if (signal !== 0) signals.push(signal)
-    if (signal === 0 && ++probes > 1) throw missingProcess()
+    if (signal !== 0) {
+      signals.push(signal)
+    }
+    if (signal === 0 && ++probes > 1) {
+      throw missingProcess()
+    }
   }
 
   await stopFunctionalGateProcess(
@@ -52,8 +58,12 @@ test('cleans an orphaned Unix process group after the wrapper leaves ps', async 
   const signals = []
   let probes = 0
   const kill = (_pid, signal) => {
-    if (signal !== 0) signals.push(signal)
-    if (signal === 0 && ++probes > 2) throw missingProcess()
+    if (signal !== 0) {
+      signals.push(signal)
+    }
+    if (signal === 0 && ++probes > 2) {
+      throw missingProcess()
+    }
   }
 
   await stopFunctionalGateProcess(
@@ -74,9 +84,15 @@ test('escalates a Unix process group that does not finish clean shutdown', async
   const signals = []
   let killed = false
   const kill = (_pid, signal) => {
-    if (signal !== 0) signals.push(signal)
-    if (signal === 'SIGKILL') killed = true
-    if (signal === 0 && killed) throw missingProcess()
+    if (signal !== 0) {
+      signals.push(signal)
+    }
+    if (signal === 'SIGKILL') {
+      killed = true
+    }
+    if (signal === 0 && killed) {
+      throw missingProcess()
+    }
   }
 
   await stopFunctionalGateProcess(runningChild(42), {
@@ -95,7 +111,9 @@ test('falls back to the descendant tree when npm shares the runner process group
   const alive = new Set([51, 52, 53])
   const kill = (pid, signal) => {
     if (signal === 0) {
-      if (alive.has(pid)) return
+      if (alive.has(pid)) {
+        return
+      }
       throw missingProcess()
     }
     signals.push([pid, signal])
@@ -127,7 +145,9 @@ test('uses graceful taskkill before forced Windows cleanup', async () => {
   await stopFunctionalGateProcess(runningChild(43), {
     platform: 'win32',
     kill: (_pid, signal) => {
-      if (signal === 0 && ++probes > 1) throw missingProcess()
+      if (signal === 0 && ++probes > 1) {
+        throw missingProcess()
+      }
     },
     runTaskkill: (...args) => commands.push(args),
     graceMs: 100,
@@ -140,7 +160,9 @@ test('uses graceful taskkill before forced Windows cleanup', async () => {
 
 test('treats a reused inaccessible Unix process group as cleaned up', async () => {
   const kill = (_pid, signal) => {
-    if (signal === 0) throw Object.assign(new Error('not permitted'), { code: 'EPERM' })
+    if (signal === 0) {
+      throw Object.assign(new Error('not permitted'), { code: 'EPERM' })
+    }
   }
 
   await stopFunctionalGateProcess(runningChild(54), {

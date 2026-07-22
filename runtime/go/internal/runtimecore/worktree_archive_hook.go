@@ -11,8 +11,7 @@ import (
 	"time"
 )
 
-// Electron parity (migration/electron-reference/src/main/hooks.ts + migration/electron-reference/src/main/ipc/worktrees.ts): the
-// `scripts.archive` command from the project root's pebble.yaml runs in the
+// The `scripts.archive` command from the project root's pebble.yaml runs in the
 // worktree directory before `git worktree remove`, bounded by the same
 // two-minute hook timeout, with the PEBBLE_* env vars teardown scripts expect.
 // This file is shared by the local removal path (manager.go) and

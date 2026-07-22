@@ -1,4 +1,4 @@
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { writeFileSync } from 'node:fs'
 
 async function setCustomGenerator(page: Page, scriptPath: string): Promise<void> {

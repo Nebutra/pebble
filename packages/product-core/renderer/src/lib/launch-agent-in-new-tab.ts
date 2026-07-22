@@ -116,8 +116,7 @@ export function launchAgentInNewTab(args: LaunchAgentInNewTabArgs): LaunchAgentI
           repo.connectionId ? undefined : getLocalProjectExecutionRuntimeContext(store, worktreeId)
         )
       : CLIENT_PLATFORM)
-  // Why: SSH remotes deploy the CLI shim as plain `pebble`, so the Linux-only
-  // `pebble-ide` rename must not be applied for remote launches.
+  // Why: preserve the SSH signal so remote launch routing remains relay-owned.
   const isRemote = repo ? repoIsRemote(repo) : false
   const cmdOverrides = store.settings?.agentCmdOverrides ?? {}
   const effectiveAgentArgs =

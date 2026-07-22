@@ -10,16 +10,14 @@ import (
 	"time"
 )
 
-// GitHubForkParent mirrors the owner/repo pair getRepoUpstream resolves in
-// migration/electron-reference/src/main/github/client.ts.
+// GitHubForkParent is the owner/repo pair resolved for a fork's parent.
 type GitHubForkParent struct {
 	Owner string
 	Repo  string
 }
 
 // ResolveGitHubForkParent asks the GitHub API for originOwner/originRepo's fork
-// parent, mirroring getRepoUpstream's API fallback path (migration/electron-reference/src/main/github/client.ts)
-// for repos with no `upstream` git remote configured. Best-effort: any CLI
+// parent for repos with no `upstream` git remote configured. Best-effort: any CLI
 // failure (missing gh, unauthenticated, non-fork, network) resolves to nil
 // rather than surfacing an error, matching Electron's swallow-and-return-null
 // behavior for this best-effort lookup.
@@ -57,8 +55,8 @@ func ResolveGitHubForkParent(ctx context.Context, workdir string, originOwner st
 	return &GitHubForkParent{Owner: parentOwner, Repo: parentRepo}
 }
 
-// ghPRListFields mirrors WORK_ITEM_PR_LIST_JSON_FIELDS in migration/electron-reference/src/main/github/client.ts.
-// gh infers owner/repo from the git remotes in workdir, matching Electron's
+// ghPRListFields is the canonical work-item projection requested from gh.
+// gh infers owner/repo from the git remotes in workdir, matching the desktop runtime's
 // cwd-based resolution.
 const ghPRListFields = "number,title,state,url,labels,updatedAt,author,isDraft,headRefName,baseRefName,headRefOid,isCrossRepository"
 
@@ -92,8 +90,7 @@ type ghAuthor struct {
 	Name string `json:"name"`
 }
 
-// ListGitHubPRs runs `gh pr list` and maps to GitHubWorkItem[] (type "pr"),
-// mirroring the PR side of listWorkItems in migration/electron-reference/src/main/github/client.ts.
+// ListGitHubPRs runs `gh pr list` and maps to GitHubWorkItem[] (type "pr").
 func ListGitHubPRs(ctx context.Context, workdir string, limit int) ([]GitHubWorkItem, error) {
 	if limit <= 0 {
 		limit = 24
@@ -129,8 +126,7 @@ func GetGitHubPR(ctx context.Context, workdir string, number int) (GitHubWorkIte
 	return mapGitHubPR(&raw), nil
 }
 
-// GetGitHubPRChecks mirrors the `gh pr checks --json name,state,link` fallback
-// path in getPRChecks (migration/electron-reference/src/main/github/client.ts). A PR with no check runs makes
+// GetGitHubPRChecks uses the `gh pr checks --json name,state,link` fallback. A PR with no check runs makes
 // gh exit non-zero with "no checks reported"; that is an empty section, not a
 // failure, exactly as Electron treats it.
 func GetGitHubPRChecks(ctx context.Context, workdir string, number int) ([]PRCheckDetail, error) {
@@ -570,7 +566,7 @@ func ghAuthorLogin(author *ghAuthor) *string {
 	return &login
 }
 
-// mapCheckStatus mirrors mapCheckStatus in migration/electron-reference/src/main/github/mappers.ts.
+// mapCheckStatus normalizes GitHub check states for the shared review contract.
 func mapCheckStatus(state string) string {
 	switch strings.ToUpper(state) {
 	case "PENDING", "QUEUED":
@@ -582,7 +578,7 @@ func mapCheckStatus(state string) string {
 	}
 }
 
-// mapCheckConclusion mirrors mapCheckConclusion in migration/electron-reference/src/main/github/mappers.ts.
+// mapCheckConclusion normalizes GitHub check conclusions for the shared review contract.
 func mapCheckConclusion(state string) *string {
 	var result string
 	switch strings.ToUpper(state) {

@@ -4,7 +4,7 @@ React Native companion app for Pebble. Monitor worktrees, view terminal output, 
 
 Local development uses two processes:
 
-- Pebble desktop/Electron from the repo root. This hosts the mobile WebSocket RPC server on port `6768`.
+- Pebble desktop/Tauri from the repo root. This hosts the mobile WebSocket RPC server on port `6768`.
 - Expo Metro from `mobile/`. This serves the React Native app on port `8081`.
 
 Unless a command says otherwise, run mobile app commands from the `mobile/` directory.
@@ -32,7 +32,7 @@ Confirm the mobile RPC server is listening:
 lsof -nP -iTCP:6768 -sTCP:LISTEN
 ```
 
-Restart `pnpm dev` after changing Electron main-process code. Metro hot reload only applies to the mobile JavaScript bundle.
+Restart `pnpm dev` after changing the Tauri native bridge or Go runtime. Metro hot reload only applies to the mobile JavaScript bundle.
 
 ## Start The Mobile App
 

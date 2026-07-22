@@ -47,7 +47,9 @@ export function compareDesktopParityScreenshots(referenceBytes, candidateBytes, 
   let mismatchPixels = 0
   for (let offset = 0; offset < reference.data.length; offset += 4) {
     const changed = pixelChanged(reference, candidate, offset, channelThreshold, spatialTolerancePx)
-    if (changed) mismatchPixels += 1
+    if (changed) {
+      mismatchPixels += 1
+    }
     writeDiffPixel(diff.data, candidate.data, offset, changed)
   }
 
@@ -82,8 +84,12 @@ function pixelChanged(reference, candidate, offset, threshold, spatialToleranceP
   const effectiveSpatialTolerancePx = rasterEdge
     ? Math.max(spatialTolerancePx, RASTER_EDGE_SPATIAL_TOLERANCE_PX)
     : spatialTolerancePx
-  if (pixelsMatch(reference.data, offset, candidate.data, offset, effectiveThreshold)) return false
-  if (effectiveSpatialTolerancePx === 0) return true
+  if (pixelsMatch(reference.data, offset, candidate.data, offset, effectiveThreshold)) {
+    return false
+  }
+  if (effectiveSpatialTolerancePx === 0) {
+    return true
+  }
   const pixelIndex = offset / 4
   const x = pixelIndex % reference.width
   const y = Math.floor(pixelIndex / reference.width)
@@ -116,10 +122,20 @@ function isRasterEdge(image, offset) {
   const x = pixelIndex % image.width
   const y = Math.floor(pixelIndex / image.width)
   const center = luminanceAt(image.data, offset)
-  for (let nearbyY = Math.max(0, y - 1); nearbyY <= Math.min(image.height - 1, y + 1); nearbyY += 1) {
-    for (let nearbyX = Math.max(0, x - 1); nearbyX <= Math.min(image.width - 1, x + 1); nearbyX += 1) {
+  for (
+    let nearbyY = Math.max(0, y - 1);
+    nearbyY <= Math.min(image.height - 1, y + 1);
+    nearbyY += 1
+  ) {
+    for (
+      let nearbyX = Math.max(0, x - 1);
+      nearbyX <= Math.min(image.width - 1, x + 1);
+      nearbyX += 1
+    ) {
       const nearbyOffset = (nearbyY * image.width + nearbyX) * 4
-      if (Math.abs(center - luminanceAt(image.data, nearbyOffset)) >= RASTER_EDGE_CONTRAST) return true
+      if (Math.abs(center - luminanceAt(image.data, nearbyOffset)) >= RASTER_EDGE_CONTRAST) {
+        return true
+      }
     }
   }
   return false
@@ -137,7 +153,9 @@ function hasNearbyMatch(source, sourceOffset, target, x, y, threshold, radius) {
   for (let nearbyY = minY; nearbyY <= maxY; nearbyY += 1) {
     for (let nearbyX = minX; nearbyX <= maxX; nearbyX += 1) {
       const targetOffset = (nearbyY * target.width + nearbyX) * 4
-      if (pixelsMatch(source.data, sourceOffset, target.data, targetOffset, threshold)) return true
+      if (pixelsMatch(source.data, sourceOffset, target.data, targetOffset, threshold)) {
+        return true
+      }
     }
   }
   return false
@@ -191,7 +209,7 @@ function readCliOptions(argv) {
   const diffPath = values.get('diff')
   if (!referencePath || !candidatePath || !diffPath) {
     throw new Error(
-      'Required: --reference <electron.png> --candidate <tauri.png> --diff <diff.png>'
+      'Required: --reference <approved-tauri.png> --candidate <tauri.png> --diff <diff.png>'
     )
   }
   return {
@@ -220,7 +238,9 @@ function runCli() {
   writeFileSync(options.diffPath, result.diffBytes)
   const report = { ...result, diffBytes: undefined, diffPath: options.diffPath }
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
-  if (!result.matches) process.exitCode = 1
+  if (!result.matches) {
+    process.exitCode = 1
+  }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

@@ -2,9 +2,8 @@
 // boundary. Lives in `shared/` rather than main so the Privacy pane
 // (renderer-side) can import the type without pulling in main-only code.
 //
-// The same discriminated union is what `migration/electron-reference/src/main/telemetry/consent.ts`
-// produces from `resolveConsent(settings)`. Keeping it here as the source
-// of truth means the IPC getter in `migration/electron-reference/src/main/ipc/telemetry.ts` returns
+// The native telemetry bridge produces this discriminated union from persisted
+// settings. Keeping it here as the source of truth means the bridge getter returns
 // this exact shape and the Privacy pane renders helper text by pattern-
 // matching the `reason` without re-deriving the rules.
 

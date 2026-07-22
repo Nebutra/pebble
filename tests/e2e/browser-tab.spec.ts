@@ -141,7 +141,9 @@ async function readBrowserInputValue(
     const slot = [...document.querySelectorAll('[data-browser-overlay-tab-id]')].find(
       (candidate) => candidate.getAttribute('data-browser-overlay-tab-id') === targetBrowserTabId
     )
-    const webview = slot?.querySelector('webview') as Electron.WebviewTag | null
+    const webview = slot?.querySelector('webview') as (HTMLElement & {
+      executeJavaScript: (script: string) => Promise<unknown>
+    }) | null
     if (!webview) {
       return null
     }
@@ -167,7 +169,9 @@ async function writeBrowserInputValue(
       const slot = [...document.querySelectorAll('[data-browser-overlay-tab-id]')].find(
         (candidate) => candidate.getAttribute('data-browser-overlay-tab-id') === targetBrowserTabId
       )
-      const webview = slot?.querySelector('webview') as Electron.WebviewTag | null
+      const webview = slot?.querySelector('webview') as (HTMLElement & {
+        executeJavaScript: (script: string) => Promise<unknown>
+      }) | null
       if (!webview) {
         throw new Error(`Missing webview for browser tab ${targetBrowserTabId}`)
       }
@@ -286,7 +290,7 @@ test.describe('Browser Tab', () => {
       await writeBrowserInputValue(pebblePage, secondTab!.id, 'second typed value')
 
       // Why: switching browser tabs used to unmount and reparent the inactive
-      // Electron webview, which recreated the guest document and erased form DOM.
+      // desktop child webview, which recreated the guest document and erased form DOM.
       await switchToBrowserTab(pebblePage, worktreeId, firstTab!.id)
       await expect
         .poll(async () => readBrowserInputValue(pebblePage, firstTab!.id), { timeout: 5_000 })

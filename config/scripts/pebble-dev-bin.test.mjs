@@ -39,7 +39,7 @@ describe('pebble-dev package bin', () => {
         ...process.env,
         PEBBLE_DEV_CLI_ENTRY_PATH: cliEntry,
         PEBBLE_DEV_USER_DATA_PATH: path.join(root, 'user-data'),
-        PEBBLE_APP_EXECUTABLE: path.join(root, 'Electron')
+        PEBBLE_APP_EXECUTABLE: path.join(root, 'Pebble')
       },
       stdio: 'ignore'
     })
@@ -47,7 +47,7 @@ describe('pebble-dev package bin', () => {
     expect(JSON.parse(readFileSync(outputPath, 'utf8'))).toEqual({
       argv: ['--help'],
       pebbleUserDataPath: path.join(root, 'user-data'),
-      pebbleAppExecutable: path.join(root, 'Electron')
+      pebbleAppExecutable: path.join(root, 'Pebble')
     })
   })
 })

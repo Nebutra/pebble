@@ -262,7 +262,7 @@ export function ReviewPRViewAnimatedVisual(props: { reducedMotion: boolean }): J
                 </span>
               </div>
               <div className="ravpr-comment-list">
-                <CommentCard index={0} path="migration/electron-reference/src/main/diagnostics.ts">
+                <CommentCard index={0} path="apps/desktop/src-tauri/src/commands/diagnostics.rs">
                   {translate(
                     'auto.components.feature.wall.ReviewPRViewAnimatedVisual.71828fba75',
                     'Can we include the failing command in the diagnostic payload?'

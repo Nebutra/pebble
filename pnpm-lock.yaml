@@ -86,9 +86,6 @@ importers:
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@nebutra/playwright-test':
-        specifier: npm:@stablyai/playwright-test@^2.1.14
-        version: '@stablyai/playwright-test@2.1.14(@playwright/test@1.59.1)(zod@4.4.3)'
       '@playwright/test':
         specifier: ^1.59.1
         version: 1.59.1
@@ -2229,26 +2226,6 @@ packages:
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
 
-  '@stablyai/playwright-base@2.1.14':
-    resolution: {integrity: sha512-/iAgMW5tC0ETDo3mFyTzszRrD7rGFIT4fgDgtZxqa9vPhiTLix/1+GeOOBNY0uS+XRLFY0Uc/irsC3XProL47g==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      '@playwright/test': ^1.52.0
-      zod: ^3.25.0 || ^4.0.0
-    peerDependenciesMeta:
-      zod:
-        optional: true
-
-  '@stablyai/playwright-test@2.1.14':
-    resolution: {integrity: sha512-CAyVVnRdsyJg9pbK3Yq5L9lcvEabilFLb2RWeTQybKv7sDkEEqE2t1boXqBt3X6wQO6lsyhUHB9pc10wSwuc4Q==}
-    peerDependencies:
-      '@playwright/test': ^1.52.0
-
-  '@stablyai/playwright@2.1.14':
-    resolution: {integrity: sha512-+SkphioOf+o2VWiM3KPm/fFTTjwNHUV5b2ZRPrLMTsW6bwmEvjo2FbVOUobNBqbopQBnntNLd8ZCG2gvw7rwtg==}
-    peerDependencies:
-      '@playwright/test': ^1.52.0
-
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
@@ -2857,9 +2834,6 @@ packages:
 
   '@types/react@19.2.14':
     resolution: {integrity: sha512-ilcTH/UniCkMdtexkoCN0bI7pMcJDvmQFPvuPvmEaYA/NSfFTAgdUSLAoVjaRJm7+6PvcM+q1zYOwS4wTYMF9w==}
-
-  '@types/retry@0.12.0':
-    resolution: {integrity: sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==}
 
   '@types/set-cookie-parser@2.4.10':
     resolution: {integrity: sha512-GGmQVGpQWUe5qglJozEjZV/5dyxbOOZ0LHe/lqyWssB88Y4svNfst0uqBVscdDeIKl5Jy5+aPSvy7mI9tYRguw==}
@@ -4231,9 +4205,6 @@ packages:
   jose@6.2.3:
     resolution: {integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==}
 
-  jpeg-js@0.4.4:
-    resolution: {integrity: sha512-WZzeDOEtTOBK4Mdsar0IqEU5sMr3vSV2RqkAIzUEV2BHnUfKGyswWFPFwK5EeDo93K3FohSHbLAjj0s1Wzd+dg==}
-
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -4815,10 +4786,6 @@ packages:
     resolution: {integrity: sha512-R79ZZ/0wAxKGu3oYMlz8jy/kbhsNrS7SKZ7PxEHBgJ5+F2mtFW2fK2cOtBh1cHYkQsbzFV7I+EoRKe6Yt0oK7A==}
     engines: {node: '>=8'}
 
-  p-retry@4.6.2:
-    resolution: {integrity: sha512-312Id396EbJdvRONlngUx0NydfrIQ5lsYu0znKVUzVvArzEIt08V1qhtyESbGVd1FGX7UKtiFp5uwKZdM8wIuQ==}
-    engines: {node: '>=8'}
-
   p-try@2.2.0:
     resolution: {integrity: sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ==}
     engines: {node: '>=6'}
@@ -4910,10 +4877,6 @@ packages:
   pngjs@5.0.0:
     resolution: {integrity: sha512-40QW5YalBNfQo5yRYmiw7Yz6TKKVr3h6970B2YE+3fQpsWcrbj1PzJgxeJ19DRQjhMbKPIuMY8rFaXc8moolVw==}
     engines: {node: '>=10.13.0'}
-
-  pngjs@7.0.0:
-    resolution: {integrity: sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow==}
-    engines: {node: '>=14.19.0'}
 
   points-on-curve@0.2.0:
     resolution: {integrity: sha512-0mYKnYYe9ZcqMCWhUjItv/oHjvgEsfKvnUTg8sAtnHr3GVy7rGkXCb6d5cSyqrWqL4k81b9CPg3urd+T7aop3A==}
@@ -5188,10 +5151,6 @@ packages:
   restore-cursor@5.1.0:
     resolution: {integrity: sha512-oMA2dcrw6u0YfxJQXm342bFKX/E4sG9rbTzO9ptUcR/e8A33cHuvStiYOwH7fszkZlZ1z/ta9AAoPk2F4qIOHA==}
     engines: {node: '>=18'}
-
-  retry@0.13.1:
-    resolution: {integrity: sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg==}
-    engines: {node: '>= 4'}
 
   rettime@0.11.11:
     resolution: {integrity: sha512-ILJRqVWBCTlg9r42fFgwVZx1gnFAcQF8mRoMkbgQfIrjEDf9nbBFDFx00oloOa+Q869FUtaYDXZvEfnecQSCoQ==}
@@ -7547,30 +7506,6 @@ snapshots:
 
   '@sindresorhus/merge-streams@4.0.0': {}
 
-  '@stablyai/playwright-base@2.1.14(@playwright/test@1.59.1)(zod@4.4.3)':
-    dependencies:
-      '@playwright/test': 1.59.1
-      jpeg-js: 0.4.4
-      p-retry: 4.6.2
-      pngjs: 7.0.0
-    optionalDependencies:
-      zod: 4.4.3
-
-  '@stablyai/playwright-test@2.1.14(@playwright/test@1.59.1)(zod@4.4.3)':
-    dependencies:
-      '@playwright/test': 1.59.1
-      '@stablyai/playwright': 2.1.14(@playwright/test@1.59.1)(zod@4.4.3)
-      '@stablyai/playwright-base': 2.1.14(@playwright/test@1.59.1)(zod@4.4.3)
-    transitivePeerDependencies:
-      - zod
-
-  '@stablyai/playwright@2.1.14(@playwright/test@1.59.1)(zod@4.4.3)':
-    dependencies:
-      '@playwright/test': 1.59.1
-      '@stablyai/playwright-base': 2.1.14(@playwright/test@1.59.1)(zod@4.4.3)
-    transitivePeerDependencies:
-      - zod
-
   '@standard-schema/spec@1.1.0': {}
 
   '@tailwindcss/node@4.2.4':
@@ -8175,8 +8110,6 @@ snapshots:
   '@types/react@19.2.14':
     dependencies:
       csstype: 3.2.3
-
-  '@types/retry@0.12.0': {}
 
   '@types/set-cookie-parser@2.4.10':
     dependencies:
@@ -9583,8 +9516,6 @@ snapshots:
 
   jose@6.2.3: {}
 
-  jpeg-js@0.4.4: {}
-
   js-tokens@4.0.0: {}
 
   js-yaml@4.2.0:
@@ -10450,11 +10381,6 @@ snapshots:
     dependencies:
       p-limit: 2.3.0
 
-  p-retry@4.6.2:
-    dependencies:
-      '@types/retry': 0.12.0
-      retry: 0.13.1
-
   p-try@2.2.0: {}
 
   package-manager-detector@1.6.0: {}
@@ -10531,8 +10457,6 @@ snapshots:
       fsevents: 2.3.2
 
   pngjs@5.0.0: {}
-
-  pngjs@7.0.0: {}
 
   points-on-curve@0.2.0: {}
 
@@ -10946,8 +10870,6 @@ snapshots:
     dependencies:
       onetime: 7.0.0
       signal-exit: 4.1.0
-
-  retry@0.13.1: {}
 
   rettime@0.11.11: {}
 

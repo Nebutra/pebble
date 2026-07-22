@@ -1,4 +1,4 @@
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import type { PRComment, PRInfo } from '../../../packages/product-core/shared/types'
 
 export type PRCommentsSidebarSeed = {

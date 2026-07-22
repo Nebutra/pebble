@@ -12,8 +12,7 @@ import (
 	"strings"
 )
 
-// AzureDevOpsConfig mirrors migration/electron-reference/src/main/azure-devops/azure-devops-api-request.ts:
-// Bearer access token first, then Basic username:PAT.
+// AzureDevOpsConfig prefers a Bearer access token, then Basic username:PAT.
 type AzureDevOpsConfig struct {
 	APIBaseURL  string
 	PAT         string
@@ -62,8 +61,7 @@ type azureDevOpsRepoRef struct {
 
 var azureDevOpsSCPLikePattern = regexp.MustCompile(`^(?:[^@/:]+@)?([^:\s/]+):(\S+?)(?:\.git)?$`)
 
-// parseAzureDevOpsRepoRef mirrors parseAzureDevOpsRepoRef in
-// migration/electron-reference/src/main/azure-devops/repository-ref.ts: dev.azure.com URLs,
+// parseAzureDevOpsRepoRef accepts dev.azure.com URLs,
 // ssh.dev.azure.com v3 remotes, *.visualstudio.com, and on-prem servers
 // identified by the `_git` path convention.
 func parseAzureDevOpsRepoRef(remoteURL string) *azureDevOpsRepoRef {
@@ -301,8 +299,7 @@ func mapAzureDevOpsPR(raw *azureDevOpsPRRaw, webBaseURL string) ReviewWorkItem {
 	}
 }
 
-// mapAzureDevOpsPRState mirrors mapAzureDevOpsPullRequestState in
-// migration/electron-reference/src/main/azure-devops/pull-request-mappers.ts.
+// mapAzureDevOpsPRState normalizes provider state for the shared review contract.
 func mapAzureDevOpsPRState(raw *azureDevOpsPRRaw) string {
 	status := ""
 	if raw.Status != nil {

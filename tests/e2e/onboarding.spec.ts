@@ -4,13 +4,13 @@
  *
  * The onboarding overlay is gated by `OnboardingState.closedAt === null` (see
  * `shouldShowOnboarding` in `should-show-onboarding.ts`). Each test gets a fresh
- * Electron instance + isolated userData dir, so persistence starts clean and
+ * isolated browser context + mocked native store, so persistence starts clean and
  * the overlay renders on first paint without any setup.
  */
 
 import { test, expect } from './helpers/pebble-app'
 import { waitForSessionReady } from './helpers/store'
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import type { GlobalSettings, TuiAgent } from '../../packages/product-core/shared/types'
 import { ONBOARDING_FINAL_STEP } from '../../packages/product-core/shared/constants'
 

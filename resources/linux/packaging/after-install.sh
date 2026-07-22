@@ -1,38 +1,36 @@
 #!/bin/bash
-# Why: register the bundled `pebble-ide` CLI on PATH at package-install time.
-# The in-app "Install CLI" action (CliInstaller) can never run on a headless
-# server, so without this symlink `pebble serve` is unreachable from the shell on
-# the exact hosts that need it most. deb/rpm both run this after unpacking.
-#
-# The shim resolves the real app by walking up from its own location, so a
-# symlink works. We discover the install dir instead of hardcoding /opt/Pebble
-# because electron-builder's directory name can vary by productName sanitization.
+# Why: deb/rpm install the Tauri binary under its Cargo name; expose the stable
+# `pebble` command while retaining the former Linux command as a compatibility alias.
 set -e
 
-primary_link="/usr/bin/pebble-ide"
-legacy_link="/usr/bin/pebble-ide"
+native_executable="/usr/bin/pebble-desktop-tauri"
 
-for dir in /opt/Pebble /opt/pebble-ide /opt/pebble /opt/Pebble /opt/pebble-ide /opt/pebble; do
-  sandbox="$dir/chrome-sandbox"
-  if [ -f "$sandbox" ]; then
-    # Why: packaged Linux installs must leave Chromium's sandbox helper usable
-    # on hosts where unprivileged user namespaces are unavailable.
-    chmod 4755 "$sandbox" || true
+is_pebble_owned_target() {
+  case "$1" in
+    "$native_executable"|/opt/Pebble/resources/bin/pebble-ide|/opt/pebble-ide/resources/bin/pebble-ide|/opt/pebble/resources/bin/pebble-ide)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+if [ ! -x "$native_executable" ]; then
+  exit 0
+fi
+
+for link in /usr/bin/pebble /usr/bin/pebble-ide; do
+  if [ -e "$link" ] && [ ! -L "$link" ]; then
+    continue
   fi
-
-  shim="$dir/resources/bin/pebble-ide"
-  if [ -x "$shim" ]; then
-    # Only manage our own symlinks; never clobber unrelated user/system commands.
-    if [ ! -e "$primary_link" ] || [ -L "$primary_link" ]; then
-      ln -sf "$shim" "$primary_link"
+  if [ -L "$link" ]; then
+    target="$(readlink "$link" || true)"
+    if ! is_pebble_owned_target "$target"; then
+      continue
     fi
-
-    legacy_shim="$dir/resources/bin/pebble-ide"
-    if [ -x "$legacy_shim" ] && { [ ! -e "$legacy_link" ] || [ -L "$legacy_link" ]; }; then
-      ln -sf "$legacy_shim" "$legacy_link"
-    fi
-    break
   fi
+  ln -sfn "$native_executable" "$link"
 done
 
 exit 0

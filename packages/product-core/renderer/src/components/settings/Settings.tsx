@@ -281,7 +281,7 @@ function Settings(): React.JSX.Element {
   const isMac = isMacUserAgent()
   const isWebClient = isWebClientLocation()
   const showDesktopOnlySettings = !isWebClient
-  const showElectronCompatibilitySettings = showDesktopOnlySettings && !isPebbleTauriShell()
+  const showLegacyDesktopCompatibilitySettings = showDesktopOnlySettings && !isPebbleTauriShell()
   const [activeSectionId, setActiveSectionId] = useState('general')
   const [mountedSectionIds, setMountedSectionIds] = useState<Set<string>>(
     getInitialMountedSectionIds
@@ -1484,7 +1484,7 @@ function Settings(): React.JSX.Element {
                   {isSectionMounted('privacy') ? <PrivacyPane settings={settings} /> : null}
                 </SettingsSection>
 
-                {showElectronCompatibilitySettings ? (
+                {showLegacyDesktopCompatibilitySettings ? (
                   <SettingsSection
                     id="advanced"
                     title={translate('auto.components.settings.Settings.1c87f8d024', 'Advanced')}

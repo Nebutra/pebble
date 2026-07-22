@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { scanLegacyBrandIdentifiers } from './legacy-brand-identifier-scan.mjs'
+import { verifyPebbleRepositoryLayout } from './verify-pebble-repository-layout.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../..')
 
@@ -37,7 +38,7 @@ const checks = [
       text.includes('DEFAULT_MAX_MISMATCH_RATIO = 0.015') &&
       text.includes('mismatchRatio <= maxMismatchRatio') &&
       text.includes('writeFileSync(options.diffPath, result.diffBytes)') &&
-      text.includes('if (!result.matches) process.exitCode = 1')
+      /if\s*\(!result\.matches\)\s*\{?\s*process\.exitCode\s*=\s*1/.test(text)
   },
   {
     name: 'Tauri debug shell captures the primary renderer without window chrome',
@@ -860,7 +861,7 @@ const checks = [
     expect: (text) =>
       text.includes('export const ClientUiUpdateSchema') &&
       text.includes('export const FeatureInteractionIdSchema') &&
-      text.includes('.strict().default({})')
+      /\.strict\(\)\s*\.default\(\{\}\)/.test(text)
   },
   {
     name: 'Tauri UI runtime RPC persists validated canonical UI state',
@@ -1018,11 +1019,19 @@ const checks = [
   },
   {
     name: 'Release CI preflights signing and inspects native sidecar artifacts',
-    file: '.github/workflows/tauri-desktop-release.yml',
+    files: [
+      '.github/workflows/tauri-desktop-release.yml',
+      'config/scripts/prepare-apple-api-key.mjs'
+    ],
     expect: (text) =>
       text.includes('verify-tauri-release-preflight.mjs') &&
       text.includes('verify-tauri-release-artifacts.mjs') &&
       text.includes('tauri-release-inspection-${{ matrix.label }}') &&
+      text.includes('prepare-apple-api-key.mjs') &&
+      text.includes('APPLE_API_KEY_P8') &&
+      text.includes('APPLE_API_ISSUER') &&
+      text.includes('APPLE_API_KEY_PATH') &&
+      text.includes('mode: 0o600') &&
       text.includes('APPLE_TEAM_ID')
   },
   {
@@ -1360,11 +1369,12 @@ const checks = [
       !text.includes('Browser cookie import requires the Tauri WebView adapter.')
   },
   {
-    name: 'Tauri bundles target-qualified Go runtime and relay sidecars',
+    name: 'Tauri bundles target-qualified Go runtime, CLI, and relay sidecars',
     file: 'apps/desktop/src-tauri/tauri.conf.json',
     expect: (text) =>
       text.includes('node scripts/prepare-go-sidecars.mjs') &&
       text.includes('"binaries/pebble-runtime"') &&
+      text.includes('"binaries/pebble-control"') &&
       text.includes('"binaries/pebble-relay-worker"') &&
       text.includes('"binaries/relay-workers"')
   },
@@ -1377,6 +1387,7 @@ const checks = [
       text.includes("'universal-apple-darwin'") &&
       text.includes("run('lipo'") &&
       text.includes("'pebble-runtime'") &&
+      text.includes("'pebble-control'") &&
       text.includes("'pebble-relay-worker'") &&
       text.includes('buildRelayWorkerMatrix()') &&
       text.includes('pebble-relay-worker-${goos}-${goarch}') &&
@@ -1832,7 +1843,8 @@ const checks = [
     name: 'Tauri speech API exposes cloud dictation and explicit local-model gaps',
     file: 'apps/desktop/src/tauri-speech-api.ts',
     expect: (text) =>
-      text.includes('SPEECH_MODEL_CATALOG, getCatalogModel') &&
+      text.includes('SPEECH_MODEL_CATALOG') &&
+      text.includes('getCatalogModel') &&
       text.includes('speech_get_model_states') &&
       text.includes('TAURI_LOCAL_INFERENCE_UNAVAILABLE') &&
       text.includes('speech_start_dictation') &&
@@ -2500,8 +2512,7 @@ const checks = [
     name: 'Tauri menu API bridges native menu actions into renderer callbacks',
     file: 'apps/desktop/src/tauri-menu-api.ts',
     expect: (text) =>
-      text.includes('Menu,') &&
-      text.includes("from '@tauri-apps/api/menu'") &&
+      text.includes("import { Menu } from '@tauri-apps/api/menu'") &&
       text.includes("import { getCurrentWebview } from '@tauri-apps/api/webview'") &&
       text.includes('getEffectiveKeybindingsForAction') &&
       text.includes('export function installTauriMenuApi') &&
@@ -2604,7 +2615,7 @@ const checks = [
       text.includes('onExit: addRuntimePtyExitListener') &&
       text.includes('recordRuntimeAgentSessionSpawn({ session, spawnOptions: opts })') &&
       text.includes('markRuntimeAgentSessionStopped(id)') &&
-      text.includes('management: {') &&
+      text.includes('management: runtimePtyManagement') &&
       text.includes('listSessions: listManagedRuntimePtySessions') &&
       text.includes('killAll: killAllManagedRuntimePtySessions') &&
       text.includes('restart: restartManagedRuntimePtyProcess') &&
@@ -2659,7 +2670,7 @@ const checks = [
     expect: (text) =>
       text.includes('queueMicrotask(() => flush(sessionId, queue))') &&
       text.includes('flushScheduled: boolean') &&
-      text.includes('if (queue.pending.length === 0) return') &&
+      text.includes('if (queue.pending.length === 0)') &&
       !text.includes('sending: boolean') &&
       text.includes('shouldFlushImmediately') &&
       text.includes("writes.map((write) => write.data).join('')") &&
@@ -4091,10 +4102,7 @@ const checks = [
   },
   {
     name: 'Tauri registers Pebble deep links as a native desktop protocol',
-    files: [
-      'apps/desktop/src-tauri/src/main.rs',
-      'apps/desktop/src-tauri/src/primary_window.rs'
-    ],
+    files: ['apps/desktop/src-tauri/src/main.rs', 'apps/desktop/src-tauri/src/primary_window.rs'],
     expect: (text) =>
       text.includes('.plugin(tauri_plugin_deep_link::init())') &&
       text.includes('tauri_plugin_single_instance::init') &&
@@ -4330,12 +4338,12 @@ const checks = [
     name: 'Tauri reconciles Command Code hooks with sanitized-environment recovery',
     file: 'apps/desktop/src-tauri/src/commands/agent_hooks_command_code.rs',
     expect: (text) =>
-      text.includes('(\"PreToolUse\", true)') &&
-      text.includes('(\"PostToolUse\", true)') &&
-      text.includes('(\"Stop\", false)') &&
+      text.includes('("PreToolUse", true)') &&
+      text.includes('("PostToolUse", true)') &&
+      text.includes('("Stop", false)') &&
       text.includes('__pebble_read_ancestor_var') &&
       text.includes('__pebble_fill_from_endpoint_file') &&
-      text.includes('!= \"$PEBBLE_AGENT_HOOK_PORT\"') &&
+      text.includes('!= "$PEBBLE_AGENT_HOOK_PORT"') &&
       text.includes('sourceEndpointByPort') &&
       text.includes('write_json_atomically')
   },
@@ -4344,9 +4352,9 @@ const checks = [
     file: 'apps/desktop/src-tauri/src/commands/agent_hooks_grok.rs',
     expect: (text) =>
       text.includes('join("pebble-status.json")') &&
-      text.includes('(\"SessionStart\", false)') &&
-      text.includes('(\"PostToolUseFailure\", true)') &&
-      text.includes('(\"Notification\", false)') &&
+      text.includes('("SessionStart", false)') &&
+      text.includes('("PostToolUseFailure", true)') &&
+      text.includes('("Notification", false)') &&
       text.includes('"timeout": 10') &&
       text.includes('remove_managed') &&
       text.includes('write_json_atomically')
@@ -5091,7 +5099,7 @@ const checks = [
       text.includes('subscribeRuntimeEventPush(handleActionEvent, handlePushState)') &&
       text.includes("entry.topic !== 'computer.changed'") &&
       text.includes('readTauriComputerAction(envelope.payload)') &&
-      text.includes('if (pushActive) return') &&
+      text.includes('if (pushActive)') &&
       text.includes('FALLBACK_POLL_INTERVAL_MS') &&
       text.includes('pollGroups') &&
       text.includes('TERMINAL_CACHE_LIMIT')
@@ -5596,11 +5604,11 @@ const checks = [
       ) && text.includes("@source '../../../packages/product-core/renderer/src';")
   },
   {
-    name: 'Roadmap declares Tauri as the desktop mainline and Electron as parity-only',
+    name: 'Roadmap declares Tauri as the sole desktop mainline',
     file: 'ROADMAP.md',
     expect: (text) =>
       text.includes('Tauri desktop mainline migration') &&
-      text.includes('Electron is a parity reference only')
+      text.includes('secondary desktop-shell workspace')
   },
   {
     name: 'Root package exposes the Tauri mainline verifier',
@@ -5629,7 +5637,40 @@ const checks = [
       text.includes('Verify Tauri desktop mainline contract') &&
       text.includes('pnpm verify:tauri-mainline') &&
       text.includes('Build Tauri desktop shell') &&
-      text.includes('pnpm build:tauri:no-bundle')
+      text.includes('pnpm build:tauri:no-bundle') &&
+      text.includes('--app-dir=apps/desktop/src-tauri/target/release') &&
+      text.includes('--sidecar-dir=apps/desktop/src-tauri/binaries') &&
+      !text.includes('dist/linux-unpacked')
+  },
+  {
+    name: 'Linux packages register the native Pebble CLI aliases',
+    file: 'apps/desktop/src-tauri/tauri.linux.conf.json',
+    expect: (text) => {
+      const config = JSON.parse(text)
+      const linux = config.bundle?.linux
+      return (
+        linux?.deb?.postInstallScript === '../../../resources/linux/packaging/after-install.sh' &&
+        linux?.deb?.postRemoveScript === '../../../resources/linux/packaging/after-remove.sh' &&
+        linux?.rpm?.postInstallScript === '../../../resources/linux/packaging/after-install.sh' &&
+        linux?.rpm?.postRemoveScript === '../../../resources/linux/packaging/after-remove.sh'
+      )
+    }
+  },
+  {
+    name: 'Homebrew casks expose the native Tauri entrypoint as pebble',
+    file: 'Casks/pebble.rb',
+    expect: (text) =>
+      text.includes(
+        'binary "#{appdir}/Pebble.app/Contents/MacOS/pebble-desktop-tauri", target: "pebble"'
+      ) && !text.includes('Contents/Resources/bin/pebble')
+  },
+  {
+    name: 'Homebrew RC cask exposes the native Tauri entrypoint as pebble',
+    file: 'Casks/pebble@rc.rb',
+    expect: (text) =>
+      text.includes(
+        'binary "#{appdir}/Pebble.app/Contents/MacOS/pebble-desktop-tauri", target: "pebble"'
+      ) && !text.includes('Contents/Resources/bin/pebble')
   },
   {
     name: 'Tauri desktop release workflow builds the Tauri app across desktop platforms',
@@ -6302,7 +6343,7 @@ const checks = [
       text.includes('appWindow.startDragging()') &&
       text.includes('resolveTauriTitlebarPointerAction') &&
       text.includes('window.api.ui.requestClose()') &&
-      text.includes('getCurrentWindow().toggleMaximize()') &&
+      /getCurrentWindow\(\)\s*\.toggleMaximize\(\)/.test(text) &&
       text.includes("region === 'no-drag'") &&
       text.includes("region === 'drag'") &&
       text.includes('DRAG_REGION_SELECTOR') &&
@@ -6818,8 +6859,8 @@ const checks = [
     name: 'Go runtime and Tauri expose provider rate limits without web fallbacks',
     file: 'apps/desktop/src/pebble-tauri-preload-api.ts',
     expect: (text) =>
-      text.includes('api.gh = {') &&
-      text.includes('api.gl = {') &&
+      text.includes('api.gh = createPebbleGitHubApi') &&
+      text.includes('api.gl = createPebbleGitLabApi') &&
       text.includes('fetchGitHubRateLimit(readProviderJson, args)') &&
       text.includes('fetchGitLabRateLimit(readProviderJson, args)')
   },
@@ -7227,10 +7268,144 @@ const checks = [
   }
 ]
 
+const sourceFiles = execFileSync(
+  'git',
+  ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+  { cwd: repoRoot, encoding: 'utf8' }
+)
+  .split('\0')
+  .filter(Boolean)
+
+// Why: several Tauri domains were split into bounded companion modules. Keep
+// each contract scoped to that domain instead of pinning it to a former monolith.
+const contractCompanionPrefixes = new Map([
+  [
+    'config/scripts/run-tauri-real-runtime-gate.mjs',
+    ['config/scripts/run-tauri-real-runtime-', 'config/scripts/tauri-real-runtime-']
+  ],
+  ['apps/desktop/src/tauri-real-runtime-gate.ts', ['apps/desktop/src/tauri-real-runtime-gate-']],
+  [
+    'packages/product-core/renderer/src/components/onboarding/OnboardingInlineCommandTerminal.tsx',
+    ['packages/product-core/renderer/src/components/onboarding/onboarding-inline-terminal-']
+  ],
+  [
+    'apps/desktop/src/tauri-menu-api.ts',
+    [
+      'apps/desktop/src/tauri-menu-',
+      'apps/desktop/src/tauri-appearance-menu-',
+      'apps/desktop/src/tauri-window-shortcut-',
+      'apps/desktop/src/tauri-webview-reload'
+    ]
+  ],
+  [
+    'apps/desktop/src/tauri-accounts-api.ts',
+    [
+      'apps/desktop/src/tauri-account-',
+      'apps/desktop/src/tauri-accounts-',
+      'apps/desktop/src/tauri-claude-account',
+      'apps/desktop/src/tauri-claude-login-',
+      'apps/desktop/src/tauri-codex-account'
+    ]
+  ],
+  [
+    'apps/desktop/src/tauri-rate-limits-api.ts',
+    ['apps/desktop/src/tauri-rate-limit', 'apps/desktop/src/tauri-rate-limits-']
+  ],
+  [
+    'apps/desktop/src/tauri-folder-workspace-api.ts',
+    [
+      'apps/desktop/src/tauri-folder-workspace-',
+      'apps/desktop/src/tauri-nested-repo-',
+      'apps/desktop/src/tauri-project-group-'
+    ]
+  ],
+  ['apps/desktop/src/tauri-automation-runtime-mapping.ts', ['apps/desktop/src/tauri-automation-']],
+  [
+    'apps/desktop/src/tauri-automations-api.ts',
+    [
+      'apps/desktop/src/tauri-automation-',
+      'apps/desktop/src/tauri-automations-',
+      'apps/desktop/src/tauri-external-automation'
+    ]
+  ],
+  [
+    'apps/desktop/src/pebble-tauri-preload-api.ts',
+    [
+      'apps/desktop/src/pebble-tauri-provider-',
+      'apps/desktop/src/tauri-github-',
+      'apps/desktop/src/tauri-gitlab-',
+      'apps/desktop/src/tauri-provider-rate-limit-',
+      'apps/desktop/src/pebble-tauri-app-',
+      'apps/desktop/src/pebble-tauri-preflight-',
+      'apps/desktop/src/pebble-tauri-runtime-control-',
+      'apps/desktop/src/host-terminal-capabilities',
+      'apps/desktop/src/tauri-startup-'
+    ]
+  ],
+  [
+    'apps/desktop/src/pebble-tauri-runtime-control-api.test.ts',
+    ['apps/desktop/src/pebble-tauri-runtime-control-api-']
+  ],
+  ['apps/desktop/src/tauri-ssh-targets-api.ts', ['apps/desktop/src/tauri-ssh-']],
+  ['apps/desktop/src/tauri-file-watch-api.ts', ['apps/desktop/src/tauri-file-watch-']],
+  ['apps/desktop/src/tauri-runtime-pty-api.ts', ['apps/desktop/src/tauri-runtime-pty-']],
+  ['apps/desktop/src/runtime-pty-input-batcher.ts', ['apps/desktop/src/runtime-pty-input-batcher']],
+  [
+    'apps/desktop/src/tauri-agent-status-api.ts',
+    [
+      'apps/desktop/src/tauri-agent-status-',
+      'apps/desktop/src/tauri-agent-migration-',
+      'apps/desktop/src/tauri-agent-binding'
+    ]
+  ],
+  ['apps/desktop/src/tauri-terminal-runtime-rpc.ts', ['apps/desktop/src/tauri-terminal-']],
+  ['apps/desktop/src/tauri-git-runtime-rpc.ts', ['apps/desktop/src/tauri-git-']],
+  [
+    'apps/desktop/src/tauri-source-control-text-generation.ts',
+    ['apps/desktop/src/tauri-source-control-']
+  ],
+  ['apps/desktop/src/tauri-updater-api.ts', ['apps/desktop/src/tauri-updater-']],
+  ['apps/desktop/src/tauri-window-shortcut-bridge.ts', ['apps/desktop/src/tauri-window-shortcut-']],
+  ['apps/desktop/src/tauri-browser-runtime-api.ts', ['apps/desktop/src/tauri-browser-runtime-']],
+  [
+    'apps/desktop/src/tauri-browser-runtime-events.ts',
+    ['apps/desktop/src/tauri-browser-runtime-event', 'apps/desktop/src/tauri-browser-download-']
+  ],
+  ['apps/desktop/src/tauri-computer-action-waiter.ts', ['apps/desktop/src/tauri-computer-action-']],
+  [
+    'apps/desktop/src/tauri-browser-diff.ts',
+    ['apps/desktop/src/tauri-browser-diff', 'apps/desktop/src/tauri-browser-text-diff']
+  ],
+  ['apps/desktop/src/tauri-window-drag-regions.ts', ['apps/desktop/src/tauri-window-drag-regions']],
+  [
+    'apps/desktop/src/tauri-browser-runtime-rpc.test.ts',
+    ['apps/desktop/src/tauri-browser-runtime-rpc']
+  ],
+  [
+    'packages/product-core/renderer/src/components/browser-pane/tauri-browser-page-webview.test.ts',
+    ['packages/product-core/renderer/src/components/browser-pane/tauri-browser-page-webview']
+  ]
+])
+
+function expandContractFiles(files) {
+  const prefixes = files.flatMap((file) => contractCompanionPrefixes.get(file) ?? [])
+  if (prefixes.length === 0) {
+    return files
+  }
+  const includeTestCompanions = files.some((file) => file.includes('.test.'))
+  const companions = sourceFiles.filter(
+    (file) =>
+      prefixes.some((prefix) => file.startsWith(prefix)) &&
+      (includeTestCompanions || !file.includes('.test.'))
+  )
+  return [...new Set([...files, ...companions])]
+}
+
 const failures = []
+failures.push(...verifyPebbleRepositoryLayout())
 
 for (const check of checks) {
-  const files = check.files ?? [check.file]
+  const files = expandContractFiles(check.files ?? [check.file])
   const text = (
     await Promise.all(files.map((file) => readFile(resolve(repoRoot, file), 'utf8')))
   ).join('\n')
@@ -7239,13 +7414,6 @@ for (const check of checks) {
   }
 }
 
-const sourceFiles = execFileSync(
-  'git',
-  ['ls-files', '-z', '--cached', '--others', '--exclude-standard'],
-  { cwd: repoRoot, encoding: 'utf8' }
-)
-  .split('\0')
-  .filter(Boolean)
 const legacyBrandFiles = await scanLegacyBrandIdentifiers(repoRoot, sourceFiles)
 if (legacyBrandFiles.length > 0) {
   failures.push(
@@ -7335,10 +7503,7 @@ const tauriExternalImportSource = await readFile(
   'utf8'
 )
 const tauriExternalImportRust = await readFile(
-  resolve(
-    repoRoot,
-    'apps/desktop/src-tauri/src/commands/filesystem_external_import.rs'
-  ),
+  resolve(repoRoot, 'apps/desktop/src-tauri/src/commands/filesystem_external_import.rs'),
   'utf8'
 )
 const runtimeFileClientSource = await readFile(
@@ -7455,6 +7620,11 @@ const remoteWorkspaceBridge = await readFile(
   resolve(repoRoot, 'apps/desktop/src/tauri-remote-workspace-api.ts'),
   'utf8'
 )
+const remoteWorkspaceSnapshotWatch = await readFile(
+  resolve(repoRoot, 'apps/desktop/src/remote-workspace-snapshot-watch.ts'),
+  'utf8'
+)
+const remoteWorkspaceClient = `${remoteWorkspaceBridge}\n${remoteWorkspaceSnapshotWatch}`
 const remoteWorkspaceRelay = await readFile(
   resolve(repoRoot, 'runtime/go/cmd/pebble-relay-worker/main.go'),
   'utf8'
@@ -7473,11 +7643,11 @@ if (
   failures.push('Remote workspace changes must stream from the SSH relay into Go runtime events')
 }
 if (
-  !remoteWorkspaceBridge.includes('subscribeRuntimeEventPush') ||
-  !remoteWorkspaceBridge.includes('workspace.watch-status') ||
-  !remoteWorkspaceBridge.includes('needsPolling') ||
-  !remoteWorkspaceBridge.includes('releaseTargetWatch') ||
-  !remoteWorkspaceBridge.includes('scheduleTargetWatchRetry')
+  !remoteWorkspaceClient.includes('subscribeRuntimeEventPush') ||
+  !remoteWorkspaceClient.includes('workspace.watch-status') ||
+  !remoteWorkspaceClient.includes('needsPolling') ||
+  !remoteWorkspaceClient.includes('releaseTargetWatch') ||
+  !remoteWorkspaceClient.includes('scheduleTargetWatchRetry')
 ) {
   failures.push('Tauri remote workspace sync must prefer push and bound polling to outages')
 }
@@ -7579,34 +7749,38 @@ const terminationSignal = await readFile(
   resolve(repoRoot, 'apps/desktop/src-tauri/src/termination_signal.rs'),
   'utf8'
 )
-const realRuntimeGate = await readFile(
-  resolve(repoRoot, 'config/scripts/run-tauri-real-runtime-gate.mjs'),
-  'utf8'
-)
-const tauriPreload = await readFile(
-  resolve(repoRoot, 'apps/desktop/src/pebble-tauri-preload-api.ts'),
-  'utf8'
-)
-const tauriGitRuntime = await readFile(
-  resolve(repoRoot, 'apps/desktop/src/tauri-git-runtime-rpc.ts'),
-  'utf8'
-)
+const realRuntimeGate = (
+  await Promise.all(
+    expandContractFiles([
+      'config/scripts/run-tauri-real-runtime-gate.mjs',
+      'apps/desktop/src/tauri-real-runtime-gate.ts'
+    ]).map((file) => readFile(resolve(repoRoot, file), 'utf8'))
+  )
+).join('\n')
+const tauriPreload = (
+  await Promise.all(
+    expandContractFiles(['apps/desktop/src/pebble-tauri-preload-api.ts']).map((file) =>
+      readFile(resolve(repoRoot, file), 'utf8')
+    )
+  )
+).join('\n')
+const tauriGitRuntime = (
+  await Promise.all(
+    expandContractFiles(['apps/desktop/src/tauri-git-runtime-rpc.ts']).map((file) =>
+      readFile(resolve(repoRoot, file), 'utf8')
+    )
+  )
+).join('\n')
 const tauriNativeChat = await readFile(
   resolve(repoRoot, 'apps/desktop/src/tauri-native-chat-api.ts'),
   'utf8'
 )
 const nativeChatTranscript = await readFile(
-  resolve(
-    repoRoot,
-    'apps/desktop/src-tauri/src/commands/native_chat_transcript.rs'
-  ),
+  resolve(repoRoot, 'apps/desktop/src-tauri/src/commands/native_chat_transcript.rs'),
   'utf8'
 )
 const nativeSessionRecovery = await readFile(
-  resolve(
-    repoRoot,
-    'apps/desktop/src-tauri/src/commands/native_session_recovery.rs'
-  ),
+  resolve(repoRoot, 'apps/desktop/src-tauri/src/commands/native_session_recovery.rs'),
   'utf8'
 )
 const tauriTelemetry = await readFile(
@@ -7730,4 +7904,3 @@ async function listFiles(dir) {
   )
   return files.flat()
 }
-import './verify-pebble-repository-layout.mjs'

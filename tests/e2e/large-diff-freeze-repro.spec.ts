@@ -1,5 +1,5 @@
 import { rmSync, writeFileSync } from 'node:fs'
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { waitForSessionReady } from './helpers/store'
 import { getLargeDiffRenderLimit } from '../../packages/product-core/shared/large-diff-render-limit'

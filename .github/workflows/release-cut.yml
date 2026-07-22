@@ -10,7 +10,7 @@ name: Cut Release
 #   2. Read the latest stable release from GitHub.
 #   3. Compute the next version from `kind` (rc | patch | minor | major).
 #   4. For stable kinds, REFUSE if the new version is <= the latest stable.
-#      This is the only guard electron-updater actually needs — it compares
+#      This is the only guard the Tauri updater needs; it compares
 #      semver within a channel, so a regressing "latest" is the one thing
 #      that breaks auto-update for fresh installs.
 #   5. Write every desktop version source, commit (detached), tag, push tag.
@@ -562,55 +562,37 @@ jobs:
           #   platform: windows
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           ref: refs/tags/${{ needs.cut.outputs.tag }}
-
-      - name: Install native build tools
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential python3 xvfb
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version-file: package.json
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6
         with:
           run_install: false
-
-      # Why: Linux terminal golden E2E uses the same native install path as
-      # release CI, which needs pnpm to bypass its non-executable gyp_main.py.
-      - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: runtime/go/go.mod
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux Tauri dependencies
         if: runner.os == 'Linux'
-        run: |
-          npm install -g node-gyp@11.5.0
-          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build Electron app for terminal rendering golden
-        run: npx electron-vite build --config migration/electron-reference/electron.vite.config.ts --mode e2e
-
-      - name: Run terminal rendering golden on Linux
+        run: sudo apt-get update && sudo apt-get install -y at-spi2-core dbus-x11 gir1.2-atspi-2.0 libwebkit2gtk-4.1-dev libappindicator3-dev python3-gi librsvg2-dev patchelf xvfb
+      - run: pnpm install --frozen-lockfile
+      - name: Run Tauri terminal golden on Linux
         if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-golden
-
-      - name: Run terminal rendering golden on macOS
+        run: xvfb-run --auto-servernum dbus-run-session -- node config/scripts/run-tauri-terminal-evidence.mjs --mode golden --output artifacts/tauri-terminal-golden/report.json
+      - name: Run Tauri terminal golden on macOS
         if: runner.os == 'macOS'
-        run: env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-golden
-
-      - name: Upload Playwright traces
-        if: failure()
+        run: node config/scripts/run-tauri-terminal-evidence.mjs --mode golden --output artifacts/tauri-terminal-golden/report.json
+      - name: Upload Tauri terminal golden evidence
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: terminal-rendering-golden-${{ matrix.platform }}-playwright-traces
-          path: test-results/
-          retention-days: 7
-          if-no-files-found: ignore
+          name: terminal-rendering-golden-${{ matrix.platform }}
+          path: artifacts/tauri-terminal-golden*
+          retention-days: 14
+          if-no-files-found: error
 
   # Why: these broader terminal rendering repros are useful release evidence,
   # but they include heavier app-like flows and must not block publishing.
@@ -637,63 +619,37 @@ jobs:
           #   platform: windows
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           ref: refs/tags/${{ needs.cut.outputs.tag }}
-
-      - name: Install native build tools
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential python3 xvfb
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version-file: package.json
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6
         with:
           run_install: false
-
-      # Why: keep the non-blocking evidence lane on the same Linux native
-      # install path as the blocking golden and release build jobs.
-      - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: runtime/go/go.mod
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux Tauri dependencies
         if: runner.os == 'Linux'
-        run: |
-          npm install -g node-gyp@11.5.0
-          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build Electron app for terminal rendering evidence
-        run: npx electron-vite build --config migration/electron-reference/electron.vite.config.ts --mode e2e
-
-      - name: Run terminal rendering evidence on Linux
+        run: sudo apt-get update && sudo apt-get install -y at-spi2-core dbus-x11 gir1.2-atspi-2.0 libwebkit2gtk-4.1-dev libappindicator3-dev python3-gi librsvg2-dev patchelf xvfb
+      - run: pnpm install --frozen-lockfile
+      - name: Run Tauri terminal release evidence on Linux
         if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-release-evidence
-
-      - name: Run terminal rendering evidence on macOS
+        run: xvfb-run --auto-servernum dbus-run-session -- node config/scripts/run-tauri-terminal-evidence.mjs --mode release --output artifacts/tauri-terminal-release-evidence/report.json
+      - name: Run Tauri terminal release evidence on macOS
         if: runner.os == 'macOS'
-        run: env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-release-evidence
-
-      - name: Run terminal rendering evidence on Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $env:SKIP_BUILD = '1'
-          $env:PEBBLE_E2E_FORWARD_APP_LOGS = '1'
-          pnpm run test:e2e:terminal-rendering-release-evidence
-
-      - name: Upload Playwright traces
-        if: failure()
+        run: node config/scripts/run-tauri-terminal-evidence.mjs --mode release --output artifacts/tauri-terminal-release-evidence/report.json
+      - name: Upload Tauri terminal release evidence
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: terminal-rendering-release-evidence-${{ matrix.platform }}-playwright-traces
-          path: test-results/
-          retention-days: 7
-          if-no-files-found: ignore
+          name: terminal-rendering-release-evidence-${{ matrix.platform }}
+          path: artifacts/tauri-terminal-release-evidence*
+          retention-days: 14
+          if-no-files-found: error
 
   build-tauri:
     needs:

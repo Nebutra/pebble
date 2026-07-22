@@ -40,8 +40,7 @@ type UpdateReviewResult struct {
 	Reviewers []GitLabReviewer `json:"reviewers,omitempty"`
 }
 
-// UpdateGitHubPullRequest mirrors updatePRDetails/updatePRState/requestPRReviewers/
-// removePRReviewers in migration/electron-reference/src/main/github/client.ts using gh's `pr edit`/`pr close`/
+// UpdateGitHubPullRequest updates details, state, and reviewers using gh's `pr edit`/`pr close`/
 // `pr reopen` subcommands instead of raw REST calls, since gh already exposes
 // realistic subcommands for these operations.
 func UpdateGitHubPullRequest(ctx context.Context, workdir string, input UpdateReviewRequest) UpdateReviewResult {
@@ -117,9 +116,8 @@ func UpdateGitHubPullRequest(ctx context.Context, workdir string, input UpdateRe
 	return UpdateReviewResult{OK: true}
 }
 
-// UpdateGitLabMergeRequest mirrors updateMR/closeMR/reopenMR in
-// migration/electron-reference/src/main/gitlab/client.ts. Title/body use `glab api PUT` (as updateMR does);
-// close/reopen use glab's dedicated subcommands.
+// UpdateGitLabMergeRequest updates title/body with `glab api PUT`; close/reopen
+// use glab's dedicated subcommands.
 func UpdateGitLabMergeRequest(ctx context.Context, workdir string, input UpdateReviewRequest) UpdateReviewResult {
 	if input.Number <= 0 {
 		return UpdateReviewResult{Code: "validation", Error: "Update MR failed: a merge request number is required."}

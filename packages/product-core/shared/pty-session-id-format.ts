@@ -1,7 +1,7 @@
 /**
  * Shared helpers for the minted PTY session id format.
  *
- * Why split out of `migration/electron-reference/src/main/daemon/pty-session-id.ts`: the renderer-side
+ * Why shared: the renderer-side
  * merge in `mergeSnapshotAndSessions.ts` and the boot-time hydration in
  * `attach-main-window-services.ts` both need to recover the owning
  * worktreeId from a session id. Three call sites silently re-implementing

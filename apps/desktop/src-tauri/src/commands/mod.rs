@@ -1,4 +1,5 @@
 pub mod agent_accounts;
+pub mod agent_awake;
 pub mod agent_hooks;
 pub mod agent_trust;
 pub mod app_native;

@@ -7,7 +7,47 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/nebutra/pebble/runtime/go/internal/runtimeauth"
 )
+
+func TestResolveRuntimeAuthDiscoversRunningLocalRuntime(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("PEBBLE_RUNTIME_DATA_DIR", dataDir)
+	cleanup, err := runtimeauth.Publish(dataDir, "http://127.0.0.1:18888", "secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	endpoint, token := resolveRuntimeAuth("http://127.0.0.1:17777", "", false, false)
+	if endpoint != "http://127.0.0.1:18888" || token != "secret" {
+		t.Fatalf("unexpected discovered runtime auth endpoint=%q token=%q", endpoint, token)
+	}
+}
+
+func TestResolveRuntimeAuthPreservesExplicitAndServeConfiguration(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("PEBBLE_RUNTIME_DATA_DIR", dataDir)
+	cleanup, err := runtimeauth.Publish(dataDir, "http://127.0.0.1:18888", "discovered")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	endpoint, token := resolveRuntimeAuth("http://127.0.0.1:19999", "", true, false)
+	if endpoint != "http://127.0.0.1:19999" || token != "" {
+		t.Fatalf("explicit endpoint was overwritten: endpoint=%q token=%q", endpoint, token)
+	}
+	endpoint, token = resolveRuntimeAuth("http://127.0.0.1:17777", "explicit", false, false)
+	if endpoint != "http://127.0.0.1:17777" || token != "explicit" {
+		t.Fatalf("explicit token was overwritten: endpoint=%q token=%q", endpoint, token)
+	}
+	endpoint, token = resolveRuntimeAuth("http://127.0.0.1:17777", "", false, true)
+	if endpoint != "http://127.0.0.1:17777" || token != "" {
+		t.Fatalf("serve configuration used desktop credentials: endpoint=%q token=%q", endpoint, token)
+	}
+}
 
 func TestSplitCommandPreservesQuotedScript(t *testing.T) {
 	got := splitCommand(`/bin/sh -c "printf 'agent-run-ok\n'"`)

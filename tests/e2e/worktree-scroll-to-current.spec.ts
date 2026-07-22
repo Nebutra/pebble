@@ -1,4 +1,4 @@
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 
@@ -23,7 +23,7 @@ async function prepareSidebarForScrollTest(page: Page): Promise<void> {
 
 test.describe('Reveal active workspace button', () => {
   test.beforeEach(async ({ pebblePage }) => {
-    // Why: headless Electron under xvfb never ticks a smooth-scroll animation,
+    // Why: browser automation under xvfb may never tick a smooth-scroll animation,
     // so the reveal's `scrollTo({ behavior: 'smooth' })` would never reach its
     // target. Reduced-motion makes the reveal jump instantly (see
     // worktree-sidebar-reveal.ts) so the geometry assertions are deterministic.

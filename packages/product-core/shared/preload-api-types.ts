@@ -524,7 +524,7 @@ export type AppApi = {
   /** Returns a URL base for feature-wall assets. In dev this is Vite /@fs;
    *  in packaged builds this is file:// resources. Renderer appends filenames. */
   getFeatureWallAssetBaseUrl: () => Promise<string>
-  /** Relaunches the app via Electron's app.relaunch() + app.exit(0). Used
+  /** Relaunches the app through the native application lifecycle. Used
    *  by settings panes that need a full restart to apply changes (e.g. the
    *  terminal-window blur setting in TerminalWindowSection). */
   relaunch: () => Promise<void>
@@ -532,7 +532,7 @@ export type AppApi = {
    *  sessions survive and can reattach after the new process starts. */
   restart: () => Promise<void>
   /** Reloads the current app renderer through main so expected renderer
-   *  teardown can be classified before Electron emits process-gone events. */
+   *  teardown can be classified before the native host emits process-gone events. */
   reload: () => Promise<void>
   /** Resolves when the daemon PTY provider and hook receiver have either
    *  started or failed open for the first BrowserWindow. */
@@ -1216,7 +1216,7 @@ export type PreloadApi = {
      */
     rateLimit: (args?: { force?: boolean }) => Promise<GetRateLimitResult>
     /**
-     * Probe `gh auth status` and the Electron process env to explain
+     * Probe `gh auth status` and the desktop process environment to explain
      * why ProjectV2 calls are failing with scope_missing. Surfaces the
      * common gotcha where `GITHUB_TOKEN` is exported in the user's
      * shell and silently shadows the keyring credential — in that case

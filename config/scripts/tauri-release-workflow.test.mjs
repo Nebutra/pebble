@@ -101,12 +101,14 @@ describe('Tauri release workflow signing gate', () => {
   it('preflights credentials before build and inspects artifacts before evidence upload', () => {
     const steps = releaseWorkflow().jobs.build.steps
     const names = steps.map((step) => step.name)
+    const apiKeyIndex = names.indexOf('Prepare App Store Connect API key')
     const preflightIndex = names.indexOf('Verify release signing and sidecar preflight')
     const buildIndex = names.indexOf('Build Tauri desktop bundle')
     const inspectIndex = names.indexOf('Inspect signed release artifacts and sidecars')
     const uploadIndex = names.indexOf('Upload release inspection evidence')
 
-    expect(preflightIndex).toBeGreaterThan(-1)
+    expect(apiKeyIndex).toBeGreaterThan(-1)
+    expect(apiKeyIndex).toBeLessThan(preflightIndex)
     expect(preflightIndex).toBeLessThan(buildIndex)
     expect(buildIndex).toBeLessThan(inspectIndex)
     expect(inspectIndex).toBeLessThan(uploadIndex)
@@ -117,6 +119,9 @@ describe('Tauri release workflow signing gate', () => {
     )
     expect(steps[preflightIndex].env).toEqual(
       expect.objectContaining({
+        APPLE_API_KEY: "${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY || '' }}",
+        APPLE_API_ISSUER: "${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}",
+        APPLE_API_KEY_PATH: "${{ matrix.platform == 'macos' && env.APPLE_API_KEY_PATH || '' }}",
         PEBBLE_MAC_RELEASE: "${{ matrix.platform == 'macos' && '1' || '' }}",
         TAURI_SIGNING_PRIVATE_KEY: '${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}',
         TAURI_SIGNING_PRIVATE_KEY_PASSWORD: '${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}',
@@ -172,7 +177,29 @@ describe('Tauri release workflow signing gate', () => {
     )
   })
 
-  it('maps existing macOS release secrets to the official Tauri variables', () => {
+  it('materializes the preferred API key only on macOS without exposing P8 to Tauri', () => {
+    const steps = releaseWorkflow().jobs.build.steps
+    const prepareStep = steps.find((step) => step.name === 'Prepare App Store Connect API key')
+    const buildStep = steps.find((step) => step.name === 'Build Tauri desktop bundle')
+
+    expect(prepareStep).toEqual(
+      expect.objectContaining({
+        if: "matrix.platform == 'macos'",
+        env: { APPLE_API_KEY_P8: '${{ secrets.APPLE_API_KEY_P8 }}' },
+        run: 'node config/scripts/prepare-apple-api-key.mjs'
+      })
+    )
+    expect(buildStep.env).toEqual(
+      expect.objectContaining({
+        APPLE_API_KEY: "${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY || '' }}",
+        APPLE_API_ISSUER: "${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}",
+        APPLE_API_KEY_PATH: "${{ matrix.platform == 'macos' && env.APPLE_API_KEY_PATH || '' }}"
+      })
+    )
+    expect(buildStep.env.APPLE_API_KEY_P8).toBeUndefined()
+  })
+
+  it('keeps the complete Apple ID notarization fallback mapped to Tauri', () => {
     const buildStep = releaseWorkflow().jobs.build.steps.find(
       (step) => step.name === 'Build Tauri desktop bundle'
     )

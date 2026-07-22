@@ -1,34 +1,16 @@
-# AGENTS.md — E2E Tests
+# Native and renderer E2E
 
-## Build the App With `--mode e2e` Before Running Tests
+Desktop lifecycle evidence is owned by the Tauri functional shell. Run
+`pnpm verify:tauri-real-runtime`; on Linux, wrap it with
+`xvfb-run --auto-servernum dbus-run-session --`.
 
-E2E tests read Zustand state via `window.__store`. That global is only assigned when the preload bundle is built in `e2e` mode, which is applied when you pass `--mode e2e` to `electron-vite build`. A plain `pnpm build` or `pnpm parity:electron:build` produces an `out/` tree **without** the store exposed, so reusing it with `SKIP_BUILD=1` makes every spec hang on `waitForFunction(() => Boolean(window.__store))` and time out at 30s.
+The functional gate builds an isolated profile and repository, exercises the
+real Go sidecar and Tauri commands, and tears down the complete process tree.
+Do not reuse a developer profile or assume a hidden WebView behaves the same
+as a visible window. Renderer-only Playwright specs must use the browser
+harness and typed mock bridge once classified there.
 
-- Default path: `pnpm run test:e2e` — `globalSetup` runs `electron-vite build --config migration/electron-reference/electron.vite.config.ts --mode e2e` for you.
-- Fast iteration: `pnpm exec electron-vite build --config migration/electron-reference/electron.vite.config.ts --mode e2e` once, then `SKIP_BUILD=1 pnpm run test:e2e …`.
-- If **every** E2E test times out at the `window.__store` line, do **not** assume the harness is broken. The `out/` build is almost certainly stale or was produced without `--mode e2e`. Rebuild with `--mode e2e` and retry before changing test code.
-
-## Prefer a Store-Slice Unit Test When the Logic Is Pure
-
-An E2E spec that calls `store.getState().someAction(...)` inside `page.evaluate` is a unit test paying the cost of an Electron launch (~1.5s) for no extra coverage. Before adding one, check `packages/product-core/renderer/src/store/slices/*.test.ts` — most store-level behavior (tab moves, splits, reorders, merges, no-op guards) is already covered there with `createTestAppStore()`.
-
-Reach for E2E only when the test needs something a unit test genuinely cannot reach:
-
-- Real dnd-kit / pointer events, focus, keyboard shortcuts, or drag-and-drop UI cues.
-- IPC round-trips through the main process (repos, filesystem, PTY, Git).
-- Persistence: app restart, userData dir, session rehydration.
-- Multi-window or multi-worktree interactions that depend on Electron lifecycle.
-
-If the test could be rewritten to import the slice and drive it directly without losing fidelity, do that instead.
-
-## E2E Assertions Must Target the DOM, Not the Store
-
-`window.__store` is fine for _setup_ (seeding a repo, pre-filling a draft, stubbing hydration timing) but the thing a spec finally `expect()`s on must be user-observable — `getByRole`, `toBeVisible`, `toHaveText`, `toContainText`. A spec that both writes to the store and reads it back is asserting that Zustand's setter works, not that Pebble works.
-
-Why this matters: the `'create-worktree'` modal key lived on in the `activeModal` union long after `AddWorktreeDialog.tsx` was deleted in #710, so `store.openModal('create-worktree')` + `store.activeModal === 'create-worktree'` round-trips succeeded against a modal that rendered nothing. That tautology is what let #1186 (React error #31 in `StartFromField`) ship — the store-layer test passed while the composer actively crashed for real users.
-
-Concretely:
-
-- Use the store to reach a state; use the DOM to prove the state is correct.
-- If a render-layer regression would leave the store clean but the UI broken, a store-only test will not catch it. Mount the affected subtree and assert on what the user sees.
-- Headless (`PEBBLE_E2E_HEADLESS=1`) does not exempt you from this rule — Playwright drives the real DOM via CDP regardless of window visibility. The rare cases that need focus or pointer capture use `PEBBLE_E2E_HEADFUL=1` via `project.metadata.pebbleHeadful`.
+Terminal visual evidence is produced by
+`node config/scripts/run-tauri-terminal-evidence.mjs --mode golden`. Refresh
+evidence from Tauri only; release jobs must never launch a second desktop shell
+as their comparison oracle.

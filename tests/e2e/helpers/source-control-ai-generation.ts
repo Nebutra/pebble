@@ -1,5 +1,5 @@
-import type { Page } from '@nebutra/playwright-test'
-import { expect } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
+import { expect } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'

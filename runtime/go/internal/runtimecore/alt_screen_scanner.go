@@ -5,8 +5,7 @@ import "bytes"
 // altScreenScanner tracks whether a terminal stream is currently in the
 // alternate screen buffer by watching for the smcup/rmcup DEC private-mode
 // sequences. It mirrors what the Electron terminal reports as
-// `isAlternateScreen` (buffer.active.type === 'alternate' in
-// migration/electron-reference/src/main/daemon/headless-emulator.ts), which those sequences drive.
+// `isAlternateScreen` state, which those sequences drive.
 //
 // Recognized enter/leave pairs (the same modes xterm.js toggles the alt buffer
 // on): 1049, 1047, and 47. Sequences can straddle chunk boundaries, so a short

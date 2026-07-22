@@ -1,6 +1,19 @@
-name: E2E
+name: Tauri E2E
 
 on:
+  pull_request:
+    paths:
+      - '.github/workflows/e2e.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'tests/e2e/**'
+      - 'tests/playwright.config.ts'
+      - 'packages/product-core/renderer/**'
+      - 'apps/desktop/src/**'
+      - 'apps/desktop/src-tauri/**'
+      - 'runtime/go/**'
+      - 'config/scripts/run-tauri-real-runtime-gate.mjs'
+      - 'config/scripts/run-tauri-terminal-evidence.mjs'
   workflow_call:
     inputs:
       ref:
@@ -14,162 +27,79 @@ on:
         required: false
         type: string
   schedule:
-    # Why: GitHub cron uses UTC; these slots map to 10am and 3pm
-    # America/Phoenix for the default-branch E2E run.
     - cron: '0 17,22 * * *'
 
 jobs:
-  build:
-    name: build e2e app
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ inputs.ref || github.ref }}
-
-      # Why: the E2E build compiles native modules via node-gyp. Mirrors the
-      # install step in pr.yml's verify job so E2E doesn't hit missing-toolchain
-      # errors.
-      - name: Install native build tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential python3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: package.json
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          run_install: false
-
-      # Why: this job runs the same pnpm install path as pr.yml's verify
-      # job, so it needs the same pinned node-gyp override to avoid pnpm's
-      # broken bundled gyp_main.py on Linux.
-      - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
-        if: runner.os == 'Linux'
-        run: |
-          npm install -g node-gyp@11.5.0
-          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      # Why: building once avoids five parallel electron-vite builds inside
-      # Playwright globalSetup, which otherwise contends for CPU/RAM on OSS
-      # runners before the sharded tests even start.
-      - name: Build Electron app for E2E
-        run: npx electron-vite build --config migration/electron-reference/electron.vite.config.ts --mode e2e
-
-      - name: Upload E2E build output
-        uses: actions/upload-artifact@v7
-        with:
-          name: e2e-build-out
-          path: out/
-          retention-days: 1
-          if-no-files-found: error
-
-  e2e:
-    name: e2e ${{ matrix.shard_name }}
-    needs: build
+  browser-renderer:
+    name: Browser renderer supporting E2E
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.event.pull_request.head.sha || github.ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium system dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run browser renderer supporting evidence
+        run: pnpm test:e2e:browser
+      - name: Upload browser E2E failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-renderer-supporting-e2e-failure
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  tauri-functional:
+    name: Tauri functional ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
         include:
-          - shard: '1/10'
-            shard_name: 1-of-10
-          - shard: '2/10'
-            shard_name: 2-of-10
-          - shard: '3/10'
-            shard_name: 3-of-10
-          - shard: '4/10'
-            shard_name: 4-of-10
-          - shard: '5/10'
-            shard_name: 5-of-10
-          - shard: '6/10'
-            shard_name: 6-of-10
-          - shard: '7/10'
-            shard_name: 7-of-10
-          - shard: '8/10'
-            shard_name: 8-of-10
-          - shard: '9/10'
-            shard_name: 9-of-10
-          - shard: '10/10'
-            shard_name: 10-of-10
-
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-15
+            platform: macos
+          - os: windows-latest
+            platform: windows
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref || github.ref }}
-
-      # Why: pnpm install rebuilds native modules, and those postinstall
-      # scripts still need the Linux toolchain even though this shard reuses
-      # the prebuilt Electron output.
-      - name: Install native build tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential python3
-
-      # Why: Electron on Linux needs an X display even when the app
-      # suppresses mainWindow.show() via PEBBLE_E2E_HEADLESS. xvfb provides a
-      # virtual framebuffer so Chromium can initialize without a real display.
-      - name: Install xvfb
-        run: sudo apt-get install -y xvfb
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version-file: package.json
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6
         with:
           run_install: false
-
-      # Why: this job runs the same pnpm install path as pr.yml's verify
-      # job, so it needs the same pinned node-gyp override to avoid pnpm's
-      # broken bundled gyp_main.py on Linux. Gate on runner.os matches
-      # release.yml so the invariant "this workaround is Linux-only" is
-      # consistent across all three workflows, even though this job
-      # currently pins runs-on: ubuntu-latest.
-      - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: runtime/go/go.mod
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux Tauri dependencies
         if: runner.os == 'Linux'
-        run: |
-          npm install -g node-gyp@11.5.0
-          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Download E2E build output
-        uses: actions/download-artifact@v8
-        with:
-          name: e2e-build-out
-          path: out/
-
-      # Why: the Electron suite is wall-clock constrained on OSS runners, but
-      # multiple Electron apps on one Xvfb VM contend on git/Chromium resources.
-      # Sharding keeps each VM at one Playwright worker while splitting the
-      # headless suite across separate runners.
-      # SKIP_BUILD makes Playwright globalSetup reuse the single build job's
-      # artifact instead of starting five concurrent electron-vite builds.
-      # PEBBLE_E2E_FORWARD_APP_LOGS keeps startup failures visible when Electron
-      # launches but never creates a BrowserWindow.
-      - name: Run E2E tests (${{ matrix.shard_name }})
-        run: xvfb-run --auto-servernum env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e --shard=${{ matrix.shard }}
-
-      # Why: Playwright retains traces/screenshots only on failure. Uploading
-      # them as an artifact makes post-mortem debugging on CI possible without
-      # re-running locally.
-      - name: Upload Playwright traces
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-traces-${{ matrix.shard_name }}
-          path: test-results/
-          retention-days: 7
-          if-no-files-found: ignore
+        run: sudo apt-get update && sudo apt-get install -y at-spi2-core dbus-x11 gir1.2-atspi-2.0 libwebkit2gtk-4.1-dev libappindicator3-dev python3-gi librsvg2-dev patchelf xvfb
+      - run: pnpm install --frozen-lockfile
+      - name: Run Tauri functional evidence on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum dbus-run-session -- pnpm verify:tauri-real-runtime
+      - name: Run Tauri functional evidence on macOS and Windows
+        if: runner.os != 'Linux'
+        run: pnpm verify:tauri-real-runtime

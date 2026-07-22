@@ -13336,7 +13336,7 @@ describe('connectPanePty', () => {
       terminalTitle: '* Claude done',
       stateHistory: [],
       toolName: 'Edit',
-      toolInput: 'migration/electron-reference/src/main/ipc/notifications.ts',
+      toolInput: 'apps/desktop/src-tauri/src/commands/notifications.rs',
       lastAssistantMessage: 'Implemented the formatter.',
       interrupted: false
     }
@@ -13389,7 +13389,7 @@ describe('connectPanePty', () => {
         agentState: 'done',
         agentPrompt: 'Fix notification payloads',
         agentToolName: 'Edit',
-        agentToolInput: 'migration/electron-reference/src/main/ipc/notifications.ts',
+        agentToolInput: 'apps/desktop/src-tauri/src/commands/notifications.rs',
         agentLastAssistantMessage: 'Implemented the formatter.',
         agentInterrupted: false
       })

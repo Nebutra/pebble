@@ -17,7 +17,7 @@ description: >-
 
 `linear-tickets` is the legacy bundled name for `pebble-linear`. This copy remains complete; its CLI commands are identical to `pebble-linear` and always use `pebble linear ...`.
 
-Use `pebble linear` when Linear is the source of task context or ticket updates. On Linux, use `pebble-ide` wherever this file says `pebble`.
+Use `pebble linear` when Linear is the source of task context or ticket updates.
 
 `pebble-linear` and `linear-tickets` are skill names, not CLI namespaces. Always run `pebble linear ...` commands.
 

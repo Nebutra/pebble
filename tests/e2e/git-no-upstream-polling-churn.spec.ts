@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from 'node:fs'
-import type { Page, TestInfo } from '@nebutra/playwright-test'
+import type { Page, TestInfo } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 
 // Repro command:
-//   SKIP_BUILD=1 pnpm exec playwright test tests/e2e/git-no-upstream-polling-churn.spec.ts --config tests/playwright.config.ts --project electron-headless --reporter=json
+//   SKIP_BUILD=1 pnpm exec playwright test tests/e2e/git-no-upstream-polling-churn.spec.ts --config tests/playwright.config.ts --project tauri-functional --reporter=json
 // Trigger: active worktree branch "Initi-Project" has no configured upstream
 // and no same-name origin ref, then the source-control poller runs for 7.2s.
 

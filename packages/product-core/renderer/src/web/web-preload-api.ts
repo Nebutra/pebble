@@ -2,6 +2,7 @@
    replacement for Electron preload, so the compatibility surface is necessarily
    centralized at this boundary. */
 import type { PreloadApi } from '../../../shared/preload-api-types'
+import { getPebbleCliCommandNameForPlatform } from '../../../shared/pebble-cli-command-name'
 import type { PreflightStatus, RefreshAgentsResult } from '../../../shared/preflight-api-types'
 import type {
   NativeChatApi,
@@ -2317,9 +2318,10 @@ function createPreflightApi(): NonNullable<Partial<PreloadApi>['preflight']> {
 }
 
 function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
+  const platform = getBrowserPlatform()
   const status = {
-    platform: getBrowserPlatform(),
-    commandName: getBrowserPlatform() === 'linux' ? 'pebble-ide' : 'pebble',
+    platform,
+    commandName: getPebbleCliCommandNameForPlatform(platform),
     commandPath: null,
     pathDirectory: null,
     pathConfigured: false,

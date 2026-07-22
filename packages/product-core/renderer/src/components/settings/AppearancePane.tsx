@@ -75,7 +75,7 @@ export function AppearancePane({
   const searchQuery = useAppStore((state) => state.settingsSearchQuery)
   const isSearching = normalizeSettingsSearchQuery(searchQuery).length > 0
   const isWebClient = isWebClientLocation()
-  // Why: Electron and Tauri own native Windows trays; a browser web client does not.
+  // Why: the Tauri desktop owns the native Windows tray; a browser web client does not.
   const isDesktopWindows = getRendererAppPlatform() === 'win32' && !isWebClient
 
   const [manuallyOpenSection, setManuallyOpenSection] = useState<AppearanceSectionKey | null>(

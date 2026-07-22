@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@nebutra/playwright-test'
+import type { Locator, Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import type { CreateHostedReviewResult } from '../../packages/product-core/shared/hosted-review'

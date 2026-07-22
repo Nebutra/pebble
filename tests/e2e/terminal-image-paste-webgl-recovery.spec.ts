@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import {
@@ -106,8 +106,8 @@ async function readAtlasResetCount(page: Page): Promise<number> {
   })
 }
 
-test.describe('terminal image paste WebGL recovery @headful', () => {
-  test('clears the WebGL atlas after a real image clipboard paste', async ({
+test.describe('terminal image paste WebGL renderer recovery', () => {
+  test('clears the WebGL atlas after a browser clipboard image paste', async ({
     pebblePage,
     testRepoPath
   }) => {
@@ -146,7 +146,7 @@ test.describe('terminal image paste WebGL recovery @headful', () => {
         )
         .then(() => true)
         .catch(() => false)
-      test.skip(!webglActive, 'WebGL was not active in this headful environment')
+      test.skip(!webglActive, 'WebGL was not active in this browser environment')
       expect(await patchAtlasCounter(pebblePage)).toBe(true)
 
       await pebblePage.locator('.xterm-helper-textarea').first().focus()
@@ -157,7 +157,9 @@ test.describe('terminal image paste WebGL recovery @headful', () => {
       await pebblePage.keyboard.press(process.platform === 'darwin' ? 'Meta+V' : 'Control+V')
       await waitForTerminalOutput(pebblePage, `DONE_${marker}`, 10_000)
 
-      await expect.poll(() => readAtlasResetCount(pebblePage), { timeout: 2_000 }).toBeGreaterThan(0)
+      await expect
+        .poll(() => readAtlasResetCount(pebblePage), { timeout: 2_000 })
+        .toBeGreaterThan(0)
     } finally {
       await sendToTerminal(pebblePage, ptyId, '\x03').catch(() => undefined)
       rmSync(scriptPath, { force: true })

@@ -1441,7 +1441,7 @@ describe('createUISlice hydratePersistedUI', () => {
 
   it('prunes acknowledgedAgentsByPaneKey entries older than the 7-day TTL during hydration', () => {
     // HYDRATE_MAX_AGE_MS lives in src/renderer/src/store/slices/ui.ts and matches
-    // the constant in migration/electron-reference/src/main/agent-hooks/server.ts.
+    // the native agent-hook retention contract.
     const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
     const now = 1_700_000_000_000
     vi.useFakeTimers()

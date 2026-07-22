@@ -1703,8 +1703,7 @@ func TestGitRepositoryIdentityEndpoint(t *testing.T) {
 }
 
 // TestGitRepositoryIdentityEndpointFallsBackToGitHubAPIWithoutUpstreamRemote
-// mirrors getRepoUpstream's API fallback (migration/electron-reference/src/main/github/client.ts) for forks
-// with no local `upstream` remote configured.
+// covers the GitHub API fallback for forks with no local `upstream` remote configured.
 func TestGitRepositoryIdentityEndpointFallsBackToGitHubAPIWithoutUpstreamRemote(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git executable is not available")

@@ -90,13 +90,13 @@ describe('createPebbleCliApi', () => {
     invokeMock.mockImplementation(async (command: string) => ({
       ...status(command === 'cli_wsl_remove' ? 'not_installed' : 'installed'),
       platform: 'linux',
-      commandName: 'pebble-ide'
+      commandName: 'pebble'
     }))
     const api = createPebbleCliApi({} as PreloadApi['cli'])
 
     await expect(api.getWslInstallStatus({ distro: ' Ubuntu ' })).resolves.toMatchObject({
       platform: 'linux',
-      commandName: 'pebble-ide',
+      commandName: 'pebble',
       state: 'installed'
     })
     await expect(api.installWsl({ distro: null })).resolves.toMatchObject({ state: 'installed' })

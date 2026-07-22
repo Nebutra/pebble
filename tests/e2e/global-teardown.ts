@@ -5,26 +5,29 @@
  * test run so we don't litter the user's /tmp with test directories.
  */
 
-import { readFileSync, existsSync, rmSync, readdirSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, rmSync } from 'node:fs'
 import path from 'node:path'
-import { TEST_REPO_PATH_FILE } from './global-setup'
+import { TEST_REPO_PATH_ENV } from './global-setup'
 
 export default function globalTeardown(): void {
-  if (!existsSync(TEST_REPO_PATH_FILE)) {
-    return
-  }
-
-  const testRepoDir = readFileSync(TEST_REPO_PATH_FILE, 'utf-8').trim()
+  const testRepoDir = process.env[TEST_REPO_PATH_ENV]?.trim() ?? ''
   if (testRepoDir && existsSync(testRepoDir)) {
-    // Why: git worktree add creates directories as siblings. Clean up any
-    // seeded or test-created worktrees in the same parent so reruns remain
-    // idempotent and do not leak temp repos into /tmp.
-    const parentDir = path.dirname(testRepoDir)
+    // Why: enumerate only this repository's registered worktrees so overlapping
+    // E2E runs cannot delete each other's sibling temp directories.
     try {
-      const siblings = readdirSync(parentDir)
-      for (const name of siblings) {
-        if (name.startsWith('pebble-e2e-worktree-') || name.startsWith('e2e-test-')) {
-          rmSync(path.join(parentDir, name), { recursive: true, force: true })
+      const worktreeOutput = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+        cwd: testRepoDir,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore']
+      })
+      for (const line of worktreeOutput.split(/\r?\n/)) {
+        if (!line.startsWith('worktree ')) {
+          continue
+        }
+        const worktreePath = path.resolve(line.slice('worktree '.length))
+        if (worktreePath !== path.resolve(testRepoDir)) {
+          rmSync(worktreePath, { recursive: true, force: true })
         }
       }
     } catch {
@@ -34,6 +37,4 @@ export default function globalTeardown(): void {
     rmSync(testRepoDir, { recursive: true, force: true })
     console.log(`[e2e] Cleaned up test repo at ${testRepoDir}`)
   }
-
-  rmSync(TEST_REPO_PATH_FILE, { force: true })
 }

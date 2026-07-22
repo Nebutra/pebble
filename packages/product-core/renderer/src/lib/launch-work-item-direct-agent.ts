@@ -31,8 +31,7 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
     | null
     | undefined
   launchPlatform: NodeJS.Platform
-  /** Why: SSH remotes deploy the CLI shim as plain `pebble`, so the Linux-only
-   * `pebble-ide` rename must not be applied for remote launches. */
+  /** Why: preserve the SSH signal so remote launch routing remains relay-owned. */
   isRemote?: boolean
 }): {
   startupPlan: AgentStartupPlan | null

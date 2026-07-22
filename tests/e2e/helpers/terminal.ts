@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Terminal E2E helpers share one PaneManager-backed path for PTY IO, split actions, and stable pane identity snapshots. */
-import type { Page } from '@nebutra/playwright-test'
-import { expect } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
+import { expect } from '@playwright/test'
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
@@ -469,7 +469,7 @@ export async function splitActiveTerminalPane(
         throw new Error('splitActiveTerminalPane: active pane manager not ready')
       }
 
-      // Why: Electron key delivery to the terminal pane layer is flaky in E2E
+      // Why: synthetic key delivery to the terminal pane layer is flaky in E2E
       // even when the visible pane tree is mounted. Driving the active
       // PaneManager directly still exercises the real split/layout/PTY path
       // without depending on window-focus timing.

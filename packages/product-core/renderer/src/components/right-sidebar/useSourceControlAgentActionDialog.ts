@@ -179,8 +179,7 @@ export function useSourceControlAgentActionDialog({
       groupId,
       promptDelivery,
       launchPlatform,
-      // Why: an SSH host runs the plain `pebble` shim; keep the previewed command
-      // label aligned with the real remote launch (no `pebble-ide` rename).
+      // Why: keep the previewed command aligned with SSH relay routing.
       isRemote: typeof connectionId === 'string',
       launchSource,
       connectionUnavailable,

@@ -45,7 +45,7 @@ export type TuiAgentConfig = {
    * folder?" menu (Cursor-Agent, GitHub Copilot CLI, Codex) consume the
    * bracketed paste as menu input. Pre-write the same trust artifact the
    * agent writes after the user accepts so the menu never fires. The actual
-   * file/path written lives in migration/electron-reference/src/main/agent-trust-presets.ts; this flag
+   * file/path written is owned by the native agent trust preset; this flag
    * just routes the workspace path through the matching preset before the
    * agent spawns. */
   preflightTrust?: 'cursor' | 'copilot' | 'codex'
@@ -74,7 +74,9 @@ export const TUI_AGENT_CONFIG: Record<TuiAgent, TuiAgentConfig> = {
     // binary. Detection follows the Pebble CLI, while the wrapper validates the
     // real Claude binary when it starts.
     detectCmd: 'pebble',
-    detectCmdAliases: ['pebble-dev', 'pebble-ide', 'pebble', 'pebble-dev', 'pebble-ide'],
+    // Why: older Linux packages exposed `pebble-ide`; keep detecting it while
+    // all new launch plans use the canonical `pebble` command.
+    detectCmdAliases: ['pebble-dev', 'pebble-ide'],
     launchCmd: 'pebble claude-teams',
     launchCmdByPlatform: {
       linux: `${getPebbleCliCommandNameForPlatform('linux')} claude-teams`,
@@ -360,9 +362,8 @@ export function getTuiAgentLaunchCommand(
   platform: NodeJS.Platform,
   opts?: { isRemote?: boolean }
 ): string {
-  // Why: the SSH relay shim is always named `pebble` on Unix, so the local-only
-  // `pebble-ide` rename (keeps Linux desktop installs distinct) must not
-  // leak to Linux remotes — the remote has no such desktop binary on PATH.
+  // Why: keep SSH launch selection explicit even though Unix hosts now share
+  // the canonical command name; remote platform routing remains relay-owned.
   if (opts?.isRemote && platform === 'linux') {
     return config.launchCmd
   }

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { isAbsolute, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import {
@@ -16,6 +16,15 @@ const requiredExternalBinaries = [
   'binaries/pebble-relay-worker',
   'binaries/pebble-runtime'
 ]
+const macosSigningEnvironment = ['APPLE_CERTIFICATE', 'APPLE_CERTIFICATE_PASSWORD', 'APPLE_TEAM_ID']
+const appleApiNotarizationEnvironment = ['APPLE_API_KEY', 'APPLE_API_ISSUER', 'APPLE_API_KEY_PATH']
+const appleIdNotarizationEnvironment = ['APPLE_ID', 'APPLE_PASSWORD']
+const appleApiIssuerUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
+
+function hasEnvironmentVariable(environment, name) {
+  const value = environment[name]
+  return typeof value === 'string' && value.trim() !== ''
+}
 
 function missingEnvironmentVariables(environment, names) {
   return names.filter((name) => {
@@ -79,16 +88,58 @@ export function validateMacosPlatformConfig(config) {
 }
 
 export function validateMacosReleaseEnvironment(environment) {
-  const required = [
-    'APPLE_CERTIFICATE',
-    'APPLE_CERTIFICATE_PASSWORD',
-    'APPLE_ID',
-    'APPLE_PASSWORD',
-    'APPLE_TEAM_ID'
-  ]
-  const missing = missingEnvironmentVariables(environment, required)
+  const missing = missingEnvironmentVariables(environment, macosSigningEnvironment)
   if (missing.length > 0) {
-    throw new Error(`Missing macOS signing/notarization environment: ${missing.join(', ')}.`)
+    throw new Error(`Missing macOS signing environment: ${missing.join(', ')}.`)
+  }
+
+  const apiValues = appleApiNotarizationEnvironment.filter((name) =>
+    hasEnvironmentVariable(environment, name)
+  )
+  const appleIdValues = appleIdNotarizationEnvironment.filter((name) =>
+    hasEnvironmentVariable(environment, name)
+  )
+  // Why: Tauri must receive one unambiguous notarytool authentication mode;
+  // accepting mixed secrets can silently select credentials maintainers did not intend.
+  if (apiValues.length > 0 && appleIdValues.length > 0) {
+    throw new Error(
+      `Mixed macOS notarization modes are not allowed: ${[
+        ...appleApiNotarizationEnvironment,
+        ...appleIdNotarizationEnvironment
+      ].join(', ')}.`
+    )
+  }
+  if (apiValues.length > 0) {
+    const missingApiValues = missingEnvironmentVariables(
+      environment,
+      appleApiNotarizationEnvironment
+    )
+    if (missingApiValues.length > 0) {
+      throw new Error(
+        `Incomplete App Store Connect API-key notarization environment; missing: ${missingApiValues.join(', ')}.`
+      )
+    }
+    if (!appleApiIssuerUuidPattern.test(environment.APPLE_API_ISSUER.trim())) {
+      throw new Error('APPLE_API_ISSUER must be a UUID for App Store Connect notarization.')
+    }
+    const apiKeyPath = environment.APPLE_API_KEY_PATH.trim()
+    if (/\r|\n/u.test(apiKeyPath) || !isAbsolute(apiKeyPath)) {
+      throw new Error('APPLE_API_KEY_PATH must be an absolute path without line breaks.')
+    }
+  } else if (appleIdValues.length > 0) {
+    const missingAppleIdValues = missingEnvironmentVariables(
+      environment,
+      appleIdNotarizationEnvironment
+    )
+    if (missingAppleIdValues.length > 0) {
+      throw new Error(
+        `Incomplete Apple ID notarization environment; missing: ${missingAppleIdValues.join(', ')}.`
+      )
+    }
+  } else {
+    throw new Error(
+      `Missing macOS notarization environment; provide either ${appleApiNotarizationEnvironment.join(', ')} or ${appleIdNotarizationEnvironment.join(', ')}.`
+    )
   }
   if (environment.PEBBLE_MAC_RELEASE !== '1') {
     throw new Error('PEBBLE_MAC_RELEASE must be 1 for hardened-runtime helper signing.')

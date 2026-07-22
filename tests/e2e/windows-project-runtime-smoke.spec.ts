@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { mkdtemp } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { waitForSessionReady } from './helpers/store'
 
@@ -20,7 +20,7 @@ async function removeTempRoot(root: string): Promise<void> {
         throw error
       }
       // Why: Windows and WSL-backed git probes can release repo handles shortly
-      // after the Electron fixture closes; retry to keep the smoke idempotent.
+      // after the desktop fixture closes; retry to keep the smoke idempotent.
       await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
     }
   }

@@ -17,7 +17,7 @@ Use this skill for desktop UI through `pebble computer`. When the requested targ
 
 ## Preconditions
 
-- Prefer `pebble computer ...`; on Linux, use `pebble-ide computer ...` if `pebble` is unavailable. In this Pebble worktree, use `./config/scripts/pebble-dev computer ...` only when testing the local dev runtime.
+- Prefer `pebble computer ...`. In this Pebble worktree, use `./config/scripts/pebble-dev computer ...` only when testing the local dev runtime.
 - Prefer `--json`. Screenshot bytes are omitted from JSON and written to `screenshot.path`.
 - Do not push, submit forms, send messages, buy items, delete data, change account settings, or expose secrets unless the user explicitly asked for that action.
 - If an app contains sensitive content, read only what the user requested.

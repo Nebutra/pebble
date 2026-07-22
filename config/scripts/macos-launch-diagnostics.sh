@@ -282,7 +282,6 @@ run_launchservices_probe() {
     open -n -W \
       --stdout "$stdout_file" \
       --stderr "$stderr_file" \
-      --env ELECTRON_ENABLE_LOGGING=1 \
       --env PEBBLE_STARTUP_DIAGNOSTICS=trace \
       --env PEBBLE_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
       --env PEBBLE_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
@@ -293,7 +292,6 @@ run_launchservices_probe() {
     open -n -W \
       --stdout "$stdout_file" \
       --stderr "$stderr_file" \
-      --env ELECTRON_ENABLE_LOGGING=1 \
       --env PEBBLE_STARTUP_DIAGNOSTICS=trace \
       --env PEBBLE_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
       --env PEBBLE_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
@@ -322,8 +320,7 @@ run_direct_exec_probe() {
     echo "bootstrap_file=$bootstrap_file"
   } >"$OUT_DIR/$label.meta"
 
-  ELECTRON_ENABLE_LOGGING=1 \
-    PEBBLE_STARTUP_DIAGNOSTICS=trace \
+  PEBBLE_STARTUP_DIAGNOSTICS=trace \
     PEBBLE_STARTUP_DIAGNOSTICS_TRACE_LIMIT=30000 \
     PEBBLE_STARTUP_DIAGNOSTICS_FILE="$bootstrap_file" \
     PEBBLE_NATIVE_SESSION_RECOVERY_DISABLED=launch-diagnostics \

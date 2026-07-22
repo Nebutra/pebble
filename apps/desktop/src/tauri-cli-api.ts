@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 
 import type { PreloadApi } from '../../../packages/product-core/shared/preload-api-types'
 import type { CliInstallStatus } from '../../../packages/product-core/shared/cli-install-types'
+import { getPebbleCliCommandNameForPlatform } from '../../../packages/product-core/shared/pebble-cli-command-name'
 import { hasTauriInternals } from './pebble-runtime-http-bridge'
 
 type CliApi = NonNullable<Partial<PreloadApi>['cli']>
@@ -21,7 +22,7 @@ function webUnsupportedStatus(): CliInstallStatus {
   const platform = hostPlatform()
   return {
     platform,
-    commandName: platform === 'linux' ? 'pebble-ide' : 'pebble',
+    commandName: getPebbleCliCommandNameForPlatform(platform),
     commandPath: null,
     pathDirectory: null,
     pathConfigured: false,

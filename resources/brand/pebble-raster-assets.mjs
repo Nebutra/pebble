@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join, resolve } from 'node:path'
 import { PNG } from 'pngjs'
 import {
   buildWindowsIcoFromPng,
@@ -9,7 +8,7 @@ import {
   resizeImage
 } from '../../config/scripts/trim-windows-icon-source.mjs'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
+const __dirname = import.meta.dirname
 const ROOT = resolve(__dirname, '..', '..')
 const GENERATED = join(ROOT, 'resources', 'brand', 'generated')
 const PROCESSED = join(ROOT, 'resources', 'brand', 'processed')

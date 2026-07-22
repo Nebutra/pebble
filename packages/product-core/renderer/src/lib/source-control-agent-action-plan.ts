@@ -36,8 +36,7 @@ export function planSourceControlAgentActionLaunch(args: {
   cmdOverrides?: Partial<Record<TuiAgent, string>>
   agentArgs?: string | null
   platform?: NodeJS.Platform
-  /** Why: SSH remotes deploy the CLI shim as plain `pebble`, so the Linux-only
-   * `pebble-ide` rename must not be applied for remote launches. */
+  /** Why: preserve the SSH signal so remote launch routing remains relay-owned. */
   isRemote?: boolean
 }): SourceControlLaunchPlanResult {
   const agent = args.agent

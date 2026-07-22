@@ -42,12 +42,9 @@ top level:
 | `native/rust-host/`             | Shared native host boundary and typed runtime client                      |
 | `native/zig-system/`            | Low-level process and platform primitives linked into Tauri               |
 | `docs/architecture/`            | Architecture and migration ownership                                      |
-| `migration/electron-reference/` | Non-shipping Electron parity reference pending final native evidence      |
 
-`migration/` contains temporary, non-shipping code that is still being folded
-into the canonical applications. It is not a second Pebble implementation.
-Electron main and preload code are isolated under `migration/electron-reference/`;
-the default start, build, and release paths target `apps/desktop/`.
+The desktop application, native bridge, development server, builds, and releases
+are all owned by `apps/desktop/`; there is no secondary desktop-shell implementation.
 
 ## Features
 

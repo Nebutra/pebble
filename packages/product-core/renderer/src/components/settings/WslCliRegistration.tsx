@@ -69,7 +69,7 @@ export function WslCliRegistration({
 
   const isEnabled = status?.state === 'installed'
   const isSupported = status?.supported ?? false
-  const commandName = status?.commandName ?? 'pebble-ide'
+  const commandName = status?.commandName ?? 'pebble'
 
   const handleInstall = async (): Promise<void> => {
     setBusyAction('install')
@@ -161,7 +161,7 @@ export function WslCliRegistration({
                 : (status?.detail ??
                   translate(
                     'auto.components.settings.WslCliRegistration.7aa456a460',
-                    'Register `pebble-ide` in ~/.local/bin inside WSL.'
+                    'Register `pebble` in ~/.local/bin inside WSL.'
                   ))}
             </p>
           </div>

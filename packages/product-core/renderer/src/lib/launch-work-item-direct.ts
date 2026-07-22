@@ -276,8 +276,7 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
         promptDelivery,
         settings,
         launchPlatform,
-        // Why: SSH hosts run the plain `pebble` shim, so the Linux-only `pebble-ide`
-        // rename must not be applied for remote launches.
+        // Why: preserve the SSH signal so remote launch routing remains relay-owned.
         isRemote: typeof launchConnectionId === 'string'
       }))
 

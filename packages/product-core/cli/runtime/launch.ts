@@ -1,5 +1,5 @@
 import { spawn as spawnProcess, type SpawnOptions } from 'node:child_process'
-import { dirname, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { RuntimeClientError } from './types'
 
 export function launchPebbleApp(): void {
@@ -11,29 +11,9 @@ export function launchPebbleApp(): void {
 
   const overrideExecutable = process.env.PEBBLE_APP_EXECUTABLE
   if (typeof overrideExecutable === 'string' && overrideExecutable.trim().length > 0) {
-    spawnDetached(overrideExecutable, getExecutableAppArgs(), {
+    spawnDetached(overrideExecutable, [], {
       ...getExecutableSpawnOptions(overrideExecutable),
-      env: stripElectronRunAsNode(process.env)
-    })
-    return
-  }
-
-  if (process.env.ELECTRON_RUN_AS_NODE === '1') {
-    if (process.platform === 'darwin') {
-      const appBundlePath = getMacAppBundlePath(process.execPath)
-      if (appBundlePath) {
-        // Why: launching the inner MacOS binary directly can trigger macOS app
-        // launch failures and bypass normal bundle lifecycle. The public
-        // packaged CLI should re-open the .app the same way Finder does.
-        spawnDetached('open', [appBundlePath], {
-          env: stripElectronRunAsNode(process.env)
-        })
-        return
-      }
-    }
-
-    spawnDetached(process.execPath, [], {
-      env: stripElectronRunAsNode(process.env)
+      env: process.env
     })
     return
   }
@@ -68,7 +48,7 @@ export function servePebbleApp(
   } = {}
 ): Promise<number> {
   const executable = resolveForegroundPebbleExecutable()
-  const childArgs = [...getExecutableAppArgs(), '--serve']
+  const childArgs = ['--serve']
   if (args.json) {
     childArgs.push('--serve-json')
   }
@@ -99,7 +79,7 @@ export function servePebbleApp(
     cwd: resolveAppRoot(),
     stdio: args.recipeJson === true ? ['ignore', 'pipe', 'inherit'] : 'inherit',
     ...getExecutableSpawnOptions(executable),
-    env: stripElectronRunAsNode(process.env)
+    env: process.env
   })
 
   if (args.recipeJson) {
@@ -203,18 +183,13 @@ function waitForRecipeJson(child: ReturnType<typeof spawnProcess>): Promise<numb
   })
 }
 
-function getExecutableAppArgs(): string[] {
-  return process.env.PEBBLE_APP_EXECUTABLE_NEEDS_APP_ROOT === '1' ? [resolveAppRoot()] : []
-}
-
 function getExecutableSpawnOptions(executable: string): Pick<SpawnOptions, 'shell'> {
   return process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(executable) ? { shell: true } : {}
 }
 
 function resolveAppRoot(): string {
-  // Why: dev-mode resource resolution in the Electron child may consult
-  // process.cwd(). Pin it to the app root so `pebble serve` behaves the same
-  // regardless of the shell directory it was launched from.
+  // Why: development desktop commands resolve source-owned sidecars relative
+  // to the repository; pinning cwd keeps `pebble serve` independent of the shell.
   return resolve(__dirname, '../../..')
 }
 
@@ -223,27 +198,8 @@ function resolveForegroundPebbleExecutable(): string {
   if (typeof overrideExecutable === 'string' && overrideExecutable.trim().length > 0) {
     return overrideExecutable
   }
-  if (process.env.ELECTRON_RUN_AS_NODE === '1') {
-    return process.execPath
-  }
   throw new RuntimeClientError(
     'runtime_serve_failed',
     'Could not determine how to start Pebble server. Set PEBBLE_APP_EXECUTABLE to the Pebble executable.'
   )
-}
-
-function stripElectronRunAsNode(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const next = { ...env }
-  delete next.ELECTRON_RUN_AS_NODE
-  return next
-}
-
-function getMacAppBundlePath(execPath: string): string | null {
-  if (process.platform !== 'darwin') {
-    return null
-  }
-  const macOsDir = dirname(execPath)
-  const contentsDir = dirname(macOsDir)
-  const appBundlePath = dirname(contentsDir)
-  return appBundlePath.endsWith('.app') ? appBundlePath : null
 }

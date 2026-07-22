@@ -43,12 +43,12 @@ export async function addWorktreeOp(git: GitExec, params: Record<string, unknown
   }
 
   // Why: --no-track + push.autoSetupRemote=true mirrors the local
-  // addWorktree path (migration/electron-reference/src/main/git/worktree.ts). Keeping the SSH path in
+  // worktree-creation path. Keeping the SSH path in
   // sync prevents a transport-only divergence where "Pebble creates a
   // worktree" produces a different `git status` / `git push` UX based on
   // whether the repo is local or SSH-mounted. See full design rationale
   // (state machine, common-dir scope, old-git fallback) in the comments
-  // around migration/electron-reference/src/main/git/worktree.ts addWorktree — those invariants apply
+  // around local worktree creation; those invariants apply
   // identically here.
   const effectiveBase =
     base && !checkoutExistingBranch
@@ -189,7 +189,7 @@ export async function commitChangesRelay(
   worktreePath: string,
   message: string
 ): Promise<{ success: boolean; error?: string }> {
-  // Why: defense-in-depth. The IPC handler at migration/electron-reference/src/main/ipc/filesystem.ts validates
+  // Why: defense-in-depth. The desktop bridge validates
   // the message, but a relay caller (future automation, or an SSH client connecting
   // to the relay directly) could bypass that path. Reject empty/whitespace messages
   // here so we surface a clear error instead of git's opaque failure.
@@ -204,7 +204,7 @@ export async function commitChangesRelay(
     // Why: surface whichever channel carries the useful message. Pre-commit/GPG
     // hook failures write to stderr; "nothing to commit, working tree clean"
     // writes to stdout. Try stderr first, fall back to stdout, then error.message.
-    // Mirrors commitChanges in migration/electron-reference/src/main/git/status.ts — keep the two paths in sync.
+    // Mirrors local commitChanges behavior; keep local and SSH paths in sync.
     const readStringField = (field: string): string | null => {
       if (typeof error === 'object' && error && field in error) {
         const v = (error as Record<string, unknown>)[field]

@@ -8,23 +8,19 @@ const scriptPath = realpathSync(import.meta.filename)
 const scriptDir = path.dirname(scriptPath)
 const repoRoot = path.resolve(scriptDir, '..', '..')
 const cliEntry =
-  process.env.PEBBLE_DEV_CLI_ENTRY_PATH ??
-  path.join(repoRoot, 'out', 'cli', 'index.js')
+  process.env.PEBBLE_DEV_CLI_ENTRY_PATH ?? path.join(repoRoot, 'out', 'cli', 'index.js')
 
 if (!existsSync(cliEntry)) {
   console.error("pebble-dev: CLI not built yet. Run 'pnpm run build:cli' first.")
   process.exit(1)
 }
 
-const userDataPath =
-  process.env.PEBBLE_DEV_USER_DATA_PATH ??
-  getDefaultDevUserDataPath()
+const userDataPath = process.env.PEBBLE_DEV_USER_DATA_PATH ?? getDefaultDevUserDataPath()
 process.env.PEBBLE_USER_DATA_PATH = userDataPath
 
-const electronExecutable = getElectronExecutable()
-if (!process.env.PEBBLE_APP_EXECUTABLE && isRunnableFile(electronExecutable)) {
-  process.env.PEBBLE_APP_EXECUTABLE = electronExecutable
-  process.env.PEBBLE_APP_EXECUTABLE_NEEDS_APP_ROOT = '1'
+const tauriExecutable = getTauriExecutable()
+if (!process.env.PEBBLE_APP_EXECUTABLE && isRunnableFile(tauriExecutable)) {
+  process.env.PEBBLE_APP_EXECUTABLE = tauriExecutable
 }
 
 const result = spawnSync(process.execPath, [cliEntry, ...process.argv.slice(2)], {
@@ -53,11 +49,10 @@ function getDefaultDevUserDataPath() {
   )
 }
 
-function getElectronExecutable() {
-  if (process.platform === 'win32') {
-    return path.join(repoRoot, 'node_modules', 'electron', 'dist', 'electron.exe')
-  }
-  return path.join(repoRoot, 'node_modules', '.bin', 'electron')
+function getTauriExecutable() {
+  const executable =
+    process.platform === 'win32' ? 'pebble-desktop-tauri.exe' : 'pebble-desktop-tauri'
+  return path.join(repoRoot, 'apps', 'desktop', 'src-tauri', 'target', 'release', executable)
 }
 
 function isRunnableFile(candidate) {

@@ -73,7 +73,7 @@ export async function syncTauriReleaseVersion(version, root = repoRoot) {
   return next
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] === import.meta.filename) {
   const version = process.argv[2]
   if (!version) {
     throw new Error('Usage: node config/scripts/sync-tauri-release-version.mjs <version>')

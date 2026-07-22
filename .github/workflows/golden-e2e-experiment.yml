@@ -1,16 +1,13 @@
-name: Golden E2E Experiment
+name: Tauri Golden Evidence Experiment
 
 on:
   pull_request:
     paths:
       - '.github/workflows/golden-e2e-experiment.yml'
-      - 'package.json'
-      - 'tests/e2e/golden-core-flows.spec.ts'
-      - 'tests/e2e/fixtures/terminal-emoji-table.md'
-      - 'tests/e2e/helpers/**'
-      - 'tests/e2e/terminal-raw-emoji-table-scroll-restore.spec.ts'
-      - 'packages/product-core/renderer/src/components/sidebar/SidebarHeader.tsx'
-      - 'packages/product-core/renderer/src/lib/pane-manager/**'
+      - 'apps/desktop/**'
+      - 'packages/product-core/renderer/**'
+      - 'config/scripts/run-tauri-real-runtime-gate.mjs'
+      - 'config/scripts/run-tauri-terminal-evidence.mjs'
   workflow_dispatch:
     inputs:
       ref:
@@ -19,12 +16,10 @@ on:
         type: string
 
 jobs:
-  golden-e2e:
-    name: golden e2e ${{ matrix.platform }} experiment
+  golden-evidence:
+    name: Tauri golden evidence ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    env:
-      NODE_OPTIONS: --max-old-space-size=4096
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -32,65 +27,36 @@ jobs:
           - os: ubuntu-latest
             platform: linux
           - os: macos-15
-            platform: mac
-          # Why: Windows golden E2E is temporarily disabled on CI while its
-          # flaky runner-only failures are investigated.
-          # - os: windows-latest
-          #   platform: windows
-
+            platform: macos
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
-          # Why: pull_request merge refs disappear after merge, but experiment
-          # reruns still need a stable commit to checkout.
           ref: ${{ inputs.ref || github.event.pull_request.head.sha || github.ref }}
-
-      - name: Install native build tools
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y build-essential python3 xvfb
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version-file: package.json
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6
         with:
           run_install: false
-
-      # Why: Linux golden E2E uses the same native install path as PR/release CI,
-      # which needs pnpm to bypass its non-executable bundled gyp_main.py.
-      - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: runtime/go/go.mod
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux Tauri dependencies
         if: runner.os == 'Linux'
-        run: |
-          npm install -g node-gyp@11.5.0
-          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build Electron app for E2E
-        run: npx electron-vite build --config migration/electron-reference/electron.vite.config.ts --mode e2e
-
-      - name: Run golden E2E tests on Linux
+        run: sudo apt-get update && sudo apt-get install -y at-spi2-core dbus-x11 gir1.2-atspi-2.0 libwebkit2gtk-4.1-dev libappindicator3-dev python3-gi librsvg2-dev patchelf xvfb
+      - run: pnpm install --frozen-lockfile
+      - name: Capture Tauri golden evidence on Linux
         if: runner.os == 'Linux'
-        run: |
-          xvfb-run --auto-servernum env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e -- tests/e2e/golden-core-flows.spec.ts
-          xvfb-run --auto-servernum env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-golden
-
-      - name: Run golden E2E tests on macOS
+        run: xvfb-run --auto-servernum dbus-run-session -- node config/scripts/run-tauri-terminal-evidence.mjs --mode golden --output artifacts/tauri-golden/report.json
+      - name: Capture Tauri golden evidence on macOS
         if: runner.os == 'macOS'
-        run: |
-          env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e -- tests/e2e/golden-core-flows.spec.ts
-          env SKIP_BUILD=1 PEBBLE_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-golden
-
-      - name: Upload Playwright traces
-        if: failure()
+        run: node config/scripts/run-tauri-terminal-evidence.mjs --mode golden --output artifacts/tauri-golden/report.json
+      - name: Upload Tauri golden evidence
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: golden-${{ matrix.platform }}-playwright-traces
-          path: test-results/
-          retention-days: 7
-          if-no-files-found: ignore
+          name: tauri-golden-${{ matrix.platform }}
+          path: artifacts/tauri-golden*
+          retention-days: 14
+          if-no-files-found: error

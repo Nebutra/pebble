@@ -2,7 +2,7 @@
  * E2E test for newly-added worktrees sorting correctly in "Recent" mode.
  *
  * Why this exists:
- *   Before the fix in `migration/electron-reference/src/main/ipc/worktrees.ts`, a worktree that existed
+ *   Before the fix in `apps/desktop/src/main/ipc/worktrees.ts`, a worktree that existed
  *   on disk but had no persisted WorktreeMeta (the case for folder-mode
  *   repos and pre-existing worktrees discovered when adding a new git repo)
  *   fell back to `lastActivityAt: 0`. "Recent" sort orders by
@@ -17,7 +17,7 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { waitForSessionReady, waitForActiveWorktree } from './helpers/store'
 

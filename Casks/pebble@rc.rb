@@ -35,15 +35,12 @@ cask "pebble@rc" do
 
   app "Pebble.app"
 
-  # Why: expose the bundled `pebble` CLI on PATH at install time (Homebrew symlinks
-  # this into its already-on-PATH bin dir). Without it, the CLI is only registered
-  # by the in-app "Install CLI" action, which a headless host can never trigger —
-  # so `pebble serve` on a server would be unreachable from the shell. The shim
-  # resolves the real app by walking symlinks, so the Homebrew symlink works.
-  binary "#{appdir}/Pebble.app/Contents/Resources/bin/pebble"
+  # Why: the Tauri executable owns both desktop activation and CLI dispatch, so
+  # Homebrew must expose that native entrypoint instead of the removed Node shim.
+  binary "#{appdir}/Pebble.app/Contents/MacOS/pebble-desktop-tauri", target: "pebble"
 
   # Why: Pebble writes user data under ~/.pebble (worktrees, agent state) and
-  # Electron's standard userData directories. Zap removes everything the app
+  # Pebble's standard application-data directories. Zap removes everything the app
   # creates during normal use so `brew uninstall --zap` is a clean slate.
   zap trash: [
     "~/.pebble",

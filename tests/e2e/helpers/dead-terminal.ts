@@ -193,7 +193,7 @@ export async function waitForAllPanesToHaveContent(
 }
 
 /**
- * Log WebGL canvas state for diagnostics. In headful mode, visible panes
+ * Log browser WebGL canvas state for diagnostics. Visible panes
  * should have WebGL canvases; hidden panes (suspended rendering) should not.
  */
 export async function checkWebglState(page: TestPage, label: string): Promise<void> {

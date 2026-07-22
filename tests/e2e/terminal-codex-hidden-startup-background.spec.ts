@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { PNG } from 'pngjs'
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import {
   ensureTerminalVisible,

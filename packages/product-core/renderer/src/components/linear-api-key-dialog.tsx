@@ -118,7 +118,7 @@ export function LinearApiKeyDialog({
   const storageCopy =
     runtimeTarget.kind === 'environment'
       ? 'This key is stored by the active remote runtime.'
-      : 'Local runtime keys are stored on this device using Electron encrypted storage when available.'
+      : 'Local runtime keys are stored on this device using OS-protected storage when available.'
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

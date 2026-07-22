@@ -1742,7 +1742,7 @@
         "17412483da": "Listo para instalar",
         "47126bcf57": "Descargar manualmente",
         "3553a8672f": "Último error",
-        "90559b14e3": "Esto activa un switch de red de Electron para todo el proceso después de reiniciar. Úsalo para VPNs corporativas o proxies que rechazan descargas de actualizaciones por HTTP/2.",
+        "90559b14e3": "Esto activa un switch de red de escritorio para todo el proceso después de reiniciar. Úsalo para VPNs corporativas o proxies que rechazan descargas de actualizaciones por HTTP/2.",
         "6e45bfa2e0": "Descargando...",
         "558842597d": "Descargando actualización",
         "f58b5c57a6": "Nuevo:",
@@ -4690,7 +4690,7 @@
           "40b29e0bf3": "Reiniciar",
           "87a2cb2ac8": "Pebble aplica este modo de red al inicio.",
           "89958d7edf": "Reinicio requerido",
-          "b3ad629640": "Úsalo solo cuando una VPN o proxy corporativo rompa las descargas de actualizaciones con errores de protocolo HTTP/2. Afecta toda la red de Electron después del reinicio.",
+          "b3ad629640": "Úsalo solo cuando una VPN o proxy corporativo rompa las descargas de actualizaciones con errores de protocolo HTTP/2. Afecta toda la red de escritorio después del reinicio.",
           "6627e75c92": "Explicar la compatibilidad HTTP/1.1",
           "e9506d3377": "Compatibilidad HTTP/1.1",
           "8b7a8df299": "Workarounds de bajo nivel para troubleshooting de soporte.",
@@ -5652,7 +5652,7 @@
         "OpenAiTranscriptionKeyDialog": {
           "fa83512e48": "Guardar clave",
           "07b26f2742": "Borrar clave",
-          "d246b2bdb3": "Las claves del runtime local se almacenan en ~/.pebble mediante el almacenamiento cifrado de Electron cuando está disponible.",
+          "d246b2bdb3": "Las claves del runtime local se almacenan en ~/.pebble mediante el almacenamiento protegido del sistema operativo cuando está disponible.",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "Clave API configurada",
           "16015322f9": "Clave API",
@@ -6767,7 +6767,7 @@
           "e49688f67f": "¿Registrar `{{value0}}` en WSL?",
           "61ac55278e": "¿Eliminar `{{value0}}` de WSL?",
           "e2b0ee267f": "duro",
-          "7aa456a460": "Registra `pebble-ide` en ~/.local/bin dentro de WSL.",
+          "7aa456a460": "Registra `pebble` en ~/.local/bin dentro de WSL.",
           "0307677bb9": "Comprobando el registro de la CLI de WSL..."
         },
         "accounts": {
@@ -6837,7 +6837,7 @@
             "4d44352eea": "red",
             "2b4d26d11e": "redes",
             "e04e9db503": "avanzado",
-            "585f56fae0": "Usar HTTP/1.1 para la red de Electron cuando HTTP/2 falle detrás de un proxy.",
+            "585f56fae0": "Usar HTTP/1.1 para la red de escritorio cuando HTTP/2 falle detrás de un proxy.",
             "11eea3da72": "Compatibilidad HTTP/1.1"
           }
         },

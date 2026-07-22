@@ -111,7 +111,7 @@ export async function sendRequest<TResult>(
 
         // Fast-path: ignore keepalives without running the full schema.
         // setTimeout().refresh() is stable since Node 10 (Pebble ships on
-        // Node 20+ via Electron and the standalone CLI targets the same
+        // The Tauri desktop bridge and standalone CLI target the same
         // major). See §7 risk #9.
         if (isKeepaliveFrame(raw)) {
           timeout.refresh()

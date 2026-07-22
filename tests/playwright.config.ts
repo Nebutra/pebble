@@ -1,60 +1,38 @@
-import { defineConfig } from '@nebutra/playwright-test'
+import { defineConfig } from '@playwright/test'
+import { resolve } from 'node:path'
 
-/**
- * Playwright config for Pebble E2E tests.
- *
- * Run:
- *   pnpm run test:e2e              — build + run all tests (headless)
- *   pnpm run test:e2e:headful      — run with visible window (for pointer-capture tests)
- *   SKIP_BUILD=1 pnpm run test:e2e — skip rebuild (faster iteration)
- *
- * globalSetup builds the Electron app and creates a seeded test git repo.
- * globalTeardown cleans up the test repo.
- * Tests use _electron.launch() to start the app — no manual setup needed.
- */
+import { browserPlaywrightProjects } from './e2e/e2e-ownership.mjs'
+
+const desktopPort = 5187
+
 export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
   globalTeardown: './e2e/global-teardown.ts',
-  // Why: this suite launches a fresh Electron app and isolated userData dir per
-  // test. Cold-starts late in the run can exceed 60s on CI even when the app is
-  // healthy, so the per-test budget needs to cover startup plus assertions.
   timeout: 120_000,
   expect: { timeout: 10_000 },
-  // Why: the headless Electron specs launch isolated app instances and can
-  // safely fan out across workers, which cuts the default E2E runtime
-  // substantially. The few visible-window tests that still rely on real
-  // pointer interaction are marked serial in their spec file instead.
   fullyParallel: true,
-  // Why: each CI worker launches a real Electron/Chromium process tree against
-  // a mutable seeded repo. Release runners showed two apps per VM can contend
-  // on Xvfb/git enough to create false E2E failures, so CI scales by shards.
   workers: process.env.CI ? 1 : undefined,
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: 'list',
   use: {
-    // Why: this suite intentionally runs with retries disabled so first-failure
-    // traces are the only reliable debugging artifact we can collect in CI.
+    baseURL: `http://127.0.0.1:${desktopPort}`,
+    channel: process.env.PEBBLE_PLAYWRIGHT_CHANNEL ?? 'chromium',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure'
   },
-  projects: [
-    {
-      name: 'electron-headless',
-      testMatch: '**/*.spec.ts',
-      grepInvert: /@headful/,
-      metadata: {
-        pebbleHeadful: false
-      }
-    },
-    {
-      name: 'electron-headful',
-      testMatch: '**/*.spec.ts',
-      grep: /@headful/,
-      metadata: {
-        pebbleHeadful: true
-      }
-    }
-  ]
+  webServer: {
+    // Why: renderer contracts mount the canonical Tauri entry with mocked IPC;
+    // native lifecycle evidence remains owned by the Tauri functional gate.
+    command: `./node_modules/.bin/vite --host 127.0.0.1 --port ${desktopPort} --strictPort --mode e2e`,
+    cwd: resolve('apps/desktop'),
+    url: `http://127.0.0.1:${desktopPort}`,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000
+  },
+  projects: Object.entries(browserPlaywrightProjects).map(([name, testMatch]) => ({
+    name,
+    testMatch
+  }))
 })

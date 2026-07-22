@@ -1,10 +1,12 @@
 # Mobile Terminal Output Streaming Findings
 
+> Archived migration record: referenced Electron paths document the implementation that existed when this note was written; those paths are intentionally absent from the current Tauri repository.
+
 Date: 2026-04-28
 
 ## Scope
 
-The investigation was limited to `mobile/`. Server-side files under `migration/electron-reference/src/main/` were read for context only and were not modified.
+The investigation was limited to `mobile/`. At the time, server-side files in the now-removed Electron reference shell were read for context only and were not modified.
 
 ## Verified Findings
 
@@ -20,7 +22,7 @@ The investigation was limited to `mobile/`. Server-side files under `migration/e
 - Adding a mobile-side `terminal.read` fallback did not make the current physical-phone test terminal display output, because the direct WebSocket `terminal.read` response for `mobile-output-test` remained `tail: []` and `lastOutputAt: null` after `echo hi`.
 - Calling `terminal.show` before `terminal.send` on `mobile-output-test` returned a connected/writable terminal with a `ptyId`, but a delayed `terminal.read` still returned an empty tail.
 - Root cause found after building a no-phone repro: daemon-backed PTYs were forwarding provider data to the desktop renderer, but not into `runtime.onPtyData`. The runtime tail buffer and `terminal.subscribe` listeners are fed by `runtime.onPtyData`, so the phone saw accepted sends with no output.
-- Fix: `migration/electron-reference/src/main/ipc/pty.ts` now forwards `provider.onData` into `runtime.onPtyData` for non-`LocalPtyProvider` providers. Local PTYs already use the LocalPtyProvider configure hook, so the guard avoids duplicate local output.
+- Historical fix: the former Electron PTY controller forwarded `provider.onData` into `runtime.onPtyData` for non-local providers. The current Go/Tauri runtime owns this streaming contract; the deleted path is not an implementation reference.
 - After restarting Electron, `pnpm exec tsx mobile/scripts/test-subscribe.ts <deviceToken>` passed: both `streamSawMarker` and `readSawMarker` were `true`.
 - After the backend fix, the physical phone rendered the repro marker in `TerminalWebView`.
 - Because of the empty tail/no live stream on that specific desktop terminal, the physical `ls` test did not prove the WebView display path after real PTY output.

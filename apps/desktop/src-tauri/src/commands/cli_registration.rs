@@ -32,13 +32,7 @@ fn platform_name() -> &'static str {
 }
 
 fn command_name() -> &'static str {
-    // Why: packaged Linux uses `pebble-ide` to stay distinct from GNOME Pebble;
-    // other unix platforms use the bare `pebble` command.
-    if cfg!(target_os = "linux") {
-        "pebble-ide"
-    } else {
-        "pebble"
-    }
+    "pebble"
 }
 
 fn unsupported(reason: &str, detail: &str) -> CliInstallStatus {
@@ -366,6 +360,11 @@ mod tests {
         std::env::set_var("PEBBLE_CLI_INSTALL_DIR", dir.path());
         std::env::set_var("PEBBLE_CLI_LAUNCHER_PATH", &launcher);
         Scope { _dir: dir }
+    }
+
+    #[test]
+    fn installed_command_name_is_canonical() {
+        assert_eq!(super::command_name(), "pebble");
     }
 
     #[test]

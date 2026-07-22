@@ -16,7 +16,7 @@ import { join } from 'node:path'
 const __dirname = import.meta.dirname
 // Why: the script lives under config/scripts, so go two levels up to reach the repo root.
 const ROOT = join(__dirname, '..', '..')
-const RELAY_ENTRY = join(ROOT, 'src', 'relay', 'relay.ts')
+const RELAY_ENTRY = join(ROOT, 'packages', 'product-core', 'relay', 'relay.ts')
 
 const PLATFORMS = [
   'linux-x64',

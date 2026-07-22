@@ -3244,8 +3244,7 @@ func (m *Manager) GitRepositoryIdentity(ctx context.Context, req GitRepositoryId
 	if sameGitHubRepositoryIdentity(slug, upstream) {
 		upstream = nil
 	}
-	// Why: mirrors getRepoUpstream's GitHub API fallback (migration/electron-reference/src/main/github/client.ts)
-	// for forks with no local `upstream` remote configured.
+	// Why: forks without a local `upstream` remote still need the GitHub API fallback.
 	if upstream == nil && slug != nil {
 		if parent := providercli.ResolveGitHubForkParent(ctx, base, slug.Owner, slug.Repo); parent != nil {
 			upstream = &GitHubRepositoryIdentity{Owner: parent.Owner, Repo: parent.Repo}

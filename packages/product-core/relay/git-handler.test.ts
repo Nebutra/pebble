@@ -2363,7 +2363,7 @@ describe('GitHandler', () => {
     // Why: relay handler tests for addWorktree use a mock-injection approach
     // to deterministically control git exit codes (in particular `--get` exit
     // 1 vs other non-zero codes) without relying on the test host's global
-    // git config. Mirrors the pattern in migration/electron-reference/src/main/git/worktree.test.ts.
+    // git config. This preserves the local worktree-creation contract.
     function setupMockedHandler(roots: string[]) {
       const ctx = new RelayContext()
       for (const r of roots) {
@@ -2567,7 +2567,7 @@ describe('GitHandler', () => {
       // Why: `git config --get key` exits 0 if the key has any value at any
       // scope, including an explicitly empty string. We must not fall through
       // to `--local set true` and overwrite that. Mirrors the local addWorktree
-      // parity case in migration/electron-reference/src/main/git/worktree.test.ts.
+      // parity case in the local worktree-creation contract.
       const { localDispatcher, gitMock } = setupMockedHandler(['/relay/repo', '/relay/wt'])
       gitMock.mockRejectedValueOnce(new Error('not a branch')) // rev-parse refs/heads/main^{commit}
       gitMock.mockResolvedValueOnce({ stdout: '', stderr: '' }) // worktree add

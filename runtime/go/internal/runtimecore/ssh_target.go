@@ -448,8 +448,7 @@ func sshProbeErrorStatus(detail string) string {
 	}
 }
 
-// findSystemSshBinary mirrors migration/electron-reference/src/main/ssh/system-ssh-binary.ts resolution so
-// tests can inject a fake ssh via PEBBLE_SYSTEM_SSH_PATH.
+// findSystemSshBinary supports PEBBLE_SYSTEM_SSH_PATH so tests can inject a fake ssh.
 func findSystemSshBinary() (string, bool) {
 	if override := strings.TrimSpace(os.Getenv("PEBBLE_SYSTEM_SSH_PATH")); override != "" {
 		return override, true

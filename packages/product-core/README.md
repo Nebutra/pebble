@@ -9,5 +9,5 @@ desktop, mobile, CLI, and remote runtime surfaces.
 - `relay/`: legacy Node relay pending full Go runtime retirement
 - `agent-hooks/`: managed agent hook installers
 
-Shipping desktop shell code belongs in `apps/desktop`. Electron-only code belongs in
-`migration/electron-reference` and must not be imported by this package's CLI, relay, or hooks.
+Shipping desktop shell and native bridge code belongs in `apps/desktop`. Product Core must not
+depend on an alternate desktop-shell implementation from its CLI, relay, or hook packages.

@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- Localhost SSH E2E covers setup, remote PTY, hook relay, and interrupt inference in one expensive app boot. */
 import os from 'node:os'
 
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import {
@@ -175,7 +175,7 @@ test.describe('Localhost SSH', () => {
             target: {
               ...target,
               // Why: local-only E2E should not leave a long-lived relay process
-              // behind if the Electron app is killed between cleanup hooks.
+              // behind if the desktop app is killed between cleanup hooks.
               relayGracePeriodSeconds: 1
             }
           })

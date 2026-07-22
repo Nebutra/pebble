@@ -16,10 +16,6 @@ on:
       - 'native/computer-use-windows/**'
       - 'skills/computer-use/SKILL.md'
       - 'packages/product-core/cli/**'
-      - 'migration/electron-reference/src/main/computer/**'
-      - 'migration/electron-reference/src/main/runtime/rpc/dispatcher.ts'
-      - 'migration/electron-reference/src/main/runtime/rpc/errors.ts'
-      - 'migration/electron-reference/src/main/runtime/rpc/methods/computer*.ts'
       - 'packages/product-core/shared/computer-use-*.ts'
       - 'tests/e2e/computer-linux.e2e.ts'
       - 'tests/e2e/computer-mac.e2e.ts'
@@ -51,6 +47,7 @@ jobs:
       - uses: pnpm/action-setup@v6
         with:
           run_install: false
+      - uses: dtolnay/rust-toolchain@stable
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y python3 python3-gi gir1.2-atspi-2.0 at-spi2-core gedit xvfb xclip xdotool
       # Why: pnpm's bundled node-gyp can ship gyp_main.py without execute
@@ -67,19 +64,6 @@ jobs:
           config/scripts/computer-e2e-workflow.test.mjs
           config/scripts/computer-use-skill-guidance.test.mjs
           config/scripts/computer-use-smoke.test.mjs
-          migration/electron-reference/src/main/computer/computer-provider-lifecycle.test.ts
-          migration/electron-reference/src/main/computer/computer-provider-unavailable-message.test.ts
-          migration/electron-reference/src/main/computer/sidecar-client.test.ts
-          migration/electron-reference/src/main/computer/macos-native-provider-client.test.ts
-          migration/electron-reference/src/main/computer/macos-native-provider-socket.test.ts
-          migration/electron-reference/src/main/computer/macos-computer-use-permissions.test.ts
-          migration/electron-reference/src/main/computer/macos-computer-use-permission-status.test.ts
-          migration/electron-reference/src/main/computer/desktop-script-provider-client.test.ts
-          migration/electron-reference/src/main/computer/desktop-script-provider-cache.test.ts
-          migration/electron-reference/src/main/computer/desktop-script-provider-actions.test.ts
-          migration/electron-reference/src/main/computer/desktop-script-provider-cache-lifecycle.test.ts
-          migration/electron-reference/src/main/computer/desktop-script-provider-errors.test.ts
-          migration/electron-reference/src/main/computer/desktop-script-provider-action-errors.test.ts
           packages/product-core/shared/computer-use-error-recovery.test.ts
           packages/product-core/shared/computer-use-key-spec.test.ts
           packages/product-core/cli/format.test.ts
@@ -89,12 +73,10 @@ jobs:
           packages/product-core/cli/handlers/computer-state-formatting.test.ts
           packages/product-core/cli/specs/computer.test.ts
           packages/product-core/cli/index.test.ts
-          migration/electron-reference/src/main/runtime/rpc/dispatcher-computer-errors.test.ts
-          migration/electron-reference/src/main/runtime/rpc/errors.test.ts
-          migration/electron-reference/src/main/runtime/rpc/methods/computer.test.ts
-          migration/electron-reference/src/main/runtime/rpc/methods/computer-actions.test.ts
           packages/product-core/cli/runtime/envelope-schema.test.ts
           packages/product-core/shared/remote-runtime-client.test.ts
+      - name: Test Tauri computer-use ownership
+        run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --no-default-features computer_use
       - run: pnpm verify:computer-native
       - run: pnpm build:cli
       - if: runner.os == 'Linux'

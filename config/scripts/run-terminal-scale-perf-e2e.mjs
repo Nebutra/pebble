@@ -1,46 +1,24 @@
-import { spawn } from 'node:child_process'
+#!/usr/bin/env node
+import { spawnSync } from 'node:child_process'
+import { resolve } from 'node:path'
 
-const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx'
-
-const env = {
-  ...process.env,
-  PEBBLE_E2E_OPENCODE_SCALE_PANES: process.env.PEBBLE_E2E_OPENCODE_SCALE_PANES ?? '10,25,50,100',
-  PEBBLE_E2E_OPENCODE_SCALE_CROSS_WORKSPACE_PANES:
-    process.env.PEBBLE_E2E_OPENCODE_SCALE_CROSS_WORKSPACE_PANES ?? '10,25,50,100',
-  PEBBLE_E2E_OPENCODE_SCALE_PRESSURE_PANES:
-    process.env.PEBBLE_E2E_OPENCODE_SCALE_PRESSURE_PANES ?? '25,50',
-  PEBBLE_E2E_OPENCODE_SCALE_HIDDEN_PRESSURE_PANES:
-    process.env.PEBBLE_E2E_OPENCODE_SCALE_HIDDEN_PRESSURE_PANES ?? '25',
-  PEBBLE_E2E_OPENCODE_FRAME_COUNT: process.env.PEBBLE_E2E_OPENCODE_FRAME_COUNT ?? '60'
-}
-const extraArgs = process.argv.slice(2)
-if (extraArgs[0] === '--') {
-  extraArgs.shift()
-}
-
-const child = spawn(
-  npxCommand,
-  [
-    'playwright',
-    'test',
-    'tests/e2e/artificial-opencode-terminal-load.spec.ts',
-    '--config',
-    'tests/playwright.config.ts',
-    '--project',
-    'electron-headless',
-    '--workers=1',
-    ...extraArgs
-  ],
+const root = resolve(import.meta.dirname, '../..')
+const output =
+  process.env.PEBBLE_E2E_TERMINAL_PERF_REPORT_PATH ?? 'test-results/tauri-terminal-performance.json'
+const result = spawnSync(
+  command('node'),
+  ['config/scripts/run-tauri-terminal-evidence.mjs', '--mode', 'perf', '--output', output],
   {
+    cwd: root,
     stdio: 'inherit',
-    env
+    env: process.env
   }
 )
+if (result.error) {
+  throw result.error
+}
+process.exit(result.status ?? 1)
 
-child.on('exit', (code, signal) => {
-  if (signal) {
-    process.kill(process.pid, signal)
-    return
-  }
-  process.exit(code ?? 1)
-})
+function command(name) {
+  return process.platform === 'win32' && name !== 'node' ? `${name}.cmd` : name
+}

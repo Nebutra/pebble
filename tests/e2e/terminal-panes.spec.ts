@@ -9,7 +9,7 @@
  * - closing panes works
  */
 
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import {
   UUID_RE,
@@ -243,14 +243,14 @@ async function readVisiblePaneContents(page: Page): Promise<string[]> {
 // driven through the exposed PaneManager API and runs fine headless, so the
 // suite itself is not tagged — just the one test that needs it.
 // Why: keep the suite serial so when the headful test does run, Playwright
-// does not try to open multiple visible Electron windows at once.
+// does not try to open multiple visible desktop windows at once.
 test.describe.configure({ mode: 'serial' })
 test.describe('Terminal Panes', () => {
   test.beforeEach(async ({ pebblePage }) => {
     await waitForSessionReady(pebblePage)
     await waitForActiveWorktree(pebblePage)
     await ensureTerminalVisible(pebblePage)
-    // Why: each test launches a fresh Electron instance. The React tree needs
+    // Why: each test starts from a fresh isolated browser context. The React tree needs
     // to render Terminal → TabGroupPanel → TerminalPane → useTerminalPaneLifecycle
     // before the PaneManager registers on window.__paneManagers. On cold starts
     // this easily exceeds 5s, so allow up to 30s (well within the 120s test budget)
@@ -260,9 +260,9 @@ test.describe('Terminal Panes', () => {
       .catch(() => false)
     test.skip(
       !hasPaneManager,
-      'Electron automation in this environment never mounts the live TerminalPane manager, so pane split/resize assertions would only fail on harness setup.'
+      'The current browser harness did not mount the live TerminalPane manager, so pane split/resize assertions would only fail on harness setup.'
     )
-    // Why: hidden Electron runs can report an active terminal tab before the
+    // Why: automated browser runs can report an active terminal tab before the
     // PaneManager finishes mounting the first xterm/PTY pair. Wait for that
     // initial pane so split and content-retention assertions start from a real
     // terminal surface instead of racing the bootstrapped mount.
@@ -356,7 +356,9 @@ test.describe('Terminal Panes', () => {
     expect(leafId).toMatch(UUID_RE)
   })
 
-  test('first Set Title from terminal context menu stays open for typing', async ({ pebblePage }) => {
+  test('first Set Title from terminal context menu stays open for typing', async ({
+    pebblePage
+  }) => {
     const title = `First menu title ${Date.now()}`
 
     await openTerminalContextMenu(pebblePage)
@@ -575,7 +577,7 @@ test.describe('Terminal Panes', () => {
     await expect(pebblePage.locator('.pane-title-input')).toBeVisible()
   })
 
-  test('@headful Set Title pane can be dragged from the title strip', async ({ pebblePage }) => {
+  test('Set Title pane can be dragged from the title strip', async ({ pebblePage }) => {
     const title = `Dragged title ${Date.now()}`
 
     await setPaneTitleFromTerminalMenu(pebblePage, title)
@@ -599,7 +601,9 @@ test.describe('Terminal Panes', () => {
       .locator('.pane-title-drag-handle')
     await expect(titleDragHandle).toBeVisible({ timeout: 3_000 })
     const sourceBox = await titleDragHandle.boundingBox()
-    const targetBox = await pebblePage.locator(`.pane[data-leaf-id="${target.leafId}"]`).boundingBox()
+    const targetBox = await pebblePage
+      .locator(`.pane[data-leaf-id="${target.leafId}"]`)
+      .boundingBox()
     expect(sourceBox).not.toBeNull()
     expect(targetBox).not.toBeNull()
     const sourceIndex = beforeOrder.indexOf(titledLeafId)
@@ -904,7 +908,9 @@ test.describe('Terminal Panes', () => {
 
     await setPaneTitleFromTerminalMenu(pebblePage, removeButtonTitle)
     await setPaneTitleFromTerminalMenu(pebblePage, '')
-    await expect(pebblePage.locator('.pane-title-text', { hasText: removeButtonTitle })).toBeHidden()
+    await expect(
+      pebblePage.locator('.pane-title-text', { hasText: removeButtonTitle })
+    ).toBeHidden()
     await expectSavedLayoutNotToContainTitle(pebblePage, tabId, removeButtonTitle)
 
     await setPaneTitleFromTerminalMenu(pebblePage, splitTitle)
@@ -1067,7 +1073,9 @@ test.describe('Terminal Panes', () => {
    * User Prompt:
    * - terminal panes retain state when switching tabs and when you make / close a pane / switch worktrees
    */
-  test('terminal pane retains content when splitting and closing a pane', async ({ pebblePage }) => {
+  test('terminal pane retains content when splitting and closing a pane', async ({
+    pebblePage
+  }) => {
     // Write a unique marker to the current terminal
     const ptyId = await discoverActivePtyId(pebblePage)
     const marker = `SPLIT_RETAIN_${Date.now()}`
@@ -1094,7 +1102,9 @@ test.describe('Terminal Panes', () => {
    * User Prompt:
    * - terminal panes retain state when switching tabs and when you make / close a pane / switch worktrees
    */
-  test('terminal pane retains content when switching worktrees and back', async ({ pebblePage }) => {
+  test('terminal pane retains content when switching worktrees and back', async ({
+    pebblePage
+  }) => {
     const allWorktreeIds = await getAllWorktreeIds(pebblePage)
     if (allWorktreeIds.length < 2) {
       test.skip(true, 'Need at least 2 worktrees to test worktree switching')
@@ -1121,7 +1131,7 @@ test.describe('Terminal Panes', () => {
       .toBe(worktreeId)
 
     // Why: after a worktree round-trip, the split-group container transitions
-    // from hidden back to visible. In headful Electron runs the terminal tree
+    // from hidden back to visible. In visible desktop runs the terminal tree
     // can take longer than a single render turn to rebind its serialize addon
     // after the worktree activation cascade. Waiting directly for the retained
     // marker proves the user-visible behavior without failing early on the
@@ -1130,7 +1140,9 @@ test.describe('Terminal Panes', () => {
 
     // The terminal should still contain our marker
     await expect
-      .poll(async () => (await getTerminalContent(pebblePage)).includes(marker), { timeout: 20_000 })
+      .poll(async () => (await getTerminalContent(pebblePage)).includes(marker), {
+        timeout: 20_000
+      })
       .toBe(true)
   })
 
@@ -1158,12 +1170,12 @@ test.describe('Terminal Panes', () => {
    * Why this test must be headful: the pane divider's drag handler calls
    * setPointerCapture(e.pointerId) on pointerdown. Pointer capture requires
    * a valid pointer ID from a real pointing-device event, which Playwright's
-   * mouse API only produces when the Electron window is visible. In headless
+   * mouse API only produces when the desktop window is visible. In browser-only
    * mode setPointerCapture silently fails, pointermove never fires on the
    * divider, and the resize has no effect. Run with:
    *   PEBBLE_E2E_HEADFUL=1 pnpm run test:e2e
    */
-  test('@headful can resize terminal panes by real mouse drag', async ({ pebblePage }) => {
+  test('can resize terminal panes by Playwright mouse drag', async ({ pebblePage }) => {
     // Split the terminal to create a resizable divider
     const panesBefore = await countVisibleTerminalPanes(pebblePage)
     await splitActiveTerminalPane(pebblePage, 'vertical')
@@ -1213,7 +1225,7 @@ test.describe('Terminal Panes', () => {
       .toBe(true)
   })
 
-  test('@headful resizing split panes forwards only the settled PTY size', async ({ pebblePage }) => {
+  test('resizing split panes forwards only the settled PTY size', async ({ pebblePage }) => {
     await splitActiveTerminalPane(pebblePage, 'vertical')
     const snapshot = await waitForPaneIdentitySnapshot(pebblePage, 2)
     const ptyIds = snapshot.panes
@@ -1261,7 +1273,7 @@ test.describe('Terminal Panes', () => {
     }
   })
 
-  test('@headful dragging terminal panes around preserves leaf-keyed PTY bindings', async ({
+  test('dragging terminal panes around preserves leaf-keyed PTY bindings', async ({
     pebblePage
   }) => {
     await splitActiveTerminalPane(pebblePage, 'vertical')
@@ -1282,7 +1294,9 @@ test.describe('Terminal Panes', () => {
     )
     await expect(sourceHandle).toBeVisible({ timeout: 3_000 })
     const sourceBox = await sourceHandle.boundingBox()
-    const targetBox = await pebblePage.locator(`.pane[data-leaf-id="${target.leafId}"]`).boundingBox()
+    const targetBox = await pebblePage
+      .locator(`.pane[data-leaf-id="${target.leafId}"]`)
+      .boundingBox()
     expect(sourceBox).not.toBeNull()
     expect(targetBox).not.toBeNull()
 

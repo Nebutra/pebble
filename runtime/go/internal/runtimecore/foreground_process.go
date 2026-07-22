@@ -41,8 +41,7 @@ func parsePsRows(stdout string) []psRow {
 }
 
 // foregroundProcessNameForPgid resolves the command name of the foreground
-// process group leader. This mirrors the intent of resolveAgentForegroundProcess
-// in migration/electron-reference/src/main/providers/agent-foreground-process.ts: prefer the process that
+// process group leader. Prefer the process that
 // holds the terminal foreground (the `+` stat flag on Unix), falling back to the
 // group leader itself. Returns "" when the pgid has no matching row.
 func foregroundProcessNameForPgid(rows []psRow, pgid int) string {

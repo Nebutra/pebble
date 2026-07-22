@@ -77,8 +77,7 @@ export function buildAgentStartupPlan(args: {
   allowEmptyPromptLaunch?: boolean
   agentArgs?: string | null
   agentEnv?: Record<string, string> | null
-  /** Why: SSH remotes deploy the CLI shim as plain `pebble`, so the Linux-only
-   * `pebble-ide` rename must be skipped for remote launches. */
+  /** Why: remote platform routing remains owned by the SSH relay. */
   isRemote?: boolean
 }): AgentStartupPlan | null {
   const { agent, prompt, cmdOverrides, platform, allowEmptyPromptLaunch = false } = args

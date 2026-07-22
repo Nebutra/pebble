@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Scheduler E2E coverage shares one booted Electron app and debug API. */
+/* eslint-disable max-lines -- Scheduler E2E coverage shares one browser context and debug API. */
 /**
  * E2E repro for terminal output bursts from many background tabs.
  *
@@ -8,7 +8,7 @@
  * the shared scheduler instead of direct xterm writes.
  */
 
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import {
   ensureTerminalVisible,

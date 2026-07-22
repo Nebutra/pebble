@@ -162,6 +162,26 @@ function installClipboardImageBlob(blob: Blob): {
   return { getType, read }
 }
 
+describe('web CLI preload API', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('reports the canonical Pebble command on Linux browsers', async () => {
+    const { api } = await installApi('Linux')
+
+    await expect(api.cli.getInstallStatus()).resolves.toMatchObject({
+      platform: 'linux',
+      commandName: 'pebble',
+      state: 'unsupported'
+    })
+  })
+})
+
 describe('web keybindings preload API', () => {
   beforeEach(() => {
     vi.resetModules()

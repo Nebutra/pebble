@@ -9,8 +9,8 @@ import (
 )
 
 // handleAgentHookIngest accepts the form-encoded POSTs that the managed agent
-// hook scripts already emit against Electron's loopback listener (see
-// migration/electron-reference/src/main/agent-hooks): /hook/{source} with an X-Pebble-Agent-Hook-Token
+// Hook scripts emit against the native loopback listener at /hook/{source}
+// with an X-Pebble-Agent-Hook-Token
 // header. Pointing PEBBLE_AGENT_HOOK_PORT at the Go runtime is the whole
 // Tauri-side transport — the scripts themselves stay unchanged.
 func (s *Server) handleAgentHookIngest(w http.ResponseWriter, r *http.Request) {

@@ -1,5 +1,7 @@
 # Reliability Gates Implementation Plan
 
+> Archived migration record: referenced Electron paths document the implementation that existed when this note was written; those paths are intentionally absent from the current Tauri repository.
+
 Date: 2026-07-02
 
 Source context: [`docs/reference/reliability-pain-points-2026-06-30.md`](./reliability-pain-points-2026-06-30.md).
@@ -337,9 +339,8 @@ Result on 2026-07-02: 4 test files passed, 481 tests passed, duration 5.98s. Thi
 The live local PTY gate now has its first executable Electron slice:
 
 ```sh
-pnpm run parity:electron:ensure-runtime && npx playwright test \
-  tests/e2e/terminal-live-pty-liveness.spec.ts \
-  --config tests/playwright.config.ts --project electron-headless --workers=1
+node config/scripts/run-tauri-terminal-evidence.mjs \
+  --mode golden --output artifacts/tauri-terminal-golden/report.json
 ```
 
 Result on 2026-07-02 after adding two workspace hide/restore cycles, exact active-PTY listing, and actual resize convergence: 1 Playwright test passed, test body 8.6s, full command 58.6s including build/setup. This one local macOS run asserts a real Electron local terminal binds a PTY, lists the active PTY id exactly once, accepts keyboard input through focused xterm, renders process output markers, preserves the same PTY id through repeated worktree switch-away/switch-back cycles, accepts additional keyboard input after each restore, applies an actual `pty:getSize` change after viewport resize, reports the same process-visible size, exits the probe, exits the shell, and removes the PTY id from `pty:listSessions`. It does not yet prove tab switch within the same worktree, scrollback after restore, app restart persistence, daemon, SSH, WSL, remote-runtime, Linux CI stability, or Windows ConPTY behavior.
@@ -538,7 +539,7 @@ Promotion split for existing E2Es:
 The first live PTY gate is deliberately small:
 
 - File: `tests/e2e/terminal-live-pty-liveness.spec.ts`.
-- Command: `pnpm run parity:electron:ensure-runtime && npx playwright test tests/e2e/terminal-live-pty-liveness.spec.ts --config tests/playwright.config.ts --project electron-headless --workers=1`.
+- Command: `node config/scripts/run-tauri-terminal-evidence.mjs --mode golden --output artifacts/tauri-terminal-golden/report.json`.
 - Invariant: a newly opened local terminal has one active PTY id listed exactly once, accepts real keyboard input through focused xterm, delivers process output visibly, keeps the same PTY id through repeated workspace hide/restore cycles, accepts input after restore, applies an actual size change, and exits without leaving a stale binding.
 - Oracle: start a deterministic Node raw-mode probe, wait for `LIVE_PTY_READY_<runId>`, require the active PTY id to appear exactly once in `pty:listSessions`, type through `.xterm-helper-textarea`, require ordered per-key markers in serialized terminal content, switch to another worktree and back twice, require the active pane to keep the original PTY id, type again after each restore, resize and require `pty:getSize` to change plus a matching process-visible size marker, then exit the probe and shell and require the old PTY id to disappear from `pty:listSessions`.
 - Wait rule: no blind sleeps. Wait only on PTY binding, active worktree changes, ready marker, key markers, resize marker, and list-session absence.
@@ -710,7 +711,7 @@ pnpm exec vitest run --config config/vitest.config.ts \
 Run the existing terminal perf report gate before promoting terminal lifecycle gates to blocking:
 
 ```sh
-pnpm run test:e2e:terminal-perf:scale:report
+node config/scripts/run-tauri-terminal-evidence.mjs --mode perf --output artifacts/tauri-terminal-perf/report.json
 ```
 
 ## Promotion Criteria

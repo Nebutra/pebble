@@ -18,7 +18,13 @@
   "bundle": {
     "linux": {
       "deb": {
-        "depends": ["at-spi2-core", "gir1.2-atspi-2.0", "python3", "python3-gi"]
+        "depends": ["at-spi2-core", "gir1.2-atspi-2.0", "python3", "python3-gi"],
+        "postInstallScript": "../../../resources/linux/packaging/after-install.sh",
+        "postRemoveScript": "../../../resources/linux/packaging/after-remove.sh"
+      },
+      "rpm": {
+        "postInstallScript": "../../../resources/linux/packaging/after-install.sh",
+        "postRemoveScript": "../../../resources/linux/packaging/after-remove.sh"
       }
     }
   }

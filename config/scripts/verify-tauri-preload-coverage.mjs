@@ -23,8 +23,9 @@ if (apiNamespaces.length === 0 || unexpected.length > 0 || migratedButAllowliste
   if (apiNamespaces.length === 0) {
     console.error(`Preload API schema has no namespaces: ${apiTypePath}`)
   }
-  if (unexpected.length > 0)
+  if (unexpected.length > 0) {
     console.error(`Unexpected fallback namespaces: ${unexpected.join(', ')}`)
+  }
   if (migratedButAllowlisted.length > 0) {
     console.error(
       `Remove migrated namespaces from the fallback allowlist: ${migratedButAllowlisted.join(', ')}`
@@ -47,7 +48,9 @@ function readTypeMembers(filePath, typeName) {
     ) {
       const declaration = ts.isTypeAliasDeclaration(node) ? node.type : node
       for (const member of declaration.members ?? []) {
-        if (member.name) members.push(propertyName(member.name, source))
+        if (member.name) {
+          members.push(propertyName(member.name, source))
+        }
       }
     }
   })

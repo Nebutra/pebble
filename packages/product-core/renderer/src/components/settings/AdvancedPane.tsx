@@ -88,7 +88,7 @@ export function AdvancedPane({ settings, updateSettings }: AdvancedPaneProps): R
                     >
                       {translate(
                         'auto.components.settings.AdvancedPane.b3ad629640',
-                        'Use only when a corporate VPN or proxy breaks update downloads with HTTP/2 protocol errors. It affects all Electron networking after restart.'
+                        'Use only when a corporate VPN or proxy breaks update downloads with HTTP/2 protocol errors. It affects desktop networking after restart.'
                       )}
                     </TooltipContent>
                   </Tooltip>

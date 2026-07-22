@@ -41,8 +41,35 @@ type PtySpawnOptions = Parameters<PreloadApi['pty']['spawn']>[0]
 
 const agentStatusSetListeners = new Set<(data: AgentStatusIpcPayload) => void>()
 const agentStatusClearListeners = new Set<(data: { paneKey: string }) => void>()
+const currentRuntimeAwakeListeners = new Set<() => void>()
 const bindingsBySessionId = new Map<string, RuntimeAgentBinding>()
 const bindingsByPaneKey = new Map<string, RuntimeAgentBinding>()
+const currentRuntimePaneKeys = new Set<string>()
+
+export type CurrentRuntimeAgentAwakeStatus = Pick<
+  AgentStatusIpcPayload,
+  'paneKey' | 'state' | 'receivedAt'
+> & {
+  observedInCurrentRuntime: true
+}
+
+export function getCurrentRuntimeAgentAwakeStatuses(): CurrentRuntimeAgentAwakeStatus[] {
+  return Array.from(currentRuntimePaneKeys)
+    .map((paneKey) => bindingsByPaneKey.get(paneKey))
+    .filter((binding): binding is RuntimeAgentBinding => binding !== undefined)
+    .map((binding) => ({
+      paneKey: binding.paneKey,
+      state: binding.state,
+      receivedAt: binding.receivedAt,
+      observedInCurrentRuntime: true
+    }))
+    .sort((left, right) => left.paneKey.localeCompare(right.paneKey))
+}
+
+export function subscribeCurrentRuntimeAgentAwakeStatuses(listener: () => void): () => void {
+  currentRuntimeAwakeListeners.add(listener)
+  return () => currentRuntimeAwakeListeners.delete(listener)
+}
 
 export function installTauriAgentStatusApi(): void {
   if (!hasTauriInternals()) {
@@ -189,10 +216,14 @@ function rememberBinding(binding: RuntimeAgentBinding): void {
 }
 
 function emitAgentStatus(binding: RuntimeAgentBinding): void {
+  // Why: startup hydration is replayed state; only a live runtime emission may
+  // request a process-scoped native sleep assertion.
+  currentRuntimePaneKeys.add(binding.paneKey)
   const payload = toAgentStatusPayload(binding)
   for (const listener of agentStatusSetListeners) {
     listener(payload)
   }
+  emitCurrentRuntimeAwakeStatusesChanged()
 }
 
 function dropRuntimeAgentPane(paneKey: string): void {
@@ -206,7 +237,9 @@ function dropRuntimeAgentPane(paneKey: string): void {
     bindingsBySessionId.delete(binding.sessionId)
     bindingsByPaneKey.delete(paneKey)
   }
+  currentRuntimePaneKeys.delete(paneKey)
   emitAgentStatusClear(paneKey)
+  emitCurrentRuntimeAwakeStatusesChanged()
 }
 
 function dropRuntimeAgentTab(tabId: string): void {
@@ -224,6 +257,12 @@ function dropRuntimeAgentTab(tabId: string): void {
 function emitAgentStatusClear(paneKey: string): void {
   for (const listener of agentStatusClearListeners) {
     listener({ paneKey })
+  }
+}
+
+function emitCurrentRuntimeAwakeStatusesChanged(): void {
+  for (const listener of currentRuntimeAwakeListeners) {
+    listener()
   }
 }
 

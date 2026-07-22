@@ -14,7 +14,7 @@ description: >-
 
 # Pebble Linear
 
-Use `pebble linear` when Linear is the source of task context or ticket updates. On Linux, use `pebble-ide` wherever this file says `pebble`.
+Use `pebble linear` when Linear is the source of task context or ticket updates.
 
 `pebble-linear` and `linear-tickets` are skill names, not CLI namespaces. Always run `pebble linear ...` commands.
 

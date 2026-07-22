@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
 
+	"github.com/nebutra/pebble/runtime/go/internal/runtimeauth"
 	"github.com/nebutra/pebble/runtime/go/internal/runtimecore"
 	"github.com/nebutra/pebble/runtime/go/internal/runtimehttp"
 )
@@ -23,7 +23,7 @@ func main() {
 		return
 	}
 	listen := flag.String("listen", "127.0.0.1:17777", "HTTP listen address")
-	dataDir := flag.String("data-dir", defaultDataDir(), "runtime data directory")
+	dataDir := flag.String("data-dir", runtimeauth.DefaultDataDir(), "runtime data directory")
 	token := flag.String("token", os.Getenv("PEBBLE_RUNTIME_TOKEN"), "optional runtime bearer token")
 	flag.Parse()
 
@@ -34,6 +34,17 @@ func main() {
 		os.Exit(1)
 	}
 	defer manager.Shutdown()
+	endpoint, err := runtimeauth.EndpointForListen(*listen)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	cleanupCredential, err := runtimeauth.Publish(*dataDir, endpoint, *token)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer cleanupCredential()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -63,13 +74,6 @@ func monitorDesktopParent(ctx context.Context, stop context.CancelFunc, rawParen
 			stop()
 		}
 	}()
-}
-
-func defaultDataDir() string {
-	if home, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(home, ".pebble")
-	}
-	return ".pebble"
 }
 
 func detectUnavailableTools() []string {

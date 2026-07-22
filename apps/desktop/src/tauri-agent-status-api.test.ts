@@ -15,6 +15,7 @@ vi.mock('./runtime-bridge', () => ({
 
 import {
   emitRuntimeAgentSessionStatus,
+  getCurrentRuntimeAgentAwakeStatuses,
   installTauriAgentStatusApi,
   type TauriRuntimeAgentSession
 } from './tauri-agent-status-api'
@@ -72,6 +73,7 @@ describe('installTauriAgentStatusApi', () => {
         paneKey: 'tab-failed:22222222-2222-4222-8222-222222222222'
       })
     ])
+    expect(getCurrentRuntimeAgentAwakeStatuses()).toEqual([])
   })
 
   it('propagates runtime session snapshot failures instead of returning fake empty status', async () => {
@@ -111,6 +113,13 @@ describe('installTauriAgentStatusApi', () => {
         paneKey: 'tab-stopped:33333333-3333-4333-8333-333333333333'
       })
     ])
+    expect(getCurrentRuntimeAgentAwakeStatuses()).toContainEqual(
+      expect.objectContaining({
+        paneKey: 'tab-stopped:33333333-3333-4333-8333-333333333333',
+        state: 'done',
+        observedInCurrentRuntime: true
+      })
+    )
   })
 
   it('surfaces and clears legacy numeric pane sessions instead of dropping them', async () => {

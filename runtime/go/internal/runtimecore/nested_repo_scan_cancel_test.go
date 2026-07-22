@@ -22,8 +22,8 @@ func makeNestedRepoFixture(t *testing.T) (string, []string) {
 }
 
 // TestScanNestedReposContextCancelProducesStoppedResult proves a cancelled
-// request context aborts the walk with the same partial `stopped` result the
-// Electron AbortSignal cancel flow produces, instead of an error.
+// request context aborts the walk with a partial `stopped` result instead of
+// surfacing cancellation as an error.
 func TestScanNestedReposContextCancelProducesStoppedResult(t *testing.T) {
 	parent, _ := makeNestedRepoFixture(t)
 	manager, err := NewManager(t.TempDir(), nil)

@@ -1,8 +1,7 @@
 import type { RpcClient } from '../transport/rpc-client'
 import type { RpcSuccess } from '../transport/types'
 
-// Mirrors the host GenerateCommitMessageResult (migration/electron-reference/src/main/text-generation/
-// commit-message-text-generation.ts) — a single resolved result, not a stream.
+// Mirrors the desktop runtime's commit-message result: a single resolved result, not a stream.
 export type MobileGenerateCommitMessageResult =
   | { success: true; message: string }
   | { success: false; error: string; canceled?: boolean }

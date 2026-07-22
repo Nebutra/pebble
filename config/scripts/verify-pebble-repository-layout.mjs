@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { collectLegacyExecutionFailures } from './pebble-repository-legacy-execution-contract.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const requiredPaths = [
@@ -43,6 +44,7 @@ const forbiddenPaths = [
 ]
 
 const failures = []
+failures.push(...collectLegacyExecutionFailures(root))
 for (const path of requiredPaths) {
   if (!existsSync(resolve(root, path))) {
     failures.push(`missing canonical path: ${path}`)
@@ -128,12 +130,21 @@ if (
   failures.push('apps/mobile and runtime/go must retain the canonical encrypted RPC handshake')
 }
 
-if (failures.length > 0) {
-  console.error('Pebble repository layout verification failed:')
-  for (const failure of failures) {
-    console.error(`- ${failure}`)
-  }
-  process.exit(1)
+export function verifyPebbleRepositoryLayout() {
+  return failures
 }
 
-console.log('Pebble repository layout verification passed.')
+export function assertPebbleRepositoryLayout() {
+  if (failures.length > 0) {
+    console.error('Pebble repository layout verification failed:')
+    for (const failure of failures) {
+      console.error(`- ${failure}`)
+    }
+    process.exit(1)
+  }
+  console.log('Pebble repository layout verification passed.')
+}
+
+if (process.argv[1] && import.meta.filename === resolve(process.argv[1])) {
+  assertPebbleRepositoryLayout()
+}

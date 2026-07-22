@@ -6,9 +6,9 @@ Thanks for contributing to Pebble.
 
 - Keep changes scoped to a clear user-facing improvement, bug fix, or refactor.
 - Pebble targets macOS, Linux, and Windows. Every change must stay compatible with all three platforms unless the code is explicitly guarded by a runtime platform check.
-- For keyboard shortcuts, use runtime platform checks in renderer code and `CmdOrCtrl` in Electron menu accelerators.
+- For keyboard shortcuts, use runtime platform checks in renderer code and `CmdOrCtrl` in desktop menu accelerators.
 - For shortcut labels, show `⌘` and `⇧` on macOS, and `Ctrl+` and `Shift+` on Linux and Windows.
-- For file paths, use Node or Electron path utilities such as `path.join`.
+- For file paths, use the platform path APIs for the current layer, such as Node `path.join` or Rust `PathBuf`.
 - Pebble must work against local repositories, remote servers, and SSH worktrees. Do not assume a process, file, credential, shell, or network path exists only on the local machine.
 - Pebble supports many CLI agents, integrations, and git providers. Keep generic behavior provider-neutral; guard integration-specific logic behind explicit checks.
 - Keep changes well-engineered and performant: follow existing architecture, avoid unnecessary work in hot paths, clean up owned resources, and use concrete module names.
@@ -52,7 +52,7 @@ If your change affects UI or interaction behavior, verify it on the platforms it
 
 Project-owned type declarations belong in `.ts` files. `.d.ts` is reserved for ambient shims (e.g., `env.d.ts`, `vite/client.d.ts`). TypeScript's `skipLibCheck: true` setting applies globally, including to our own `.d.ts` files, which means any unresolved type reference in a `.d.ts` silently becomes `any` at its call sites. Write your types in `.ts` files so the compiler actually checks them.
 
-CI enforces this for `migration/electron-reference/src/preload/` and `packages/product-core/shared/` — see `docs/preload-typecheck-hole.md`.
+CI enforces this for `packages/product-core/shared/` and the Tauri bridge contracts — see `docs/preload-typecheck-hole.md`.
 
 ## Pull Requests
 
@@ -101,7 +101,7 @@ All stable kinds (`patch`, `minor`, `major`) are computed off the latest _stable
 
 **Safety guarantees:**
 
-- Stable releases are refused if the new version isn't strictly greater than the latest published stable. This is the only rule `electron-updater` actually needs — it compares semver within the `latest` channel, so a regressing stable is the one thing that breaks auto-update for fresh installs.
+- Stable releases are refused if the new version isn't strictly greater than the latest published stable. The Tauri updater compares semver within the `latest` channel, so a regressing stable would break auto-update for fresh installs.
 - Complete RC draft releases created by the release workflow are published before cutting a new tag only when the draft tag was built from the current release ref. Stale drafts are skipped so fixes cut a fresh RC instead of exposing old artifacts.
 - If the latest RC tag exists but is still draft-only or missing its GitHub Release, the workflow resumes that tag only when it was built from the current release ref. Otherwise the next RC number is cut.
 - RC numbering also considers release commits on `main`, so deleting a stale tag does not let a later cut reuse the same RC number.

@@ -32,7 +32,7 @@ import {
 import { shouldRetryFileLoadError } from '@/components/editor/useEditorPanelFileLoadRetry'
 import { readRuntimeFileContent } from './runtime-file-client'
 
-// Mirrors migration/electron-reference/src/main/ipc/filesystem-auth.ts PATH_ACCESS_DENIED_MESSAGE.
+// Mirrors the native filesystem bridge's path-access-denied message.
 const PATH_ACCESS_DENIED_MESSAGE =
   'Access denied: path resolves outside allowed directories. If this blocks a legitimate workflow, please file a GitHub issue.'
 
@@ -49,7 +49,7 @@ const fsReadFile = vi.fn()
 
 /**
  * Stand-in for the main-process `fs:readFile` IPC handler. It mirrors the real
- * routing in migration/electron-reference/src/main/ipc/filesystem.ts: when a connectionId is supplied the
+ * routing in the native filesystem bridge: when a connectionId is supplied the
  * read is served by the SSH provider; otherwise it goes through the local
  * authorized-path resolver, which denies any path outside the local allowed
  * roots (SSH repo roots are intentionally excluded — see getLocalRepos).

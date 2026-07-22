@@ -92,7 +92,7 @@ describe('NotificationsPane', () => {
 
     await sendNotificationSettingsTestNotification(createSettings().notifications, 50)
 
-    // Why: this UI sends via Electron's main-process Notification module;
+    // Why: this UI sends through the native notification bridge;
     // renderer Web Notification.permission can stay stale after macOS Settings changes.
     expect(notifications.dispatch).toHaveBeenCalledWith({
       source: 'test',

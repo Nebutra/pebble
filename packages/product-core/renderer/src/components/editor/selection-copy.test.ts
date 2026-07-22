@@ -5,7 +5,7 @@ describe('formatCopiedSelectionWithContext', () => {
   it('formats multi-line selections with file and line context', () => {
     expect(
       formatCopiedSelectionWithContext({
-        relativePath: 'migration/electron-reference/src/main/git/status.ts',
+        relativePath: 'runtime/go/internal/runtimecore/manager.go',
         language: 'typescript',
         selection: {
           startLineNumber: 44,
@@ -17,7 +17,7 @@ describe('formatCopiedSelectionWithContext', () => {
       })
     ).toBe(
       [
-        'File: migration/electron-reference/src/main/git/status.ts',
+        'File: runtime/go/internal/runtimecore/manager.go',
         'Lines: 44-47',
         '',
         '```ts',
@@ -42,7 +42,7 @@ describe('formatCopiedSelectionWithContext', () => {
 
     expect(
       formatCopiedSelectionWithContext({
-        relativePath: 'migration/electron-reference/src/main/git/status.ts',
+        relativePath: 'runtime/go/internal/runtimecore/manager.go',
         language: 'typescript',
         selection,
         selectedText: 'line 44\nline 45\nline 46\nline 47\n'
@@ -53,7 +53,7 @@ describe('formatCopiedSelectionWithContext', () => {
   it('keeps full-line single-line selections copyable', () => {
     expect(
       formatCopiedSelectionWithContext({
-        relativePath: 'migration/electron-reference/src/main/git/status.ts',
+        relativePath: 'runtime/go/internal/runtimecore/manager.go',
         language: 'typescript',
         selection: {
           startLineNumber: 44,
@@ -69,7 +69,7 @@ describe('formatCopiedSelectionWithContext', () => {
   it('leaves single-line selections alone', () => {
     expect(
       formatCopiedSelectionWithContext({
-        relativePath: 'migration/electron-reference/src/main/git/status.ts',
+        relativePath: 'runtime/go/internal/runtimecore/manager.go',
         language: 'typescript',
         selection: {
           startLineNumber: 44,

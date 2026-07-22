@@ -16,16 +16,17 @@ function readJson(filePath) {
 
 function makeProject({ sourceText, enCatalog = {}, esCatalog = {} }) {
   const root = mkdtempSync(path.join(tmpdir(), 'pebble-localization-catalog-'))
-  const rendererDir = path.join(root, 'src', 'renderer', 'src', 'components')
-  const mainDir = path.join(root, 'src', 'main')
-  const localesDir = path.join(root, 'src', 'renderer', 'src', 'i18n', 'locales')
+  const rendererRoot = path.join(root, 'packages', 'product-core', 'renderer', 'src')
+  const rendererDir = path.join(rendererRoot, 'components')
+  const desktopDir = path.join(root, 'apps', 'desktop', 'src')
+  const localesDir = path.join(rendererRoot, 'i18n', 'locales')
 
   mkdirSync(rendererDir, { recursive: true })
-  mkdirSync(mainDir, { recursive: true })
+  mkdirSync(desktopDir, { recursive: true })
   mkdirSync(localesDir, { recursive: true })
 
   writeFileSync(path.join(rendererDir, 'Example.tsx'), sourceText, 'utf8')
-  writeFileSync(path.join(mainDir, 'empty.ts'), 'export {}\n', 'utf8')
+  writeFileSync(path.join(desktopDir, 'empty.ts'), 'export {}\n', 'utf8')
   writeJson(path.join(localesDir, 'en.json'), enCatalog)
   writeJson(path.join(localesDir, 'es.json'), esCatalog)
 

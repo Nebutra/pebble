@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from '@nebutra/playwright-test'
+import type { Page, TestInfo } from '@playwright/test'
 import {
   dispatchActiveTerminalWheelEvent,
   readActiveTerminalScrollState,
@@ -78,7 +78,7 @@ export async function measureActiveTerminalWheelScroll(page: Page): Promise<Scro
     })()
     pane.terminal.focus()
     pane.terminal.scrollToBottom()
-    // Why: Linux headless can miss wheel input over xterm's text layer while
+    // Why: Linux browser automation can miss wheel input over xterm's text layer while
     // output is flooding; the viewport is the scrollable surface users affect.
     const wheelTarget =
       pane.container.querySelector<HTMLElement>('.xterm-viewport') ??

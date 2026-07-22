@@ -1,5 +1,5 @@
-import type { Page } from '@nebutra/playwright-test'
-import { expect } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
+import { expect } from '@playwright/test'
 
 /** Open the right sidebar file explorer and wait for store state to match. */
 export async function openFileExplorer(page: Page): Promise<void> {
@@ -10,7 +10,7 @@ export async function openFileExplorer(page: Page): Promise<void> {
     }
 
     const state = store.getState()
-    // Why: hidden Electron runs do not reliably deliver Cmd/Ctrl+Shift+E or
+    // Why: automated browser runs do not reliably deliver Cmd/Ctrl+Shift+E or
     // expose the sidebar DOM in time for locator-based setup. Drive the same
     // store state the shortcut would update so file-open specs cover the
     // explorer workflow instead of hidden-window input timing.

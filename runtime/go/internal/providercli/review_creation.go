@@ -39,9 +39,8 @@ type CreateReviewResult struct {
 var githubPullURLPattern = regexp.MustCompile(`https://github\.com/[^/\s]+/[^/\s]+/pull/(\d+)`)
 var gitlabMergeRequestURLPattern = regexp.MustCompile(`https?://[^\s]+/-/merge_requests/(\d+)`)
 
-// pullRequestTemplateCandidates mirrors PULL_REQUEST_TEMPLATE_CANDIDATES in
-// migration/electron-reference/src/main/source-control/pull-request-template.ts so native Create PR
-// hydration finds the same conventional template paths Electron does.
+// pullRequestTemplateCandidates keeps native Create PR hydration aligned with
+// the conventional template paths supported by the renderer.
 var pullRequestTemplateCandidates = []string{
 	".github/pull_request_template.md",
 	".github/PULL_REQUEST_TEMPLATE.md",

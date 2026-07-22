@@ -4,6 +4,7 @@ mod commands;
 #[cfg(target_os = "macos")]
 mod macos_native_quit;
 mod native_quit;
+mod packaged_cli;
 mod primary_window;
 mod termination_signal;
 mod window_chrome;
@@ -16,6 +17,9 @@ use tauri::ActivationPolicy;
 use tauri::Manager;
 
 fn main() {
+    if let Some(exit_code) = packaged_cli::dispatch_if_requested() {
+        std::process::exit(exit_code);
+    }
     run()
 }
 
@@ -137,6 +141,7 @@ pub fn run() {
                 .handle_event(window, event);
         })
         .manage(commands::runtime_process::RuntimeProcessState::default())
+        .manage(commands::agent_awake::AgentAwakeState::default())
         .manage(commands::browser_request_control::NativeBrowserRequestControlState::default())
         .manage(commands::browser_native_input::BrowserNativeInputState::default())
         .plugin(tauri_plugin_deep_link::init())
@@ -167,6 +172,7 @@ pub fn run() {
             commands::browser_full_page_screenshot::browser_stitch_full_page_screenshot,
             zig_system::zig_system_status,
             commands::agent_accounts::agent_account_auth_status,
+            commands::agent_awake::agent_awake_sync,
             commands::agent_trust::agent_trust_mark_trusted,
             commands::managed_codex_accounts::managed_codex_account_prepare,
             commands::managed_codex_accounts::managed_codex_account_identity,
@@ -474,6 +480,9 @@ pub fn run() {
             }
         }
         tauri::RunEvent::Exit => {
+            app_handle
+                .state::<commands::agent_awake::AgentAwakeState>()
+                .shutdown();
             let runtime_state =
                 app_handle.state::<commands::runtime_process::RuntimeProcessState>();
             let _ = commands::runtime_process::stop_managed_runtime_process(&runtime_state);

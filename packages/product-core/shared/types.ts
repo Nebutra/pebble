@@ -63,7 +63,7 @@ export type {
 // ─── Shell PATH hydration ────────────────────────────────────────────
 // Why: shared so the main-side `HydrationResult` discriminator and the
 // telemetry schema in `telemetry-events.ts` stay in lockstep without
-// `packages/product-core/shared/` taking a forbidden import from `migration/electron-reference/src/main/`. A compile-time
+// `packages/product-core/shared/` taking a forbidden import from the desktop shell. A compile-time
 // guard in telemetry-events.ts asserts the schema enum matches this alias —
 // adding a new failure mode without updating both places fails the build.
 export type ShellHydrationFailureReason =
@@ -405,8 +405,8 @@ export type HookCommandSourcePolicy = 'shared-only' | 'local-only' | 'run-both'
  *
  * Why: declared in `shared/` rather than colocated with the handler so the
  * preload bridge and renderer can import the same named type. Before this
- * lived in `migration/electron-reference/src/main/git/repo.ts` — the preload layer cannot import from
- * `migration/electron-reference/src/main/`, which forced three sites to inline the same structural shape
+ * lived in the old desktop handler; bridge consumers could not import it, which forced three sites to
+ * inline the same structural shape
  * and risk silent drift.
  *
  * Why `remoteCount`: BaseRefPicker renders a multi-remote hint when the repo
@@ -1780,8 +1780,7 @@ export type ClassifiedError = {
 
 // Why: declared here as a shared shape so IPC return envelopes and renderer
 // slices can reference the same structural type without importing from main.
-// Aliased as `OwnerRepo` in `migration/electron-reference/src/main/github/gh-utils.ts` so main call sites
-// can continue using the short local name.
+// Runtime providers may alias this as `OwnerRepo` while sharing the same wire shape.
 export type GitHubOwnerRepo = GitHubRepositoryIdentity
 
 // Why: GitLab-specific types live in `./gitlab-types` so they can grow
@@ -2211,8 +2210,8 @@ export type UpdateStatus =
       activeNudgeId?: string
       // Why: releaseUrl is not currently populated by the update-available handler
       // (it always sends undefined). Kept on the type for the Settings page's
-      // release-notes link fallback and for potential future use if the main
-      // process starts extracting release URLs from electron-updater metadata.
+      // release-notes link fallback and for potential future use if the native
+      // updater starts exposing release URLs from the signed Tauri manifest.
       releaseUrl?: string
       // Why: changelog is always explicitly set by the main process — null means
       // the fetch failed or the version wasn't in the JSON (simple mode), and a

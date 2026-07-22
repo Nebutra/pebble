@@ -74,8 +74,7 @@ func runCLICapture(ctx context.Context, bin string, workdir string, args ...stri
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
-// isUnauthenticated mirrors the auth-detection substrings Electron checks in
-// migration/electron-reference/src/main/github/client.ts and the glab error classification path.
+// isUnauthenticated keeps GitHub and GitLab CLI auth-error classification aligned.
 func isUnauthenticated(message string) bool {
 	lower := strings.ToLower(message)
 	for _, marker := range []string{

@@ -33,8 +33,8 @@ func startHookStateTestSession(t *testing.T, command string, launchToken string)
 }
 
 // TestSessionHookStateTransitionsGateWait proves hook-reported idle (not
-// working or permission) is what satisfies a tui-idle wait, matching
-// Electron's TUI readiness model.
+// working or permission) is what satisfies a tui-idle wait, preserving the
+// persisted session readiness contract.
 func TestSessionHookStateTransitionsGateWait(t *testing.T) {
 	manager, session := startHookStateTestSession(t, "sleep 30", "")
 

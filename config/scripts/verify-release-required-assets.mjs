@@ -39,7 +39,9 @@ export function extractTauriManifestAssetNames(manifestText) {
     throw new Error('Tauri latest.json is missing its platforms object')
   }
   return Object.values(platforms).flatMap((entry) => {
-    if (!entry || typeof entry !== 'object' || typeof entry.url !== 'string') return []
+    if (!entry || typeof entry !== 'object' || typeof entry.url !== 'string') {
+      return []
+    }
     return extractManifestAssetNames(`url: ${entry.url}`)
   })
 }

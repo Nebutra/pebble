@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { expect } from './helpers/pebble-app'
 import {
   DOCKER_SSH_RELAY_REMOTE_REPO_PATH,

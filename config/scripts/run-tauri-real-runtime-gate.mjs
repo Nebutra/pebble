@@ -2,8 +2,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
-import { compareDesktopParityScreenshots } from './compare-desktop-parity-screenshots.mjs'
+import { dirname, join, resolve } from 'node:path'
 import {
   nativeInputFixtureHtml,
   nativeInputFrameFixtureHtml
@@ -27,13 +26,18 @@ const nativeChatRoot = join(temporary, 'native-chat')
 const screenshotDir = process.env.PEBBLE_REAL_RUNTIME_SCREENSHOT_DIR
   ? resolve(process.env.PEBBLE_REAL_RUNTIME_SCREENSHOT_DIR)
   : null
+const reportPath = process.env.PEBBLE_REAL_RUNTIME_REPORT_PATH
+  ? resolve(process.env.PEBBLE_REAL_RUNTIME_REPORT_PATH)
+  : null
 const nativeInputOnly = process.argv.includes('--native-input-only')
 const nativeDragOnly = process.argv.includes('--native-drag-only')
 mkdirSync(repo)
 mkdirSync(dataDir)
 mkdirSync(providerBin)
 mkdirSync(nativeChatRoot)
-if (screenshotDir) mkdirSync(screenshotDir, { recursive: true })
+if (screenshotDir) {
+  mkdirSync(screenshotDir, { recursive: true })
+}
 await assertPortAvailable(4175)
 const functionalGateAccessibilityReset = nativeDragOnly ? false : resetFunctionalGateAccessibility()
 seedGitRepository(repo)
@@ -87,7 +91,9 @@ try {
       const evidenceStarted = readEvidenceIfPresent(evidence) !== null
       await stopFunctionalGateProcess(shell)
       shell = null
-      if (evidenceStarted || attempt === 3) throw error
+      if (evidenceStarted || attempt === 3) {
+        throw error
+      }
       await delay(500)
     }
   }
@@ -112,9 +118,15 @@ try {
     (process.platform === 'darwin' && !nativeDragOnly && !result.browserTrustedCheckInput) ||
     (process.platform === 'darwin' && !nativeDragOnly && !result.browserTrustedSelectInput) ||
     (process.platform === 'darwin' && !nativeDragOnly && !result.browserTrustedFrameShadowInput) ||
-    (process.platform === 'darwin' && !nativeDragOnly && result.browserAccessibilityStatus !== 'not-granted') ||
-    (process.platform === 'darwin' && nativeDragOnly && result.browserAccessibilityStatus !== 'granted') ||
-    (process.platform === 'darwin' && !nativeDragOnly && !result.browserFunctionalGateAccessibilityReset) ||
+    (process.platform === 'darwin' &&
+      !nativeDragOnly &&
+      result.browserAccessibilityStatus !== 'not-granted') ||
+    (process.platform === 'darwin' &&
+      nativeDragOnly &&
+      result.browserAccessibilityStatus !== 'granted') ||
+    (process.platform === 'darwin' &&
+      !nativeDragOnly &&
+      !result.browserFunctionalGateAccessibilityReset) ||
     result.browserScreenshotBytes < 2_000 ||
     (!nativeInputOnly && !nativeDragOnly && !result.sourceControlProjected) ||
     (!nativeInputOnly && !nativeDragOnly && result.sourceControlEntryCount < 4) ||
@@ -127,7 +139,10 @@ try {
     throw new Error(`real runtime gate failed: ${JSON.stringify(result)}`)
   }
   if (!nativeInputOnly && !nativeDragOnly) {
-    const windowLifecycle = evaluateWindowLifecycleEvidence(result.windowLifecycle, process.platform)
+    const windowLifecycle = evaluateWindowLifecycleEvidence(
+      result.windowLifecycle,
+      process.platform
+    )
     if (!windowLifecycle.passed) {
       throw new Error(`window lifecycle release gate failed: ${JSON.stringify(windowLifecycle)}`)
     }
@@ -142,8 +157,10 @@ try {
   }
   if (screenshotDir) {
     validateTauriRuntimeScreenshots(screenshotDir)
-    captureElectronReference(browserFixture.url)
-    validateCrossShellParity(screenshotDir)
+  }
+  if (reportPath) {
+    mkdirSync(dirname(reportPath), { recursive: true })
+    writeFileSync(reportPath, `${JSON.stringify(result, null, 2)}\n`)
   }
   console.log(
     `Tauri ${nativeDragOnly ? 'trusted native drag' : nativeInputOnly ? 'trusted native input' : 'real runtime'} gate passed in ${result.durationMs}ms.`
@@ -170,49 +187,6 @@ function readEvidenceIfPresent(path) {
   }
 }
 
-function validateCrossShellParity(directory) {
-  for (const surface of ['terminal', 'source-control', 'checks']) {
-    const result = compareDesktopParityScreenshots(
-      readFileSync(join(directory, `electron-${surface}.png`)),
-      readFileSync(join(directory, `tauri-${surface}.png`))
-    )
-    writeFileSync(join(directory, `${surface}-diff.png`), result.diffBytes)
-    const ratio = `${(result.mismatchRatio * 100).toFixed(2)}%`
-    if (!result.matches) {
-      throw new Error(
-        `${surface} cross-shell pixel parity failed: ${ratio} exceeds ` +
-          `${(result.maxMismatchRatio * 100).toFixed(2)}%`
-      )
-    }
-    console.log(`${surface} cross-shell pixel mismatch: ${ratio}`)
-  }
-}
-
-function captureElectronReference(browserUrl) {
-  run(
-    'pnpm',
-    [
-      'exec',
-      'playwright',
-      'test',
-      'tests/e2e/runtime-surface-parity-reference.spec.ts',
-      '--config',
-      'tests/playwright.config.ts',
-      '--project',
-      'electron-headless',
-      '--workers=1'
-    ],
-    root,
-    {
-      PEBBLE_ELECTRON_RUNTIME_SURFACE_DIR: screenshotDir,
-      PEBBLE_RUNTIME_PARITY_REPO_PATH: repo,
-      PEBBLE_RUNTIME_PARITY_BROWSER_URL: browserUrl,
-      PEBBLE_PROVIDER_INVOCATION_LOG: join(screenshotDir, 'provider-invocations.log'),
-      PATH: `${providerBin}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH ?? ''}`
-    }
-  )
-}
-
 function seedNativeChatFixture(fixtureRoot) {
   const sessions = join(fixtureRoot, '2026', '07', '18')
   mkdirSync(sessions, { recursive: true })
@@ -234,14 +208,14 @@ async function startBrowserFixture() {
   const server = createServer((request, response) => {
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
     response.end(
-      request.url === '/frame'
-        ? nativeInputFrameFixtureHtml()
-        : nativeInputFixtureHtml('/frame')
+      request.url === '/frame' ? nativeInputFrameFixtureHtml() : nativeInputFixtureHtml('/frame')
     )
   })
   await new Promise((resolveListen) => server.listen(0, '127.0.0.1', resolveListen))
   const address = server.address()
-  if (!address || typeof address === 'string') throw new Error('browser fixture did not bind')
+  if (!address || typeof address === 'string') {
+    throw new Error('browser fixture did not bind')
+  }
   return {
     url: `http://127.0.0.1:${address.port}/fixture`,
     close: () =>
@@ -401,11 +375,15 @@ function run(name, args, cwd, extraEnv = {}) {
     stdio: 'inherit',
     env: { ...process.env, ...extraEnv }
   })
-  if (result.status !== 0) throw new Error(`${name} exited with ${result.status ?? 'no status'}`)
+  if (result.status !== 0) {
+    throw new Error(`${name} exited with ${result.status ?? 'no status'}`)
+  }
 }
 
 function resetFunctionalGateAccessibility() {
-  if (process.platform !== 'darwin') return false
+  if (process.platform !== 'darwin') {
+    return false
+  }
   const result = spawnSync(
     '/usr/bin/tccutil',
     ['reset', 'Accessibility', 'nebutra.pebble.functional-gate'],
@@ -414,7 +392,9 @@ function resetFunctionalGateAccessibility() {
   if (result.status !== 0) {
     // Why: tccutil reports an unregistered test bundle as an error even though
     // that state already proves the bundle has no Accessibility grant.
-    if (isMissingTccBundleRegistration(result.stderr)) return true
+    if (isMissingTccBundleRegistration(result.stderr)) {
+      return true
+    }
     throw new Error(
       `could not reset functional gate Accessibility: ${result.stderr?.trim() || 'unknown error'}`
     )
@@ -458,9 +438,13 @@ function assertPortAvailable(port) {
 async function waitForUrl(url, child) {
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error('optimized renderer preview exited early')
+    if (child.exitCode !== null) {
+      throw new Error('optimized renderer preview exited early')
+    }
     try {
-      if ((await fetch(url)).ok) return
+      if ((await fetch(url)).ok) {
+        return
+      }
     } catch {}
     await delay(100)
   }
@@ -475,14 +459,20 @@ async function waitForEvidence(path, child, captureDirectory) {
     try {
       const evidence = JSON.parse(readFileSync(path, 'utf8'))
       lastStage = evidence.stage || evidence.status || lastStage
-      const surface = captureDirectory ? lastStage.match(/^(terminal|browser|source-control|checks)-capture-ready$/)?.[1] : null
+      const surface = captureDirectory
+        ? lastStage.match(/^(terminal|browser|source-control|checks)-capture-ready$/)?.[1]
+        : null
       if (process.platform === 'darwin' && surface && !capturedSurfaces.has(surface)) {
         captureFunctionalWindow(surface, captureDirectory)
         capturedSurfaces.add(surface)
       }
-      if (evidence.status !== 'running') return
+      if (evidence.status !== 'running') {
+        return
+      }
     } catch {}
-    if (child.exitCode !== null) throw new Error('functional Tauri shell exited before evidence')
+    if (child.exitCode !== null) {
+      throw new Error('functional Tauri shell exited before evidence')
+    }
     await delay(100)
   }
   throw new Error(`timed out waiting for real runtime evidence after ${lastStage}`)

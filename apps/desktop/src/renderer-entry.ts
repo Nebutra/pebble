@@ -16,6 +16,7 @@ import { useAppStore } from '@/store'
 import { installPebbleTauriPreloadApi } from './pebble-tauri-preload-api'
 import { PRODUCT_NAME } from './product-brand'
 import { installTauriAgentStatusApi } from './tauri-agent-status-api'
+import { installTauriAgentAwakeSync } from './tauri-agent-awake-sync'
 import { installTauriBrowserRuntimeApi } from './tauri-browser-runtime-api'
 import { installTauriClipboardApi } from './tauri-clipboard-api'
 import { installTauriDevEducationSuppression } from './tauri-dev-education-suppression'
@@ -54,6 +55,7 @@ export function startPebbleTauriRenderer(): boolean {
     runTauriRendererBootstrapStage('install-updater-api', installTauriUpdaterApi) &&
     runTauriRendererBootstrapStage('install-menu-api', installTauriMenuApi) &&
     runTauriRendererBootstrapStage('install-agent-status-api', installTauriAgentStatusApi) &&
+    runTauriRendererBootstrapStage('install-agent-awake-sync', installTauriAgentAwakeSync) &&
     runTauriRendererBootstrapStage('install-star-nag-api', installTauriStarNagApi) &&
     runTauriRendererBootstrapStage('install-runtime-pty-api', installTauriRuntimePtyApi) &&
     runTauriRendererBootstrapStage('start-runtime-event-delivery', () => {

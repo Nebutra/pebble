@@ -165,6 +165,12 @@ jobs:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: ./config/scripts/import-tauri-windows-certificate.ps1
 
+      - name: Prepare App Store Connect API key
+        if: matrix.platform == 'macos'
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: node config/scripts/prepare-apple-api-key.mjs
+
       - name: Prepare signed updater configuration
         env:
           TAURI_RELEASE_PLATFORM: ${{ matrix.platform }}
@@ -178,6 +184,9 @@ jobs:
         env:
           APPLE_CERTIFICATE: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}
           APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS_PASSWORD || '' }}
+          APPLE_API_KEY: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY || '' }}
+          APPLE_API_ISSUER: ${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
+          APPLE_API_KEY_PATH: ${{ matrix.platform == 'macos' && env.APPLE_API_KEY_PATH || '' }}
           APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
           APPLE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
@@ -199,6 +208,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}
           APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS_PASSWORD || '' }}
+          APPLE_API_KEY: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY || '' }}
+          APPLE_API_ISSUER: ${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
+          APPLE_API_KEY_PATH: ${{ matrix.platform == 'macos' && env.APPLE_API_KEY_PATH || '' }}
           APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
           APPLE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}

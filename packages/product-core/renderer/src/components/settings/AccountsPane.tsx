@@ -231,7 +231,7 @@ function getCodexAccountErrorDescription(error: unknown): string {
     .trim()
   const normalizedMessage = message.toLowerCase()
 
-  // Why: Codex account actions cross the Electron IPC boundary, and invoke()
+  // Why: Codex account actions cross the native bridge, and invoke()
   // failures often include transport-level wrapper text that is useful in
   // devtools but noisy in product UI. Normalize the handful of expected auth
   // failures here so users see actionable sign-in guidance instead of IPC

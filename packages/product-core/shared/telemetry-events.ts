@@ -701,8 +701,7 @@ const setupScriptPromptActionSchema = z
 
 // Managed-hook installer per-agent label. Distinct from `AGENT_KIND_VALUES`:
 // hook installation only targets the agents in `AGENT_HOOK_TARGETS` and the
-// labels here match the `*HookService.install()` call sites in
-// `migration/electron-reference/src/main/index.ts`. `claude` (not `claude-code`) is intentional — the
+// labels here match the native hook-install call sites. `claude` (not `claude-code`) is intentional — the
 // failure is about Claude Code's `~/.claude/settings.json`, not the broader
 // product taxonomy. Sourced from `AGENT_HOOK_TARGETS` so the wire enum and
 // the IPC `AgentHookTarget` type cannot drift as new hook-install agents

@@ -1,5 +1,7 @@
 # Windows Performance Investigation — Progress Log
 
+> Archived migration record: referenced Electron paths document the implementation that existed when this note was written; those paths are intentionally absent from the current Tauri repository.
+
 Goal: (1) significantly improve Windows startup time (~1 min cold start reported),
 (2) fix OpenCode-driven UI freezes, (3) improve overall Windows performance.
 All changes must be proven with before/after benchmark numbers.

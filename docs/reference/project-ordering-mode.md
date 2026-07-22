@@ -1,5 +1,7 @@
 # Project Ordering Mode
 
+> Archived migration record: referenced Electron paths document the implementation that existed when this note was written; those paths are intentionally absent from the current Tauri repository.
+
 ## Problem
 
 The sidebar can group workspaces by project, but project header order is currently coupled to workspace sorting instead of having its own user choice.

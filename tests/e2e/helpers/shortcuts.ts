@@ -1,4 +1,4 @@
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 
 type ShortcutOptions = {
   shift?: boolean

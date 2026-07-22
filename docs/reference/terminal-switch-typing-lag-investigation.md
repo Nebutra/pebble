@@ -1,5 +1,7 @@
 # Terminal Switch Typing Lag Investigation
 
+> Archived migration record: referenced Electron paths document the implementation that existed when this note was written; those paths are intentionally absent from the current Tauri repository.
+
 Date: 2026-07-01
 
 ## Scope

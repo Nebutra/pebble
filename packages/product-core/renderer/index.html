@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <title>Pebble</title>
-    <!-- CSP is relaxed during development; electron-vite injects a stricter policy for production builds -->
+    <!-- CSP is relaxed here for standalone renderer development; the packaged
+         Tauri application owns the production content-security policy. -->
   </head>
 
   <body>

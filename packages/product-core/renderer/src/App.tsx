@@ -1112,8 +1112,8 @@ function App(): React.JSX.Element {
           // user knows they're in degraded "no-save" mode. Without this, every
           // new tab/file/browse becomes silently ephemeral — `hydrationSucceeded`
           // stays false for the rest of the process and the session writer is
-          // a no-op. The "Restart now" action calls app.relaunch (defined in
-          // migration/electron-reference/src/main/ipc/app.ts) so the user can recover with one click instead
+          // a no-op. The "Restart now" action calls the native app relaunch bridge so
+          // the user can recover with one click instead
           // of having to find a quit/relaunch path themselves.
           toast.error(translate('auto.App.12e77cf12b', 'Session restore failed'), {
             description: translate(

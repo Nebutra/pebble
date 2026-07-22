@@ -43,7 +43,7 @@ export function getDefaultUserDataPath(
   platform: NodeJS.Platform = process.platform,
   homeDir = homedir()
 ): string {
-  // Why: in dev mode (and for parallel Pebble instances), the Electron app writes
+  // Why: in dev mode (and for parallel Pebble instances), the desktop app writes
   // runtime metadata to a separate userData directory (e.g. `pebble-dev`) to avoid
   // clobbering the production app's metadata. The CLI needs to find the same
   // metadata file, so this env var lets the CLI target a specific instance.
@@ -63,8 +63,8 @@ export function getDefaultUserDataPath(
     }
     return join(appData, 'pebble')
   }
-  // Why: the CLI must find the same metadata file Electron writes in packaged
-  // runs, so this mirrors Electron's default userData base instead of inventing
+  // Why: the CLI must find the same metadata file Tauri writes in packaged
+  // runs, so this mirrors the desktop app's default data base instead of inventing
   // a CLI-specific config path.
   return join(process.env.XDG_CONFIG_HOME || join(homeDir, '.config'), 'pebble')
 }

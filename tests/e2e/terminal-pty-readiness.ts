@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import type { Page } from '@nebutra/playwright-test'
-import { expect } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
+import { expect } from '@playwright/test'
 import { sendToTerminal } from './helpers/terminal'
 import { nodeTerminalCommand } from './terminal-node-command'
 import { buildFreshShellProbeInputSequence } from './terminal-probe-input-sequence'

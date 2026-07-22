@@ -103,8 +103,7 @@ func encodeGitLabProjectPath(path string) string {
 }
 
 // glabMRRaw is the subset of `glab mr list --output json` output this package
-// maps. glab infers the project from the git remotes in workdir, matching the
-// cwd-inferred fallback path in listMergeRequests (migration/electron-reference/src/main/gitlab/client.ts).
+// maps. glab infers the project from the git remotes in workdir.
 type glabMRRaw struct {
 	ID              int         `json:"id"`
 	IID             int         `json:"iid"`
@@ -151,7 +150,7 @@ func (l *glabLabel) UnmarshalJSON(data []byte) error {
 
 var draftTitlePattern = regexp.MustCompile(`(?i)^(draft|wip):\s*`)
 
-// glabMRListStateFlags mirrors mrListStateFlags in migration/electron-reference/src/main/gitlab/client.ts.
+// glabMRListStateFlags maps the shared state filter to glab flags.
 func glabMRListStateFlags(state string) []string {
 	switch state {
 	case "merged":
@@ -251,7 +250,7 @@ func glabAuthorUsername(user *glabUser) *string {
 	return &username
 }
 
-// mapMRState mirrors mapMRState in migration/electron-reference/src/main/gitlab/mappers.ts.
+// mapMRState normalizes GitLab merge-request state for the shared review contract.
 func mapMRState(state string, isDraft bool, title string) string {
 	switch strings.ToLower(state) {
 	case "merged":

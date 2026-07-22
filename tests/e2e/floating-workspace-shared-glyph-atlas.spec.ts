@@ -1,4 +1,4 @@
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { sendToTerminal, waitForActivePanePtyId } from './helpers/terminal'
@@ -341,7 +341,7 @@ async function captureWorkspaceAfterTrigger(
   return captureStableWorkspaceShot(page, scenario.workspacePtyId)
 }
 
-test.describe('floating workspace shared glyph atlas @headful', () => {
+test.describe('floating workspace shared glyph atlas renderer evidence', () => {
   test('switching floating workspace tabs keeps workspace terminal glyphs intact', async ({
     pebblePage
   }, testInfo) => {

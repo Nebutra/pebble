@@ -1,16 +1,16 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import type { Page, TestInfo } from '@nebutra/playwright-test'
+import type { Page, TestInfo } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { waitForActivePaneHookDescriptor, waitForActiveTerminalManager } from './helpers/terminal'
 import { waitForTerminalPtyDataInjector } from './helpers/terminal-pty-injection'
 
 // Repro commands:
-//   SKIP_BUILD=1 pnpm exec playwright test tests/e2e/terminal-foreground-redraw-freeze.spec.ts --config tests/playwright.config.ts --project electron-headless -g "active OpenTUI-style"
+//   SKIP_BUILD=1 pnpm exec playwright test tests/e2e/terminal-foreground-redraw-freeze.spec.ts --config tests/playwright.config.ts --project tauri-functional -g "active OpenTUI-style"
 //   git clone https://github.com/anomalyco/opencode.git .tmp/opencode
 //   node tests/e2e/capture-opencode-tui-repro.mjs
-//   SKIP_BUILD=1 pnpm exec playwright test tests/e2e/terminal-foreground-redraw-freeze.spec.ts --config tests/playwright.config.ts --project electron-headless -g "captured OpenCode/OpenTUI" --reporter=json
+//   SKIP_BUILD=1 pnpm exec playwright test tests/e2e/terminal-foreground-redraw-freeze.spec.ts --config tests/playwright.config.ts --project tauri-functional -g "captured OpenCode/OpenTUI" --reporter=json
 // The captured replay uses an artificial OpenCode source-tree harness that
 // imports OpenCode's spinner frames and emits real OpenTUI <=2KB redraw chunks.
 

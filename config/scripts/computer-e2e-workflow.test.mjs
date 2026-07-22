@@ -51,10 +51,7 @@ describe('computer-use e2e workflow', () => {
         'config/scripts/computer-use-smoke.mjs',
         'config/scripts/computer-use-smoke.test.mjs',
         'skills/computer-use/SKILL.md',
-        'migration/electron-reference/src/main/computer/**',
-        'migration/electron-reference/src/main/runtime/rpc/dispatcher.ts',
-        'migration/electron-reference/src/main/runtime/rpc/errors.ts',
-        'migration/electron-reference/src/main/runtime/rpc/methods/computer*.ts',
+        'apps/desktop/src-tauri/**',
         'packages/product-core/shared/computer-use-*.ts',
         'tests/e2e/vitest.config.ts'
       ])
@@ -74,19 +71,6 @@ describe('computer-use e2e workflow', () => {
       'config/scripts/computer-e2e-workflow.test.mjs',
       'config/scripts/computer-use-skill-guidance.test.mjs',
       'config/scripts/computer-use-smoke.test.mjs',
-      'migration/electron-reference/src/main/computer/computer-provider-lifecycle.test.ts',
-      'migration/electron-reference/src/main/computer/computer-provider-unavailable-message.test.ts',
-      'migration/electron-reference/src/main/computer/sidecar-client.test.ts',
-      'migration/electron-reference/src/main/computer/macos-native-provider-client.test.ts',
-      'migration/electron-reference/src/main/computer/macos-native-provider-socket.test.ts',
-      'migration/electron-reference/src/main/computer/macos-computer-use-permissions.test.ts',
-      'migration/electron-reference/src/main/computer/macos-computer-use-permission-status.test.ts',
-      'migration/electron-reference/src/main/computer/desktop-script-provider-client.test.ts',
-      'migration/electron-reference/src/main/computer/desktop-script-provider-cache.test.ts',
-      'migration/electron-reference/src/main/computer/desktop-script-provider-actions.test.ts',
-      'migration/electron-reference/src/main/computer/desktop-script-provider-cache-lifecycle.test.ts',
-      'migration/electron-reference/src/main/computer/desktop-script-provider-errors.test.ts',
-      'migration/electron-reference/src/main/computer/desktop-script-provider-action-errors.test.ts',
       'packages/product-core/shared/computer-use-error-recovery.test.ts',
       'packages/product-core/shared/computer-use-key-spec.test.ts',
       'packages/product-core/cli/format.test.ts',
@@ -96,10 +80,6 @@ describe('computer-use e2e workflow', () => {
       'packages/product-core/cli/handlers/computer-state-formatting.test.ts',
       'packages/product-core/cli/specs/computer.test.ts',
       'packages/product-core/cli/index.test.ts',
-      'migration/electron-reference/src/main/runtime/rpc/dispatcher-computer-errors.test.ts',
-      'migration/electron-reference/src/main/runtime/rpc/errors.test.ts',
-      'migration/electron-reference/src/main/runtime/rpc/methods/computer.test.ts',
-      'migration/electron-reference/src/main/runtime/rpc/methods/computer-actions.test.ts',
       'packages/product-core/cli/runtime/envelope-schema.test.ts',
       'packages/product-core/shared/remote-runtime-client.test.ts'
     ]
@@ -126,20 +106,17 @@ describe('computer-use e2e workflow', () => {
     )
   })
 
-  it('does not build the Electron reference for native computer-use e2e', () => {
+  it('runs the Tauri computer-use Rust tests in PR smoke', () => {
     const workflow = parse(
       readFileSync(join(projectDir, '.github/workflows/computer-e2e.yml'), 'utf8')
     )
 
-    for (const jobName of ['native-smoke', 'mac', 'linux', 'windows']) {
-      const runs = workflow.jobs[jobName].steps
-        .map((step) => step.run)
-        .filter((run) => typeof run === 'string')
-
-      expect(runs, `${jobName} should use the CLI/native runtime directly`).not.toContain(
-        'pnpm parity:electron:build'
-      )
-    }
+    const runs = workflow.jobs['native-smoke'].steps
+      .map((step) => step.run)
+      .filter((run) => typeof run === 'string')
+    expect(runs).toContain(
+      'cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --no-default-features computer_use'
+    )
   })
 
   it('runs core Windows computer-use e2e in the PR native-smoke job', () => {

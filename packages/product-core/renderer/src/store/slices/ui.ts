@@ -284,8 +284,8 @@ const MAX_RIGHT_SIDEBAR_WIDTH = 4000
 const LINEAR_TASK_PREFETCH_LIMIT = 36
 // Why: bound disk growth for acknowledgedAgentsByPaneKey across hard quits —
 // in-session cleanup (agent-status.ts) prunes on pane lifecycle, but crash/
-// forced-kill paths leave entries pinned. Mirrors HYDRATE_MAX_AGE_MS in
-// migration/electron-reference/src/main/agent-hooks/server.ts for parallel reasoning with the sibling
+// forced-kill paths leave entries pinned. The seven-day bound matches the
+// native hook-status retention contract for the sibling
 // hook-status entries these acks pair with.
 const HYDRATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 const VALID_TASK_PRESETS = new Set<TaskViewPresetId>([

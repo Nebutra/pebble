@@ -5,8 +5,7 @@
  *
  *   - `MemorySnapshot.worktrees` — local PTYs only, with numeric CPU/Mem
  *     per worktree and per session (the local memory collector doesn't see
- *     SSH process trees, by design — see migration/electron-reference/src/main/memory/collector.ts and
- *     the registerPty branch at migration/electron-reference/src/main/ipc/pty.ts:832).
+ *     SSH process trees, by design; the runtime session inventory owns those).
  *   - `pty.listSessions()` — every PTY the daemon tracks, local or SSH.
  *
  * The merge is renderer-only and pure. It does NOT widen the shared

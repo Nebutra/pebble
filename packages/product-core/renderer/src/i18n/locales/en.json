@@ -1742,7 +1742,7 @@
         "17412483da": "Ready to Install",
         "47126bcf57": "Download Manually",
         "3553a8672f": "Last error",
-        "90559b14e3": "This turns on a process-wide Electron networking switch after restart. Use it for corporate VPNs or proxies that reject HTTP/2 update downloads.",
+        "90559b14e3": "This turns on a process-wide desktop networking switch after restart. Use it for corporate VPNs or proxies that reject HTTP/2 update downloads.",
         "6e45bfa2e0": "Downloading...",
         "558842597d": "Downloading Update",
         "f58b5c57a6": "New:",
@@ -4690,7 +4690,7 @@
           "40b29e0bf3": "Restart",
           "87a2cb2ac8": "Pebble applies this networking mode at startup.",
           "89958d7edf": "Restart required",
-          "b3ad629640": "Use only when a corporate VPN or proxy breaks update downloads with HTTP/2 protocol errors. It affects all Electron networking after restart.",
+          "b3ad629640": "Use only when a corporate VPN or proxy breaks update downloads with HTTP/2 protocol errors. It affects desktop networking after restart.",
           "6627e75c92": "Explain HTTP/1.1 compatibility",
           "e9506d3377": "HTTP/1.1 Compatibility",
           "8b7a8df299": "Low-level workarounds for support troubleshooting.",
@@ -5689,7 +5689,7 @@
         "OpenAiTranscriptionKeyDialog": {
           "fa83512e48": "Save Key",
           "07b26f2742": "Clear Key",
-          "d246b2bdb3": "Local runtime keys are stored in ~/.pebble using Electron encrypted storage when available.",
+          "d246b2bdb3": "Local runtime keys are stored in ~/.pebble using OS-protected storage when available.",
           "c3380e4ca5": "sk-...",
           "2f797018f0": "API key configured",
           "16015322f9": "API Key",
@@ -6804,7 +6804,7 @@
           "e49688f67f": "Register `{{value0}}` in WSL?",
           "61ac55278e": "Remove `{{value0}}` from WSL?",
           "e2b0ee267f": "stale",
-          "7aa456a460": "Register `pebble-ide` in ~/.local/bin inside WSL.",
+          "7aa456a460": "Register `pebble` in ~/.local/bin inside WSL.",
           "0307677bb9": "Checking WSL CLI registration..."
         },
         "accounts": {
@@ -6874,7 +6874,7 @@
             "4d44352eea": "network",
             "2b4d26d11e": "networking",
             "e04e9db503": "advanced",
-            "585f56fae0": "Use HTTP/1.1 for Electron networking when HTTP/2 fails behind a proxy.",
+            "585f56fae0": "Use HTTP/1.1 for desktop networking when HTTP/2 fails behind a proxy.",
             "11eea3da72": "HTTP/1.1 Compatibility"
           }
         },

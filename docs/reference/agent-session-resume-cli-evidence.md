@@ -1,5 +1,7 @@
 # Agent Session Resume Evidence for Sleep/Wake
 
+> Archived migration record: referenced Electron paths document the implementation that existed when this note was written; those paths are intentionally absent from the current Tauri repository.
+
 Date: June 5, 2026
 
 Scope: issue [nebutra/pebble#1796](https://github.com/nebutra/pebble/issues/1796), current worktree code, installed agent CLIs on this machine, cloned open-source CLI repos under `/tmp/pebble-agent-resume-research`, and official provider docs where available.

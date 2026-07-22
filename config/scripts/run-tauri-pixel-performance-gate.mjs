@@ -158,7 +158,9 @@ function clearParityHarnessCrashState() {
       : process.platform === 'win32'
         ? process.env.APPDATA
         : process.env.XDG_DATA_HOME || resolve(homedir(), '.local/share')
-  if (!appDataRoot) return
+  if (!appDataRoot) {
+    return
+  }
   const parityData = resolve(appDataRoot, 'nebutra.pebble.parity')
   for (const name of [
     'crash-reports.json',
@@ -248,7 +250,9 @@ function waitForExit(child) {
 }
 
 async function stopProcessTree(child) {
-  if (child.exitCode !== null || child.signalCode !== null) return
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return
+  }
   if (process.platform === 'win32') {
     spawnSync('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore' })
   } else {

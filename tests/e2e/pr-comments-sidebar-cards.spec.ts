@@ -1,4 +1,4 @@
-import type { Locator } from '@nebutra/playwright-test'
+import type { Locator } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { openChecks } from './helpers/source-control-ai-generation'
 import { seedPRCommentsSidebarFixture } from './helpers/pr-comments-sidebar-fixture'

@@ -1,4 +1,4 @@
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 
 export type ActiveTerminalScrollState = {
   viewportY: number

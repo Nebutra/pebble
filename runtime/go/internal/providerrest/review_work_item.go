@@ -1,10 +1,8 @@
 // Package providerrest lists review work items (pull requests) for git
 // providers that have no bundled CLI path — Bitbucket Cloud, Azure DevOps, and
 // Gitea/Forgejo — by calling their REST APIs directly. Auth and base-URL
-// configuration mirrors Electron's clients field-for-field: the same PEBBLE_*
-// environment variables read by migration/electron-reference/src/main/bitbucket/client.ts,
-// migration/electron-reference/src/main/azure-devops/azure-devops-api-request.ts, and
-// migration/electron-reference/src/main/gitea/client.ts configure tokens and endpoint overrides.
+// Provider configuration uses the same PEBBLE_* environment variables across
+// Bitbucket, Azure DevOps, and Gitea token and endpoint overrides.
 package providerrest
 
 import (

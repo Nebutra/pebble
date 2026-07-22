@@ -64,7 +64,7 @@ function getWindowsSafeSpawn(
   return { spawnCmd: getCmdExePath(), spawnArgs: ['/d', '/s', '/c', commandLine] }
 }
 
-// Why: mirrors migration/electron-reference/src/main/text-generation/commit-message-text-generation.ts. On
+// Why: matches the local text-generation launcher contract. On
 // Windows, npm-installed CLIs like `claude`/`codex` are usually `.cmd` shims.
 // We route those through cmd.exe so Node can launch them, and taskkill is
 // needed to terminate the whole wrapper + node.exe process tree. Kept

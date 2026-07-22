@@ -1,4 +1,4 @@
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import { expect } from './pebble-app'
 import type { CommitMessageAiSettings } from '../../../packages/product-core/shared/types'
 

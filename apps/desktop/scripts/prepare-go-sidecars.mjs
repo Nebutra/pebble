@@ -12,7 +12,7 @@ const target = process.env.TAURI_ENV_TARGET_TRIPLE || hostTargetTriple()
 const hostOnly = process.argv.includes('--host-only')
 mkdirSync(resolve(outputRoot, 'relay-workers'), { recursive: true })
 
-for (const binary of ['pebble-runtime', 'pebble-relay-worker']) {
+for (const binary of ['pebble-runtime', 'pebble-control', 'pebble-relay-worker']) {
   buildSidecar(binary, target)
 }
 if (!hostOnly) {

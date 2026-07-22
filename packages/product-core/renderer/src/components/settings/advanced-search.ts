@@ -13,7 +13,7 @@ export const getAdvancedPaneSearchEntries = createLocalizedCatalog((): SettingsS
     ),
     description: translate(
       'auto.components.settings.advanced.search.585f56fae0',
-      'Use HTTP/1.1 for Electron networking when HTTP/2 fails behind a proxy.'
+      'Use HTTP/1.1 for desktop networking when HTTP/2 fails behind a proxy.'
     ),
     keywords: [
       ...translateSearchKeyword('auto.components.settings.advanced.search.e04e9db503', 'advanced'),

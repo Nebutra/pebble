@@ -12,7 +12,7 @@ import type { CheckStatus, ClassifiedError, PRConflictSummary } from './types'
 // live under arbitrarily nested groups (`group/subgroup/project`), and
 // (b) self-hosted instances live on hostnames other than gitlab.com so the
 // host has to travel with the path for URL construction and glab host
-// targeting. Aliased as `ProjectRef` in `migration/electron-reference/src/main/gitlab/gl-utils.ts`.
+// targeting. Runtime providers use this shared identity directly.
 export type GitLabProjectRef = { host: string; path: string }
 
 // ── GitLab MR / issue / work-item shapes ────────────────────────────

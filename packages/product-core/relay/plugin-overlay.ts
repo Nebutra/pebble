@@ -10,11 +10,10 @@
 // frequently as new agent events get added (see docs/design/agent-status-
 // over-ssh.md §4 "Why ship the plugin source over the wire").
 //
-// We deliberately do not reuse OpenCodeHookService / PiTitlebarExtensionService
-// directly: those modules import `electron` and ride on Pebble's userData
-// path. The relay's electron-free constraint forces a thin parallel
-// implementation rooted at $HOME/.pebble-relay/ for OpenCode and at the remote
-// Pi/OMP homes for those agents.
+// We deliberately keep this separate from the desktop-native installers:
+// renderer host paths and local app-data ownership do not exist on SSH targets.
+// The relay therefore owns a thin remote implementation rooted at
+// $HOME/.pebble-relay/ for OpenCode and at the remote Pi/OMP homes.
 
 import { createHash } from 'node:crypto'
 import {

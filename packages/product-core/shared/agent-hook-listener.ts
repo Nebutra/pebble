@@ -7,8 +7,8 @@
 
 // Why: shared ownership lets the relay and desktop/runtime hosts use the same
 // listener pipeline without importing a shell implementation. The
-// module uses only Node builtins (http/fs/crypto/net/path/url/os) — none of
-// which pull `electron` — so it is safe to import from `packages/product-core/relay/`. See
+// module uses only Node builtins (http/fs/crypto/net/path/url/os), so it is safe
+// to import from `packages/product-core/relay/` without a desktop-shell dependency. See
 // docs/design/agent-status-over-ssh.md §3 ("relay normalizes; Pebble routes").
 import type { IncomingMessage } from 'node:http'
 import { createHash, randomUUID } from 'node:crypto'

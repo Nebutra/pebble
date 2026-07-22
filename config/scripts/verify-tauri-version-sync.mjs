@@ -9,7 +9,9 @@ export function assertTauriVersionsMatch(versions) {
   const entries = Object.entries(versions)
   const expected = versions.rootPackage
   const mismatches = entries.filter(([, version]) => version !== expected)
-  if (mismatches.length === 0) return expected
+  if (mismatches.length === 0) {
+    return expected
+  }
   const details = entries.map(([source, version]) => `${source}=${version}`).join(', ')
   throw new Error(`Pebble desktop versions must match: ${details}`)
 }
@@ -27,7 +29,9 @@ function readCargoPackageVersion(manifestPath) {
     )
   )
   const packageRecord = metadata.packages.find((entry) => entry.name === 'pebble-desktop-tauri')
-  if (!packageRecord?.version) throw new Error('Cargo metadata omitted pebble-desktop-tauri')
+  if (!packageRecord?.version) {
+    throw new Error('Cargo metadata omitted pebble-desktop-tauri')
+  }
   return packageRecord.version
 }
 
@@ -46,7 +50,7 @@ export async function verifyTauriVersionSync(root = repoRoot) {
   })
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] === import.meta.filename) {
   const version = await verifyTauriVersionSync()
   console.log(`Pebble Tauri version sync verified: ${version}`)
 }

@@ -272,7 +272,7 @@ test.describe('Tab visibility with closed sidebar', () => {
       if (!store) {
         throw new Error('window.__store is not available — is the app in dev mode?')
       }
-      // Why: CI runs Electron hidden, where Playwright can wait forever for
+      // Why: CI uses an automated browser, where Playwright can wait forever for
       // a titlebar button to be "stable". The regression is the collapsed
       // geometry and hit target, so drive that state directly.
       store.getState().setSidebarOpen(false)

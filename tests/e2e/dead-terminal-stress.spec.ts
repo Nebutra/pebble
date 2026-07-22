@@ -5,7 +5,7 @@
  * - Forced WebGL context loss (simulating Chromium memory pressure)
  * - Rapid switching during the ~200ms scheduleSplitScrollRestore window
  *
- * All tests require @headful mode for WebGL to be active.
+ * WebGL assertions skip when the browser runner cannot provide a context.
  */
 
 import { test, expect } from './helpers/pebble-app'
@@ -25,7 +25,7 @@ import {
 
 const STRESS_ITERATIONS = 5
 
-test.describe('Dead Terminal Stress @headful', () => {
+test.describe('Dead Terminal Stress renderer evidence', () => {
   const createdWorktreeIds: string[] = []
 
   test.beforeEach(async ({ pebblePage }) => {
@@ -55,7 +55,7 @@ test.describe('Dead Terminal Stress @headful', () => {
    * pressure — especially with many worktrees open. The recovery path is:
    * onContextLoss → dispose WebGL → DOM fallback → rAF → fit + refresh.
    */
-  test('@headful setup-split with forced WebGL context loss recovers', async ({ pebblePage }) => {
+  test('setup-split with forced WebGL context loss recovers', async ({ pebblePage }) => {
     test.setTimeout(120_000)
     const homeWorktreeId = await waitForActiveWorktree(pebblePage)
     await waitForActiveTerminalManager(pebblePage, 30_000)
@@ -64,7 +64,9 @@ test.describe('Dead Terminal Stress @headful', () => {
       const newId = await createAndActivateWorktreeWithSetup(pebblePage, `ctxloss-${i}`, 'vertical')
       createdWorktreeIds.push(newId)
 
-      await expect.poll(async () => getActiveWorktreeId(pebblePage), { timeout: 10_000 }).toBe(newId)
+      await expect
+        .poll(async () => getActiveWorktreeId(pebblePage), { timeout: 10_000 })
+        .toBe(newId)
       await ensureTerminalVisible(pebblePage)
       await waitForActiveTerminalManager(pebblePage, 30_000)
       await waitForPaneCount(pebblePage, 2, 15_000)
@@ -107,7 +109,7 @@ test.describe('Dead Terminal Stress @headful', () => {
    * race between wrapInSplit() reparenting, WebGL context creation during
    * resumeRendering(), and the scheduleSplitScrollRestore 200ms timer.
    */
-  test('@headful rapid worktree switching during setup-split lifecycle', async ({ pebblePage }) => {
+  test('rapid worktree switching during setup-split lifecycle', async ({ pebblePage }) => {
     test.setTimeout(120_000)
     const homeWorktreeId = await waitForActiveWorktree(pebblePage)
     await waitForActiveTerminalManager(pebblePage, 30_000)
@@ -123,7 +125,9 @@ test.describe('Dead Terminal Stress @headful', () => {
 
       // Switch back — triggers resumeRendering on partially-initialized panes
       await switchToWorktree(pebblePage, newId)
-      await expect.poll(async () => getActiveWorktreeId(pebblePage), { timeout: 10_000 }).toBe(newId)
+      await expect
+        .poll(async () => getActiveWorktreeId(pebblePage), { timeout: 10_000 })
+        .toBe(newId)
       await ensureTerminalVisible(pebblePage)
       await waitForActiveTerminalManager(pebblePage, 30_000)
       await waitForPaneCount(pebblePage, 2, 15_000)

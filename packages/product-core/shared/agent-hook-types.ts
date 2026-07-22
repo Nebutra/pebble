@@ -1,6 +1,5 @@
-// Why: shared agent-hook IPC payload shapes and the managed-script protocol
-// version constant. Consumed by both the main-process hook server (migration/electron-reference/src/main/
-// agent-hooks/server.ts) and each per-agent hook service. Lives in `shared/`
+// Why: shared agent-hook payload shapes and the managed-script protocol
+// version constant. Consumed by the native runtime and each per-agent hook service. Lives in `shared/`
 // to keep a single source of truth for the version string and status contract.
 
 export const AGENT_HOOK_TARGETS = [

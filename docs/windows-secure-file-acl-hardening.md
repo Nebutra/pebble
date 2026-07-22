@@ -64,7 +64,7 @@ published with a broader-than-intended ACL.
 
 ## Manual Windows end-to-end test plan
 
-The automated e2e harness (`pnpm test:e2e`, Playwright `electron-headless`) runs
+The automated Tauri functional harness (`pnpm verify:tauri-real-runtime`) runs
 on `ubuntu-latest`, where `applySecurePathRestriction` short-circuits to
 `chmodSync` and never reaches the PowerShell path. The ACL storm therefore cannot
 be reproduced in the cross-platform e2e harness; verify it manually on Windows.

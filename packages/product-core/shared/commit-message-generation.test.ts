@@ -10,16 +10,16 @@ describe('buildCommitMessagePrompt', () => {
     const prompt = buildCommitMessagePrompt(
       {
         branch: 'feature/commit-drafts',
-        stagedSummary: 'M\tmigration/electron-reference/src/main/ipc/filesystem.ts',
+        stagedSummary: 'M\tapps/desktop/src-tauri/src/commands/filesystem_download.rs',
         stagedPatch:
-          'diff --git a/migration/electron-reference/src/main/ipc/filesystem.ts b/migration/electron-reference/src/main/ipc/filesystem.ts\n+hello'
+          'diff --git a/apps/desktop/src-tauri/src/commands/filesystem_download.rs b/apps/desktop/src-tauri/src/commands/filesystem_download.rs\n+hello'
       },
       ''
     )
 
     expect(prompt).toContain('Branch: feature/commit-drafts')
     expect(prompt).toContain(
-      'Staged files:\nM\tmigration/electron-reference/src/main/ipc/filesystem.ts'
+      'Staged files:\nM\tapps/desktop/src-tauri/src/commands/filesystem_download.rs'
     )
     expect(prompt).toContain('Staged patch:\n```diff')
     expect(prompt).toContain('+hello')

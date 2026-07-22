@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { Locator, Page } from '@nebutra/playwright-test'
-import { expect } from '@nebutra/playwright-test'
+import type { Locator, Page } from '@playwright/test'
+import { expect } from '@playwright/test'
 
 const MARKDOWN_HYDRATION_TIMEOUT_MS = 25_000
 const DRAFT_SERIALIZATION_TIMEOUT_MS = 10_000
@@ -314,7 +314,7 @@ export async function placeCaretInLoadedThirdEmptyItem(page: Page): Promise<void
         throw new Error('Cannot place caret in the loaded empty ordered-list item')
       }
 
-      // Why: headless Electron can click an empty paragraph without committing
+      // Why: automated browser input can click an empty paragraph without committing
       // ProseMirror's state selection before Enter; set the same caret explicitly.
       editor.editor.commands.setTextSelection?.(selectionPosition)
       editor.editor.commands.focus?.()

@@ -100,14 +100,11 @@ describe('tui agent startup plans', () => {
       allowEmptyPromptLaunch: true
     })
 
-    expect(plan?.launchCommand).toBe('pebble-ide claude-teams')
+    expect(plan?.launchCommand).toBe('pebble claude-teams')
   })
 
-  it('uses the plain pebble shim for Claude Agent Teams on Linux SSH remotes', () => {
-    // Why: the SSH relay deploys the CLI shim as `pebble` (not the local-only
-    // `pebble-ide` desktop wrapper), so a remote launch must not
-    // emit `pebble-ide claude-teams` — that name is not on the remote PATH and
-    // `claude-teams` is rejected by the relay's CLI switch (issue #6500).
+  it('uses the canonical pebble shim for Claude Agent Teams on Linux SSH remotes', () => {
+    // Why: SSH launches must continue using the relay-provided Unix command.
     const plan = buildAgentStartupPlan({
       agent: 'claude-agent-teams',
       prompt: '',
@@ -135,10 +132,7 @@ describe('tui agent startup plans', () => {
     expect(plan?.launchCommand).toBe('pebble.cmd claude-teams')
   })
 
-  it('keeps the Linux pebble-ide wrapper for local (non-remote) Claude Agent Teams', () => {
-    // Why: the `pebble-ide` wrapper is still required for a local Linux desktop
-    // install, so an explicit
-    // isRemote:false must preserve it.
+  it('uses the canonical Pebble command for local Linux Claude Agent Teams', () => {
     const plan = buildAgentStartupPlan({
       agent: 'claude-agent-teams',
       prompt: '',
@@ -148,7 +142,7 @@ describe('tui agent startup plans', () => {
       allowEmptyPromptLaunch: true
     })
 
-    expect(plan?.launchCommand).toBe('pebble-ide claude-teams')
+    expect(plan?.launchCommand).toBe('pebble claude-teams')
   })
 
   it('launches OpenClaude as a distinct argv agent', () => {
@@ -416,7 +410,7 @@ describe('tui agent startup plans', () => {
   it('returns an OMP draft plan with PEBBLE_OMP_PREFILL (OMP-scoped, not Pi-shared)', () => {
     // Why: OMP owns its own managed prefill extension and env var.
     // pebble-prefill.ts reads PEBBLE_OMP_PREFILL for OMP launches — see
-    // migration/electron-reference/src/main/pi/titlebar-extension-service.ts — so a draft plan for OMP
+    // the native Pi titlebar integration, so a draft plan for OMP
     // MUST emit that name. A regression here would either silently drop the
     // draft (Pi var ignored by OMP) or honor a stale Pi-PTY draft.
     const plan = buildAgentDraftLaunchPlan({

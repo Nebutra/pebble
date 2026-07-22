@@ -146,7 +146,7 @@ export function createPtyOutputProcessor({
     // and it re-emits that title many times per turn (on every internal redraw)
     // even while it's actively working. Pebble drives the cursor spinner/unread
     // path by injecting its own synthesized "⠋ Cursor Agent" and "Cursor ready"
-    // frames from the hook server (see migration/electron-reference/src/main/index.ts). If we let cursor's
+    // frames from the hook server. If we let cursor's
     // bare title through, it lands in `runtimePaneTitlesByTabId` — where
     // `getWorktreeStatus` reads from — and flips the sidebar dot back to solid
     // within a second of the spinner appearing. Dropping the bare title before
@@ -700,7 +700,7 @@ export function createIpcPtyTransport(opts: IpcPtyTransportOptions = {}): PtyTra
         // both the raw Error.message and Electron's IPC-wrapped form
         // ("Error invoking remote method 'pty:spawn': TerminalKilledError:
         // ..."). The phrase "was explicitly killed" only appears in that one
-        // error type (see migration/electron-reference/src/main/daemon/daemon-pty-adapter.ts), so a
+        // runtime error type, so a
         // substring match is safe.
         if (msg.includes('was explicitly killed')) {
           return undefined

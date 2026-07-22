@@ -18,7 +18,7 @@ type sshCachedCredential struct {
 	password   string
 }
 
-// SshCredentialKind mirrors migration/electron-reference/src/main/ssh/ssh-connection-utils SshCredentialKind.
+// SshCredentialKind is the stable credential-kind wire contract.
 const (
 	SshCredentialKindPassphrase = "passphrase"
 	SshCredentialKindPassword   = "password"

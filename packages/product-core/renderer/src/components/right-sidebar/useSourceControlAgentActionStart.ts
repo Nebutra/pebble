@@ -27,8 +27,7 @@ type UseSourceControlAgentActionStartArgs = {
   groupId?: string | null
   promptDelivery: 'auto-submit' | 'draft' | 'submit-after-ready'
   launchPlatform?: NodeJS.Platform
-  /** Why: SSH hosts launch the plain `pebble` shim, so the previewed command must
-   * drop the Linux-only `pebble-ide` rename to match the real launch. */
+  /** Why: keep the previewed command aligned with SSH relay routing. */
   isRemote?: boolean
   launchSource: LaunchSource
   connectionUnavailable: boolean

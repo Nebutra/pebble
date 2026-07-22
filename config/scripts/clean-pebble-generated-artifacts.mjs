@@ -1,6 +1,5 @@
 import { rmSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 const generatedPaths = [
   'dist',
@@ -37,7 +36,7 @@ export function cleanPebbleGeneratedArtifacts(repoRoot, { includeRelease = false
   return paths
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (process.argv[1] && import.meta.filename === resolve(process.argv[1])) {
   const repoRoot = resolve(import.meta.dirname, '../..')
   const includeRelease = process.argv.includes('--include-release')
   const removed = cleanPebbleGeneratedArtifacts(repoRoot, { includeRelease })

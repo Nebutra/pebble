@@ -15,7 +15,7 @@ import { readBlobAtOid, type GitBufferExec, type GitExec } from './git-handler-o
 
 /**
  * Short TTL for the configured-submodule-paths cache, matching the local
- * handler (migration/electron-reference/src/main/git/status.ts) so a burst of diff clicks on a worktree
+ * handler so a burst of diff clicks on a worktree
  * doesn't re-read `.gitmodules` over the (possibly high-latency) SSH link.
  */
 export const SUBMODULE_PATHS_CACHE_TTL_MS = 5_000

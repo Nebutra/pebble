@@ -1,4 +1,4 @@
-import type { TestInfo } from '@nebutra/playwright-test'
+import type { TestInfo } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import {
   ensureTerminalVisible,

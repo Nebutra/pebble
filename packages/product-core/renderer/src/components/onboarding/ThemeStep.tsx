@@ -72,7 +72,7 @@ export function ThemeStep({ theme, onThemeChange, settings, updateSettings }: Th
   // "we found your Ghostty config" prompt instead of a buried Import button.
   // Settings are not applied until the user clicks Import (per design doc).
   useEffect(() => {
-    // Why: Ghostty config-import is darwin-only (see migration/electron-reference/src/main/ghostty/discovery.ts).
+    // Why: Ghostty config import depends on macOS-specific discovery paths.
     // Skip the IPC + telemetry emission entirely on non-Mac so the
     // `_discovered: absent` rate measured by the Mac-cohort dashboard isn't
     // polluted by a population that cannot have a Ghostty config.

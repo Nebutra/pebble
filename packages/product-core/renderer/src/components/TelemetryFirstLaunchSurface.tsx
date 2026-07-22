@@ -3,7 +3,7 @@
 // matches the category norm for developer tooling; see telemetry-plan.md
 // §First-launch experience for the rationale.
 //
-// Cohort marker populated by the migration in `migration/electron-reference/src/main/persistence.ts`:
+// Cohort marker retained in persisted settings for pre-telemetry installs:
 //
 //   - `existedBeforeTelemetryRelease === true && optedIn === null`
 //       → FirstLaunchBanner (notice; no events transmit until the user

@@ -1,7 +1,9 @@
 use super::{unsupported, CliInstallStatus};
 
 #[cfg(any(target_os = "windows", test))]
-const COMMAND_NAME: &str = "pebble-ide";
+const COMMAND_NAME: &str = "pebble";
+#[cfg(any(target_os = "windows", test))]
+const LEGACY_COMMAND_NAME: &str = "pebble-ide";
 #[cfg(any(target_os = "windows", test))]
 const MANAGED_MARKER: &str = "# Pebble managed WSL CLI launcher";
 #[cfg(any(target_os = "windows", test))]
@@ -89,6 +91,53 @@ fn quote_shell(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
+#[cfg(any(target_os = "windows", test))]
+struct ReadyState {
+    distro: String,
+    command_path: String,
+    legacy_command_path: String,
+    bridge_path: String,
+    launcher_path: String,
+    path_configured: bool,
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn command_dir(path: &str) -> &str {
+    path.rsplit_once('/').map(|(dir, _)| dir).unwrap_or("/")
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn install_script(ready: &ReadyState) -> String {
+    let launcher = build_launcher(&ready.launcher_path, &ready.bridge_path);
+    let bridge = build_bridge();
+    format!(
+        "set -euo pipefail\nmkdir -p {} {}\ncommand_path={}\nlegacy_command_path={}\nbridge_path={}\nif [ -L \"$command_path\" ] || {{ [ -e \"$command_path\" ] && ! grep -Fq {} \"$command_path\"; }}; then exit 23; fi\nif [ -L \"$bridge_path\" ] || {{ [ -e \"$bridge_path\" ] && ! grep -Fq {} \"$bridge_path\"; }}; then exit 23; fi\ncommand_tmp=\"${{command_path}}.tmp.$$\"\nbridge_tmp=\"${{bridge_path}}.tmp.$$\"\ntrap 'rm -f \"$command_tmp\" \"$bridge_tmp\"' EXIT\ncat > \"$bridge_tmp\" <<'PEBBLE_WSL_BRIDGE'\n{}PEBBLE_WSL_BRIDGE\ncat > \"$command_tmp\" <<'PEBBLE_WSL_CLI'\n{}PEBBLE_WSL_CLI\nchmod 644 \"$bridge_tmp\"\nchmod 755 \"$command_tmp\"\nmv -f \"$bridge_tmp\" \"$bridge_path\"\nmv -f \"$command_tmp\" \"$command_path\"\nif [ ! -L \"$legacy_command_path\" ] && [ -f \"$legacy_command_path\" ] && grep -Fq {} \"$legacy_command_path\"; then rm -f \"$legacy_command_path\"; fi\ntrap - EXIT\n",
+        quote_shell(command_dir(&ready.command_path)),
+        quote_shell(command_dir(&ready.bridge_path)),
+        quote_shell(&ready.command_path),
+        quote_shell(&ready.legacy_command_path),
+        quote_shell(&ready.bridge_path),
+        quote_shell(MANAGED_MARKER),
+        quote_shell(BRIDGE_MARKER),
+        bridge,
+        launcher,
+        quote_shell(MANAGED_MARKER)
+    )
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn remove_script(ready: &ReadyState) -> String {
+    format!(
+        "set -euo pipefail\nfor entry in {} {}; do\n  if [ -L \"$entry\" ] || {{ [ -e \"$entry\" ] && ! grep -Fq 'Pebble managed WSL' \"$entry\"; }}; then exit 23; fi\ndone\nrm -f {} {}\nlegacy_command_path={}\nif [ ! -L \"$legacy_command_path\" ] && [ -f \"$legacy_command_path\" ] && grep -Fq {} \"$legacy_command_path\"; then rm -f \"$legacy_command_path\"; fi\n",
+        quote_shell(&ready.command_path),
+        quote_shell(&ready.bridge_path),
+        quote_shell(&ready.command_path),
+        quote_shell(&ready.bridge_path),
+        quote_shell(&ready.legacy_command_path),
+        quote_shell(MANAGED_MARKER)
+    )
+}
+
 #[cfg(target_os = "windows")]
 mod windows {
     use std::env;
@@ -100,19 +149,12 @@ mod windows {
     use wait_timeout::ChildExt;
 
     use super::{
-        build_bridge, build_launcher, quote_shell, unsupported, CliInstallStatus, BRIDGE_MARKER,
-        COMMAND_NAME, MANAGED_MARKER,
+        build_bridge, build_launcher, command_dir, install_script, quote_shell, remove_script,
+        unsupported, CliInstallStatus, ReadyState, BRIDGE_MARKER, COMMAND_NAME,
+        LEGACY_COMMAND_NAME, MANAGED_MARKER,
     };
 
     const TIMEOUT: Duration = Duration::from_secs(10);
-
-    struct ReadyState {
-        distro: String,
-        command_path: String,
-        bridge_path: String,
-        launcher_path: String,
-        path_configured: bool,
-    }
 
     pub fn status(distro: Option<String>) -> CliInstallStatus {
         match resolve_ready(distro) {
@@ -186,6 +228,7 @@ mod windows {
         }
         let path_directory = format!("{home}/.local/bin");
         let command_path = format!("{path_directory}/{COMMAND_NAME}");
+        let legacy_command_path = format!("{path_directory}/{LEGACY_COMMAND_NAME}");
         let bridge_path = format!("{home}/.local/share/pebble/pebble-wsl-bridge.ps1");
         let path_check = format!(
             "case \":$PATH:\" in *:{}:*) printf yes ;; *) printf no ;; esac",
@@ -197,6 +240,7 @@ mod windows {
         Ok(ReadyState {
             distro,
             command_path,
+            legacy_command_path,
             bridge_path,
             launcher_path: launcher.to_string_lossy().into_owned(),
             path_configured,
@@ -245,32 +289,6 @@ mod windows {
             unsupported_reason: None,
             detail: Some(format!("WSL CLI registration for {}.", ready.distro)),
         }
-    }
-
-    fn install_script(ready: &ReadyState) -> String {
-        let launcher = build_launcher(&ready.launcher_path, &ready.bridge_path);
-        let bridge = build_bridge();
-        format!(
-            "set -euo pipefail\nmkdir -p {} {}\ncommand_path={}\nbridge_path={}\nif [ -L \"$command_path\" ] || {{ [ -e \"$command_path\" ] && ! grep -Fq {} \"$command_path\"; }}; then exit 23; fi\nif [ -L \"$bridge_path\" ] || {{ [ -e \"$bridge_path\" ] && ! grep -Fq {} \"$bridge_path\"; }}; then exit 23; fi\ncommand_tmp=\"${{command_path}}.tmp.$$\"\nbridge_tmp=\"${{bridge_path}}.tmp.$$\"\ntrap 'rm -f \"$command_tmp\" \"$bridge_tmp\"' EXIT\ncat > \"$bridge_tmp\" <<'PEBBLE_WSL_BRIDGE'\n{}PEBBLE_WSL_BRIDGE\ncat > \"$command_tmp\" <<'PEBBLE_WSL_CLI'\n{}PEBBLE_WSL_CLI\nchmod 644 \"$bridge_tmp\"\nchmod 755 \"$command_tmp\"\nmv -f \"$bridge_tmp\" \"$bridge_path\"\nmv -f \"$command_tmp\" \"$command_path\"\ntrap - EXIT\n",
-            quote_shell(command_dir(&ready.command_path)),
-            quote_shell(command_dir(&ready.bridge_path)),
-            quote_shell(&ready.command_path),
-            quote_shell(&ready.bridge_path),
-            quote_shell(MANAGED_MARKER),
-            quote_shell(BRIDGE_MARKER),
-            bridge,
-            launcher
-        )
-    }
-
-    fn remove_script(ready: &ReadyState) -> String {
-        format!(
-            "set -euo pipefail\nfor entry in {} {}; do\n  if [ -L \"$entry\" ] || {{ [ -e \"$entry\" ] && ! grep -Fq 'Pebble managed WSL' \"$entry\"; }}; then exit 23; fi\ndone\nrm -f {} {}\n",
-            quote_shell(&ready.command_path),
-            quote_shell(&ready.bridge_path),
-            quote_shell(&ready.command_path),
-            quote_shell(&ready.bridge_path)
-        )
     }
 
     enum FileState {
@@ -359,10 +377,6 @@ mod windows {
     fn normalize(value: &str) -> String {
         format!("{}\n", value.trim_end())
     }
-
-    fn command_dir(path: &str) -> &str {
-        path.rsplit_once('/').map(|(dir, _)| dir).unwrap_or("/")
-    }
 }
 
 #[cfg(test)]
@@ -376,7 +390,8 @@ mod tests {
             "/home/test/.local/share/pebble/pebble-wsl-bridge.ps1",
         );
         assert!(launcher.contains(MANAGED_MARKER));
-        assert_eq!(COMMAND_NAME, "pebble-ide");
+        assert_eq!(COMMAND_NAME, "pebble");
+        assert_eq!(LEGACY_COMMAND_NAME, "pebble-ide");
         assert!(launcher.contains("PEBBLE_WIN_LAUNCHER_B64="));
         assert!(launcher.contains("wslpath -w"));
         assert!(launcher.contains("\"$@\""));
@@ -386,5 +401,28 @@ mod tests {
     #[test]
     fn shell_quote_handles_single_quotes() {
         assert_eq!(quote_shell("a'b"), "'a'\"'\"'b'");
+    }
+
+    #[test]
+    fn scripts_install_canonical_command_and_clean_only_managed_legacy_launcher() {
+        let ready = ReadyState {
+            distro: "Ubuntu".to_string(),
+            command_path: "/home/test/.local/bin/pebble".to_string(),
+            legacy_command_path: "/home/test/.local/bin/pebble-ide".to_string(),
+            bridge_path: "/home/test/.local/share/pebble/pebble-wsl-bridge.ps1".to_string(),
+            launcher_path: r"C:\Program Files\Pebble\pebble.exe".to_string(),
+            path_configured: true,
+        };
+
+        let install = install_script(&ready);
+        let remove = remove_script(&ready);
+        assert_eq!(ready.distro, "Ubuntu");
+        assert!(ready.path_configured);
+        assert!(install.contains("command_path='/home/test/.local/bin/pebble'"));
+        assert!(install.contains("legacy_command_path='/home/test/.local/bin/pebble-ide'"));
+        assert!(install.contains("[ ! -L \"$legacy_command_path\" ]"));
+        assert!(remove.contains("[ ! -L \"$legacy_command_path\" ]"));
+        assert!(install.contains(MANAGED_MARKER));
+        assert!(remove.contains(MANAGED_MARKER));
     }
 }

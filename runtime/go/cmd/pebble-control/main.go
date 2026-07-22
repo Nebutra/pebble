@@ -12,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/nebutra/pebble/runtime/go/internal/runtimeauth"
 )
 
 func main() {
@@ -23,11 +25,34 @@ func main() {
 		usage()
 		os.Exit(2)
 	}
-	client := controlClient{endpoint: strings.TrimRight(*endpoint, "/"), token: strings.TrimSpace(*token), http: http.DefaultClient}
+	endpointExplicit := false
+	flag.Visit(func(candidate *flag.Flag) {
+		endpointExplicit = endpointExplicit || candidate.Name == "endpoint"
+	})
+	resolvedEndpoint, resolvedToken := resolveRuntimeAuth(
+		*endpoint,
+		*token,
+		endpointExplicit,
+		args[0] == "serve",
+	)
+	client := controlClient{endpoint: resolvedEndpoint, token: resolvedToken, http: http.DefaultClient}
 	if err := run(client, args); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func resolveRuntimeAuth(endpoint, token string, endpointExplicit, serving bool) (string, string) {
+	endpoint = strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	token = strings.TrimSpace(token)
+	if serving || token != "" {
+		return endpoint, token
+	}
+	credential, err := runtimeauth.Discover(runtimeauth.DefaultDataDir())
+	if err != nil || (endpointExplicit && endpoint != credential.Endpoint) {
+		return endpoint, token
+	}
+	return credential.Endpoint, credential.Token
 }
 
 type controlClient struct {
@@ -40,6 +65,8 @@ func run(client controlClient, args []string) error {
 	switch args[0] {
 	case "status":
 		return client.printJSON(http.MethodGet, "/v1/status", nil)
+	case "serve":
+		return runServe(args[1:], client.token, os.Stdout, os.Stderr)
 	case "events":
 		return runEvents(client, args[1:])
 	case "project":
@@ -57,6 +84,8 @@ func run(client controlClient, args []string) error {
 	case "dispatch":
 		return runDispatch(client, args[1:])
 	case "automation":
+		return runAutomation(client, args[1:])
+	case "automations":
 		return runAutomation(client, args[1:])
 	case "external-task":
 		return runExternalTask(client, args[1:])
@@ -1784,5 +1813,5 @@ func isEscapableCommandRune(char rune) bool {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: pebble-control [--endpoint URL] <status|events|project|worktree|session|agent|task|message|dispatch|automation|external-task|file|release|settings|source-control|browser|computer|emulator|mobile-relay|git|provider|subsystem> ...")
+	fmt.Fprintln(os.Stderr, "usage: pebble-control [--endpoint URL] <status|serve|events|project|worktree|session|agent|task|message|dispatch|automation|external-task|file|release|settings|source-control|browser|computer|emulator|mobile-relay|git|provider|subsystem> ...")
 }

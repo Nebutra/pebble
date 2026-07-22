@@ -14,9 +14,8 @@ import (
 const probeTimeout = 5 * time.Second
 
 // TerminalCapabilities is the JSON shape the desktop shell consumes. Field names
-// mirror RemoteWindowsTerminalCapabilities in
-// migration/electron-reference/src/main/ipc/preflight-remote-windows-terminal-capabilities.ts so the renderer
-// contract is identical across the Electron and Tauri hosts.
+// mirror the renderer's RemoteWindowsTerminalCapabilities contract so local
+// and remote hosts expose identical capability data.
 type TerminalCapabilities struct {
 	WSLAvailable     bool     `json:"wslAvailable"`
 	WSLDistros       []string `json:"wslDistros"`
@@ -70,7 +69,7 @@ func (p *Prober) Detect() TerminalCapabilities {
 	return caps
 }
 
-// isWslAvailable mirrors isWslAvailable in migration/electron-reference/src/main/wsl.ts: `wsl.exe --status`
+// isWslAvailable treats `wsl.exe --status` exiting cleanly as functional WSL.
 // exiting cleanly means WSL is functional.
 func (p *Prober) isWslAvailable() bool {
 	if p.GOOS != "windows" {
@@ -82,8 +81,7 @@ func (p *Prober) isWslAvailable() bool {
 	return ok
 }
 
-// isPwshAvailable mirrors isPwshAvailable in migration/electron-reference/src/main/pwsh.ts: `pwsh.exe
-// -Version` exiting cleanly means PowerShell 7 is installed.
+// isPwshAvailable treats `pwsh.exe -Version` exiting cleanly as installed PowerShell 7.
 func (p *Prober) isPwshAvailable() bool {
 	if p.GOOS != "windows" {
 		return false
@@ -94,8 +92,8 @@ func (p *Prober) isPwshAvailable() bool {
 	return ok
 }
 
-// listWslDistros mirrors listWslDistros in migration/electron-reference/src/main/wsl.ts: `wsl.exe --list
-// --quiet`, NUL-stripped, default-marker-stripped, docker-desktop filtered.
+// listWslDistros runs `wsl.exe --list --quiet`, strips NUL/default markers,
+// and filters docker-desktop distributions.
 func (p *Prober) listWslDistros() []string {
 	if p.GOOS != "windows" {
 		return []string{}
@@ -109,8 +107,7 @@ func (p *Prober) listWslDistros() []string {
 	return parseWslDistros(stdout)
 }
 
-// parseWslDistros normalizes `wsl.exe --list --quiet` output the way
-// normalizeWslListOutput + isUserWslDistro do in migration/electron-reference/src/main/wsl.ts.
+// parseWslDistros normalizes `wsl.exe --list --quiet` output for user distributions.
 func parseWslDistros(output string) []string {
 	cleaned := strings.ReplaceAll(output, "\x00", "")
 	distros := []string{}

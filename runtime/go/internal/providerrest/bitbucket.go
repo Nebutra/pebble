@@ -13,8 +13,7 @@ import (
 
 const defaultBitbucketAPIBaseURL = "https://api.bitbucket.org/2.0"
 
-// BitbucketConfig mirrors the auth config in migration/electron-reference/src/main/bitbucket/client.ts:
-// Bearer access token first, then Basic email:api-token.
+// BitbucketConfig prefers a Bearer access token, then Basic email:api-token.
 type BitbucketConfig struct {
 	APIBaseURL  string
 	AccessToken string
@@ -56,8 +55,7 @@ type bitbucketRepoRef struct {
 
 var bitbucketSCPLikePattern = regexp.MustCompile(`(?i)^(?:[^@]+@)?bitbucket\.org:(\S+?)(?:\.git)?$`)
 
-// parseBitbucketRepoRef mirrors parseBitbucketRepoRef in
-// migration/electron-reference/src/main/bitbucket/repository-ref.ts: scp-like and URL remotes on
+// parseBitbucketRepoRef accepts scp-like and URL remotes on
 // bitbucket.org only.
 func parseBitbucketRepoRef(remoteURL string) *bitbucketRepoRef {
 	trimmed := strings.TrimSpace(remoteURL)
@@ -222,8 +220,7 @@ func mapBitbucketPR(raw *bitbucketPRRaw) ReviewWorkItem {
 	}
 }
 
-// mapBitbucketPRState mirrors mapBitbucketPullRequestState in
-// migration/electron-reference/src/main/bitbucket/pull-request-mappers.ts.
+// mapBitbucketPRState normalizes provider state for the shared review contract.
 func mapBitbucketPRState(state *string) string {
 	if state == nil {
 		return "open"

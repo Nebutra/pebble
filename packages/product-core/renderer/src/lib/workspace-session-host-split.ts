@@ -4,8 +4,8 @@ import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../../../shared/e
 /**
  * Split / merge the unified WorkspaceSessionState across per-host partitions.
  *
- * Persistence stores one session slice per execution host (see
- * migration/electron-reference/src/main/persistence.ts host-keyed getWorkspaceSession/setWorkspaceSession).
+ * Persistence stores one session slice per execution host through the
+ * host-keyed workspace-session contract.
  * The renderer holds a single unified session, so before writing it must
  * partition each worktree-scoped slice to its owning host, and on hydration it
  * must merge the per-host slices back into one.

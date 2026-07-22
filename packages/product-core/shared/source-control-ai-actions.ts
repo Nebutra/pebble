@@ -136,7 +136,7 @@ export const SOURCE_CONTROL_ACTION_VARIABLE_INFO: Record<string, SourceControlAc
     changedFiles: {
       description: 'A summary of files changed between the branch and the base branch.',
       example:
-        'src/shared/source-control-ai-actions.ts | 24 +++++\nmigration/electron-reference/src/main/text-generation.ts | 8 +-'
+        'packages/product-core/shared/source-control-ai-actions.ts | 24 +++++\nruntime/go/internal/providercli/review_creation.go | 8 +'
     },
     patch: {
       description: 'The branch diff against the base branch used for PR-details generation.',

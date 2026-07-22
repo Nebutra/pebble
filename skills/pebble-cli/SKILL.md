@@ -15,7 +15,7 @@ description: >-
 
 # Pebble CLI
 
-Use `pebble` when Pebble's running editor/runtime is the source of truth. On Linux, use `pebble-ide` wherever this file says `pebble`.
+Use `pebble` when Pebble's running editor/runtime is the source of truth.
 
 **Dev builds (`pnpm dev`):** after `pnpm build:cli`, the dev CLI is exposed as `pebble-dev` (the global shim points at this checkout's wrapper + out/cli). Inside a dev Pebble's terminals use `pebble-dev emulator ...` (or `./config/scripts/pebble-dev.mjs emulator ...` for worktree-local invocation that does not depend on the /usr/local/bin symlink). Plain `pebble` targets any installed production Pebble. The app's own agent preambles use `pebble-dev` automatically in dev mode.
 
@@ -24,7 +24,7 @@ Use plain shell tools when Pebble state does not matter.
 ## Start Here
 
 ```bash
-command -v pebble || command -v pebble-ide
+command -v pebble
 pebble status --json
 pebble worktree ps --json
 pebble terminal list --json

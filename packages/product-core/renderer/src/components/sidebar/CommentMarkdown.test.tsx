@@ -189,7 +189,7 @@ describe('CommentMarkdown', () => {
       <CommentMarkdown
         variant="document"
         content={[
-          '`migration/electron-reference/src/main/hooks.ts:289 getEffectiveHookScript with policy=shared-only returns yamlScript?.trim() only; localScript is ignored`',
+          '`runtime/go/internal/runtimecore/worktree_archive_hook.go:29 shared-only policy ignores local scripts`',
           '',
           '```',
           'const veryLongLine = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";',

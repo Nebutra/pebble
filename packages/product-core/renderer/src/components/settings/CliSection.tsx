@@ -57,16 +57,12 @@ function getInstallDescription(platform: string): string {
     return 'Register `pebble` in /usr/local/bin.'
   }
   if (platform === 'linux') {
-    return 'Register `pebble-ide` in ~/.local/bin.'
+    return 'Register `pebble` in ~/.local/bin.'
   }
   if (platform === 'win32') {
     return 'Register `pebble` in your user PATH.'
   }
   return 'CLI registration is not yet available on this platform.'
-}
-
-function getFallbackCommandName(platform: string): string {
-  return platform === 'linux' ? 'pebble-ide' : 'pebble'
 }
 
 export function CliSection({
@@ -159,7 +155,7 @@ export function CliSection({
   const isSupported = status?.supported ?? false
   const isBrowserManaged = status?.unsupportedReason === 'launch_mode_unavailable'
   const revealLabel = getRevealLabel(currentPlatform)
-  const commandName = status?.commandName ?? getFallbackCommandName(currentPlatform)
+  const commandName = status?.commandName ?? 'pebble'
   const canRevealCommandPath =
     status?.commandPath != null && ['installed', 'stale', 'conflict'].includes(status.state)
 

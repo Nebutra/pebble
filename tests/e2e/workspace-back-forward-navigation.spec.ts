@@ -11,7 +11,7 @@
  */
 
 import { test, expect } from './helpers/pebble-app'
-import type { Page } from '@nebutra/playwright-test'
+import type { Page } from '@playwright/test'
 import {
   waitForSessionReady,
   waitForActiveWorktree,
@@ -227,7 +227,7 @@ test.describe('Workspace Back/Forward Navigation', () => {
     // Why: focus body so the window-level keydown capture handler runs without
     // an `isEditableTarget` bail-out. The xterm helper textarea is explicitly
     // treated as non-editable, but body is the simplest stable target in a
-    // hidden-window Electron run.
+    // automated browser run.
     await pebblePage.evaluate(() => document.body.focus())
 
     await pebblePage.keyboard.press(`${mod}+Alt+ArrowLeft`)

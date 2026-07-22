@@ -7,7 +7,7 @@
  * pipeline, so a controlled-input value reset mid-composition cancels the
  * composition exactly like a real OS IME session.
  */
-import type { CDPSession, Locator, Page } from '@nebutra/playwright-test'
+import type { CDPSession, Locator, Page } from '@playwright/test'
 import { test, expect } from './helpers/pebble-app'
 import { getStoreState, waitForSessionReady } from './helpers/store'
 import type { Repo } from '../../packages/product-core/shared/types'

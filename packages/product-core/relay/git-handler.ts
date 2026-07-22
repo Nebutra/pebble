@@ -921,7 +921,7 @@ export class GitHandler {
   private async push(params: Record<string, unknown>) {
     this.gitDiffReadDedupe.clear()
     const worktreePath = params.worktreePath as string
-    // Why: mirror migration/electron-reference/src/main/git/remote.ts. Push to a configured upstream when
+    // Why: mirror local git-remote behavior. Push to a configured upstream when
     // present so SSH worktrees with non-origin targets do not get repointed.
     void params.publish
     try {
