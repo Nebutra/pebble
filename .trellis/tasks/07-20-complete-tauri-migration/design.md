@@ -58,6 +58,12 @@ uses the repository-owned hardened-runtime entitlements. Release preflight owns
 credential completeness; artifact inspection owns Developer ID identity,
 strict nested signatures, updater signatures, and stapled notarization tickets.
 
+The preferred notarization mode is an App Store Connect team API key. GitHub
+stores the key ID, issuer UUID, and `.p8` contents as separate secrets; a
+macOS-only step writes the key to `$RUNNER_TEMP` with restrictive permissions
+and exports `APPLE_API_KEY_PATH`. Apple ID plus app-specific password remains a
+fallback, but partial or mixed credential sets fail preflight.
+
 ## Compatibility
 
 - Cross-platform behavior stays behind runtime/platform checks.

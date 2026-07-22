@@ -49,6 +49,8 @@ external developer tool, not Pebble product code.
 - Complete the Tauri-owned macOS Developer ID signing and notarization path,
   including nested executable resources, hardened-runtime entitlements, and
   stapled-ticket verification before release publication.
+- Support App Store Connect team API-key notarization without writing the `.p8`
+  key into the repository or relying exclusively on an Apple ID app password.
 - Complete Tauri updater signing configuration without committing or rotating
   private key material. Release CI must fail before packaging when the updater
   public key, private key, or private-key password is missing or placeholder.
@@ -77,7 +79,10 @@ external developer tool, not Pebble product code.
 - [ ] macOS release builds carry the repository-owned entitlements, include the
   signed computer-use helper, use Developer ID signing, notarize the app and
   DMG, and reject missing or unstapled notarization evidence.
-- [ ] Tauri updater artifacts are generated and cryptographically verified
+- [x] Release CI materializes the App Store Connect `.p8` key only on the macOS
+  runner, validates key ID/issuer/path as one credential set, and keeps the
+  Apple ID/app-password mode as an explicit fallback.
+- [x] Tauri updater artifacts are generated and cryptographically verified
   against the configured public key; signing secrets remain Actions-only and
   are validated before the build starts.
 

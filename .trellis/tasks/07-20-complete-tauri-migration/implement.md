@@ -92,6 +92,12 @@
   entitlements, updater artifacts, and stapled app/DMG notarization.
 - [x] Document the exact repository/organization secret names and the rule that
   updater key rotation requires an explicit migration plan.
+- [x] Materialize `APPLE_API_KEY_P8` into a macOS runner temporary file and map
+  `APPLE_API_KEY`, `APPLE_API_ISSUER`, and `APPLE_API_KEY_PATH` to Tauri.
+- [x] Validate a complete API-key notarization set or a complete Apple ID
+  fallback set, rejecting partial/mixed credentials without printing values.
+- [x] Extend workflow, preflight, documentation, and mainline tests for both
+  notarization credential modes.
 
 ## Validation Gates
 
@@ -105,6 +111,8 @@
 - [ ] Tauri production build and release contract tests
 - [x] macOS entitlements, release preflight, release workflow, artifact
   inspection, and updater manifest contract tests
+- [x] App Store Connect API-key materialization and notarization-mode tests
+- [x] Real App Store Connect API credentials authenticated with `notarytool`
 - [ ] `pnpm verify:tauri-mainline` and repository layout verification
 - [ ] Repository-wide executable-reference scan returns no Electron legacy owner
 - [ ] `git diff --check`

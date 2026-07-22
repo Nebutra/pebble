@@ -27,12 +27,16 @@
 
 ## External State
 
-- Repository-level Actions secrets and variables are currently empty.
-- Organization-level secrets may be inherited, but the current GitHub identity
-  cannot enumerate them. Code must therefore fail fast and name every missing
-  credential without printing secret values.
-- The local machine currently has no Developer ID identity or relevant release
-  environment variables. A real notarized build cannot be performed locally.
+- The Developer ID certificate matches its CSR and resolves to the valid local
+  identity `Developer ID Application: ZiXian Tang (2L5YC85FQ7)`.
+- Repository Actions secrets now contain the encrypted Developer ID P12,
+  certificate password, Team ID, App Store Connect key ID and `.p8` contents,
+  issuer UUID, plus the first Tauri updater private/public key set.
+- The team API key ID `LTM7747UGT` and issuer UUID authenticated successfully
+  with `notarytool history`, confirming the credentials can reach Apple's
+  notarization service without submitting a new artifact.
+- Generated certificate/updater recovery values are stored in the login
+  Keychain and were not written to the repository.
 
 ## Trust Constraint
 
