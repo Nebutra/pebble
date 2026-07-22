@@ -6,7 +6,6 @@
   "build": {
     "beforeDevCommand": "node scripts/prepare-go-sidecars.mjs && npm run dev",
     "beforeBuildCommand": "node scripts/prepare-go-sidecars.mjs && npm run build",
-    "beforeBundleCommand": "node scripts/stage-macos-speech-libraries.mjs",
     "devUrl": "http://127.0.0.1:5174",
     "frontendDist": "../dist"
   },
@@ -33,7 +32,11 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "externalBin": ["binaries/pebble-runtime", "binaries/pebble-relay-worker"],
+    "externalBin": [
+      "binaries/pebble-runtime",
+      "binaries/pebble-control",
+      "binaries/pebble-relay-worker"
+    ],
     "resources": {
       "binaries/relay-workers": "binaries/relay-workers",
       "../../../native/computer-use-linux/runtime.py": "computer-use-linux/runtime.py",
@@ -41,6 +44,7 @@
       "../../../node_modules/serve-sim/bin/serve-sim-bin": "serve-sim/serve-sim-bin"
     },
     "macOS": {
+      "entitlements": "../../../resources/build/entitlements.mac.plist",
       "hardenedRuntime": true,
       "frameworks": [
         "staged-macos-libraries/libonnxruntime.1.17.1.dylib",

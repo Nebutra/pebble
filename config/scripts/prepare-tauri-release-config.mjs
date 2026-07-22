@@ -10,7 +10,7 @@ const placeholderPublicKey =
 
 export function validateUpdaterPublicKey(value) {
   const publicKey = value?.trim() ?? ''
-  if (!publicKey || publicKey === placeholderPublicKey) {
+  if (!publicKey || publicKey === placeholderPublicKey || isPlaceholderSigningValue(publicKey)) {
     throw new Error('TAURI_UPDATER_PUBLIC_KEY must contain the production updater public key.')
   }
   if (!/^[A-Za-z0-9+/=]+$/.test(publicKey)) {
@@ -20,9 +20,50 @@ export function validateUpdaterPublicKey(value) {
 }
 
 export function validateSigningPrivateKey(value) {
-  if (!value?.trim()) {
+  if (!value?.trim() || isPlaceholderSigningValue(value)) {
     throw new Error('TAURI_SIGNING_PRIVATE_KEY must be configured for release packaging.')
   }
+}
+
+export function validateSigningPrivateKeyPassword(value) {
+  if (!value?.trim() || isPlaceholderSigningValue(value)) {
+    throw new Error('TAURI_SIGNING_PRIVATE_KEY_PASSWORD must be configured for release packaging.')
+  }
+}
+
+export function validateUpdaterSigningEnvironment(environment) {
+  const validators = [
+    ['TAURI_UPDATER_PUBLIC_KEY', validateUpdaterPublicKey],
+    ['TAURI_SIGNING_PRIVATE_KEY', validateSigningPrivateKey],
+    ['TAURI_SIGNING_PRIVATE_KEY_PASSWORD', validateSigningPrivateKeyPassword]
+  ]
+  const invalid = validators
+    .filter(([name, validate]) => {
+      try {
+        validate(environment[name])
+        return false
+      } catch {
+        return true
+      }
+    })
+    .map(([name]) => name)
+  if (invalid.length > 0) {
+    throw new Error(
+      `Missing or placeholder Tauri updater signing environment: ${invalid.join(', ')}.`
+    )
+  }
+  return { publicKey: validateUpdaterPublicKey(environment.TAURI_UPDATER_PUBLIC_KEY) }
+}
+
+function isPlaceholderSigningValue(value) {
+  return new Set([
+    'changeme',
+    'example',
+    'not-configured',
+    'placeholder',
+    'replace-me',
+    'todo'
+  ]).has(value.trim().toLowerCase())
 }
 
 export function validateReleaseVersion(value) {
@@ -85,13 +126,13 @@ export async function prepareTauriReleaseConfig({
   await writeFile(configPath, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  validateSigningPrivateKey(process.env.TAURI_SIGNING_PRIVATE_KEY)
+if (process.argv[1] === import.meta.filename) {
+  const signingEnvironment = validateUpdaterSigningEnvironment(process.env)
   const rootPackage = JSON.parse(await readFile(rootPackagePath, 'utf8'))
   await prepareTauriReleaseConfig({
     configPath: resolve(process.env.TAURI_CONFIG_PATH || defaultConfigPath),
     platform: process.env.TAURI_RELEASE_PLATFORM,
-    publicKey: process.env.TAURI_UPDATER_PUBLIC_KEY,
+    publicKey: signingEnvironment.publicKey,
     version: process.env.TAURI_RELEASE_VERSION || rootPackage.version,
     windowsCertificateThumbprint: process.env.TAURI_WINDOWS_CERTIFICATE_THUMBPRINT
   })

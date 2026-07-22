@@ -170,6 +170,7 @@ jobs:
           TAURI_RELEASE_PLATFORM: ${{ matrix.platform }}
           TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           TAURI_RELEASE_VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
         run: node config/scripts/prepare-tauri-release-config.mjs
 
@@ -180,6 +181,10 @@ jobs:
           APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
           APPLE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
+          PEBBLE_MAC_RELEASE: ${{ matrix.platform == 'macos' && '1' || '' }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: node config/scripts/verify-tauri-release-preflight.mjs ${{ matrix.platform }}
 
       - name: Build Tauri desktop bundle
@@ -197,6 +202,7 @@ jobs:
           APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
           APPLE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
+          PEBBLE_MAC_RELEASE: ${{ matrix.platform == 'macos' && '1' || '' }}
         with:
           projectPath: apps/desktop
           tauriScript: pnpm exec tauri

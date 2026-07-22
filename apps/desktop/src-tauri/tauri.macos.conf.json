@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeBundleCommand": "node scripts/prepare-macos-bundle-resources.mjs"
+  },
+  "bundle": {
+    "resources": {
+      "../../../native/computer-use-macos/.build/release/Pebble Computer Use.app": "Pebble Computer Use.app"
+    }
+  }
+}

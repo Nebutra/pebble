@@ -115,6 +115,14 @@ describe('Tauri release workflow signing gate', () => {
     expect(steps[inspectIndex].env.TAURI_UPDATER_PUBLIC_KEY).toBe(
       '${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}'
     )
+    expect(steps[preflightIndex].env).toEqual(
+      expect.objectContaining({
+        PEBBLE_MAC_RELEASE: "${{ matrix.platform == 'macos' && '1' || '' }}",
+        TAURI_SIGNING_PRIVATE_KEY: '${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}',
+        TAURI_SIGNING_PRIVATE_KEY_PASSWORD: '${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}',
+        TAURI_UPDATER_PUBLIC_KEY: '${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}'
+      })
+    )
   })
 
   it('executes renderer and native runtime gates on every release runner', () => {
@@ -173,6 +181,7 @@ describe('Tauri release workflow signing gate', () => {
       expect.objectContaining({
         PEBBLE_BUILD_IDENTITY: expect.stringContaining("'rc' || 'stable'"),
         PEBBLE_DIAGNOSTICS_TOKEN_URL: 'https://www.nebutra.com/pebble/diagnostics/token',
+        PEBBLE_MAC_RELEASE: "${{ matrix.platform == 'macos' && '1' || '' }}",
         APPLE_CERTIFICATE: "${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}",
         APPLE_CERTIFICATE_PASSWORD:
           "${{ matrix.platform == 'macos' && secrets.MAC_CERTS_PASSWORD || '' }}",
@@ -202,6 +211,9 @@ describe('Tauri release workflow signing gate', () => {
       WINDOWS_CERTIFICATE_PASSWORD: '${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}'
     })
     expect(steps[prepareIndex].env.TAURI_RELEASE_PLATFORM).toBe('${{ matrix.platform }}')
+    expect(steps[prepareIndex].env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD).toBe(
+      '${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}'
+    )
     const inspect = steps.find(
       ({ name }) => name === 'Inspect signed release artifacts and sidecars'
     )
@@ -221,11 +233,11 @@ describe('Tauri release workflow signing gate', () => {
 
   it('cryptographically verifies the updater payloads uploaded to the draft release', () => {
     const job = releaseWorkflow().jobs['verify-updater-manifest']
-    const verifyStep = job.steps.find(({ name }) => name === 'Verify published signed platform matrix')
-
-    expect(verifyStep.env.TAURI_UPDATER_PUBLIC_KEY).toBe(
-      '${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}'
+    const verifyStep = job.steps.find(
+      ({ name }) => name === 'Verify published signed platform matrix'
     )
+
+    expect(verifyStep.env.TAURI_UPDATER_PUBLIC_KEY).toBe('${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}')
     expect(verifyStep.run).toContain('verify-tauri-updater-manifest.mjs')
   })
 })

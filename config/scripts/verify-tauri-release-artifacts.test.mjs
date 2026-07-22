@@ -8,7 +8,6 @@ import {
   macosDyldProbeCommand,
   resolveReleaseRoot,
   runArtifactCommand,
-  validateMacosCodeSignatureMetadata,
   verifyBinaryArchitecture,
   verifyLinuxGlibcSymbolCeiling,
   verifyTauriReleaseArtifacts as inspectTauriReleaseArtifacts
@@ -121,10 +120,7 @@ function createBundledRelayWorkerMatrix(appContentsPath) {
     join(appContentsPath, 'Resources/computer-use-windows/runtime.ps1'),
     Buffer.from('# native Windows provider')
   )
-  writeBinary(
-    join(appContentsPath, 'Resources/serve-sim/serve-sim-bin'),
-    universalMachBinary()
-  )
+  writeBinary(join(appContentsPath, 'Resources/serve-sim/serve-sim-bin'), universalMachBinary())
   writeBinary(
     join(
       appContentsPath,
@@ -136,7 +132,7 @@ function createBundledRelayWorkerMatrix(appContentsPath) {
 
 function createPreparedSidecars(desktopDir, targetTriple, bytes) {
   const extension = targetTriple.includes('windows') ? '.exe' : ''
-  for (const name of ['pebble-runtime', 'pebble-relay-worker']) {
+  for (const name of ['pebble-runtime', 'pebble-control', 'pebble-relay-worker']) {
     writeBinary(
       join(desktopDir, 'src-tauri/binaries', `${name}-${targetTriple}${extension}`),
       bytes
@@ -188,33 +184,6 @@ describe.runIf(process.platform !== 'win32')('macOS dyld launch probe', () => {
   })
 })
 
-describe('macOS code signature metadata', () => {
-  const developerIdMetadata = [
-    'Authority=Developer ID Application: Pebble Test (TESTTEAM)',
-    'TeamIdentifier=TESTTEAM',
-    'flags=0x10000(runtime)'
-  ].join('\n')
-
-  it('requires Developer ID, the expected team, and hardened runtime', () => {
-    expect(() => validateMacosCodeSignatureMetadata(developerIdMetadata, 'TESTTEAM')).not.toThrow()
-    expect(() =>
-      validateMacosCodeSignatureMetadata(
-        developerIdMetadata.replace('Developer ID', 'Apple'),
-        'TESTTEAM'
-      )
-    ).toThrow(/Developer ID/)
-    expect(() => validateMacosCodeSignatureMetadata(developerIdMetadata, 'OTHERTEAM')).toThrow(
-      /team identifier/
-    )
-    expect(() =>
-      validateMacosCodeSignatureMetadata(
-        developerIdMetadata.replace('(runtime)', '(none)'),
-        'TESTTEAM'
-      )
-    ).toThrow(/hardened runtime/)
-  })
-})
-
 describe('Tauri release artifact inspection', () => {
   it('rejects Linux binaries linked against a newer glibc than the support floor', () => {
     expect(() =>
@@ -247,11 +216,11 @@ describe('Tauri release artifact inspection', () => {
     const bytes = elfBinary(0x3e)
     createPreparedSidecars(desktopDir, targetTriple, bytes)
     writeBinary(join(releaseDir, 'pebble-desktop-tauri'), bytes)
-    for (const name of ['pebble-runtime', 'pebble-relay-worker']) {
+    for (const name of ['pebble-runtime', 'pebble-control', 'pebble-relay-worker']) {
       writeBinary(join(releaseDir, name), bytes)
     }
     writeBinary(join(releaseDir, 'bundle/deb/Pebble.deb'), Buffer.from('deb-placeholder'))
-    const commandRunner = vi.fn((command, args, options) => {
+    const commandRunner = vi.fn((command, args, _options) => {
       if (command === 'dpkg-deb' && args[0] === '--extract') {
         createBundledRelayWorkerMatrix(args[2])
       }
@@ -275,7 +244,7 @@ describe('Tauri release artifact inspection', () => {
     expect(result).toEqual(
       expect.objectContaining({ platform: 'linux', schemaVersion: 1, targetTriple })
     )
-    expect(result.artifacts).toHaveLength(12)
+    expect(result.artifacts).toHaveLength(14)
     expect(result.artifacts.map((artifact) => artifact.role).sort()).toEqual([
       'installer',
       'main-executable',
@@ -287,6 +256,8 @@ describe('Tauri release artifact inspection', () => {
       'prepared-relay-worker',
       'prepared-sidecar',
       'prepared-sidecar',
+      'prepared-sidecar',
+      'staged-sidecar',
       'staged-sidecar',
       'staged-sidecar'
     ])
@@ -311,14 +282,19 @@ describe('Tauri release artifact inspection', () => {
     const releaseDir = join(targetDir, 'release')
     const bytes = elfBinary(0x3e)
     createPreparedSidecars(desktopDir, targetTriple, bytes)
-    for (const name of ['pebble-desktop-tauri', 'pebble-runtime', 'pebble-relay-worker']) {
+    for (const name of [
+      'pebble-desktop-tauri',
+      'pebble-runtime',
+      'pebble-control',
+      'pebble-relay-worker'
+    ]) {
       writeBinary(join(releaseDir, name), bytes)
     }
     writeBinary(join(releaseDir, 'bundle/deb/Pebble.deb'), Buffer.from('deb-placeholder'))
 
     expect(() =>
       verifyTauriReleaseArtifacts({
-        commandRunner: (command, args, options) => {
+        commandRunner: (command, args, _options) => {
           if (command === 'dpkg-deb' && args[0] === '--extract') {
             createBundledRelayWorkerMatrix(args[2])
             rmSync(join(args[2], 'Resources/computer-use-windows/runtime.ps1'))
@@ -347,7 +323,7 @@ describe('Tauri release artifact inspection', () => {
     const bytes = universalMachBinary()
     createPreparedSidecars(desktopDir, targetTriple, bytes)
     writeBinary(join(appPath, 'pebble-desktop-tauri'), bytes)
-    for (const name of ['pebble-runtime', 'pebble-relay-worker']) {
+    for (const name of ['pebble-runtime', 'pebble-control', 'pebble-relay-worker']) {
       writeBinary(join(appPath, name), bytes)
     }
     for (const name of ['libonnxruntime.1.17.1.dylib', 'libsherpa-onnx-c-api.dylib']) {
@@ -360,6 +336,24 @@ describe('Tauri release artifact inspection', () => {
     )
     createUpdaterArtifact(join(targetDir, targetTriple, 'release'))
     const commandRunner = vi.fn((command, args) => {
+      if (command === 'codesign' && args.includes('--entitlements')) {
+        return {
+          stderr: [
+            '<plist><dict>',
+            '<key>com.apple.security.automation.apple-events</key><true/>',
+            '<key>com.apple.security.device.audio-input</key><true/>',
+            '<key>com.apple.security.device.bluetooth</key><true/>',
+            '<key>com.apple.security.device.camera</key><true/>',
+            '<key>com.apple.security.device.usb</key><true/>',
+            '<key>com.apple.security.personal-information.location</key><true/>',
+            '<key>com.apple.security.cs.allow-dyld-environment-variables</key><true/>',
+            '<key>com.apple.security.cs.allow-jit</key><true/>',
+            '<key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>',
+            '</dict></plist>'
+          ].join(''),
+          stdout: ''
+        }
+      }
       if (command === 'codesign' && args.includes('--display')) {
         return {
           stderr: [
@@ -382,7 +376,7 @@ describe('Tauri release artifact inspection', () => {
       targetTriple
     })
 
-    expect(commandRunner).toHaveBeenCalledTimes(21)
+    expect(commandRunner).toHaveBeenCalledTimes(26)
     expect(commandRunner).toHaveBeenCalledWith(
       'codesign',
       expect.arrayContaining(['--verify', '--strict', '--deep'])
@@ -398,7 +392,7 @@ describe('Tauri release artifact inspection', () => {
       join(appPath, 'pebble-desktop-tauri'),
       '3'
     ])
-    expect(result.artifacts).toHaveLength(26)
+    expect(result.artifacts).toHaveLength(28)
     expect(
       result.artifacts.filter((artifact) => artifact.role === 'bundled-relay-worker')
     ).toHaveLength(6)
@@ -414,12 +408,16 @@ describe('Tauri release artifact inspection', () => {
     expect(
       result.artifacts.filter((artifact) => artifact.role === 'bundled-computer-use-helper')
     ).toHaveLength(1)
+    expect(
+      result.artifacts.find((artifact) => artifact.role === 'bundled-computer-use-helper').checks
+    ).toContain('entitlements')
     expect(result.artifacts.find((artifact) => artifact.role === 'main-executable').checks).toEqual(
       [
         'architecture',
         'codesign-developer-id',
         'codesign-strict',
         'dyld-launch',
+        'entitlements',
         'hardened-runtime',
         'notarization-stapled'
       ]
@@ -433,7 +431,12 @@ describe('Tauri release artifact inspection', () => {
     const releaseDir = join(targetDir, 'release')
     const bytes = peBinary(0x8664)
     createPreparedSidecars(desktopDir, targetTriple, bytes)
-    for (const name of ['pebble-desktop-tauri', 'pebble-runtime', 'pebble-relay-worker']) {
+    for (const name of [
+      'pebble-desktop-tauri',
+      'pebble-runtime',
+      'pebble-control',
+      'pebble-relay-worker'
+    ]) {
       writeBinary(join(releaseDir, `${name}.exe`), bytes)
     }
     writeBinary(join(releaseDir, 'bundle/nsis/Pebble-setup.exe'), bytes)
@@ -459,7 +462,7 @@ describe('Tauri release artifact inspection', () => {
       windowsSignatureVerifier
     })
 
-    expect(windowsSignatureVerifier).toHaveBeenCalledTimes(5)
+    expect(windowsSignatureVerifier).toHaveBeenCalledTimes(6)
     expect(commandRunner).toHaveBeenCalledWith(
       'msiexec',
       expect.arrayContaining(['/a', join(releaseDir, 'bundle/msi/Pebble.msi'), '/qn'])
@@ -485,7 +488,12 @@ describe('Tauri release artifact inspection', () => {
     const releaseDir = join(targetDir, 'release')
     const bytes = peBinary(0x8664)
     createPreparedSidecars(desktopDir, targetTriple, bytes)
-    for (const name of ['pebble-desktop-tauri', 'pebble-runtime', 'pebble-relay-worker']) {
+    for (const name of [
+      'pebble-desktop-tauri',
+      'pebble-runtime',
+      'pebble-control',
+      'pebble-relay-worker'
+    ]) {
       writeBinary(join(releaseDir, `${name}.exe`), bytes)
     }
     writeBinary(join(releaseDir, 'bundle/nsis/Pebble-setup.exe'), bytes)
@@ -512,7 +520,12 @@ describe('Tauri release artifact inspection', () => {
     const releaseDir = join(targetDir, 'release')
     const bytes = peBinary(0x8664)
     createPreparedSidecars(desktopDir, targetTriple, bytes)
-    for (const name of ['pebble-desktop-tauri', 'pebble-runtime', 'pebble-relay-worker']) {
+    for (const name of [
+      'pebble-desktop-tauri',
+      'pebble-runtime',
+      'pebble-control',
+      'pebble-relay-worker'
+    ]) {
       writeBinary(join(releaseDir, `${name}.exe`), bytes)
     }
     writeBinary(join(releaseDir, 'bundle/nsis/Pebble-setup.exe'), bytes)
@@ -536,7 +549,12 @@ describe('Tauri release artifact inspection', () => {
     const releaseDir = join(targetDir, 'release')
     const bytes = peBinary(0x8664)
     createPreparedSidecars(desktopDir, targetTriple, bytes)
-    for (const name of ['pebble-desktop-tauri', 'pebble-runtime', 'pebble-relay-worker']) {
+    for (const name of [
+      'pebble-desktop-tauri',
+      'pebble-runtime',
+      'pebble-control',
+      'pebble-relay-worker'
+    ]) {
       writeBinary(join(releaseDir, `${name}.exe`), bytes)
     }
     writeBinary(join(releaseDir, 'bundle/nsis/Pebble-setup.exe'), bytes)
@@ -569,7 +587,12 @@ describe('Tauri release artifact inspection', () => {
     const releaseDir = join(targetDir, 'release')
     const bytes = peBinary(0x8664)
     createPreparedSidecars(desktopDir, targetTriple, bytes)
-    for (const name of ['pebble-desktop-tauri', 'pebble-runtime', 'pebble-relay-worker']) {
+    for (const name of [
+      'pebble-desktop-tauri',
+      'pebble-runtime',
+      'pebble-control',
+      'pebble-relay-worker'
+    ]) {
       writeBinary(join(releaseDir, `${name}.exe`), bytes)
     }
     writeBinary(join(releaseDir, 'bundle/nsis/Pebble-setup.exe'), bytes)

@@ -3,8 +3,10 @@ import test from 'node:test'
 
 import {
   applyReleaseUpdaterConfig,
+  validateSigningPrivateKeyPassword,
   validateSigningPrivateKey,
   validateReleaseVersion,
+  validateUpdaterSigningEnvironment,
   validateUpdaterPublicKey
 } from './prepare-tauri-release-config.mjs'
 
@@ -37,7 +39,12 @@ test('release updater config rejects the checked-in placeholder key', () => {
 
 test('release updater config requires updater endpoints', () => {
   assert.throws(
-    () => applyReleaseUpdaterConfig({ bundle: {}, plugins: { updater: {} } }, productionPublicKey, '1.4.128'),
+    () =>
+      applyReleaseUpdaterConfig(
+        { bundle: {}, plugins: { updater: {} } },
+        productionPublicKey,
+        '1.4.128'
+      ),
     /endpoints must be configured/
   )
 })
@@ -49,7 +56,33 @@ test('release version accepts tags but rejects placeholder package versions', ()
 
 test('release updater config requires a signing private key without persisting it', () => {
   assert.throws(() => validateSigningPrivateKey(''), /must be configured/)
+  assert.throws(() => validateSigningPrivateKey('placeholder'), /must be configured/)
   assert.equal(validateSigningPrivateKey('private-key-material'), undefined)
+})
+
+test('release updater config requires a non-placeholder private-key password', () => {
+  assert.throws(() => validateSigningPrivateKeyPassword(''), /must be configured/)
+  assert.throws(() => validateSigningPrivateKeyPassword('replace-me'), /must be configured/)
+  assert.equal(validateSigningPrivateKeyPassword('private-key-password'), undefined)
+})
+
+test('release updater signing validation names every missing secret without printing values', () => {
+  assert.throws(
+    () =>
+      validateUpdaterSigningEnvironment({
+        TAURI_UPDATER_PUBLIC_KEY: productionPublicKey,
+        TAURI_SIGNING_PRIVATE_KEY: 'placeholder'
+      }),
+    /TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD/
+  )
+  assert.deepEqual(
+    validateUpdaterSigningEnvironment({
+      TAURI_UPDATER_PUBLIC_KEY: productionPublicKey,
+      TAURI_SIGNING_PRIVATE_KEY: 'private-key-material',
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: 'private-key-password'
+    }),
+    { publicKey: productionPublicKey }
+  )
 })
 
 test('Windows release config derives signing metadata from the imported certificate', () => {

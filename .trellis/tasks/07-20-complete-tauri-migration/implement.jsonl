@@ -1,0 +1,3 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Release signing spans Tauri config, platform bundle preparation, GitHub Actions secrets, and artifact verification."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse the existing signing identity, entitlements, release preflight, and artifact verification owners instead of duplicating trust logic."}
+{"file":".trellis/tasks/07-20-complete-tauri-migration/research/tauri-release-signing-audit.md","reason":"Current-state audit and non-rotation constraints for macOS notarization and updater signing."}

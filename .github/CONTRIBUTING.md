@@ -72,6 +72,9 @@ If there is no visual change, say that explicitly in the PR description.
 
 Version bumps, tags, and releases are maintainer-managed. Do not include release version changes in a normal contribution unless a maintainer asks for them.
 
+Maintainers must configure the signing credentials and trust-root contract in
+[`RELEASE_SIGNING.md`](./RELEASE_SIGNING.md) before running a desktop release.
+
 ### Cutting a release (maintainers)
 
 All releases are cut from the **Cut Release** GitHub Actions workflow. There is no local `pnpm release:*` script — running releases locally is too easy to get wrong (dirty tree, wrong branch, stale main).

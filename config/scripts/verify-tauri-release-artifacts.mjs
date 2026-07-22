@@ -20,11 +20,13 @@ const repoRoot = resolve(import.meta.dirname, '../..')
 const desktopRoot = resolve(repoRoot, 'apps/desktop')
 const defaultTargetDir = resolve(desktopRoot, 'src-tauri/target')
 const tauriManifestPath = resolve(desktopRoot, 'src-tauri/Cargo.toml')
-const sidecarNames = ['pebble-relay-worker', 'pebble-runtime']
-const macosSpeechLibraryNames = [
-  'libonnxruntime.1.17.1.dylib',
-  'libsherpa-onnx-c-api.dylib'
-]
+const mainMacosEntitlementsPath = resolve(repoRoot, 'resources/build/entitlements.mac.plist')
+const computerUseMacosEntitlementsPath = resolve(
+  repoRoot,
+  'resources/build/entitlements.computer-use.mac.plist'
+)
+const sidecarNames = ['pebble-control', 'pebble-relay-worker', 'pebble-runtime']
+const macosSpeechLibraryNames = ['libonnxruntime.1.17.1.dylib', 'libsherpa-onnx-c-api.dylib']
 const computerUseScripts = [
   ['computer-use-linux', 'runtime.py'],
   ['computer-use-windows', 'runtime.ps1']
@@ -84,7 +86,9 @@ export function resolveReleaseRoot(targetDir, targetTriple, platform) {
     existsSync(preferred) &&
     statSync(preferred).isDirectory() &&
     (platform !== 'macos' || existsSync(resolve(preferred, 'bundle/macos/Pebble.app')))
-  if (preferredHasOutput) return preferred
+  if (preferredHasOutput) {
+    return preferred
+  }
   const localMacosRelease = resolve(targetDir, 'release')
   // Why: `tauri build` without `--target` uses Cargo's default target/release
   // even though artifact verification still needs the host architecture triple.
@@ -255,6 +259,21 @@ export function validateMacosCodeSignatureMetadata(output, expectedTeamId) {
   }
 }
 
+export function validateMacosEntitlements(output, requiredKeys, label) {
+  if (!/<plist\b[^>]*>[\s\S]*<dict>[\s\S]*<\/dict>[\s\S]*<\/plist>/u.test(output)) {
+    throw new Error(`${label} has no embedded entitlements plist.`)
+  }
+  for (const key of requiredKeys) {
+    if (!output.includes(`<key>${key}</key>`)) {
+      throw new Error(`${label} is missing required entitlement ${key}.`)
+    }
+  }
+}
+
+function entitlementKeys(path) {
+  return [...readFileSync(path, 'utf8').matchAll(/<key>([^<]+)<\/key>/gu)].map((match) => match[1])
+}
+
 function sha256(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex')
 }
@@ -415,6 +434,7 @@ function verifyMacosArtifacts(root, targetTriple, commandRunner, expectedAppleTe
     ),
     'bundled macOS computer-use helper'
   )
+  const computerUseHelperApp = resolve(appPath, 'Contents/Resources/Pebble Computer Use.app')
   const computerUseProviders = installedComputerUseScripts(appPath).map((path) =>
     requireFile(path, 'bundled computer-use provider script')
   )
@@ -440,11 +460,29 @@ function verifyMacosArtifacts(root, targetTriple, commandRunner, expectedAppleTe
       )
     }
   }
+  commandRunner('codesign', ['--verify', '--strict', '--deep', computerUseHelperApp])
+  const helperEntitlements = commandRunner('codesign', [
+    '--display',
+    '--entitlements',
+    ':-',
+    computerUseHelperApp
+  ])
+  validateMacosEntitlements(
+    `${helperEntitlements.stdout ?? ''}\n${helperEntitlements.stderr ?? ''}`,
+    entitlementKeys(computerUseMacosEntitlementsPath),
+    'macOS computer-use helper'
+  )
   commandRunner('codesign', ['--verify', '--strict', '--deep', appPath])
   const appMetadata = commandRunner('codesign', ['--display', '--verbose=4', appPath])
   validateMacosCodeSignatureMetadata(
     `${appMetadata.stdout ?? ''}\n${appMetadata.stderr ?? ''}`,
     expectedAppleTeamId
+  )
+  const appEntitlements = commandRunner('codesign', ['--display', '--entitlements', ':-', appPath])
+  validateMacosEntitlements(
+    `${appEntitlements.stdout ?? ''}\n${appEntitlements.stderr ?? ''}`,
+    entitlementKeys(mainMacosEntitlementsPath),
+    'macOS app bundle'
   )
   // Why: a valid Developer ID signature alone does not prove notarization was stapled.
   commandRunner('xcrun', ['stapler', 'validate', appPath])
@@ -472,6 +510,7 @@ function verifyMacosArtifacts(root, targetTriple, commandRunner, expectedAppleTe
       'codesign-developer-id',
       'codesign-strict',
       'dyld-launch',
+      'entitlements',
       'hardened-runtime',
       'notarization-stapled'
     ]),
@@ -517,6 +556,7 @@ function verifyMacosArtifacts(root, targetTriple, commandRunner, expectedAppleTe
       'architecture',
       'codesign-developer-id',
       'codesign-strict',
+      'entitlements',
       'hardened-runtime'
     ])
   ]
@@ -547,12 +587,11 @@ function verifyWindowsArtifacts(root, targetTriple, signatureVerifier, commandRu
   for (const path of [mainExecutable, ...sidecars]) {
     verifyBinaryArchitecture(path, targetTriple)
   }
-  verifyExtractedPackageResources(
-    (extractionRoot) =>
-      commandRunner('msiexec', ['/a', msiInstaller, '/qn', `TARGETDIR=${extractionRoot}`])
+  verifyExtractedPackageResources((extractionRoot) =>
+    commandRunner('msiexec', ['/a', msiInstaller, '/qn', `TARGETDIR=${extractionRoot}`])
   )
-  verifyExtractedPackageResources(
-    (extractionRoot) => commandRunner(nsisInstaller, ['/S', `/D=${extractionRoot}`])
+  verifyExtractedPackageResources((extractionRoot) =>
+    commandRunner(nsisInstaller, ['/S', `/D=${extractionRoot}`])
   )
 
   return [
@@ -598,10 +637,7 @@ export function verifyLinuxGlibcSymbolCeiling(output, path) {
 }
 
 function verifyLinuxArtifacts(root, targetTriple, commandRunner) {
-  const mainExecutable = requireFile(
-    resolve(root, 'pebble-desktop-tauri'),
-    'Linux main executable'
-  )
+  const mainExecutable = requireFile(resolve(root, 'pebble-desktop-tauri'), 'Linux main executable')
   const sidecars = sidecarNames.map((name) =>
     requireFile(resolve(root, name), `staged ${name} sidecar`)
   )
@@ -616,7 +652,11 @@ function verifyLinuxArtifacts(root, targetTriple, commandRunner) {
 
   const debPackages = walk(resolve(root, 'bundle')).filter((path) => path.endsWith('.deb'))
   const debPackage = requireSingle(debPackages, 'Linux Debian installer')
-  const debArchitecture = commandRunner('dpkg-deb', ['--field', debPackage, 'Architecture']).stdout.trim()
+  const debArchitecture = commandRunner('dpkg-deb', [
+    '--field',
+    debPackage,
+    'Architecture'
+  ]).stdout.trim()
   if (debArchitecture !== linuxPackageArchitecture(targetTriple)) {
     throw new Error(
       `${debPackage} has Debian architecture ${debArchitecture || '<missing>'}; expected ${linuxPackageArchitecture(targetTriple)}.`
@@ -624,18 +664,19 @@ function verifyLinuxArtifacts(root, targetTriple, commandRunner) {
   }
   const debDependencies = commandRunner('dpkg-deb', ['--field', debPackage, 'Depends']).stdout
   for (const dependency of ['at-spi2-core', 'gir1.2-atspi-2.0', 'python3', 'python3-gi']) {
-    if (!new RegExp(`(^|[,\\s])${dependency.replaceAll('.', '\\.')}(?:\\s|,|\\(|$)`).test(debDependencies)) {
+    if (
+      !new RegExp(`(^|[,\\s])${dependency.replaceAll('.', '\\.')}(?:\\s|,|\\(|$)`).test(
+        debDependencies
+      )
+    ) {
       throw new Error(`${debPackage} is missing required computer-use dependency ${dependency}.`)
     }
   }
-  verifyExtractedPackageResources(
-    (extractionRoot) => commandRunner('dpkg-deb', ['--extract', debPackage, extractionRoot])
+  verifyExtractedPackageResources((extractionRoot) =>
+    commandRunner('dpkg-deb', ['--extract', debPackage, extractionRoot])
   )
   return [
-    evidenceRecord('main-executable', mainExecutable, [
-      'architecture',
-      'glibc-symbol-ceiling'
-    ]),
+    evidenceRecord('main-executable', mainExecutable, ['architecture', 'glibc-symbol-ceiling']),
     ...sidecars.map((path) =>
       evidenceRecord('staged-sidecar', path, ['architecture', 'glibc-symbol-ceiling'])
     ),

@@ -2,10 +2,20 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import {
+  validateUpdaterPublicKey,
+  validateUpdaterSigningEnvironment
+} from './prepare-tauri-release-config.mjs'
+
 const repoRoot = resolve(import.meta.dirname, '../..')
 const defaultConfigPath = resolve(repoRoot, 'apps/desktop/src-tauri/tauri.conf.json')
+const defaultMacosConfigPath = resolve(repoRoot, 'apps/desktop/src-tauri/tauri.macos.conf.json')
 const supportedPlatforms = new Set(['linux', 'macos', 'windows'])
-const requiredExternalBinaries = ['binaries/pebble-relay-worker', 'binaries/pebble-runtime']
+const requiredExternalBinaries = [
+  'binaries/pebble-control',
+  'binaries/pebble-relay-worker',
+  'binaries/pebble-runtime'
+]
 
 function missingEnvironmentVariables(environment, names) {
   return names.filter((name) => {
@@ -42,6 +52,30 @@ export function validateTauriReleaseConfig(config) {
   if (config?.bundle?.macOS?.signingIdentity === '-') {
     throw new Error('Tauri release config must not use an ad-hoc macOS signing identity.')
   }
+
+  if (config?.bundle?.macOS?.entitlements !== '../../../resources/build/entitlements.mac.plist') {
+    throw new Error('Tauri macOS release config must use the repository-owned main entitlements.')
+  }
+  if (config?.bundle?.createUpdaterArtifacts !== true) {
+    throw new Error('Tauri release config must enable signed updater artifacts.')
+  }
+  if (
+    !Array.isArray(config?.plugins?.updater?.endpoints) ||
+    config.plugins.updater.endpoints.length === 0
+  ) {
+    throw new Error('Tauri release config must retain updater endpoints.')
+  }
+  validateUpdaterPublicKey(config?.plugins?.updater?.pubkey)
+}
+
+export function validateMacosPlatformConfig(config) {
+  if (config?.build?.beforeBundleCommand !== 'node scripts/prepare-macos-bundle-resources.mjs') {
+    throw new Error('Tauri macOS bundling must prepare signed platform resources before sealing.')
+  }
+  const helperSource = '../../../native/computer-use-macos/.build/release/Pebble Computer Use.app'
+  if (config?.bundle?.resources?.[helperSource] !== 'Pebble Computer Use.app') {
+    throw new Error('Tauri macOS bundling must include the signed computer-use helper app.')
+  }
 }
 
 export function validateMacosReleaseEnvironment(environment) {
@@ -55,6 +89,9 @@ export function validateMacosReleaseEnvironment(environment) {
   const missing = missingEnvironmentVariables(environment, required)
   if (missing.length > 0) {
     throw new Error(`Missing macOS signing/notarization environment: ${missing.join(', ')}.`)
+  }
+  if (environment.PEBBLE_MAC_RELEASE !== '1') {
+    throw new Error('PEBBLE_MAC_RELEASE must be 1 for hardened-runtime helper signing.')
   }
 }
 
@@ -71,14 +108,28 @@ export function validateWindowsReleaseConfig(config) {
   }
 }
 
-export function validateReleasePreflight({ platform, environment = process.env, config }) {
+export function validateReleasePreflight({
+  platform,
+  environment = process.env,
+  config,
+  macosConfig
+}) {
   if (!supportedPlatforms.has(platform)) {
     throw new Error(`Unsupported Tauri release platform: ${platform || '<missing>'}.`)
   }
 
   validateTauriReleaseConfig(config)
+  const signingEnvironment = validateUpdaterSigningEnvironment(environment)
+  // Why: release config preparation may inject only the public trust root;
+  // preflight proves it is the same key supplied to the signing workflow.
+  if (config.plugins.updater.pubkey !== signingEnvironment.publicKey) {
+    throw new Error(
+      'Tauri release config updater public key does not match the signing environment.'
+    )
+  }
   if (platform === 'macos') {
     validateMacosReleaseEnvironment(environment)
+    validateMacosPlatformConfig(macosConfig)
   } else if (platform === 'windows') {
     validateWindowsReleaseConfig(config)
   }
@@ -90,7 +141,9 @@ export function main(argv = process.argv.slice(2), environment = process.env) {
   const platform = argv[0]
   const configPath = resolve(argv[1] || defaultConfigPath)
   const config = JSON.parse(readFileSync(configPath, 'utf8'))
-  const result = validateReleasePreflight({ platform, environment, config })
+  const macosConfig =
+    platform === 'macos' ? JSON.parse(readFileSync(defaultMacosConfigPath, 'utf8')) : undefined
+  const result = validateReleasePreflight({ platform, environment, config, macosConfig })
   console.log(
     `Verified ${result.platform} Tauri release preflight with ${result.externalBinaries.length} sidecars.`
   )

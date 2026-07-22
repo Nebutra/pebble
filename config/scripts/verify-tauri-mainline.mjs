@@ -264,12 +264,22 @@ const checks = [
   },
   {
     name: 'macOS Tauri release stages the signed computer-use helper before sealing the app',
-    file: 'apps/desktop/scripts/finalize-macos-app-bundle.mjs',
+    file: 'apps/desktop/scripts/prepare-macos-bundle-resources.mjs',
     expect: (text) =>
       text.includes('build-computer-macos.mjs') &&
-      text.includes("const computerUseHelperName = 'Pebble Computer Use.app'") &&
-      text.includes('stageComputerUseHelper()') &&
-      text.includes('cpSync(source, destination, { recursive: true })')
+      text.includes('stage-macos-speech-libraries.mjs') &&
+      text.includes("platform !== 'darwin'")
+  },
+  {
+    name: 'macOS Tauri configuration owns helper resources and main entitlements',
+    files: [
+      'apps/desktop/src-tauri/tauri.conf.json',
+      'apps/desktop/src-tauri/tauri.macos.conf.json'
+    ],
+    expect: (text) =>
+      text.includes('../../../resources/build/entitlements.mac.plist') &&
+      text.includes('prepare-macos-bundle-resources.mjs') &&
+      text.includes('Pebble Computer Use.app')
   },
   {
     name: 'Tauri browser selector check and select cross the macOS native input boundary',
@@ -5639,6 +5649,7 @@ const checks = [
       text.includes('TAURI_RELEASE_VERSION') &&
       text.includes('TAURI_SIGNING_PRIVATE_KEY') &&
       text.includes('TAURI_SIGNING_PRIVATE_KEY_PASSWORD') &&
+      text.includes('PEBBLE_MAC_RELEASE') &&
       text.includes('uploadUpdaterJson: true') &&
       text.includes('verify-tauri-updater-manifest.mjs') &&
       text.includes('Verify merged updater manifest') &&
@@ -5662,6 +5673,7 @@ const checks = [
     expect: (text) =>
       text.includes('validateUpdaterPublicKey') &&
       text.includes('validateSigningPrivateKey') &&
+      text.includes('validateSigningPrivateKeyPassword') &&
       text.includes('validateReleaseVersion') &&
       text.includes('createUpdaterArtifacts: true') &&
       text.includes('version: process.env.TAURI_RELEASE_VERSION || rootPackage.version') &&

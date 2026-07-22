@@ -1,31 +1,11 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import process from 'node:process'
 
 import { resolveMacosCodeSigningIdentity } from './macos-code-signing-identity.mjs'
 
 const appPath = resolve('src-tauri/target/release/bundle/macos/Pebble.app')
-const repoRoot = resolve('../..')
-const computerUseHelperName = 'Pebble Computer Use.app'
-
-function stageComputerUseHelper() {
-  execFileSync(process.execPath, [resolve(repoRoot, 'config/scripts/build-computer-macos.mjs')], {
-    cwd: repoRoot,
-    stdio: 'inherit'
-  })
-  const source = resolve(
-    repoRoot,
-    'native/computer-use-macos/.build/release',
-    computerUseHelperName
-  )
-  if (!existsSync(source)) {
-    throw new Error(`Expected macOS computer-use helper at ${source}`)
-  }
-  const destination = resolve(appPath, 'Contents/Resources', computerUseHelperName)
-  rmSync(destination, { recursive: true, force: true })
-  cpSync(source, destination, { recursive: true })
-}
 
 function runCodesign(args) {
   execFileSync('codesign', args, { stdio: 'inherit' })
@@ -68,9 +48,8 @@ if (process.platform === 'darwin') {
     throw new Error(`Expected macOS app bundle at ${appPath}`)
   }
 
-  // Tauri validates the outer seal but does not replace an upstream ad-hoc
-  // signature on executable resources, so nested code is always signed first.
-  stageComputerUseHelper()
+  // The helper is prepared by beforeBundleCommand so release and local bundles
+  // share the same nested signing order before the outer resource seal exists.
   signBundle(resolveMacosCodeSigningIdentity())
   verifyBundle()
 }

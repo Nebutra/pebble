@@ -1,0 +1,3 @@
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify the release trust chain remains consistent across config, workflow, secret inputs, bundle preparation, and artifact evidence."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check that signing and notarization validation has one owner per contract and no drift-prone duplicate lists."}
+{"file":".trellis/tasks/07-20-complete-tauri-migration/research/tauri-release-signing-audit.md","reason":"Validate the implementation against the audited gaps and updater trust-root constraints."}
