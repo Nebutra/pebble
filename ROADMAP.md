@@ -589,7 +589,7 @@ the Nebutra feedback route with a ten-second timeout and trusted app version,
 platform, kernel release, and architecture metadata. Anonymous submissions drop
 all renderer-supplied GitHub identity at the native boundary, and all text fields
 are bounded before network I/O. The Nebutra project still must implement the
-documented `POST /pebble/v1/feedback` production route before public release.
+documented `POST /v1/feedback` production route before public release.
 
 ### Tauri Markdown PDF Export Delta
 
@@ -1473,6 +1473,25 @@ new application builds use this origin without a `/pebble` path prefix. DNS,
 TLS, CDN/origin routing, and compatibility handling remain deployment work and
 must be ready before a public release consumes these routes.
 
+This section is the ecosystem-preparation contract for the first public desktop
+release. Client URL migration alone does not satisfy it: the canonical host,
+machine endpoints, storage, monitoring, privacy handling, and deletion path must
+be deployed and exercised in production-like staging.
+
+Domain namespace:
+
+- Deploy `pebble.nebutra.com`, `status.pebble.nebutra.com`, and
+  `staging.pebble.nebutra.com` now. The status host must remain reachable when
+  the product origin or application API is impaired; staging must use isolated
+  data, secrets, storage, and routing.
+- Reserve `app.pebble.nebutra.com`, `cloud.pebble.nebutra.com`,
+  `relay.pebble.nebutra.com`, `telemetry.pebble.nebutra.com`, and
+  `assets.pebble.nebutra.com`. `api.pebble.nebutra.com` is optional if a future
+  public API needs a separate origin.
+- Current desktop and mobile clients remain path-based on
+  `https://pebble.nebutra.com`; reserved hosts are namespace protection, not
+  permission to move an existing route without a client migration.
+
 Path migration rule:
 
 - `https://www.nebutra.com/pebble` -> `https://pebble.nebutra.com`
@@ -1483,27 +1502,95 @@ Compatibility rollout rules:
 
 - Human-facing `GET` pages such as the product root, download, docs, privacy,
   and changelog pages may use permanent redirects after the new host is live.
-- Machine-consumed JSON, media, diagnostics, and API routes must be mirrored or
-  reverse-proxied during rollout. Do not rely on clients preserving headers,
-  methods, or bodies across redirects.
-- `POST /v1/feedback` must remain a direct dynamic handler or reverse proxy;
-  it must not depend on a redirect from either legacy origin.
+- Machine-consumed JSON, media, diagnostics, and feedback routes must return
+  their final response without redirects. Legacy origins may mirror content or
+  use an internal reverse proxy, but clients must not depend on a redirect
+  preserving methods, bodies, authorization headers, or cache behavior.
 - Keep compatibility routing for at least one complete desktop/mobile release
   cycle and monitor TLS, status codes, latency, and error rates by route.
 
+Route and deployment ownership:
+
+- CDN/edge owns the product root, download, docs, privacy, changelog pages,
+  `GET /whats-new/changelog.json`, `GET /whats-new/nudge.json`, and
+  `GET /media/*`. Machine-consumed static routes still follow the no-redirect
+  rule.
+- One Nebutra-owned API service may own all dynamic routes; microservices are
+  not required. It must expose `POST /diagnostics/token`,
+  `POST /diagnostics/upload`, `POST /diagnostics/delete/:ticketId`, and
+  `POST /v1/feedback` on the canonical public host, directly or through an
+  internal edge reverse proxy.
+- `POST /v1/feedback` accepts JSON feedback and crash submissions plus
+  multipart crash submissions with a diagnostic NDJSON attachment. Submissions,
+  optional identity, and attachments are private support data: do not place raw
+  payloads in public issue trackers, analytics events, access logs, or other
+  PII-unsafe destinations.
+- GitHub continues to own Releases, tags, updater artifacts, installer assets,
+  and `releases.atom`; the product origin may link or proxy discovery pages but
+  does not become the release artifact authority.
+
+Diagnostics protocol:
+
+1. The client calls `POST /diagnostics/token` with JSON
+   `{"bundle_submission_id":"<id>","bytes":<integer>}`. The service returns
+   `{"token":"<bearer>","upload_url":"https://pebble.nebutra.com/diagnostics/upload","max_bytes":4194304}`.
+2. The upload URL must use HTTP(S), remain HTTPS when the token endpoint is
+   HTTPS, and have the same host and effective port as the token endpoint. The
+   client rejects a cross-host upload URL.
+3. The client calls the issued upload URL with `POST`, `Authorization: Bearer
+   <token>`, `Content-Type: application/x-ndjson`, an exact `Content-Length`,
+   and a redacted NDJSON body no larger than 4 MiB. The service returns
+   `{"ticket_id":"<ticketId>"}`.
+4. User-requested removal calls `POST /diagnostics/delete/:ticketId` with an
+   empty JSON object. A successful response confirms that the ticket and its
+   stored object are deleted or irreversibly queued for deletion.
+
+Minimum production topology:
+
+- CDN/edge termination and routing for the canonical, status, and staging hosts.
+- One horizontally deployable API service for diagnostics and feedback.
+- Managed Postgres for tickets, deletion state, support metadata, and audit
+  records, with encryption, backups, and point-in-time recovery.
+- Private object storage for diagnostic attachments; objects must not be public
+  or discoverable by ticket ID alone.
+- Isolated staging configuration, database, object storage, credentials, and
+  monitoring so validation cannot mutate production support data.
+- Service monitoring, route-level alerting, structured redacted logs, and the
+  independently hosted status page.
+
+Unless an approved operating policy replaces them, the baseline production
+decisions are a 10-minute diagnostic token lifetime, a 4 MiB request and stored
+object cap, and 30-day diagnostic retention. The API must enforce route-specific
+rate and body limits, redact secrets and local paths before durable logging,
+expire objects and records, and provide a support-verifiable deletion workflow.
+Backups and Postgres point-in-time recovery must be tested; object lifecycle and
+backup retention must not silently resurrect data after a completed deletion.
+Privacy documentation, telemetry consent and opt-out behavior, support access
+controls, incident response, and data-subject request handling are release
+operations obligations, not future documentation polish.
+
+The broader ecosystem is required for product completion but does not block the
+first desktop public release: a hosted web client; cloud account and control
+plane; managed server offering; relay/tunnel service; APNs/FCM delivery;
+billing/licensing; and team, admin, and audit surfaces. Each remains an explicit
+roadmap milestone and must adopt the reserved namespace, privacy, staging, and
+operational contracts before launch.
+
 Required canonical routes:
 
-| Legacy route                                    | Canonical route                                           | Surface                 | Compatibility action                                      |
-| ----------------------------------------------- | --------------------------------------------------------- | ----------------------- | --------------------------------------------------------- |
-| `https://www.nebutra.com/pebble`                | `https://pebble.nebutra.com`                              | Product landing page    | Human `GET` may redirect after the new host is healthy.    |
-| `https://onpebble.dev/download`                 | `https://pebble.nebutra.com/download`                     | Download page           | Human `GET` may redirect after artifact links are verified. |
-| `https://onpebble.dev/docs/*`                   | `https://pebble.nebutra.com/docs/*`                       | Product documentation   | Preserve path and query strings on redirect.              |
-| `https://onpebble.dev/whats-new/changelog.json` | `https://pebble.nebutra.com/whats-new/changelog.json`     | Update changelog feed   | Mirror or reverse-proxy JSON; do not redirect clients.    |
-| `https://onpebble.dev/whats-new/nudge.json`     | `https://pebble.nebutra.com/whats-new/nudge.json`         | Update nudge feed       | Mirror or reverse-proxy JSON; do not redirect clients.    |
-| `https://onpebble.dev/media/*`                  | `https://pebble.nebutra.com/media/*`                      | Changelog media assets  | Mirror or reverse-proxy immutable assets during rollout.  |
-| `https://www.onpebble.dev/diagnostics/token`    | `https://pebble.nebutra.com/diagnostics/token`            | Crash diagnostics token | Reverse-proxy the machine endpoint without redirect.      |
-| `https://www.onpebble.dev/v1/feedback`          | `https://pebble.nebutra.com/v1/feedback`                  | Feedback submission API | Reverse-proxy `POST`, headers, and body without redirect.  |
-| `https://api.onpebble.dev/v1/feedback`          | `https://pebble.nebutra.com/v1/feedback`                  | Feedback fallback API   | Retain only as a compatibility proxy for older clients.   |
+| Legacy route                                    | Canonical route                                           | Surface                    | Compatibility action                                        |
+| ----------------------------------------------- | --------------------------------------------------------- | -------------------------- | ----------------------------------------------------------- |
+| `https://www.nebutra.com/pebble`                | `https://pebble.nebutra.com`                              | Product landing page       | Human `GET` may redirect after the new host is healthy.      |
+| `https://onpebble.dev/download`                 | `https://pebble.nebutra.com/download`                     | Download page              | Human `GET` may redirect after artifact links are verified. |
+| `https://onpebble.dev/docs/*`                   | `https://pebble.nebutra.com/docs/*`                       | Product documentation      | Preserve path and query strings on redirect.                |
+| `https://onpebble.dev/whats-new/changelog.json` | `https://pebble.nebutra.com/whats-new/changelog.json`     | Update changelog feed      | Mirror or internally proxy; never redirect clients.         |
+| `https://onpebble.dev/whats-new/nudge.json`     | `https://pebble.nebutra.com/whats-new/nudge.json`         | Update nudge feed          | Mirror or internally proxy; never redirect clients.         |
+| `https://onpebble.dev/media/*`                  | `https://pebble.nebutra.com/media/*`                      | Changelog media assets     | Mirror or internally proxy immutable assets.                |
+| `https://www.onpebble.dev/diagnostics/token`    | `https://pebble.nebutra.com/diagnostics/token`            | Diagnostics token `POST`   | Reverse-proxy method, JSON, and response without redirect.   |
+| None                                            | `https://pebble.nebutra.com/diagnostics/upload`           | Diagnostics upload `POST`  | Required direct handler; no redirect.                        |
+| None                                            | `https://pebble.nebutra.com/diagnostics/delete/:ticketId` | Diagnostics delete `POST`  | Required direct handler; no redirect.                        |
+| `https://www.onpebble.dev/v1/feedback`          | `https://pebble.nebutra.com/v1/feedback`                  | Feedback/crash `POST`      | Reverse-proxy JSON or multipart without redirect.            |
+| `https://api.onpebble.dev/v1/feedback`          | `https://pebble.nebutra.com/v1/feedback`                  | Feedback fallback `POST`   | Retain only as a compatibility proxy for older clients.     |
 
 ## Nebutra package namespace backfill
 
@@ -1549,17 +1636,21 @@ Routes currently referenced by the app, README, localized READMEs, telemetry sur
 
 ## Product web/static feed gaps
 
-These are not normal docs pages. The Pebble product origin must serve them
+These machine-consumed static routes must be served by the product CDN/edge
 before public release:
 
 - `https://pebble.nebutra.com/whats-new/changelog.json`
 - `https://pebble.nebutra.com/whats-new/nudge.json`
 - Changelog media URLs should use `https://pebble.nebutra.com/media/*`
-- `https://pebble.nebutra.com/diagnostics/token`
 
-This feedback endpoint still needs a Nebutra-owned dynamic POST handler or proxy:
+The dynamic API routes and their operational requirements are defined by the
+Pebble product origin rollout contract above. All four require a Nebutra-owned
+handler or internal reverse proxy with no client-visible redirect:
 
-- `https://pebble.nebutra.com/v1/feedback`
+- `POST https://pebble.nebutra.com/diagnostics/token`
+- `POST https://pebble.nebutra.com/diagnostics/upload`
+- `POST https://pebble.nebutra.com/diagnostics/delete/:ticketId`
+- `POST https://pebble.nebutra.com/v1/feedback`
 
 The in-app changelog and update card currently link release notes to GitHub Releases:
 
@@ -2007,7 +2098,9 @@ These are outside the product-site/docs route migration above:
   - `GET /whats-new/changelog.json`
   - `GET /whats-new/nudge.json`
   - `GET /media/*`
-  - `GET /diagnostics/token`
+  - `POST /diagnostics/token`
+  - `POST /diagnostics/upload`
+  - `POST /diagnostics/delete/:ticketId`
   - `POST /v1/feedback`
 - Brand assets now use a Pebble candidate mark instead of the legacy whale glyph. Final brand QA should still settle the source-of-truth vector/bitmap set and regenerate any marketing-only collateral.
 - Historical/internal design docs have been migrated from legacy product
