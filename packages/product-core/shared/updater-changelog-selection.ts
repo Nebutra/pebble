@@ -10,7 +10,7 @@ export type ChangelogEntry = {
 
 const CHANGELOG_URL = 'https://github.com/nebutra/pebble/releases'
 const PEBBLE_RELEASE_TAG_URL_PREFIX = 'https://github.com/nebutra/pebble/releases/tag/'
-const PRODUCT_CHANGELOG_HOSTS = new Set(['nebutra.com', 'www.nebutra.com'])
+const PRODUCT_CHANGELOG_HOST = 'pebble.nebutra.com'
 
 export function selectChangelogData(
   json: unknown,
@@ -86,8 +86,10 @@ function canonicalReleaseNotesUrl(releaseNotesUrl: string): string {
     const host = url.hostname.toLowerCase()
     const parts = url.pathname.split('/').filter(Boolean)
 
-    if (PRODUCT_CHANGELOG_HOSTS.has(host) && parts[0] === 'pebble' && parts[1] === 'changelog') {
-      const version = parts[2]
+    // Why: legacy origins are handled at the edge; release metadata should only
+    // trust the canonical Pebble product origin when deriving a release tag.
+    if (host === PRODUCT_CHANGELOG_HOST && parts[0] === 'changelog') {
+      const version = parts[1]
       return version
         ? `${PEBBLE_RELEASE_TAG_URL_PREFIX}${releaseTagFromVersion(version)}`
         : CHANGELOG_URL

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tauri::AppHandle;
 
-const FEEDBACK_API_URL: &str = "https://www.nebutra.com/pebble/v1/feedback";
+const FEEDBACK_API_URL: &str = "https://pebble.nebutra.com/v1/feedback";
 const FEEDBACK_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_FEEDBACK_CHARS: usize = 64 * 1024;
 const MAX_IDENTITY_CHARS: usize = 320;

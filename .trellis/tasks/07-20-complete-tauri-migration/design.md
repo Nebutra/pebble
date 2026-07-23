@@ -64,6 +64,18 @@ macOS-only step writes the key to `$RUNNER_TEMP` with restrictive permissions
 and exports `APPLE_API_KEY_PATH`. Apple ID plus app-specific password remains a
 fallback, but partial or mixed credential sets fail preflight.
 
+### 6. Canonical Product Origin
+
+Application code, release workflows, public documentation, mobile links, and
+package metadata use `https://pebble.nebutra.com` as the single product origin.
+Product paths move from `/pebble/<path>` to `/<path>` on that host. GitHub
+Releases and the release Atom feed remain owned by GitHub.
+
+Deployment compatibility is intentionally outside the application: human GET
+pages may redirect, while changelog/nudge JSON, media, diagnostics, and feedback
+routes are mirrored or reverse-proxied so clients do not rely on redirect method,
+body, authorization-header, or cache behavior.
+
 ## Compatibility
 
 - Cross-platform behavior stays behind runtime/platform checks.

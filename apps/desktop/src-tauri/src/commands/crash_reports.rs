@@ -29,7 +29,7 @@ const CRASH_REPORTS_FILE: &str = "crash-reports.json";
 // the snapshot on load and folded back in when the journal grows past MAX_JOURNAL_ENTRIES.
 const CRASH_REPORTS_JOURNAL_FILE: &str = "crash-reports.log.ndjson";
 const MAX_JOURNAL_ENTRIES: usize = 64;
-const FEEDBACK_API_URL: &str = "https://www.nebutra.com/pebble/v1/feedback";
+const FEEDBACK_API_URL: &str = "https://pebble.nebutra.com/v1/feedback";
 const MAX_REPORTS: usize = 5;
 const MAX_BREADCRUMBS: usize = 30;
 const MAX_BREADCRUMB_NAME_LENGTH: usize = 80;

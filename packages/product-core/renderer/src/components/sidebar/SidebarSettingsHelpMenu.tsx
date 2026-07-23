@@ -35,7 +35,7 @@ import { SidebarFeedbackDialog } from './SidebarFeedbackDialog'
 import { translate } from '@/i18n/i18n'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
 
-const DOCS_URL = 'https://www.nebutra.com/pebble/docs'
+const DOCS_URL = 'https://pebble.nebutra.com/docs'
 const CHANGELOG_URL = 'https://github.com/nebutra/pebble/releases'
 const GITHUB_URL = 'https://github.com/nebutra/pebble'
 const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'

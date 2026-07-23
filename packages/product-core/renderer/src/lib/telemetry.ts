@@ -25,7 +25,7 @@ export { tuiAgentToAgentKind } from '../../../shared/agent-kind'
 // telemetry surfaces (FirstLaunchBanner, PrivacyPane). Keeping it here — in
 // the shared telemetry lib — prevents the surfaces from drifting if the doc
 // ever moves.
-export const PRIVACY_URL = 'https://www.nebutra.com/pebble/docs/telemetry'
+export const PRIVACY_URL = 'https://pebble.nebutra.com/docs/telemetry'
 
 // Why: the IPC boundary is untyped at runtime, so a malformed payload from
 // main would otherwise let the Privacy pane render on garbage. Validate the

@@ -26,7 +26,7 @@ describe('parseMobileMarkdown', () => {
   it('normalizes common README HTML into readable Markdown preview text', () => {
     const normalized = normalizeMobileMarkdownPreviewHtml(`
 <h1 align="center">
-  <a href="https://www.nebutra.com/pebble"><img src="resources/build/icon.png" alt="Pebble" width="64" /></a>
+  <a href="https://pebble.nebutra.com"><img src="resources/build/icon.png" alt="Pebble" width="64" /></a>
   Pebble
 </h1>
 
@@ -37,7 +37,7 @@ describe('parseMobileMarkdown', () => {
 </p>
 `)
 
-    expect(normalized).toContain('# [Pebble](https://www.nebutra.com/pebble)')
+    expect(normalized).toContain('# [Pebble](https://pebble.nebutra.com)')
     expect(normalized).toContain('[GitHub stars](https://github.com/nebutra/pebble/stargazers)')
     expect(normalized).toContain('**The AI Orchestrator**')
     expect(normalized).not.toContain('<h1')

@@ -3922,7 +3922,7 @@ const checks = [
       text.includes('prefers a signed native package without consulting the release fallback') &&
       text.includes('uses a tag-scoped signed manifest for explicit prerelease checks') &&
       text.includes("'updater_fetch_changelog_entries'") &&
-      text.includes('https://www.nebutra.com/pebble/media/release-popup.gif') &&
+      text.includes('https://pebble.nebutra.com/media/release-popup.gif') &&
       text.includes('https://github.com/nebutra/pebble/releases/tag/v1.4.128')
   },
   {
@@ -3959,11 +3959,26 @@ const checks = [
     file: 'packages/product-core/shared/updater-changelog-selection.ts',
     expect: (text) =>
       text.includes('export function selectChangelogData') &&
-      text.includes("'www.nebutra.com'") &&
+      text.includes("'pebble.nebutra.com'") &&
+      text.includes("parts[0] === 'changelog'") &&
       text.includes('https://github.com/nebutra/pebble/releases/tag/') &&
       text.includes('releaseNotesUrl: CHANGELOG_URL') &&
       text.includes('function canonicalReleaseNotesUrl') &&
       text.includes('export function compareReleaseVersions')
+  },
+  {
+    name: 'Shared updater changelog tests pin the canonical Pebble release-note origin',
+    file: 'packages/product-core/shared/updater-changelog-selection.test.ts',
+    expect: (text) =>
+      text.includes('selectChangelogData') &&
+      text.includes('https://pebble.nebutra.com/changelog/1.4.128') &&
+      text.includes('https://github.com/nebutra/pebble/releases/tag/v1.4.128')
+  },
+  {
+    name: 'Tauri release workflow compiles diagnostics against the canonical Pebble origin',
+    file: '.github/workflows/tauri-desktop-release.yml',
+    expect: (text) =>
+      text.includes('PEBBLE_DIAGNOSTICS_TOKEN_URL: https://pebble.nebutra.com/diagnostics/token')
   },
   {
     name: 'Tauri updater and process plugins are registered in the native shell',
@@ -5308,6 +5323,7 @@ const checks = [
     file: 'apps/desktop/src-tauri/src/commands/crash_reports.rs',
     expect: (text) =>
       text.includes('const CRASH_REPORTS_FILE: &str = "crash-reports.json"') &&
+      text.includes('const FEEDBACK_API_URL: &str = "https://pebble.nebutra.com/v1/feedback"') &&
       text.includes('pub async fn crash_reports_get_latest_pending') &&
       text.includes('pub async fn crash_reports_record_renderer_error') &&
       text.includes('pub fn crash_reports_record_breadcrumb') &&
@@ -5316,7 +5332,6 @@ const checks = [
       text.includes('sanitize_crash_report_string') &&
       text.includes('format_desktop_shell_line') &&
       text.includes('"Desktop shell: Tauri"') &&
-      text.includes('FEEDBACK_API_URL') &&
       text.includes('collect_crash_diagnostic_bundle_attachment') &&
       text.includes('create_feedback_multipart_form')
   },
@@ -5490,7 +5505,10 @@ const checks = [
         'const ATOM_FEED_URL: &str = "https://github.com/nebutra/pebble/releases.atom"'
       ) &&
       text.includes(
-        'const CHANGELOG_JSON_URL: &str = "https://www.nebutra.com/pebble/whats-new/changelog.json"'
+        'const CHANGELOG_JSON_URL: &str = "https://pebble.nebutra.com/whats-new/changelog.json"'
+      ) &&
+      text.includes(
+        'const NUDGE_JSON_URL: &str = "https://pebble.nebutra.com/whats-new/nudge.json"'
       ) &&
       text.includes('pub async fn updater_check_latest_release') &&
       text.includes('pub async fn updater_check_release_tag') &&
@@ -5662,7 +5680,9 @@ const checks = [
     expect: (text) =>
       text.includes(
         'binary "#{appdir}/Pebble.app/Contents/MacOS/pebble-desktop-tauri", target: "pebble"'
-      ) && !text.includes('Contents/Resources/bin/pebble')
+      ) &&
+      text.includes('homepage "https://pebble.nebutra.com/"') &&
+      !text.includes('Contents/Resources/bin/pebble')
   },
   {
     name: 'Homebrew RC cask exposes the native Tauri entrypoint as pebble',
@@ -5670,7 +5690,9 @@ const checks = [
     expect: (text) =>
       text.includes(
         'binary "#{appdir}/Pebble.app/Contents/MacOS/pebble-desktop-tauri", target: "pebble"'
-      ) && !text.includes('Contents/Resources/bin/pebble')
+      ) &&
+      text.includes('homepage "https://pebble.nebutra.com/"') &&
+      !text.includes('Contents/Resources/bin/pebble')
   },
   {
     name: 'Tauri desktop release workflow builds the Tauri app across desktop platforms',
@@ -6371,9 +6393,7 @@ const checks = [
     name: 'Tauri feedback uses a bounded native host submission instead of the web fallback',
     file: 'apps/desktop/src-tauri/src/commands/feedback.rs',
     expect: (text) =>
-      text.includes(
-        'const FEEDBACK_API_URL: &str = "https://www.nebutra.com/pebble/v1/feedback"'
-      ) &&
+      text.includes('const FEEDBACK_API_URL: &str = "https://pebble.nebutra.com/v1/feedback"') &&
       text.includes('Duration::from_secs(10)') &&
       text.includes('fn sanitize_identity') &&
       text.includes('if anonymous') &&

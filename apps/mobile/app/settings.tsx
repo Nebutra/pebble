@@ -87,7 +87,7 @@ export default function SettingsScreen() {
       <View style={[styles.section, styles.sectionSpacer]}>
         <Pressable
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => void Linking.openURL('https://www.nebutra.com/pebble/docs/privacy')}
+          onPress={() => void Linking.openURL('https://pebble.nebutra.com/docs/privacy')}
         >
           <Shield size={16} color={colors.textSecondary} />
           <Text style={styles.rowLabel}>Privacy Policy</Text>

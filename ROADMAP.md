@@ -1466,32 +1466,44 @@ runtime termination uses its signal primitive. PTY session ownership remains
 Go's (`creack/pty`); measured binary transport and low-level accessibility work
 are the next candidate Zig boundaries.
 
-## Nebutra web route backfill
+## Pebble product origin rollout
 
-After the Pebble rename, the app and public assets should treat
-`https://www.nebutra.com/pebble` as the product web root. The nebutra.com
-project needs to serve these real routes so the app can stop depending on the
-old product domain.
+The canonical product origin is `https://pebble.nebutra.com`. Public links and
+new application builds use this origin without a `/pebble` path prefix. DNS,
+TLS, CDN/origin routing, and compatibility handling remain deployment work and
+must be ready before a public release consumes these routes.
 
 Path migration rule:
 
-- Product pages: `https://onpebble.dev/<path>` -> `https://www.nebutra.com/pebble/<path>`
-- Product root: `https://onpebble.dev` -> `https://www.nebutra.com/pebble`
-- Docs pages: `https://onpebble.dev/docs/<path>` -> `https://www.nebutra.com/pebble/docs/<path>`
+- `https://www.nebutra.com/pebble` -> `https://pebble.nebutra.com`
+- `https://www.nebutra.com/pebble/<path>` -> `https://pebble.nebutra.com/<path>`
+- `https://onpebble.dev/<path>` -> `https://pebble.nebutra.com/<path>`
 
-Required Nebutra routes:
+Compatibility rollout rules:
 
-| Legacy route                                    | Nebutra route                                             | Surface                 | Status                                                                                                       |
-| ----------------------------------------------- | --------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `https://onpebble.dev`                          | `https://www.nebutra.com/pebble`                          | Product landing page    | App/README/Homebrew links migrated; nebutra.com must serve it.                                               |
-| `https://onpebble.dev/download`                 | `https://www.nebutra.com/pebble/download`                 | Download page           | App/README links migrated; nebutra.com must serve it.                                                        |
-| `https://onpebble.dev/docs/*`                   | `https://www.nebutra.com/pebble/docs/*`                   | Mintlify docs           | App/README/mobile links migrated; route list below.                                                          |
-| `https://onpebble.dev/whats-new/changelog.json` | `https://www.nebutra.com/pebble/whats-new/changelog.json` | Update changelog feed   | App now reads the Nebutra route; nebutra.com must serve static JSON.                                         |
-| `https://onpebble.dev/whats-new/nudge.json`     | `https://www.nebutra.com/pebble/whats-new/nudge.json`     | Update nudge feed       | App now reads the Nebutra route; nebutra.com must serve static JSON.                                         |
-| `https://onpebble.dev/media/*`                  | `https://www.nebutra.com/pebble/media/*`                  | Changelog media assets  | Feed media should use this static bucket/object-prefix route.                                                |
-| `https://www.onpebble.dev/diagnostics/token`    | `https://www.nebutra.com/pebble/diagnostics/token`        | Crash diagnostics token | Release workflows now compile official builds against the Nebutra route; nebutra.com must serve or proxy it. |
-| `https://www.onpebble.dev/v1/feedback`          | `https://www.nebutra.com/pebble/v1/feedback`              | Feedback submission API | App now posts only to the Nebutra route; dynamic POST route or proxy required.                               |
-| `https://api.onpebble.dev/v1/feedback`          | `https://www.nebutra.com/pebble/v1/feedback`              | Feedback fallback API   | Legacy fallback removed from app; keep this listed only for external redirect/proxy cleanup.                 |
+- Human-facing `GET` pages such as the product root, download, docs, privacy,
+  and changelog pages may use permanent redirects after the new host is live.
+- Machine-consumed JSON, media, diagnostics, and API routes must be mirrored or
+  reverse-proxied during rollout. Do not rely on clients preserving headers,
+  methods, or bodies across redirects.
+- `POST /v1/feedback` must remain a direct dynamic handler or reverse proxy;
+  it must not depend on a redirect from either legacy origin.
+- Keep compatibility routing for at least one complete desktop/mobile release
+  cycle and monitor TLS, status codes, latency, and error rates by route.
+
+Required canonical routes:
+
+| Legacy route                                    | Canonical route                                           | Surface                 | Compatibility action                                      |
+| ----------------------------------------------- | --------------------------------------------------------- | ----------------------- | --------------------------------------------------------- |
+| `https://www.nebutra.com/pebble`                | `https://pebble.nebutra.com`                              | Product landing page    | Human `GET` may redirect after the new host is healthy.    |
+| `https://onpebble.dev/download`                 | `https://pebble.nebutra.com/download`                     | Download page           | Human `GET` may redirect after artifact links are verified. |
+| `https://onpebble.dev/docs/*`                   | `https://pebble.nebutra.com/docs/*`                       | Product documentation   | Preserve path and query strings on redirect.              |
+| `https://onpebble.dev/whats-new/changelog.json` | `https://pebble.nebutra.com/whats-new/changelog.json`     | Update changelog feed   | Mirror or reverse-proxy JSON; do not redirect clients.    |
+| `https://onpebble.dev/whats-new/nudge.json`     | `https://pebble.nebutra.com/whats-new/nudge.json`         | Update nudge feed       | Mirror or reverse-proxy JSON; do not redirect clients.    |
+| `https://onpebble.dev/media/*`                  | `https://pebble.nebutra.com/media/*`                      | Changelog media assets  | Mirror or reverse-proxy immutable assets during rollout.  |
+| `https://www.onpebble.dev/diagnostics/token`    | `https://pebble.nebutra.com/diagnostics/token`            | Crash diagnostics token | Reverse-proxy the machine endpoint without redirect.      |
+| `https://www.onpebble.dev/v1/feedback`          | `https://pebble.nebutra.com/v1/feedback`                  | Feedback submission API | Reverse-proxy `POST`, headers, and body without redirect.  |
+| `https://api.onpebble.dev/v1/feedback`          | `https://pebble.nebutra.com/v1/feedback`                  | Feedback fallback API   | Retain only as a compatibility proxy for older clients.   |
 
 ## Nebutra package namespace backfill
 
@@ -1510,43 +1522,44 @@ entries.
 
 Canonical docs base:
 
-- `https://www.nebutra.com/pebble/docs`
+- `https://pebble.nebutra.com/docs`
 
 Routes currently referenced by the app, README, localized READMEs, telemetry surfaces, mobile settings, and feature-wall entry points:
 
-- `/pebble/docs`
-- `/pebble/docs/mobile`
-- `/pebble/docs/model/worktrees`
-- `/pebble/docs/terminal`
-- `/pebble/docs/browser/design-mode`
-- `/pebble/docs/review/linear`
-- `/pebble/docs/ssh`
-- `/pebble/docs/review/annotate-ai-diff`
-- `/pebble/docs/editing/file-explorer`
-- `/pebble/docs/cli/overview`
-- `/pebble/docs/model/quick-open`
-- `/pebble/docs/agents/usage-tracking`
-- `/pebble/docs/editing/markdown`
-- `/pebble/docs/editing/viewers`
-- `/pebble/docs/cli/computer-use`
-- `/pebble/docs/notifications`
-- `/pebble/docs/telemetry`
-- `/pebble/docs/privacy`
-- `/pebble/docs/agents/supported`
-- `/pebble/docs/tasks`
+- `/docs`
+- `/docs/mobile`
+- `/docs/model/worktrees`
+- `/docs/terminal`
+- `/docs/browser/design-mode`
+- `/docs/review/linear`
+- `/docs/ssh`
+- `/docs/review/annotate-ai-diff`
+- `/docs/editing/file-explorer`
+- `/docs/cli/overview`
+- `/docs/model/quick-open`
+- `/docs/agents/usage-tracking`
+- `/docs/editing/markdown`
+- `/docs/editing/viewers`
+- `/docs/cli/computer-use`
+- `/docs/notifications`
+- `/docs/telemetry`
+- `/docs/privacy`
+- `/docs/agents/supported`
+- `/docs/tasks`
 
 ## Product web/static feed gaps
 
-These are not normal docs pages. The app now points at these Nebutra routes, so the nebutra.com project must serve them before public release:
+These are not normal docs pages. The Pebble product origin must serve them
+before public release:
 
-- `https://www.nebutra.com/pebble/whats-new/changelog.json`
-- `https://www.nebutra.com/pebble/whats-new/nudge.json`
-- Changelog media URLs should move to `https://www.nebutra.com/pebble/media/*`
-- `https://www.nebutra.com/pebble/diagnostics/token`
+- `https://pebble.nebutra.com/whats-new/changelog.json`
+- `https://pebble.nebutra.com/whats-new/nudge.json`
+- Changelog media URLs should use `https://pebble.nebutra.com/media/*`
+- `https://pebble.nebutra.com/diagnostics/token`
 
 This feedback endpoint still needs a Nebutra-owned dynamic POST handler or proxy:
 
-- `https://www.nebutra.com/pebble/v1/feedback`
+- `https://pebble.nebutra.com/v1/feedback`
 
 The in-app changelog and update card currently link release notes to GitHub Releases:
 
@@ -1989,12 +2002,13 @@ Repository cleanup follows dependency direction rather than cosmetic moves:
 
 These are outside the product-site/docs route migration above:
 
-- Nebutra.com must implement or proxy these runtime routes now referenced by the app:
-  - `GET /pebble/whats-new/changelog.json`
-  - `GET /pebble/whats-new/nudge.json`
-  - `GET /pebble/media/*`
-  - `GET /pebble/diagnostics/token`
-  - `POST /pebble/v1/feedback`
+- The Pebble product origin must implement or proxy these runtime routes now
+  referenced by the app:
+  - `GET /whats-new/changelog.json`
+  - `GET /whats-new/nudge.json`
+  - `GET /media/*`
+  - `GET /diagnostics/token`
+  - `POST /v1/feedback`
 - Brand assets now use a Pebble candidate mark instead of the legacy whale glyph. Final brand QA should still settle the source-of-truth vector/bitmap set and regenerate any marketing-only collateral.
 - Historical/internal design docs have been migrated from legacy product
   wording, CLI examples, local paths, and reference links to Pebble naming.

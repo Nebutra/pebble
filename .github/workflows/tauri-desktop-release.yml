@@ -203,7 +203,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PEBBLE_BUILD_IDENTITY: ${{ contains(github.event_name == 'push' && github.ref_name || inputs.release_tag, '-rc.') && 'rc' || 'stable' }}
           PEBBLE_POSTHOG_WRITE_KEY: ${{ secrets.PEBBLE_POSTHOG_WRITE_KEY }}
-          PEBBLE_DIAGNOSTICS_TOKEN_URL: https://www.nebutra.com/pebble/diagnostics/token
+          PEBBLE_DIAGNOSTICS_TOKEN_URL: https://pebble.nebutra.com/diagnostics/token
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}

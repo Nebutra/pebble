@@ -20,7 +20,7 @@ type FeatureWallTileBase = {
   docsUrl: string
 }
 
-const PEBBLE_DOCS_BASE_URL = 'https://www.nebutra.com/pebble/docs'
+const PEBBLE_DOCS_BASE_URL = 'https://pebble.nebutra.com/docs'
 
 function pebbleDocsUrl(path: string): string {
   return `${PEBBLE_DOCS_BASE_URL}${path}`

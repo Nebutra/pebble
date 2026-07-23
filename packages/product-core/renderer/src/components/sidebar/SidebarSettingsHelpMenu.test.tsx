@@ -240,7 +240,7 @@ describe('SidebarSettingsHelpMenu', () => {
       docsButton.click()
     })
 
-    expect(mocks.shellOpenUrl).toHaveBeenCalledWith('https://www.nebutra.com/pebble/docs')
+    expect(mocks.shellOpenUrl).toHaveBeenCalledWith('https://pebble.nebutra.com/docs')
   })
 
   it('renders Changelog link', () => {

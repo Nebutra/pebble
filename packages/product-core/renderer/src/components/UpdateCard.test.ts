@@ -23,8 +23,8 @@ const RICH_CHANGELOG: ChangelogData = {
   release: {
     title: 'Inline Diffs',
     description: 'Review diffs without leaving the terminal.',
-    mediaUrl: 'https://www.nebutra.com/pebble/media/inline-diffs.png',
-    releaseNotesUrl: 'https://www.nebutra.com/pebble/changelog/1.2.0'
+    mediaUrl: 'https://pebble.nebutra.com/media/inline-diffs.png',
+    releaseNotesUrl: 'https://pebble.nebutra.com/changelog/1.2.0'
   },
   releasesBehind: 3
 }

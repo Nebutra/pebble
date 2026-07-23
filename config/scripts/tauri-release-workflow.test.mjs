@@ -207,7 +207,7 @@ describe('Tauri release workflow signing gate', () => {
     expect(buildStep.env).toEqual(
       expect.objectContaining({
         PEBBLE_BUILD_IDENTITY: expect.stringContaining("'rc' || 'stable'"),
-        PEBBLE_DIAGNOSTICS_TOKEN_URL: 'https://www.nebutra.com/pebble/diagnostics/token',
+        PEBBLE_DIAGNOSTICS_TOKEN_URL: 'https://pebble.nebutra.com/diagnostics/token',
         PEBBLE_MAC_RELEASE: "${{ matrix.platform == 'macos' && '1' || '' }}",
         APPLE_CERTIFICATE: "${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}",
         APPLE_CERTIFICATE_PASSWORD:

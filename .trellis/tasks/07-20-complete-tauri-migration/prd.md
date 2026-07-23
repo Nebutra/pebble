@@ -54,6 +54,10 @@ external developer tool, not Pebble product code.
 - Complete Tauri updater signing configuration without committing or rotating
   private key material. Release CI must fail before packaging when the updater
   public key, private key, or private-key password is missing or placeholder.
+- Make `https://pebble.nebutra.com` the canonical product origin across runtime,
+  release, mobile, renderer, Homebrew, README, and documentation surfaces.
+- Preserve legacy product origins only as documented deployment compatibility
+  routes; machine JSON/API/POST consumers must not depend on redirects.
 
 ## Acceptance Criteria
 
@@ -85,6 +89,8 @@ external developer tool, not Pebble product code.
 - [x] Tauri updater artifacts are generated and cryptographically verified
   against the configured public key; signing secrets remain Actions-only and
   are validated before the build starts.
+- [x] Product links and runtime endpoints use `https://pebble.nebutra.com`
+  without the former `/pebble` prefix, with compatibility operations documented.
 
 ## Out Of Scope
 

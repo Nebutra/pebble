@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { compareReleaseVersions, isValidReleaseVersion } from './updater-changelog-selection'
+import {
+  compareReleaseVersions,
+  isValidReleaseVersion,
+  selectChangelogData
+} from './updater-changelog-selection'
 
 describe('release version comparison', () => {
   it('orders prereleases before their stable release', () => {
@@ -16,5 +20,25 @@ describe('release version comparison', () => {
     expect(isValidReleaseVersion('1.4')).toBe(false)
     expect(isValidReleaseVersion('latest')).toBe(false)
     expect(isValidReleaseVersion('1.4.128')).toBe(true)
+  })
+
+  it('canonicalizes Pebble product release notes to the matching GitHub release', () => {
+    const changelog = selectChangelogData(
+      [
+        {
+          version: '1.4.128',
+          title: 'Pebble 1.4.128',
+          description: 'Release notes',
+          mediaUrl: 'https://pebble.nebutra.com/media/release-popup.gif',
+          releaseNotesUrl: 'https://pebble.nebutra.com/changelog/1.4.128'
+        }
+      ],
+      '1.4.128',
+      '1.4.127'
+    )
+
+    expect(changelog?.release.releaseNotesUrl).toBe(
+      'https://github.com/nebutra/pebble/releases/tag/v1.4.128'
+    )
   })
 })

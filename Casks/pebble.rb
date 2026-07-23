@@ -9,7 +9,7 @@ cask "pebble" do
       verified: "github.com/nebutra/pebble/"
   name "Pebble"
   desc "IDE for orchestrating AI coding agents across terminals and worktrees"
-  homepage "https://www.nebutra.com/pebble/"
+  homepage "https://pebble.nebutra.com/"
 
   livecheck do
     url :url

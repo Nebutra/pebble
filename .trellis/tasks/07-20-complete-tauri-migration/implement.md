@@ -99,6 +99,16 @@
 - [x] Extend workflow, preflight, documentation, and mainline tests for both
   notarization credential modes.
 
+## Phase 7: Move To The Pebble Product Subdomain
+
+- [x] Change runtime feeds, feedback, diagnostics, privacy, docs, download,
+  release-note, renderer/shared, mobile, Homebrew, and public README links to
+  `https://pebble.nebutra.com` without the former `/pebble` prefix.
+- [x] Update updater URL canonicalization, release workflow contracts, focused
+  tests, and mainline assertions while keeping GitHub release URLs unchanged.
+- [x] Document DNS/TLS readiness and redirect-versus-reverse-proxy compatibility
+  requirements without performing remote provider configuration.
+
 ## Validation Gates
 
 - [ ] `pnpm lint`

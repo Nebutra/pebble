@@ -58,10 +58,10 @@ export default function AboutScreen() {
       <View style={styles.section}>
         <Pressable
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => void Linking.openURL('https://www.nebutra.com/pebble')}
+          onPress={() => void Linking.openURL('https://pebble.nebutra.com')}
         >
           <Globe size={16} color={colors.textSecondary} />
-          <Text style={styles.rowValue}>nebutra.com/pebble</Text>
+          <Text style={styles.rowValue}>pebble.nebutra.com</Text>
         </Pressable>
         <View style={styles.separator} />
         <Pressable

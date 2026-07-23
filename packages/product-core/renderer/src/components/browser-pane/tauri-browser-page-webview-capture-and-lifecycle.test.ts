@@ -489,12 +489,12 @@ describe('ensureTauriBrowserPageWebview', () => {
       value: () => ({ left: 10, top: 20, width: 800, height: 600 })
     })
 
-    webview.src = 'https://www.nebutra.com/pebble'
+    webview.src = 'https://pebble.nebutra.com'
 
     await vi.waitFor(() => {
       expect(tauriCoreMocks.invoke).toHaveBeenCalledWith('browser_child_webview_create', {
         input: expect.objectContaining({
-          url: 'https://www.nebutra.com/pebble',
+          url: 'https://pebble.nebutra.com',
           x: 10,
           y: 20,
           width: 800,
@@ -732,7 +732,6 @@ describe('ensureTauriBrowserPageWebview', () => {
     expect(script).toContain("replace(/\\s+/g, '')")
     expect(script).toContain('Android 13')
   })
-
 })
 
 function createGrabPayload(): Record<string, unknown> {

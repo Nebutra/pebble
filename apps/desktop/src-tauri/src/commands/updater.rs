@@ -6,8 +6,8 @@ use tauri::{Manager, ResourceId, Runtime, Webview};
 use tauri_plugin_updater::UpdaterExt;
 
 const ATOM_FEED_URL: &str = "https://github.com/nebutra/pebble/releases.atom";
-const CHANGELOG_JSON_URL: &str = "https://www.nebutra.com/pebble/whats-new/changelog.json";
-const NUDGE_JSON_URL: &str = "https://www.nebutra.com/pebble/whats-new/nudge.json";
+const CHANGELOG_JSON_URL: &str = "https://pebble.nebutra.com/whats-new/changelog.json";
+const NUDGE_JSON_URL: &str = "https://pebble.nebutra.com/whats-new/nudge.json";
 const RELEASES_DOWNLOAD_BASE: &str = "https://github.com/nebutra/pebble/releases/download";
 const RELEASES_TAG_BASE: &str = "https://github.com/nebutra/pebble/releases/tag";
 const DEFAULT_UPDATER_ENDPOINT: &str =

@@ -80,8 +80,8 @@ describe('installTauriUpdaterApi', () => {
             version: '1.4.128',
             title: 'Release popup polish',
             description: 'Update cards keep session state visible.',
-            mediaUrl: 'https://www.nebutra.com/pebble/media/release-popup.gif',
-            releaseNotesUrl: 'https://www.nebutra.com/pebble/changelog/1.4.128'
+            mediaUrl: 'https://pebble.nebutra.com/media/release-popup.gif',
+            releaseNotesUrl: 'https://pebble.nebutra.com/changelog/1.4.128'
           },
           { version: '1.4.127', title: 'Previous', description: '', releaseNotesUrl: '#' }
         ]
@@ -119,7 +119,7 @@ describe('installTauriUpdaterApi', () => {
         release: {
           title: 'Release popup polish',
           description: 'Update cards keep session state visible.',
-          mediaUrl: 'https://www.nebutra.com/pebble/media/release-popup.gif',
+          mediaUrl: 'https://pebble.nebutra.com/media/release-popup.gif',
           releaseNotesUrl: 'https://github.com/nebutra/pebble/releases/tag/v1.4.128'
         },
         releasesBehind: null

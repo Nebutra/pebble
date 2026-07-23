@@ -1401,7 +1401,7 @@ mod tests {
 
     #[test]
     fn accepts_supported_browser_urls_only() {
-        assert!(validate_browser_url("https://www.nebutra.com/pebble").is_ok());
+        assert!(validate_browser_url("https://pebble.nebutra.com").is_ok());
         assert!(validate_browser_url("about:blank").is_ok());
         assert!(validate_browser_url("javascript:alert(1)").is_err());
         assert!(validate_browser_url("data:text/html,unsafe").is_err());
