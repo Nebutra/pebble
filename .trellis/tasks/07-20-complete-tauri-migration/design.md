@@ -80,7 +80,8 @@ body, authorization-header, or cache behavior.
 
 - Cross-platform behavior stays behind runtime/platform checks.
 - SSH and remote-host tests continue using deployed Go/relay contracts.
-- Negative legacy-brand fixtures remain because they enforce Pebble identity.
+- Repository paths and text retain no retired product identity or path forms;
+  regression fixtures assemble test values without embedding the retired name.
 - Historical schema compatibility remains unless an explicit migration proves
   stored data and telemetry consumers no longer need it.
 - macOS-only bundle preparation stays behind platform checks so Linux and

@@ -1,7 +1,10 @@
 import { readdir, readFile } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { scanLegacyBrandIdentifiers } from './legacy-brand-identifier-scan.mjs'
+import {
+  containsLegacyBrandIdentifier,
+  scanLegacyBrandIdentifiers
+} from './legacy-brand-identifier-scan.mjs'
 import { verifyPebbleRepositoryLayout } from './verify-pebble-repository-layout.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../..')
@@ -4437,7 +4440,7 @@ const checks = [
       text.includes('.replace(\'\\n\', "\\r\\n")') &&
       text.includes('write_script(&core, &core_source)?') &&
       !text.includes('sweep_legacy_bundle') &&
-      !text.toLowerCase().includes('orca') &&
+      !containsLegacyBrandIdentifier(text) &&
       text.includes('remove_managed')
   },
   {

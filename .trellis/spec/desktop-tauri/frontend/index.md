@@ -12,16 +12,17 @@ This directory contains guidelines for frontend development. Fill in each file w
 
 ## Guidelines Index
 
-| Guide                                             | Description                                          | Status  |
-| ------------------------------------------------- | ---------------------------------------------------- | ------- |
-| [Directory Structure](./directory-structure.md)   | Module organization and file layout                  | To fill |
-| [Component Guidelines](./component-guidelines.md) | Component patterns, props, composition               | To fill |
-| [Hook Guidelines](./hook-guidelines.md)           | Custom hooks, data fetching patterns                 | To fill |
-| [State Management](./state-management.md)         | Local state, global state, server state              | To fill |
-| [Quality Guidelines](./quality-guidelines.md)     | Renderer bootstrap entry and startup checks          | Active  |
-| [Product Origin](./product-origin.md)             | Canonical Pebble web and runtime endpoint contracts  | Active  |
-| [Release Signing](./release-signing.md)           | macOS notarization and Tauri updater trust contracts | Active  |
-| [Type Safety](./type-safety.md)                   | Type patterns, validation                            | To fill |
+| Guide                                                     | Description                                          | Status  |
+| --------------------------------------------------------- | ---------------------------------------------------- | ------- |
+| [Directory Structure](./directory-structure.md)           | Module organization and file layout                  | To fill |
+| [Component Guidelines](./component-guidelines.md)         | Component patterns, props, composition               | To fill |
+| [Hook Guidelines](./hook-guidelines.md)                   | Custom hooks, data fetching patterns                 | To fill |
+| [State Management](./state-management.md)                 | Local state, global state, server state              | To fill |
+| [Quality Guidelines](./quality-guidelines.md)             | Renderer bootstrap entry and startup checks          | Active  |
+| [Product Origin](./product-origin.md)                     | Canonical Pebble web and runtime endpoint contracts  | Active  |
+| [Retired Product Identity](./retired-product-identity.md) | Repository identity-removal contract                 | Active  |
+| [Release Signing](./release-signing.md)                   | macOS notarization and Tauri updater trust contracts | Active  |
+| [Type Safety](./type-safety.md)                           | Type patterns, validation                            | To fill |
 
 ---
 

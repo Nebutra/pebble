@@ -2,19 +2,8 @@ import { execFileSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-const scannerFiles = new Set([
-  'ROADMAP.md',
-  'config/scripts/legacy-brand-identifier-scan.mjs',
-  'config/scripts/legacy-brand-identifier-scan.test.mjs',
-  'config/scripts/verify-tauri-mainline.mjs'
-])
-
-export function isHistoricalEvidencePath(file) {
-  // Trellis task artifacts preserve migration rationale and are never shipped as product source.
-  return file.startsWith('.trellis/tasks/')
-}
-
 export function containsLegacyBrandIdentifier(value) {
+  // Construct the retired name so this scanner does not need a source exemption.
   const oldName = `${'or'}${'ca'}`
   const token = new RegExp(`(^|[^A-Za-z0-9_])${oldName}($|[^A-Za-z0-9_]|[A-Z])`, 'i')
   const legacyPrefix = new RegExp(`(^|[^A-Za-z0-9_])${oldName}_`, 'i')
@@ -25,9 +14,6 @@ export function containsLegacyBrandIdentifier(value) {
 export async function scanLegacyBrandIdentifiers(repoRoot, trackedFiles) {
   const failures = []
   for (const file of trackedFiles) {
-    if (scannerFiles.has(file) || isHistoricalEvidencePath(file)) {
-      continue
-    }
     if (containsLegacyBrandIdentifier(file)) {
       failures.push(`${file} (path)`)
       continue

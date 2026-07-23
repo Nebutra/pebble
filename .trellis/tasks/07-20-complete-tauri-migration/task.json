@@ -2,7 +2,7 @@
   "id": "complete-tauri-migration",
   "name": "complete-tauri-migration",
   "title": "Complete Tauri migration and remove legacy shell",
-  "description": "Remove Electron parity dependencies and obsolete Orca-related repository directories after migrating remaining E2E and computer-use ownership to Tauri/Rust/Go.",
+  "description": "Remove Electron parity dependencies and all retired product-identity residue after migrating remaining E2E and computer-use ownership to Tauri/Rust/Go.",
   "status": "in_progress",
   "dev_type": null,
   "scope": null,

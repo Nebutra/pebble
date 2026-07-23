@@ -76,8 +76,10 @@
 - [x] Remove ignored/generated Electron output.
 - [ ] Invert layout/mainline/brand gates to forbid legacy paths, dependencies,
   project names, and scripts.
-- [ ] Clean stale executable comments/docs while preserving negative fixtures and
-  useful historical evidence.
+- [x] Remove the retired product identifier from executable code, comments,
+  fixtures, task history, documentation, and repository paths.
+- [x] Uninstall the retired desktop application and remove its CLI, processes,
+  user data, preferences, workspace aliases, hooks, plugins, and agent skills.
 
 ## Phase 6: Complete Release Signing
 
@@ -123,6 +125,7 @@
   inspection, and updater manifest contract tests
 - [x] App Store Connect API-key materialization and notarization-mode tests
 - [x] Real App Store Connect API credentials authenticated with `notarytool`
-- [ ] `pnpm verify:tauri-mainline` and repository layout verification
+- [x] `pnpm verify:tauri-mainline` and repository layout verification
 - [ ] Repository-wide executable-reference scan returns no Electron legacy owner
-- [ ] `git diff --check`
+- [x] Repository-wide identity and path scan returns no retired product residue
+- [x] `git diff --check`
