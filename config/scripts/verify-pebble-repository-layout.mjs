@@ -14,7 +14,7 @@ const requiredPaths = [
   'native/zig-system/build.zig',
   'packages/contracts',
   'packages/product-core/package.json',
-  'docs/architecture',
+  'docs/reference/README.md',
   'tests/e2e/baselines/desktop/landing.png',
   'tests/e2e/baselines/desktop/update.png',
   'tests/e2e/baselines/desktop/crash.png',
@@ -102,7 +102,10 @@ if (!goModule.startsWith('module github.com/nebutra/pebble/runtime/go\n')) {
   failures.push('runtime/go must use the Nebutra Pebble module path')
 }
 const rustHostManifest = readFileSync(resolve(root, 'native/rust-host/Cargo.toml'), 'utf8')
-if (!rustHostManifest.includes('path = "src/lib.rs"') || !rustHostManifest.includes('path = "src/bin/pebble-runtime-status.rs"')) {
+if (
+  !rustHostManifest.includes('path = "src/lib.rs"') ||
+  !rustHostManifest.includes('path = "src/bin/pebble-runtime-status.rs"')
+) {
   failures.push('native/rust-host must resolve its canonical src crate entries')
 }
 const zigSystemBuild = readFileSync(resolve(root, 'native/zig-system/build.zig'), 'utf8')
