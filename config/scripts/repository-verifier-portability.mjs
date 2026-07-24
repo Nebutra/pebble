@@ -12,3 +12,7 @@ export function hasPebbleGoModulePath(source) {
 export function repositoryRelativePosixPath(repoRoot, filePath, pathImplementation = path) {
   return pathImplementation.relative(repoRoot, filePath).split(pathImplementation.sep).join('/')
 }
+
+export function normalizeContractSourceText(source) {
+  return source.replace(/\r\n?/g, '\n')
+}

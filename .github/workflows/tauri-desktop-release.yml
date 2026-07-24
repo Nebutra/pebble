@@ -134,6 +134,11 @@ jobs:
         working-directory: runtime/go
         run: go test ./...
 
+      - name: Prepare host Go sidecars for native tests
+        # Why: Tauri's build script resolves externalBin resources even for
+        # cargo test, before the later release build hook prepares its matrix.
+        run: node apps/desktop/scripts/prepare-go-sidecars.mjs --host-only
+
       - name: Test native Tauri host
         # Why: cfg-gated platform code must execute on its release runner;
         # compilation alone cannot catch platform-only startup regressions.

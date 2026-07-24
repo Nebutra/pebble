@@ -5,7 +5,10 @@ import {
   containsLegacyBrandIdentifier,
   scanLegacyBrandIdentifiers
 } from './legacy-brand-identifier-scan.mjs'
-import { repositoryRelativePosixPath } from './repository-verifier-portability.mjs'
+import {
+  normalizeContractSourceText,
+  repositoryRelativePosixPath
+} from './repository-verifier-portability.mjs'
 import { verifyPebbleRepositoryLayout } from './verify-pebble-repository-layout.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../..')
@@ -1387,6 +1390,8 @@ const checks = [
     file: 'apps/desktop/scripts/prepare-go-sidecars.mjs',
     expect: (text) =>
       text.includes('TAURI_ENV_TARGET_TRIPLE') &&
+      text.includes("process.argv.includes('--host-only')") &&
+      text.includes('if (!hostOnly)') &&
       text.includes("CGO_ENABLED: '0'") &&
       text.includes("'universal-apple-darwin'") &&
       text.includes("run('lipo'") &&
@@ -7430,9 +7435,9 @@ failures.push(...verifyPebbleRepositoryLayout())
 
 for (const check of checks) {
   const files = expandContractFiles(check.files ?? [check.file])
-  const text = (
-    await Promise.all(files.map((file) => readFile(resolve(repoRoot, file), 'utf8')))
-  ).join('\n')
+  const text = normalizeContractSourceText(
+    (await Promise.all(files.map((file) => readFile(resolve(repoRoot, file), 'utf8')))).join('\n')
+  )
   if (!matchesAcrossQuoteStyles(check, text)) {
     failures.push(`${check.name}: ${files.join(', ')}`)
   }

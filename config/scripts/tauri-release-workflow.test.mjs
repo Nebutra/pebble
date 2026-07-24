@@ -13,6 +13,7 @@ function releaseWorkflow() {
 }
 
 const releaseCutPath = resolve(import.meta.dirname, '../../.github/workflows/release-cut.yml')
+const tauriConfigPath = resolve(import.meta.dirname, '../../apps/desktop/src-tauri/tauri.conf.json')
 
 describe('Tauri release workflow signing gate', () => {
   it('is reusable by the single release-cut publisher and has no competing tag trigger', () => {
@@ -174,6 +175,28 @@ describe('Tauri release workflow signing gate', () => {
           'if-no-files-found': 'error'
         })
       })
+    )
+  })
+
+  it('prepares host-qualified Go sidecars before native Cargo tests', () => {
+    const steps = releaseWorkflow().jobs.build.steps
+    const prepareIndex = steps.findIndex(
+      ({ name }) => name === 'Prepare host Go sidecars for native tests'
+    )
+    const cargoTestIndex = steps.findIndex(({ name }) => name === 'Test native Tauri host')
+    const releaseBuildIndex = steps.findIndex(({ name }) => name === 'Build Tauri desktop bundle')
+
+    expect(prepareIndex).toBeGreaterThan(-1)
+    expect(prepareIndex).toBeLessThan(cargoTestIndex)
+    expect(cargoTestIndex).toBeLessThan(releaseBuildIndex)
+    expect(steps[prepareIndex].if).toBeUndefined()
+    expect(steps[prepareIndex]).toEqual(
+      expect.objectContaining({
+        run: 'node apps/desktop/scripts/prepare-go-sidecars.mjs --host-only'
+      })
+    )
+    expect(JSON.parse(readFileSync(tauriConfigPath, 'utf8')).build.beforeBuildCommand).toBe(
+      'node scripts/prepare-go-sidecars.mjs && npm run build'
     )
   })
 

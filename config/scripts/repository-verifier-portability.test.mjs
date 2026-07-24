@@ -2,6 +2,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   hasPebbleGoModulePath,
+  normalizeContractSourceText,
   repositoryRelativePosixPath
 } from './repository-verifier-portability.mjs'
 
@@ -32,5 +33,13 @@ describe('repository verifier portability', () => {
         path.win32
       )
     ).toBe('runtime/go/internal/runtimehttp/terminal.go')
+  })
+
+  it('normalizes contract source line endings without changing quotes or LF text', () => {
+    const lfSource = `if (connectionId) {\n  method: 'terminal-capabilities'\n}\n`
+    expect(normalizeContractSourceText(lfSource)).toBe(lfSource)
+    expect(
+      normalizeContractSourceText(`if (connectionId) {\r\n  method: 'terminal-capabilities'\r\n}\r`)
+    ).toBe(lfSource)
   })
 })
