@@ -6,13 +6,11 @@ import {
   type AgentAwakeSyncCoordinator
 } from './tauri-agent-awake-sync'
 
-type AwakeInput = Parameters<
-  Parameters<typeof createAgentAwakeSyncCoordinator>[0]['invokeSync']
->[0]
+type AwakeInput = Parameters<Parameters<typeof createAgentAwakeSyncCoordinator>[0]['invokeSync']>[0]
 
 function harness(initial: AwakeInput) {
   let input = initial
-  let listener = () => undefined
+  let listener: () => void = () => undefined
   const invokeSync = vi.fn(async () => undefined)
   let coordinator: AgentAwakeSyncCoordinator | undefined
   coordinator = createAgentAwakeSyncCoordinator({
@@ -52,12 +50,12 @@ describe('Tauri agent awake synchronization', () => {
   })
 
   it('deduplicates snapshots and serializes updates in their observed order', async () => {
-    let releaseFirst = () => undefined
+    let releaseFirst: () => void = () => undefined
     const firstPending = new Promise<void>((resolve) => {
       releaseFirst = resolve
     })
     let input: AwakeInput = { enabled: false, statuses: [] }
-    let listener = () => undefined
+    let listener: () => void = () => undefined
     const invokeSync = vi
       .fn<(input: AwakeInput) => Promise<void>>()
       .mockImplementationOnce(() => firstPending)
@@ -92,12 +90,12 @@ describe('Tauri agent awake synchronization', () => {
   })
 
   it('sends the latest queued state after an earlier native sync fails', async () => {
-    let rejectFirst = (_error: Error) => undefined
+    let rejectFirst: (error: Error) => void = () => undefined
     const firstPending = new Promise<void>((_resolve, reject) => {
       rejectFirst = reject
     })
     let input: AwakeInput = { enabled: false, statuses: [] }
-    let listener = () => undefined
+    let listener: () => void = () => undefined
     const invokeSync = vi
       .fn<(input: AwakeInput) => Promise<void>>()
       .mockImplementationOnce(() => firstPending)

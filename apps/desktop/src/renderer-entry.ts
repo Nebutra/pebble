@@ -1,5 +1,5 @@
 import { StrictMode, createElement } from 'react'
-import type { ReactElement } from 'react'
+import type { ComponentProps, ReactElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { useTranslation } from 'react-i18next'
 import { invoke } from '@tauri-apps/api/core'
@@ -128,17 +128,15 @@ function renderReactRoot(): void {
 
 function RendererRoot(): ReactElement {
   useTranslation()
-  return createElement(
-    RecoverableRenderErrorBoundary,
-    {
-      boundaryId: 'app.root',
-      surface: 'app-root',
-      title: translate('app.recoverableError.rootTitle', `${PRODUCT_NAME} hit a renderer error.`),
-      description: translate(
-        'app.recoverableError.rootDescription',
-        `The app shell could not finish rendering. Retry to remount it, or relaunch ${PRODUCT_NAME} if the error persists.`
-      )
-    },
-    createElement(App)
-  )
+  const boundaryProps = {
+    boundaryId: 'app.root',
+    surface: 'app-root',
+    title: translate('app.recoverableError.rootTitle', `${PRODUCT_NAME} hit a renderer error.`),
+    description: translate(
+      'app.recoverableError.rootDescription',
+      `The app shell could not finish rendering. Retry to remount it, or relaunch ${PRODUCT_NAME} if the error persists.`
+    ),
+    children: createElement(App)
+  } satisfies ComponentProps<typeof RecoverableRenderErrorBoundary>
+  return createElement(RecoverableRenderErrorBoundary, boundaryProps)
 }

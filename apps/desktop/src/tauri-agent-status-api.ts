@@ -57,7 +57,7 @@ export function getCurrentRuntimeAgentAwakeStatuses(): CurrentRuntimeAgentAwakeS
   return Array.from(currentRuntimePaneKeys)
     .map((paneKey) => bindingsByPaneKey.get(paneKey))
     .filter((binding): binding is RuntimeAgentBinding => binding !== undefined)
-    .map((binding) => ({
+    .map<CurrentRuntimeAgentAwakeStatus>((binding) => ({
       paneKey: binding.paneKey,
       state: binding.state,
       receivedAt: binding.receivedAt,
