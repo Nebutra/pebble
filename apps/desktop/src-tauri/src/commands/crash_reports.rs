@@ -19,9 +19,7 @@ use tauri::Manager;
 use uuid::Uuid;
 
 use super::diagnostics::{
-    collect_crash_diagnostic_bundle_attachment, create_feedback_multipart_form,
-    CrashFeedbackIdentity, CrashReportDiagnosticBundle, DiagnosticsState,
-    FeedbackDiagnosticBundleAttachment,
+    collect_crash_diagnostic_bundle_attachment, CrashReportDiagnosticBundle, DiagnosticsState,
 };
 
 const CRASH_REPORTS_FILE: &str = "crash-reports.json";
@@ -29,7 +27,6 @@ const CRASH_REPORTS_FILE: &str = "crash-reports.json";
 // the snapshot on load and folded back in when the journal grows past MAX_JOURNAL_ENTRIES.
 const CRASH_REPORTS_JOURNAL_FILE: &str = "crash-reports.log.ndjson";
 const MAX_JOURNAL_ENTRIES: usize = 64;
-const FEEDBACK_API_URL: &str = "https://pebble.nebutra.com/v1/feedback";
 const MAX_REPORTS: usize = 5;
 const MAX_BREADCRUMBS: usize = 30;
 const MAX_BREADCRUMB_NAME_LENGTH: usize = 80;
@@ -41,7 +38,6 @@ const MAX_RENDERER_ERROR_KEY_AGE_MS: u128 = RENDERER_ERROR_DEDUPE_MS * 2;
 const RELATED_CRASH_WINDOW_MS: i128 = 5_000;
 const SECONDARY_CANNOT_UNWIND_WINDOW: Duration = Duration::from_secs(5);
 const CANNOT_UNWIND_REASON: &str = "panic in a function that cannot unwind";
-const FEEDBACK_REQUEST_TIMEOUT_SECONDS: u64 = 10;
 const TAURI_ELECTRON_VERSION_SENTINEL: &str = "tauri";
 const FORMATTED_REPORT_TRUNCATION_SUFFIX: &str =
     "\n\n[Crash report truncated to fit feedback endpoint limits.]";
@@ -256,31 +252,31 @@ fn web_content_crash_source(label: &str) -> &'static str {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CrashReportRecord {
-    id: String,
-    created_at: String,
-    status: String,
-    source: String,
-    process_type: String,
-    reason: String,
-    exit_code: Option<i64>,
-    app_version: String,
-    platform: String,
-    os_release: String,
-    arch: String,
-    electron_version: String,
-    chrome_version: String,
-    details: Map<String, Value>,
+    pub(crate) id: String,
+    pub(crate) created_at: String,
+    pub(crate) status: String,
+    pub(crate) source: String,
+    pub(crate) process_type: String,
+    pub(crate) reason: String,
+    pub(crate) exit_code: Option<i64>,
+    pub(crate) app_version: String,
+    pub(crate) platform: String,
+    pub(crate) os_release: String,
+    pub(crate) arch: String,
+    pub(crate) electron_version: String,
+    pub(crate) chrome_version: String,
+    pub(crate) details: Map<String, Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    breadcrumbs: Option<Vec<CrashReportBreadcrumb>>,
+    pub(crate) breadcrumbs: Option<Vec<CrashReportBreadcrumb>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CrashReportBreadcrumb {
-    created_at: String,
-    name: String,
+    pub(crate) created_at: String,
+    pub(crate) name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<Map<String, Value>>,
+    pub(crate) data: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -576,18 +572,6 @@ pub async fn crash_reports_submit(
         &input.app_version,
     );
     let diagnostic_bundle = diagnostic_upload.diagnostic_bundle.clone();
-    let feedback = match &report {
-        Some(report) => {
-            format_crash_report_text(report, input.notes.as_deref(), Some(&diagnostic_bundle))
-        }
-        None => format_uncaptured_crash_report_text(
-            input.notes.as_deref(),
-            &input.app_version,
-            input.chrome_version.as_deref(),
-            Some(&diagnostic_bundle),
-        ),
-    };
-
     if let Some(report) = &report {
         if report.status != "pending" && report.status != "dismissed" {
             return Ok(CrashReportSubmitResult {
@@ -621,12 +605,19 @@ pub async fn crash_reports_submit(
         }
     }
 
-    let result = post_crash_feedback(
-        &input,
-        feedback,
-        diagnostic_upload.feedback_diagnostic_bundle,
+    let result = super::sentry_reporting::submit_manual_crash(
+        super::sentry_reporting::ManualCrashSubmission {
+            report: report.as_ref(),
+            notes: input.notes.as_deref(),
+            submit_anonymously: input.submit_anonymously.unwrap_or(false),
+            github_login: input.github_login.as_deref(),
+            github_email: input.github_email.as_deref(),
+            app_version: &input.app_version,
+            chrome_version: input.chrome_version.as_deref(),
+        },
+        diagnostic_upload.sentry_diagnostic_attachment,
     )
-    .await;
+    .map_err(|error| (None, error));
     if let Some(report) = &report {
         mark_submission_finished(&state, &report.id)?;
     }
@@ -752,7 +743,7 @@ fn record_report(
     input: CrashReportCreateInput,
 ) -> Result<CrashReportRecord, String> {
     let store = crash_report_store(app)?;
-    let _lock = lock_state(&state.file_lock)?;
+    let file_lock = lock_state(&state.file_lock)?;
     let report = CrashReportRecord {
         id: Uuid::new_v4().to_string(),
         created_at: current_iso_timestamp(),
@@ -777,6 +768,8 @@ fn record_report(
             report: report.clone(),
         },
     )?;
+    drop(file_lock);
+    super::sentry_reporting::capture_automatic_report(app, &report);
     Ok(report)
 }
 
@@ -1014,61 +1007,6 @@ fn write_snapshot(path: &Path, reports: &[CrashReportRecord]) -> Result<(), Stri
     fs::rename(&tmp_path, path)
         .map_err(|error| format!("Could not replace Pebble crash reports: {error}"))?;
     Ok(())
-}
-
-async fn post_crash_feedback(
-    input: &CrashReportSubmitInput,
-    feedback: String,
-    diagnostic_bundle: Option<FeedbackDiagnosticBundleAttachment>,
-) -> Result<(), (Option<u16>, String)> {
-    let anonymous = input.submit_anonymously.unwrap_or(false);
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(FEEDBACK_REQUEST_TIMEOUT_SECONDS))
-        .build()
-        .map_err(|error| (None, error.to_string()))?;
-    let request = client.post(FEEDBACK_API_URL);
-    let response = if let Some(diagnostic_bundle) = diagnostic_bundle {
-        let form = create_feedback_multipart_form(
-            feedback,
-            CrashFeedbackIdentity {
-                app_version: &input.app_version,
-                github_login: input.github_login.as_deref(),
-                github_email: input.github_email.as_deref(),
-                submit_anonymously: anonymous,
-            },
-            diagnostic_bundle,
-        )
-        .map_err(|error| (None, error))?;
-        request
-            .multipart(form)
-            .send()
-            .await
-            .map_err(|error| (None, error.to_string()))?
-    } else {
-        let body = json!({
-            "feedback": feedback,
-            "submissionType": "crash",
-            "githubLogin": if anonymous { None } else { input.github_login.clone() },
-            "githubEmail": if anonymous { None } else { input.github_email.clone() },
-            "appVersion": input.app_version,
-            "platform": current_node_platform(),
-            "osRelease": current_os_release(),
-            "arch": current_node_arch(),
-        });
-        request
-            .json(&body)
-            .send()
-            .await
-            .map_err(|error| (None, error.to_string()))?
-    };
-    if response.status().is_success() {
-        Ok(())
-    } else {
-        Err((
-            Some(response.status().as_u16()),
-            format!("status {}", response.status().as_u16()),
-        ))
-    }
 }
 
 fn mark_submission_started(state: &CrashReportsState, report_id: &str) -> Result<bool, String> {

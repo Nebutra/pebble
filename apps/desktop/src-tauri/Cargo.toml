@@ -41,6 +41,16 @@ json5 = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
+# Pebble owns panic persistence and consent gating; keep Sentry's automatic
+# panic hook disabled so the local crash journal remains authoritative.
+sentry = { version = "0.48.5", default-features = false, features = [
+  "backtrace",
+  "contexts",
+  "debug-images",
+  "release-health",
+  "reqwest",
+  "rustls"
+] }
 # Speech model archives are integrity-verified before feeding native parsers.
 sha2 = "0.10"
 sha1 = "0.10"
@@ -124,3 +134,9 @@ default = ["local-speech"]
 # prebuilt sherpa-onnx binary for the host target; disable the feature to
 # build without network access — local dictation then reports a typed gap.
 local-speech = ["dep:sherpa-rs"]
+
+[profile.release]
+# Sentry uploads these split line tables from CI; they are not bundled into the
+# shipped application and keep native symbolication useful without full debug info.
+debug = "line-tables-only"
+split-debuginfo = "packed"

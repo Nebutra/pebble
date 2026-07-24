@@ -21,7 +21,7 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [Quality Guidelines](./quality-guidelines.md)             | Renderer bootstrap entry and startup checks          | Active  |
 | [Product Origin](./product-origin.md)                     | Canonical Pebble web and runtime endpoint contracts  | Active  |
 | [Retired Product Identity](./retired-product-identity.md) | Repository identity-removal contract                 | Active  |
-| [Release Signing](./release-signing.md)                   | macOS notarization and Tauri updater trust contracts | Active  |
+| [Release Signing](./release-signing.md)                   | Signing, updater, and release-observability contracts | Active  |
 | [Type Safety](./type-safety.md)                           | Type patterns, validation                            | To fill |
 
 ---

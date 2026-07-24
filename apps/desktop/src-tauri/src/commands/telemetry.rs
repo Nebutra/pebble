@@ -139,9 +139,15 @@ pub async fn telemetry_set_opt_in(app: tauri::AppHandle, opted_in: bool) -> Resu
         "settings"
     };
     state.opted_in = Some(opted_in);
+    if !opted_in {
+        // Why: automatic error delivery must stop before the persisted opt-out
+        // becomes observable to the rest of the renderer.
+        super::sentry_reporting::set_automatic_capture(&app, false);
+    }
     persist_state(&app, &state)?;
 
     if opted_in {
+        super::sentry_reporting::set_automatic_capture(&app, true);
         if pending_banner {
             capture(&app, &state, "app_opened", json!({ "nth_repo_added": 0 })).await?;
         }
@@ -168,6 +174,7 @@ pub async fn telemetry_acknowledge_banner(app: tauri::AppHandle) -> Result<(), S
     consume_mutation_token()?;
     state.opted_in = Some(true);
     persist_state(&app, &state)?;
+    super::sentry_reporting::set_automatic_capture(&app, true);
     capture(&app, &state, "app_opened", json!({ "nth_repo_added": 0 })).await
 }
 
@@ -175,6 +182,10 @@ impl ConsentState {
     fn effective_enabled(&self) -> bool {
         matches!(self, Self::Enabled)
     }
+}
+
+pub(crate) fn automatic_capture_enabled(app: &tauri::AppHandle) -> Result<bool, String> {
+    Ok(resolve_consent(&load_or_create_state(app)?).effective_enabled())
 }
 
 fn resolve_consent(state: &TelemetryState) -> ConsentState {

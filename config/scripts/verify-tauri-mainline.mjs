@@ -5326,7 +5326,6 @@ const checks = [
     file: 'apps/desktop/src-tauri/src/commands/crash_reports.rs',
     expect: (text) =>
       text.includes('const CRASH_REPORTS_FILE: &str = "crash-reports.json"') &&
-      text.includes('const FEEDBACK_API_URL: &str = "https://pebble.nebutra.com/v1/feedback"') &&
       text.includes('pub async fn crash_reports_get_latest_pending') &&
       text.includes('pub async fn crash_reports_record_renderer_error') &&
       text.includes('pub fn crash_reports_record_breadcrumb') &&
@@ -5336,7 +5335,8 @@ const checks = [
       text.includes('format_desktop_shell_line') &&
       text.includes('"Desktop shell: Tauri"') &&
       text.includes('collect_crash_diagnostic_bundle_attachment') &&
-      text.includes('create_feedback_multipart_form')
+      text.includes('submit_manual_crash') &&
+      text.includes('capture_automatic_report')
   },
   {
     name: 'Tauri Rust host panics persist through the native crash journal',

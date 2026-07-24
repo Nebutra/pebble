@@ -94,6 +94,7 @@ pub mod runtime_event_stream;
 pub mod runtime_process;
 pub mod runtime_pty_input;
 pub mod runtime_status;
+pub mod sentry_reporting;
 pub mod session_store;
 pub mod settings_store;
 pub mod shell;

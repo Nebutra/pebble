@@ -411,9 +411,12 @@ executable, listener, and exit code into one short incident window. A child that
 exits during the five-second startup grace is treated as an app-replacement handoff
 rather than a crash; only a settled runtime's nonzero exit reaches the pending crash
 surface.
-Longer-term release hardening still includes a rotating native NDJSON sink and
-Crashpad/Sentry Native-class stack capture for platforms without system crash
-reports.
+Sentry Cloud now receives consent-gated Rust/native/WebView/React events through
+the Rust host, with sampled startup transactions, release health, renderer source
+maps, and native debug-file uploads. The local crash journal remains authoritative
+and manual reviewed crash submissions attach redacted diagnostics directly to
+Sentry. Longer-term hardening still includes a rotating native NDJSON sink and
+Crashpad-class minidumps for platforms without system crash reports.
 
 Tauri runtime startup now distinguishes a spawned Go child from a ready HTTP
 listener. Every native JSON request joins one shared readiness promise, probes
@@ -590,6 +593,24 @@ platform, kernel release, and architecture metadata. Anonymous submissions drop
 all renderer-supplied GitHub identity at the native boundary, and all text fields
 are bounded before network I/O. The Nebutra project still must implement the
 documented `POST /v1/feedback` production route before public release.
+
+### PostHog And Sentry Operations
+
+PostHog remains the anonymous product-event owner; the existing Rust transport,
+typed allowlist, install identity, consent precedence, and event budgets are
+unchanged. Sentry is the error/performance/release-health owner. Its Rust SDK is
+compiled without an automatic panic hook so Pebble persists the local crash
+record first, then forwards a sanitized event only when automatic telemetry is
+enabled. The existing crash Send action is explicit one-time consent and sends
+the reviewed event plus optional redacted NDJSON attachment directly to Sentry.
+
+Stable and RC release builds require `PEBBLE_POSTHOG_WRITE_KEY`,
+`PEBBLE_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT`.
+Renderer source maps are uploaded and removed before bundling; native split debug
+files are uploaded from each matrix target. Full session replay, DOM autocapture,
+user profiles, and a Pebble-owned telemetry proxy are not part of the initial
+deployment. The operational contract and RC verification sequence live in
+`docs/reference/telemetry-operations.md`.
 
 ### Tauri Markdown PDF Export Delta
 
@@ -1488,6 +1509,9 @@ Domain namespace:
   `relay.pebble.nebutra.com`, `telemetry.pebble.nebutra.com`, and
   `assets.pebble.nebutra.com`. `api.pebble.nebutra.com` is optional if a future
   public API needs a separate origin.
+- `telemetry.pebble.nebutra.com` is reservation-only while PostHog Cloud and
+  Sentry Cloud are the production destinations. It needs no DNS record, origin,
+  database, or storage for the first release.
 - Current desktop and mobile clients remain path-based on
   `https://pebble.nebutra.com`; reserved hosts are namespace protection, not
   permission to move an existing route without a client migration.
@@ -1520,14 +1544,21 @@ Route and deployment ownership:
   `POST /diagnostics/upload`, `POST /diagnostics/delete/:ticketId`, and
   `POST /v1/feedback` on the canonical public host, directly or through an
   internal edge reverse proxy.
-- `POST /v1/feedback` accepts JSON feedback and crash submissions plus
-  multipart crash submissions with a diagnostic NDJSON attachment. Submissions,
+- Current clients use `POST /v1/feedback` for ordinary feedback. The route should
+  retain legacy JSON/multipart crash compatibility for at least one complete
+  release cycle, but new reviewed crash submissions go directly to Sentry.
+  Submissions,
   optional identity, and attachments are private support data: do not place raw
   payloads in public issue trackers, analytics events, access logs, or other
   PII-unsafe destinations.
 - GitHub continues to own Releases, tags, updater artifacts, installer assets,
   and `releases.atom`; the product origin may link or proxy discovery pages but
   does not become the release artifact authority.
+- PostHog Cloud owns anonymous product analytics. Sentry Cloud owns desktop
+  errors, startup performance, release health, renderer source maps, native debug
+  files, and reviewed crash attachments. Neither requires Pebble DNS or an
+  ingestion service; vendor project access, quota alerts, retention, and incident
+  ownership remain release operations.
 
 Diagnostics protocol:
 
@@ -1548,7 +1579,8 @@ Diagnostics protocol:
 Minimum production topology:
 
 - CDN/edge termination and routing for the canonical, status, and staging hosts.
-- One horizontally deployable API service for diagnostics and feedback.
+- One horizontally deployable API service for ordinary feedback, independent
+  reviewed diagnostic uploads/deletion, and legacy crash compatibility.
 - Managed Postgres for tickets, deletion state, support metadata, and audit
   records, with encryption, backups, and point-in-time recovery.
 - Private object storage for diagnostic attachments; objects must not be public

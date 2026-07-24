@@ -220,6 +220,45 @@ describe('Tauri release workflow signing gate', () => {
     )
   })
 
+  it('uses one Sentry release distribution across renderer and native artifacts', () => {
+    const steps = releaseWorkflow().jobs.build.steps
+    const observabilityPreflight = steps.find(
+      (step) => step.name === 'Verify observability release configuration'
+    )
+    const buildStep = steps.find((step) => step.name === 'Build Tauri desktop bundle')
+    const debugUpload = steps.find((step) => step.name === 'Upload Sentry native debug files')
+
+    expect(buildStep.env).toEqual(
+      expect.objectContaining({
+        PEBBLE_SENTRY_DSN: '${{ secrets.PEBBLE_SENTRY_DSN }}',
+        PEBBLE_SENTRY_DIST: expect.stringContaining('matrix.target_triple'),
+        SENTRY_AUTH_TOKEN: '${{ secrets.SENTRY_AUTH_TOKEN }}',
+        SENTRY_ORG: '${{ vars.SENTRY_ORG }}',
+        SENTRY_PROJECT: '${{ vars.SENTRY_PROJECT }}'
+      })
+    )
+    expect(observabilityPreflight).toEqual(
+      expect.objectContaining({
+        env: expect.objectContaining({
+          PEBBLE_POSTHOG_WRITE_KEY: '${{ secrets.PEBBLE_POSTHOG_WRITE_KEY }}',
+          PEBBLE_SENTRY_DSN: buildStep.env.PEBBLE_SENTRY_DSN,
+          PEBBLE_SENTRY_DIST: buildStep.env.PEBBLE_SENTRY_DIST
+        }),
+        run: 'node config/scripts/verify-observability-release-config.mjs'
+      })
+    )
+    expect(debugUpload).toEqual(
+      expect.objectContaining({
+        env: expect.objectContaining({
+          TAURI_RELEASE_TARGET_TRIPLE: '${{ matrix.target_triple }}',
+          TAURI_RELEASE_TARGET_RELEASE_DIR: '${{ matrix.target_release_dir }}',
+          PEBBLE_SENTRY_DIST: buildStep.env.PEBBLE_SENTRY_DIST
+        }),
+        run: 'node config/scripts/upload-sentry-native-debug-files.mjs'
+      })
+    )
+  })
+
   it('imports the real Windows PFX before preparing the ephemeral signing config', () => {
     const steps = releaseWorkflow().jobs.build.steps
     const importIndex = steps.findIndex(({ name }) => name === 'Import Windows release certificate')

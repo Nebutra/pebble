@@ -10,7 +10,6 @@ use std::{
 
 use chrono::{SecondsFormat, Utc};
 use regex::Regex;
-use reqwest::multipart::{Form, Part};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use tauri::Manager;
@@ -53,7 +52,7 @@ struct CollectedDiagnosticBundle {
 }
 
 #[derive(Debug, Clone)]
-pub struct FeedbackDiagnosticBundleAttachment {
+pub struct SentryDiagnosticAttachment {
     pub bundle_submission_id: String,
     pub content: String,
     pub bytes: usize,
@@ -63,7 +62,7 @@ pub struct FeedbackDiagnosticBundleAttachment {
 #[derive(Debug, Clone)]
 pub struct CrashDiagnosticBundleAttachment {
     pub diagnostic_bundle: CrashReportDiagnosticBundle,
-    pub feedback_diagnostic_bundle: Option<FeedbackDiagnosticBundleAttachment>,
+    pub sentry_diagnostic_attachment: Option<SentryDiagnosticAttachment>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -291,7 +290,7 @@ pub fn collect_crash_diagnostic_bundle_attachment(
     match collect_diagnostic_bundle(app, app_version, CRASH_REPORT_LOG_LOOKBACK_MINUTES) {
         Ok(bundle) => CrashDiagnosticBundleAttachment {
             diagnostic_bundle: attached_crash_diagnostic_bundle(&bundle),
-            feedback_diagnostic_bundle: Some(FeedbackDiagnosticBundleAttachment {
+            sentry_diagnostic_attachment: Some(SentryDiagnosticAttachment {
                 bundle_submission_id: bundle.bundle_submission_id,
                 content: bundle.payload,
                 bytes: bundle.bytes,
@@ -783,53 +782,6 @@ fn resolve_delete_endpoint(token_endpoint: &str, ticket_id: &str) -> Result<Stri
         .map_err(|_| "invalid tokenEndpoint configuration".to_string())
 }
 
-pub fn create_feedback_multipart_form(
-    feedback: String,
-    input: CrashFeedbackIdentity<'_>,
-    attachment: FeedbackDiagnosticBundleAttachment,
-) -> Result<Form, String> {
-    let part = Part::text(attachment.content)
-        .file_name(format!(
-            "pebble-diagnostics-{}.ndjson",
-            attachment.bundle_submission_id
-        ))
-        .mime_str(DIAGNOSTIC_BUNDLE_CONTENT_TYPE)
-        .map_err(|error| error.to_string())?;
-    let mut form = Form::new()
-        .text("feedback", feedback)
-        .text("submissionType", "crash")
-        .text("appVersion", input.app_version.to_string())
-        .text("platform", current_node_platform())
-        .text("osRelease", current_os_release())
-        .text("arch", current_node_arch())
-        .text(
-            "diagnosticBundleSubmissionId",
-            attachment.bundle_submission_id,
-        )
-        .text("diagnosticBundleBytes", attachment.bytes.to_string())
-        .text(
-            "diagnosticBundleSpanCount",
-            attachment.span_count.to_string(),
-        )
-        .part("diagnosticBundleFile", part);
-    if !input.submit_anonymously {
-        if let Some(github_login) = input.github_login {
-            form = form.text("githubLogin", github_login.to_string());
-        }
-        if let Some(github_email) = input.github_email {
-            form = form.text("githubEmail", github_email.to_string());
-        }
-    }
-    Ok(form)
-}
-
-pub struct CrashFeedbackIdentity<'a> {
-    pub app_version: &'a str,
-    pub github_login: Option<&'a str>,
-    pub github_email: Option<&'a str>,
-    pub submit_anonymously: bool,
-}
-
 fn confirm_bundle_upload(bundle: &PendingDiagnosticBundle) -> bool {
     matches!(
         rfd::MessageDialog::new()
@@ -868,7 +820,7 @@ fn not_uploaded_crash_diagnostic_bundle(reason: &str) -> CrashDiagnosticBundleAt
             bytes: None,
             span_count: None,
         },
-        feedback_diagnostic_bundle: None,
+        sentry_diagnostic_attachment: None,
     }
 }
 

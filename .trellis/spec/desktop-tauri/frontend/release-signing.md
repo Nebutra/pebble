@@ -108,3 +108,80 @@ env:
 
 The macOS platform override owns its pre-bundle helper resource, while shared
 updater signing inputs remain available to every updater-producing release leg.
+
+## Scenario: Sentry Release Artifacts
+
+### 1. Scope / Trigger
+
+- Trigger: changing stable/RC observability credentials, Vite source maps,
+  Cargo release debug information, or the desktop release matrix.
+
+### 2. Signatures
+
+- Observability preflight:
+  `node config/scripts/verify-observability-release-config.mjs`.
+- Renderer postbuild:
+  `node apps/desktop/scripts/upload-sentry-renderer-artifacts.mjs`.
+- Native upload:
+  `node config/scripts/upload-sentry-native-debug-files.mjs`.
+- Release identity: `pebble@<version>`.
+- Distribution identity: `<stable-or-rc>-<target-triple>`.
+
+### 3. Contracts
+
+- Runtime secrets: `PEBBLE_POSTHOG_WRITE_KEY` and `PEBBLE_SENTRY_DSN`.
+- CI-only Sentry management inputs: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and
+  `SENTRY_PROJECT`; they must never be compiled into the application.
+- `PEBBLE_SENTRY_DIST` must exactly match the release channel and matrix target.
+- Configured stable/RC renderer builds emit hidden maps, upload minified files
+  and maps, then delete every `.map` before Tauri bundles `dist`.
+- Cargo release builds retain split line-table debug information. Native upload
+  scans only `apps/desktop/src-tauri/target/<matrix release directory>`.
+- Sentry release-health sessions use release and environment; the Sentry session
+  protocol has no distribution field. Error events, startup transactions, and
+  uploaded artifacts carry the target-specific distribution.
+
+### 4. Validation & Error Matrix
+
+- Either vendor runtime key missing -> fail stable/RC preflight.
+- DSN configured but auth/org/project/dist incomplete -> fail and print only
+  missing variable names.
+- Distribution differs from `<channel>-<target-triple>` -> fail before build.
+- Native release directory is absolute, escapes Cargo target, or is missing ->
+  fail before invoking Sentry CLI.
+- Sentry CLI failure -> redact auth token, DSN, and PostHog key from output.
+- Source-map upload failure -> fail postbuild before packaging; do not ship maps.
+
+### 5. Good/Base/Bad Cases
+
+- Good: renderer and native artifacts use one release and matrix-specific dist.
+- Base: development or unconfigured builds emit no maps and perform no upload.
+- Bad: uploading debug files from the whole repository or leaving `.map` files
+  in the packaged renderer directory.
+
+### 6. Tests Required
+
+- `sentry-release-config.test.mjs`: no-op builds, exact release/dist, incomplete
+  credentials, DSN validation, directory containment, and output redaction.
+- `tauri-release-workflow.test.mjs`: preflight/build/native upload share the same
+  DSN, project, release channel, target triple, and distribution expression.
+- Run an unconfigured renderer production build and assert postbuild succeeds
+  without Sentry network configuration.
+- Run `verify:tauri-mainline`, Rust tests, formatter, and `git diff --check`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```yaml
+TAURI_RELEASE_TARGET_RELEASE_DIR: ../../
+```
+
+#### Correct
+
+```yaml
+TAURI_RELEASE_TARGET_RELEASE_DIR: universal-apple-darwin/release
+```
+
+The explicit contained directory keeps each matrix leg from uploading unrelated
+build products or repository contents.

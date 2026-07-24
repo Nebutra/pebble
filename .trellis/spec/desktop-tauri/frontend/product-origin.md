@@ -24,7 +24,10 @@
   bundle body; response JSON is `{"ticket_id":"<ticketId>"}`.
 - Diagnostics deletion:
   `POST https://pebble.nebutra.com/diagnostics/delete/:ticketId` with `{}`.
-- Feedback and crash reports: `POST https://pebble.nebutra.com/v1/feedback`.
+- Ordinary feedback and legacy crash compatibility:
+  `POST https://pebble.nebutra.com/v1/feedback`.
+- New reviewed crash submissions and consent-gated automatic crash events:
+  Sentry Cloud, configured by `PEBBLE_SENTRY_DSN`.
 - Public docs: `https://pebble.nebutra.com/docs/*`.
 
 ### 3. Contracts
@@ -51,9 +54,11 @@
 - The feedback handler accepts JSON feedback with
   `submissionType: "feedback"`, JSON crash reports with
   `submissionType: "crash"`, and multipart crash submissions when
-  `diagnosticBundleFile` is attached. Optional identity and diagnostic contents
-  remain private support data and must not be copied into public trackers,
-  analytics, or unredacted access logs.
+  `diagnosticBundleFile` is attached for legacy clients. New clients keep
+  ordinary feedback on this route but send reviewed crash events and optional
+  redacted NDJSON attachments directly to Sentry. Optional identity and
+  diagnostic contents remain private support data and must not be copied into
+  public trackers, product analytics, or unredacted access logs.
 - Current clients remain path-based on `pebble.nebutra.com`. Deploy
   `status.pebble.nebutra.com` and `staging.pebble.nebutra.com`; reserve `app`,
   `cloud`, `relay`, `telemetry`, `assets`, and optional `api` subdomains under
@@ -85,6 +90,8 @@
   the response or block deployment.
 - Feedback/crash data lands in public or PII-unsafe storage/logging -> block
   deployment.
+- A new reviewed crash submission still calls `/v1/feedback` -> fail; only
+  ordinary feedback and legacy client compatibility remain on that route.
 - DNS/TLS route unavailable -> block public release; do not add a client-side
   legacy fallback.
 
@@ -113,8 +120,9 @@
   diagnostics token/upload/delete, Homebrew, and release-note contracts.
 - `diagnostics.rs` tests pin `POST` token/upload/delete behavior, same-host URL
   validation, the 4 MiB cap, bearer NDJSON headers, and ticket response parsing.
-- Feedback and crash-report tests pin JSON feedback/crash bodies, multipart
-  crash diagnostics, anonymity, redaction, and field/body limits.
+- Feedback tests pin JSON bodies, anonymity, and field/body limits. Crash-report
+  and Sentry tests pin direct reviewed submission, optional redacted attachment,
+  automatic consent gating, stable grouping, and no sent transition on failure.
 - Residue scans require legacy origins only in ROADMAP and reject a canonical
   origin followed by `/pebble`; run relevant lint/typecheck and
   `git diff --check`.
@@ -135,3 +143,18 @@ const DOCS_URL = 'https://pebble.nebutra.com/docs'
 
 The dedicated host is the product namespace, so retaining `/pebble` creates a
 second, drift-prone routing convention.
+
+#### Wrong
+
+```rust
+submit_reviewed_crash("https://pebble.nebutra.com/v1/feedback", report)
+```
+
+#### Correct
+
+```rust
+sentry_reporting::submit_manual_crash(report, diagnostic_attachment)
+```
+
+The crash dialog is explicit consent, but its transport is Sentry; the Pebble
+API remains responsible for ordinary feedback and standalone diagnostics.

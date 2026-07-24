@@ -115,6 +115,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@monaco-editor/react": "^4.7.0",
     "@playwright/test": "^1.59.1",
+    "@sentry/cli": "3.6.1",
     "@tailwindcss/vite": "^4.2.4",
     "@tanstack/react-virtual": "^3.13.24",
     "@testing-library/jest-dom": "^6.9.1",

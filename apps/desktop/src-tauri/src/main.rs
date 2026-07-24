@@ -25,6 +25,7 @@ fn main() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let _sentry_guard = commands::sentry_reporting::init_client();
     let browser_interception_state =
         commands::browser_navigation_interception::NativeBrowserNavigationInterceptionState::default();
     let fulfillment_protocol_state = browser_interception_state.clone();
@@ -44,6 +45,7 @@ pub fn run() {
         .manage(commands::browser_screencast::BrowserScreencastState::default())
         .manage(commands::browser_video_recording::BrowserVideoRecordingState::default())
         .manage(commands::crash_reports::CrashReportsState::default())
+        .manage(commands::sentry_reporting::SentryReportingState::default())
         .manage(commands::native_session_recovery::NativeSessionState::default())
         .manage(native_quit::NativeQuitState::default())
         .manage(commands::diagnostics::DiagnosticsState::default())
@@ -85,6 +87,7 @@ pub fn run() {
             // Why: ABI and window setup run before build returns; install the
             // host hook here so their panics still reach the crash journal.
             commands::crash_reports::install_native_panic_hook(app.handle().clone());
+            commands::sentry_reporting::sync_initial_consent(app.handle());
             // Why: Tauri invokes setup from AppKit's didFinishLaunching callback,
             // where an escaping Rust panic aborts because Objective-C cannot unwind it.
             if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -445,6 +448,7 @@ pub fn run() {
     termination_signal::install(app.handle().clone());
     app.run(|app_handle, event| match event {
         tauri::RunEvent::Ready => {
+            commands::sentry_reporting::mark_ready(app_handle);
             let _ = commands::native_session_recovery::record_stage(app_handle, "ready");
             primary_window::schedule_launch_reveal_fallback(app_handle.clone());
             #[cfg(target_os = "macos")]
@@ -480,6 +484,7 @@ pub fn run() {
             }
         }
         tauri::RunEvent::Exit => {
+            commands::sentry_reporting::shutdown(app_handle);
             app_handle
                 .state::<commands::agent_awake::AgentAwakeState>()
                 .shutdown();

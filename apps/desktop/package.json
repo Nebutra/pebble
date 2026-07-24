@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5174",
     "build": "vite build",
-    "postbuild": "node scripts/verify-settings-bundle-boundary.mjs",
+    "postbuild": "node scripts/verify-settings-bundle-boundary.mjs && node scripts/upload-sentry-renderer-artifacts.mjs",
     "preview:optimized:renderer": "vite preview --host 127.0.0.1 --port 4175 --strictPort",
     "typecheck": "tsc --noEmit",
     "verify:mainline": "node ../../config/scripts/verify-pebble-repository-layout.mjs && node ../../config/scripts/verify-tauri-mainline.mjs && cd ../.. && node config/scripts/verify-tauri-preload-coverage.mjs && node config/scripts/verify-tauri-runtime-method-coverage.mjs",

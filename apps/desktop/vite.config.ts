@@ -9,6 +9,9 @@ const packageDir = import.meta.dirname
 const repoRoot = resolve(packageDir, '../..')
 const rendererSource = resolve(repoRoot, 'packages/product-core/renderer/src')
 const rootNodeModules = resolve(repoRoot, 'node_modules')
+const sentryReleaseBuild =
+  Boolean(process.env.PEBBLE_SENTRY_DSN?.trim()) &&
+  ['stable', 'rc'].includes(process.env.PEBBLE_BUILD_IDENTITY ?? '')
 
 function createBundleBoundaryAudit(): Plugin | null {
   if (process.env.PEBBLE_BUNDLE_BOUNDARY_AUDIT !== '1') {
@@ -125,6 +128,9 @@ export default defineConfig({
     modulePreload: false,
     outDir: resolve(packageDir, 'dist'),
     emptyOutDir: true,
+    // Why: Sentry needs maps for release symbolication, but hidden maps are
+    // deleted by postbuild before Tauri packages the renderer directory.
+    sourcemap: sentryReleaseBuild ? 'hidden' : false,
     // Why: manual vendor chunks can absorb Rollup's dynamic-import helper and
     // force bootstrap to execute app code before its startup diagnostics.
     rollupOptions: { output: {} }
