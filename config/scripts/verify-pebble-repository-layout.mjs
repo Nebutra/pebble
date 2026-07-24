@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { collectLegacyExecutionFailures } from './pebble-repository-legacy-execution-contract.mjs'
+import { hasPebbleGoModulePath } from './repository-verifier-portability.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const requiredPaths = [
@@ -98,7 +99,7 @@ if (productCorePackage.name !== '@pebble/product-core' || productCorePackage.pri
 }
 
 const goModule = readFileSync(resolve(root, 'runtime/go/go.mod'), 'utf8')
-if (!goModule.startsWith('module github.com/nebutra/pebble/runtime/go\n')) {
+if (!hasPebbleGoModulePath(goModule)) {
   failures.push('runtime/go must use the Nebutra Pebble module path')
 }
 const rustHostManifest = readFileSync(resolve(root, 'native/rust-host/Cargo.toml'), 'utf8')

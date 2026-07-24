@@ -5,6 +5,7 @@ import {
   containsLegacyBrandIdentifier,
   scanLegacyBrandIdentifiers
 } from './legacy-brand-identifier-scan.mjs'
+import { repositoryRelativePosixPath } from './repository-verifier-portability.mjs'
 import { verifyPebbleRepositoryLayout } from './verify-pebble-repository-layout.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../..')
@@ -7445,10 +7446,7 @@ if (legacyBrandFiles.length > 0) {
 }
 
 const tauriRendererTsxFiles = await listFiles(resolve(repoRoot, 'apps/desktop/src')).then((files) =>
-  files
-    .filter((file) => file.endsWith('.tsx'))
-    .map((file) => file.replace(`${resolve(repoRoot)}/`, ''))
-    .sort()
+  files.filter((file) => file.endsWith('.tsx')).sort()
 )
 const allowedTauriRendererTsxFiles = [
   'apps/desktop/src/main.tsx',
@@ -7475,12 +7473,13 @@ const shellIndependentConsumerFiles = [
   ))
 ]
 for (const file of shellIndependentConsumerFiles) {
-  const text = await readFile(file, 'utf8')
+  const absoluteFile = resolve(repoRoot, file)
+  const text = await readFile(absoluteFile, 'utf8')
   const importPattern = /(?:from\s*|import\s*)["']([^"']+)["']/g
   for (const match of text.matchAll(importPattern)) {
     const importedModule = match[1]
     const resolvedImport = importedModule.startsWith('.')
-      ? resolve(file, '..', importedModule)
+      ? resolve(absoluteFile, '..', importedModule)
       : null
     const relativeToElectronMain = resolvedImport
       ? relative(electronMainRoot, resolvedImport)
@@ -7495,7 +7494,7 @@ for (const file of shellIndependentConsumerFiles) {
       importedModule.startsWith('@main') ||
       resolvesInsideElectronMain
     ) {
-      electronMainImports.push(`${file.replace(`${resolve(repoRoot)}/`, '')}: ${importedModule}`)
+      electronMainImports.push(`${file}: ${importedModule}`)
     }
   }
 }
@@ -7510,9 +7509,9 @@ const rendererSourceFiles = await listFiles(
 ).then((files) => files.filter((file) => file.endsWith('.ts') || file.endsWith('.tsx')))
 const legacyPreloadContractImports = []
 for (const file of [...tauriSourceFiles, ...rendererSourceFiles]) {
-  const text = await readFile(file, 'utf8')
+  const text = await readFile(resolve(repoRoot, file), 'utf8')
   if (text.includes('preload/api-types')) {
-    legacyPreloadContractImports.push(file.replace(`${resolve(repoRoot)}/`, ''))
+    legacyPreloadContractImports.push(file)
   }
 }
 if (legacyPreloadContractImports.length > 0) {
@@ -7555,7 +7554,9 @@ const sharedControlProductionFiles = (
   await listFiles(resolve(repoRoot, 'runtime/go/internal/runtimehttp'))
 ).filter((file) => file.endsWith('.go') && !file.endsWith('_test.go'))
 const sharedControlProductionSource = (
-  await Promise.all(sharedControlProductionFiles.map((file) => readFile(file, 'utf8')))
+  await Promise.all(
+    sharedControlProductionFiles.map((file) => readFile(resolve(repoRoot, file), 'utf8'))
+  )
 ).join('\n')
 const sharedControlMethods = new Set(
   [...sharedControlProductionSource.matchAll(/"([A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z0-9_-]+)+)"/g)].map(
@@ -7922,7 +7923,10 @@ async function listFiles(dir) {
   const files = await Promise.all(
     entries.map((entry) => {
       const fullPath = resolve(dir, entry.name)
-      return entry.isDirectory() ? listFiles(fullPath) : [fullPath]
+      // Why: verifier allowlists and scans must compare the same path shape on Windows and Unix.
+      return entry.isDirectory()
+        ? listFiles(fullPath)
+        : [repositoryRelativePosixPath(repoRoot, fullPath)]
     })
   )
   return files.flat()
