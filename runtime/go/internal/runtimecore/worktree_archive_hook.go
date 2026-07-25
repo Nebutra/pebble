@@ -151,6 +151,7 @@ func runWorktreeHookScript(
 		"CONDUCTOR_ROOT_PATH="+repoPath,
 		"GHOSTX_ROOT_PATH="+repoPath,
 	)
+	configureWorktreeHookProcess(cmd)
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		return "", false, nil

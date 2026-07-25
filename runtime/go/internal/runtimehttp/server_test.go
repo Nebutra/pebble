@@ -862,16 +862,45 @@ func TestProjectReorderEndpoint(t *testing.T) {
 
 func runtimeHTTPTestEchoCommand() []string {
 	if runtime.GOOS == "windows" {
-		return []string{"cmd.exe", "/d", "/s", "/c", "echo pebble"}
+		return runtimeHTTPWindowsShellCommand("/d", "/s", "/c", "echo pebble")
 	}
 	return []string{"/bin/sh", "-c", "printf 'pebble\n'"}
 }
 
 func runtimeHTTPTestSleepCommand() []string {
 	if runtime.GOOS == "windows" {
-		return []string{"cmd.exe", "/d", "/s", "/c", "ping -n 10 127.0.0.1 > NUL"}
+		return runtimeHTTPWindowsShellCommand("/d", "/s", "/c", "ping -n 10 127.0.0.1 > NUL")
 	}
 	return []string{"/bin/sh", "-c", "sleep 10"}
+}
+
+func runtimeHTTPWindowsShellCommand(arguments ...string) []string {
+	// Why: some Windows CI images omit System32 from PATH even though ComSpec
+	// still identifies the shell that ConPTY should launch.
+	command := strings.TrimSpace(os.Getenv("ComSpec"))
+	if command != "" {
+		if resolved, err := exec.LookPath(command); err == nil {
+			command = resolved
+		} else {
+			command = ""
+		}
+	}
+	if command == "" {
+		if systemRoot := strings.TrimSpace(os.Getenv("SystemRoot")); systemRoot != "" {
+			candidate := filepath.Join(systemRoot, "System32", "cmd.exe")
+			if _, err := os.Stat(candidate); err == nil {
+				command = candidate
+			}
+		}
+	}
+	if command == "" {
+		if resolved, err := exec.LookPath("cmd.exe"); err == nil {
+			command = resolved
+		} else {
+			command = "cmd.exe"
+		}
+	}
+	return append([]string{command}, arguments...)
 }
 
 func TestProjectLifecycleEndpoints(t *testing.T) {

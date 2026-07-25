@@ -183,7 +183,9 @@ fn dispatch_motion(
     let mut event = gdk::Event::new(gdk::EventType::MotionNotify);
     let (root_x, root_y) = root_point(window, x, y);
     unsafe {
-        let raw = event.to_glib_none_mut().0 as *mut gdk::ffi::GdkEventMotion;
+        let raw =
+            <gdk::Event as ToGlibPtrMut<*mut gdk::ffi::GdkEvent>>::to_glib_none_mut(&mut event).0
+                as *mut gdk::ffi::GdkEventMotion;
         (*raw).window = window.to_glib_full();
         (*raw).send_event = 1;
         (*raw).x = x;
@@ -216,7 +218,9 @@ fn dispatch_button(
     let mut event = gdk::Event::new(event_type);
     let (root_x, root_y) = root_point(window, x, y);
     unsafe {
-        let raw = event.to_glib_none_mut().0 as *mut gdk::ffi::GdkEventButton;
+        let raw =
+            <gdk::Event as ToGlibPtrMut<*mut gdk::ffi::GdkEvent>>::to_glib_none_mut(&mut event).0
+                as *mut gdk::ffi::GdkEventButton;
         (*raw).window = window.to_glib_full();
         (*raw).send_event = 1;
         (*raw).x = x;
@@ -243,7 +247,9 @@ fn dispatch_scroll(
     let mut event = gdk::Event::new(gdk::EventType::Scroll);
     let (root_x, root_y) = root_point(window, x, y);
     unsafe {
-        let raw = event.to_glib_none_mut().0 as *mut gdk::ffi::GdkEventScroll;
+        let raw =
+            <gdk::Event as ToGlibPtrMut<*mut gdk::ffi::GdkEvent>>::to_glib_none_mut(&mut event).0
+                as *mut gdk::ffi::GdkEventScroll;
         (*raw).window = window.to_glib_full();
         (*raw).send_event = 1;
         (*raw).x = x;
@@ -276,7 +282,9 @@ fn dispatch_key_event(
         .filter(|character| !character.is_control())
         .and_then(|character| CString::new(character.to_string()).ok());
     unsafe {
-        let raw = event.to_glib_none_mut().0 as *mut gdk::ffi::GdkEventKey;
+        let raw =
+            <gdk::Event as ToGlibPtrMut<*mut gdk::ffi::GdkEvent>>::to_glib_none_mut(&mut event).0
+                as *mut gdk::ffi::GdkEventKey;
         (*raw).window = window.to_glib_full();
         (*raw).send_event = 1;
         (*raw).state = modifiers;

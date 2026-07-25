@@ -1928,6 +1928,7 @@ func TestAgentProfileAndRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(manager.Shutdown)
 	project, err := manager.CreateProject(CreateProjectRequest{Name: "repo", Path: dir})
 	if err != nil {
 		t.Fatal(err)
@@ -1952,13 +1953,16 @@ func TestAgentProfileAndRun(t *testing.T) {
 	if run.SessionID == "" {
 		t.Fatal("agent run did not create a session")
 	}
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		runs := manager.ListAgentRuns()
-		if len(runs) == 1 && runs[0].Status == AgentRunExited {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
+	timeoutMs := float64(3_000)
+	wait, err := manager.WaitSession(context.Background(), run.SessionID, SessionWaitRequest{
+		Condition: "exit",
+		TimeoutMs: &timeoutMs,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !wait.Satisfied || wait.TimedOut || wait.Status != SessionExited {
+		t.Fatalf("agent session did not finish cleanly: %#v", wait)
 	}
 	tail, err := manager.TailSession(run.SessionID, 10)
 	if err != nil {

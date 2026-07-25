@@ -117,7 +117,9 @@ func TestCommitUploadAtomicallyReplacesExistingRelayFile(t *testing.T) {
 }
 
 func TestRunAiVaultScanJSONReturnsHostPlatform(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	t.Setenv("CODEX_HOME", filepath.Join(t.TempDir(), "codex"))
 	var output bytes.Buffer
 	if err := run([]string{"ai-vault-scan-json", "--limit", "2"}, http.DefaultClient, &output); err != nil {
@@ -133,13 +135,17 @@ func TestRunAiVaultScanJSONReturnsHostPlatform(t *testing.T) {
 }
 
 func TestRunAiVaultScanJSONAcceptsRepeatedScopePaths(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	firstScope := t.TempDir()
+	secondScope := filepath.Join(t.TempDir(), "other project")
 	var output bytes.Buffer
 	if err := run([]string{
 		"ai-vault-scan-json",
 		"--limit", "2",
-		"--scope-path", "/srv/pebble",
-		"--scope-path", "/srv/other project",
+		"--scope-path", firstScope,
+		"--scope-path", secondScope,
 	}, http.DefaultClient, &output); err != nil {
 		t.Fatal(err)
 	}

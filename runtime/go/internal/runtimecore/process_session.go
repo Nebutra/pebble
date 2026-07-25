@@ -52,6 +52,7 @@ type processSession struct {
 	hookAgentState   SessionHookState
 	hookAgentStateAt time.Time
 	stateChanged     chan struct{}
+	exitHandled      chan struct{}
 }
 
 func startProcessSession(ctx context.Context, req StartSessionRequest, emit func(topic string, payload interface{})) (*processSession, error) {
@@ -84,6 +85,7 @@ func startProcessSession(ctx context.Context, req StartSessionRequest, emit func
 		screen:       newTerminalScreen(cols, rows),
 		emit:         emit,
 		stateChanged: make(chan struct{}),
+		exitHandled:  make(chan struct{}),
 	}
 	if req.hookEndpoint.port > 0 {
 		// Hook scripts attribute events by launch token; sessions started
@@ -306,6 +308,9 @@ func (s *processSession) transcriptRead(cursor *uint64, limit int) TerminalTrans
 }
 
 func (s *processSession) wait() {
+	if s.exitHandled != nil {
+		defer close(s.exitHandled)
+	}
 	if s.cleanupProcess != nil {
 		defer s.cleanupProcess()
 	}
@@ -335,6 +340,18 @@ func (s *processSession) wait() {
 	s.outputEvents.flushNow()
 	if s.emit != nil {
 		s.emit("session.status", snapshot)
+	}
+}
+
+func (s *processSession) waitForExitHandling(ctx context.Context) bool {
+	if s.exitHandled == nil {
+		return true
+	}
+	select {
+	case <-s.exitHandled:
+		return true
+	case <-ctx.Done():
+		return false
 	}
 }
 

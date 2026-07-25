@@ -1379,28 +1379,33 @@ func TestLegacySharedControlCreatesAndWaitsForNativeTerminalWithoutBlockingConne
 		t.Fatalf("terminal.wait blocked the shared-control connection: %#v", firstResponse)
 	}
 
-	writeEncryptedLegacySharedControlTestFrame(t, rawConn, sharedKey, map[string]interface{}{"id": "exit", "deviceToken": pairing.DeviceToken, "method": "terminal.send", "params": map[string]interface{}{"terminal": handle, "text": "exit", "enter": true}})
+	// Why: this test owns wait concurrency, not shell line-discipline timing;
+	// stop only the target PTY so the second terminal remains a live guard.
+	writeEncryptedLegacySharedControlTestFrame(t, rawConn, sharedKey, map[string]interface{}{"id": "stop", "deviceToken": pairing.DeviceToken, "method": "terminal.stopExact", "params": map[string]interface{}{"expectedPtyIds": []string{handle}, "targetOnly": true}})
 	// Fail this integration test promptly instead of inheriting the package's
 	// ten-minute timeout if the connection stops producing terminal responses.
 	if err := rawConn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	defer rawConn.SetReadDeadline(time.Time{})
-	seenExitAck := false
+	seenStopAck := false
 	seenWait := false
-	for attempts := 0; attempts < 3 && (!seenExitAck || !seenWait); attempts++ {
+	for attempts := 0; attempts < 3 && (!seenStopAck || !seenWait); attempts++ {
 		response := readEncryptedLegacySharedControlTestFrame(t, conn, sharedKey)
 		switch response["id"] {
-		case "exit":
-			seenExitAck = true
+		case "stop":
+			seenStopAck = true
 		case "wait":
 			result, _ := response["result"].(map[string]interface{})
 			wait, _ := result["wait"].(map[string]interface{})
-			seenWait = wait["satisfied"] == true && wait["status"] == "exited"
+			if wait["satisfied"] != true || wait["status"] != "exited" {
+				t.Fatalf("unexpected terminal wait response: %#v", response)
+			}
+			seenWait = true
 		}
 	}
-	if !seenExitAck || !seenWait {
-		t.Fatalf("expected exit acknowledgement and satisfied wait, ack=%v wait=%v", seenExitAck, seenWait)
+	if !seenStopAck || !seenWait {
+		t.Fatalf("expected stop acknowledgement and satisfied wait, ack=%v wait=%v", seenStopAck, seenWait)
 	}
 }
 

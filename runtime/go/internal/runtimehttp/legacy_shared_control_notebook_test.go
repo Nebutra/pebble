@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nebutra/pebble/runtime/go/internal/runtimecore"
@@ -37,7 +38,7 @@ func TestLegacySharedControlNotebookExecutesOnRuntimeHost(t *testing.T) {
 		t.Fatalf("unexpected notebook dispatch: handled=%v err=%v", handled, err)
 	}
 	result := value.(runtimecore.NotebookRunResult)
-	if result.ExitCode == nil || *result.ExitCode != 0 || result.Stdout != "42\n" {
+	if result.ExitCode == nil || *result.ExitCode != 0 || strings.ReplaceAll(result.Stdout, "\r\n", "\n") != "42\n" {
 		t.Fatalf("unexpected notebook result: %#v", result)
 	}
 }

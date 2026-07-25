@@ -49,6 +49,7 @@ func codexDiscoveryTestManager(t *testing.T) (*Manager, string, string) {
 	root := t.TempDir()
 	systemHome := filepath.Join(root, "system-home")
 	t.Setenv("HOME", systemHome)
+	t.Setenv("USERPROFILE", systemHome)
 	dataDir := filepath.Join(root, "data")
 	manager := &Manager{store: &fileStore{path: filepath.Join(dataDir, "state.json")}}
 	return manager, filepath.Join(dataDir, "codex-runtime-home", "home"), systemHome

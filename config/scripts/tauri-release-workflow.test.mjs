@@ -14,6 +14,10 @@ function releaseWorkflow() {
 
 const releaseCutPath = resolve(import.meta.dirname, '../../.github/workflows/release-cut.yml')
 const tauriConfigPath = resolve(import.meta.dirname, '../../apps/desktop/src-tauri/tauri.conf.json')
+const tauriMacosConfigPath = resolve(
+  import.meta.dirname,
+  '../../apps/desktop/src-tauri/tauri.macos.conf.json'
+)
 
 describe('Tauri release workflow signing gate', () => {
   it('is reusable by the single release-cut publisher and has no competing tag trigger', () => {
@@ -197,6 +201,35 @@ describe('Tauri release workflow signing gate', () => {
     )
     expect(JSON.parse(readFileSync(tauriConfigPath, 'utf8')).build.beforeBuildCommand).toBe(
       'node scripts/prepare-go-sidecars.mjs && npm run build'
+    )
+  })
+
+  it('prepares an ad-hoc macOS helper before Cargo and rebuilds it for release signing', () => {
+    const steps = releaseWorkflow().jobs.build.steps
+    const sidecarIndex = steps.findIndex(
+      ({ name }) => name === 'Prepare host Go sidecars for native tests'
+    )
+    const helperIndex = steps.findIndex(
+      ({ name }) => name === 'Prepare ad-hoc macOS computer-use helper for native tests'
+    )
+    const cargoTestIndex = steps.findIndex(({ name }) => name === 'Test native Tauri host')
+    const releaseBuildIndex = steps.findIndex(({ name }) => name === 'Build Tauri desktop bundle')
+
+    expect(sidecarIndex).toBeLessThan(helperIndex)
+    expect(helperIndex).toBeLessThan(cargoTestIndex)
+    expect(cargoTestIndex).toBeLessThan(releaseBuildIndex)
+    expect(steps[helperIndex]).toEqual(
+      expect.objectContaining({
+        if: "matrix.platform == 'macos'",
+        env: { PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY: '-' },
+        run: 'node config/scripts/build-computer-macos.mjs'
+      })
+    )
+    expect(JSON.parse(readFileSync(tauriMacosConfigPath, 'utf8')).build.beforeBundleCommand).toBe(
+      'node scripts/prepare-macos-bundle-resources.mjs'
+    )
+    expect(steps[releaseBuildIndex].env.PEBBLE_MAC_RELEASE).toBe(
+      "${{ matrix.platform == 'macos' && '1' || '' }}"
     )
   })
 

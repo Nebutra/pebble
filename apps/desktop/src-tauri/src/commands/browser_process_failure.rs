@@ -1,5 +1,8 @@
 use tauri::{AppHandle, Webview};
 
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+use crate::commands::crash_reports;
+
 #[cfg(target_os = "linux")]
 pub(super) fn attach(
     webview: &Webview,
@@ -24,7 +27,7 @@ pub(super) fn attach(
                         WebProcessTerminationReason::TerminatedByApi => return,
                         _ => "web-process-unknown",
                     };
-                    super::crash_reports::record_native_webview_process_failure(
+                    crash_reports::record_native_webview_process_failure(
                         app.clone(),
                         label.clone(),
                         Some(url.clone()),
@@ -56,7 +59,7 @@ pub(super) fn attach(
                 let mut kind = COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED;
                 unsafe { args.ProcessFailedKind(&mut kind)? };
                 let reason = webview2_failure_reason(kind);
-                super::crash_reports::record_native_webview_process_failure(
+                crash_reports::record_native_webview_process_failure(
                     app.clone(),
                     label.clone(),
                     Some(url.clone()),

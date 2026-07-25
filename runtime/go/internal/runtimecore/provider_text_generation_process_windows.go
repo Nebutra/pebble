@@ -13,7 +13,7 @@ func killTextGenerationProcess(command *exec.Cmd) {
 	if command.Process == nil {
 		return
 	}
-	killer := exec.Command("taskkill", "/pid", strconv.Itoa(command.Process.Pid), "/t", "/f")
+	killer := exec.Command(windowsSystemExecutable("taskkill.exe"), "/pid", strconv.Itoa(command.Process.Pid), "/t", "/f")
 	if killer.Run() != nil {
 		_ = command.Process.Kill()
 	}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -29,7 +30,7 @@ func TestNotebookRunsPythonRelativeToFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.ExitCode == nil || *result.ExitCode != 0 || result.Stdout != "42\n" {
+	if result.ExitCode == nil || *result.ExitCode != 0 || strings.ReplaceAll(result.Stdout, "\r\n", "\n") != "42\n" {
 		t.Fatalf("unexpected notebook result: %#v", result)
 	}
 }

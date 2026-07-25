@@ -12,6 +12,7 @@ import (
 func TestLegacySharedControlAgentTrustWritesRemoteHome(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	manager, err := runtimecore.NewManager(t.TempDir(), nil)
 	if err != nil {
 		t.Fatal(err)

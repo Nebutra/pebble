@@ -28,6 +28,7 @@ const (
 	gitWorktreeCommandLimit   = 2 * time.Minute
 	gitCloneCommandLimit      = 10 * time.Minute
 	nativeProviderLivenessTTL = 2 * time.Minute
+	shutdownExitHandlingLimit = 5 * time.Second
 )
 
 type Manager struct {
@@ -4207,6 +4208,15 @@ func (m *Manager) Shutdown() {
 	m.mu.RUnlock()
 	for _, session := range sessions {
 		_, _ = session.stop()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownExitHandlingLimit)
+	defer cancel()
+	for _, session := range sessions {
+		// Why: stop only signals the child. Shutdown must not return while the
+		// process wait callback persists stats, but a stuck OS wait cannot hang exit.
+		if !session.waitForExitHandling(ctx) {
+			return
+		}
 	}
 }
 

@@ -44,7 +44,7 @@ func runWindowsTaskkill(pid int, force bool) error {
 	}
 	// Why: ConPTY owns a process tree, while Process.Kill only guarantees the
 	// shell process. taskkill preserves terminal stop semantics for descendants.
-	output, err := exec.Command("taskkill", args...).CombinedOutput()
+	output, err := exec.Command(windowsSystemExecutable("taskkill.exe"), args...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("taskkill failed: %w: %s", err, string(output))
 	}

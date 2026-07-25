@@ -132,6 +132,18 @@ func (m *Manager) WaitSession(ctx context.Context, id string, req SessionWaitReq
 		changed := session.stateChangeChannel()
 		snapshot := session.snapshot()
 		if satisfied := sessionWaitSatisfied(condition, snapshot); satisfied {
+			if sessionHasExited(snapshot) && session.exitHandled != nil {
+				// Why: terminal status becomes visible before its synchronous event
+				// callback finishes persisting stats; exit waits own that lifecycle barrier.
+				select {
+				case <-ctx.Done():
+					return SessionWaitResult{}, ctx.Err()
+				case <-deadline.C:
+					return buildSessionWaitResult(condition, session.snapshot(), false, true), nil
+				case <-session.exitHandled:
+					snapshot = session.snapshot()
+				}
+			}
 			return buildSessionWaitResult(condition, snapshot, true, false), nil
 		}
 		select {
@@ -145,13 +157,17 @@ func (m *Manager) WaitSession(ctx context.Context, id string, req SessionWaitReq
 }
 
 func sessionWaitSatisfied(condition string, snapshot Session) bool {
-	exited := snapshot.Status != SessionStarting && snapshot.Status != SessionRunning
+	exited := sessionHasExited(snapshot)
 	if condition == "exit" {
 		return exited
 	}
 	// tui-idle: hook-reported idle means the TUI is ready for input; a dead
 	// session can never become ready, so exit also resolves the wait.
 	return exited || snapshot.HookAgentState == SessionHookIdle
+}
+
+func sessionHasExited(snapshot Session) bool {
+	return snapshot.Status != SessionStarting && snapshot.Status != SessionRunning
 }
 
 func buildSessionWaitResult(condition string, snapshot Session, satisfied bool, timedOut bool) SessionWaitResult {

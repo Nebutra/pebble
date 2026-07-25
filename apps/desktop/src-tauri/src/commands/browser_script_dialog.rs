@@ -195,6 +195,7 @@ mod platform {
     use std::cell::RefCell;
     use std::collections::HashMap;
 
+    use glib::object::ObjectType;
     use webkit2gtk::{ScriptDialog, ScriptDialogType, WebViewExt};
 
     thread_local! {

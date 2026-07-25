@@ -36,7 +36,8 @@ func TestInstallCodexWritesSixHooksAndMatchingTrust(t *testing.T) {
 			t.Fatalf("timeout missing for %s", event.name)
 		}
 		key := configPath + ":" + event.label + ":" + string(rune('0'+groupIndex)) + ":0"
-		if !strings.Contains(string(toml), key) || !strings.Contains(string(toml), codexTrustedHash(event.label, command)) {
+		tomlKey := strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(key)
+		if !strings.Contains(string(toml), tomlKey) || !strings.Contains(string(toml), codexTrustedHash(event.label, command)) {
 			t.Fatalf("trust missing for %s:\n%s", event.name, toml)
 		}
 	}

@@ -29,7 +29,7 @@ func TestInstallAllWritesGeminiCursorAndDroidSchemas(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(home, ".gemini/settings.json"), []byte(`{"hooks":{"PreToolUse":[{"hooks":[{"command":"/old/agent-hooks/gemini-hook.sh"}]}],"Custom":[{"hooks":[{"command":"user-hook"}]}]}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	statuses := InstallAll(home)
+	statuses := InstallAllForPlatform(home, "linux")
 	if len(statuses) != 14 {
 		t.Fatalf("expected fourteen statuses, got %+v", statuses)
 	}

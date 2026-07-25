@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -29,9 +30,11 @@ func TestTerminalArtifactGrantReadAndWriteback(t *testing.T) {
 	if err != nil || string(content) != "after" {
 		t.Fatalf("content = %q, err = %v", content, err)
 	}
-	info, err := os.Stat(path)
-	if err != nil || info.Mode().Perm() != 0o640 {
-		t.Fatalf("mode = %v, err = %v", info.Mode().Perm(), err)
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		if err != nil || info.Mode().Perm() != 0o640 {
+			t.Fatalf("mode = %v, err = %v", info.Mode().Perm(), err)
+		}
 	}
 }
 
@@ -58,6 +61,9 @@ func TestTerminalArtifactRejectsOutsideTempAndStaleFiles(t *testing.T) {
 }
 
 func TestTerminalArtifactRejectsHardLinks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows file information does not expose a portable link count")
+	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "artifact.txt")
 	link := filepath.Join(dir, "artifact-link.txt")

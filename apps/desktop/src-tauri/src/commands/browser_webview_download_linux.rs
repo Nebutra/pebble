@@ -4,9 +4,9 @@ mod platform {
     use std::collections::{HashMap, HashSet};
     use std::sync::{Arc, Mutex};
 
-    use glib::prelude::ObjectExt;
+    use glib::object::ObjectType;
     use tauri::{AppHandle, Webview};
-    use webkit2gtk::{Download, DownloadExt, WebContextExt, WebViewExt};
+    use webkit2gtk::{Download, DownloadExt, URIRequestExt, WebContextExt, WebViewExt};
 
     use super::super::NativeDownloadState;
 
@@ -15,7 +15,7 @@ mod platform {
         static ATTACHED_CONTEXTS: RefCell<HashSet<usize>> = RefCell::new(HashSet::new());
     }
 
-    pub(super) fn attach(
+    pub(crate) fn attach(
         webview: &Webview,
         state: Arc<Mutex<NativeDownloadState>>,
     ) -> Result<(), String> {
@@ -58,7 +58,7 @@ mod platform {
             .map_err(|error| error.to_string())
     }
 
-    pub(super) async fn cancel(app: &AppHandle, native_download_id: &str) -> Result<bool, String> {
+    pub(crate) async fn cancel(app: &AppHandle, native_download_id: &str) -> Result<bool, String> {
         let native_download_id = native_download_id.to_string();
         let (sender, receiver) = tokio::sync::oneshot::channel();
         app.run_on_main_thread(move || {
@@ -76,7 +76,7 @@ mod platform {
             .map_err(|_| "browser download cancel callback was dropped".to_string())
     }
 
-    pub(super) fn forget(native_download_id: &str) {
+    pub(crate) fn forget(native_download_id: &str) {
         DOWNLOADS.with(|downloads| {
             downloads.borrow_mut().remove(native_download_id);
         });

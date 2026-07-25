@@ -2,6 +2,7 @@ package runtimecore
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -260,7 +261,7 @@ func TestAiVaultCandidateSelectionReservesEachDiscoveredAgent(t *testing.T) {
 	dir := t.TempDir()
 	candidates := make([]aiVaultCandidate, 0, 32)
 	for index := 0; index < 30; index++ {
-		path := filepath.Join(dir, "claude-"+string(rune('a'+index))+".jsonl")
+		path := filepath.Join(dir, fmt.Sprintf("claude-%02d.jsonl", index))
 		if err := os.WriteFile(path, []byte("{}\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -444,9 +445,10 @@ func TestParseOpenCodeLegacyAndSQLiteSessions(t *testing.T) {
 }
 
 func TestAiVaultScopeIncludesNestedCwdAndRejectsSibling(t *testing.T) {
-	scope := filepath.Join(string(filepath.Separator), "work", "pebble")
+	root := t.TempDir()
+	scope := filepath.Join(root, "pebble")
 	nested := filepath.Join(scope, "packages", "desktop")
-	sibling := filepath.Join(string(filepath.Separator), "work", "pebble-other")
+	sibling := filepath.Join(root, "pebble-other")
 
 	if !aiVaultSessionInScope(AiVaultSession{Cwd: &nested}, []string{scope}) {
 		t.Fatal("expected nested cwd to be in scope")

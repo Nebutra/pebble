@@ -38,6 +38,10 @@
   computer-use helper uses `resources/build/entitlements.computer-use.mac.plist`.
 - `tauri.macos.conf.json` adds the helper app as a macOS-only resource. Tauri's
   RFC 7396 merge preserves the base resource map.
+- Release runners prepare host Go sidecars before native Cargo tests. The macOS
+  leg also builds the computer-use helper with ad-hoc identity `-` before Cargo
+  evaluates Tauri resource paths; `beforeBundleCommand` later rebuilds it with
+  the release identity before the outer app is sealed.
 - Updater public-key rotation is not routine maintenance: installed clients pin
   the key, so rotation requires an explicit compatibility and rollout plan.
 
@@ -53,6 +57,8 @@
 - `APPLE_API_KEY_P8` on a non-macOS runner -> fail before writing any file.
 - Missing macOS pre-bundle hook, helper resource, hardened runtime, or main
   entitlements path -> fail preflight.
+- Missing ad-hoc helper before macOS Cargo tests -> fail before native tests;
+  using the ad-hoc helper as the final bundled resource -> fail signing inspection.
 - Ad-hoc signature, wrong Team ID, missing entitlement, invalid updater
   signature, or unstapled app/DMG -> fail artifact inspection.
 
@@ -60,10 +66,14 @@
 
 - Good: the helper is signed before Tauri seals the outer app; the app and DMG
   carry stapled tickets; updater payload signatures verify against the pinned key.
+- Good: native tests see host sidecars and an ad-hoc macOS helper, while the
+  production bundle hook replaces the helper with its release-signed build.
 - Base: Linux and Windows merge only the base config and never invoke Swift or
   Apple signing tools.
 - Bad: copying the helper after bundling invalidates the outer resource seal;
   rotating the updater key without migration strands installed clients.
+- Bad: relying on `beforeBundleCommand` alone leaves Cargo's earlier resource
+  validation without the macOS helper on a clean runner.
 - Bad: writing the `.p8` to a predictable path permits symlink replacement;
   placing its contents in `GITHUB_ENV` persists secret material across steps.
 
@@ -83,7 +93,8 @@
   metadata, required entitlements, strict nested signatures, updater signatures,
   and stapled app/DMG tickets.
 - `tauri-release-workflow.test.mjs`: assert platform-gated credential wiring and
-  `PEBBLE_MAC_RELEASE=1`, including runner-temporary API-key materialization.
+  `PEBBLE_MAC_RELEASE=1`, runner-temporary API-key materialization, and ordering
+  of host sidecars -> ad-hoc macOS helper -> Cargo tests -> release bundle build.
 - Run `verify:tauri-mainline`, relevant lint/typecheck, and `git diff --check`.
 
 ### 7. Wrong vs Correct
@@ -185,3 +196,71 @@ TAURI_RELEASE_TARGET_RELEASE_DIR: universal-apple-darwin/release
 
 The explicit contained directory keeps each matrix leg from uploading unrelated
 build products or repository contents.
+
+## Scenario: Cross-Platform Release Runtime Validation
+
+### 1. Scope / Trigger
+
+- Trigger: changing Go runtime sessions, release-test subprocesses, Windows
+  process signaling, worktree hooks, or shutdown persistence.
+
+### 2. Signatures
+
+- Runtime shutdown: `func (m *Manager) Shutdown()`.
+- Exit barrier: `func (s *processSession) waitForExitHandling(context.Context) bool`.
+- Hook configuration: `configureWorktreeHookProcess(*exec.Cmd)`.
+- Windows resolver: `windowsSystemExecutable(name string) string`.
+
+### 3. Contracts
+
+- `exitHandled` closes only after process cleanup and synchronous exit-event
+  persistence finish.
+- `Shutdown()` signals every session, then waits under one five-second budget;
+  a stuck OS wait must not hang application exit forever.
+- Unix hook cancellation kills the process group. Windows tree termination
+  resolves `taskkill.exe` from `SystemRoot/System32`, then `PATH`, and falls
+  back to `Process.Kill()` if the tree command fails. Every runtime `taskkill`
+  call site uses the resolver.
+- Cross-platform tests use native absolute paths, set `HOME` and `USERPROFILE`
+  when isolating home state, and normalize only CRLF when output is otherwise exact.
+
+### 4. Validation & Error Matrix
+
+- Exit callback completes -> shutdown observes persisted stats before returning.
+- Exit callback exceeds the shared deadline -> shutdown returns without hanging.
+- Windows `PATH` omits System32 -> resolve through `SystemRoot`.
+- `taskkill.exe` fails -> kill the direct process as the bounded fallback.
+- Output differs beyond CRLF vs LF -> fail the exact assertion.
+
+### 5. Good/Base/Bad Cases
+
+- Good: cancellation terminates descendants holding inherited output pipes,
+  then bounded shutdown joins exit persistence.
+- Base: an already-exited session closes its barrier immediately.
+- Bad: killing only the shell leaves descendants holding pipes; waiting on an
+  unbounded channel can hang Pebble shutdown and the release job.
+
+### 6. Tests Required
+
+- `go test ./...` and `go vet ./...` on the host platform.
+- `GOOS=windows GOARCH=amd64 go test -exec=/usr/bin/true ./...` compiles every
+  Windows-only file and test package.
+- Exit-barrier tests cover completed and cancelled contexts.
+- Shared-control wait tests use `terminal.stopExact` so shell line discipline
+  cannot obscure the long-poll concurrency contract.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```go
+exec.Command("taskkill", "/pid", pid, "/t", "/f")
+<-session.exitHandled
+```
+
+#### Correct
+
+```go
+exec.Command(windowsSystemExecutable("taskkill.exe"), "/pid", pid, "/t", "/f")
+session.waitForExitHandling(shutdownContext)
+```

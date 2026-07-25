@@ -139,6 +139,14 @@ jobs:
         # cargo test, before the later release build hook prepares its matrix.
         run: node apps/desktop/scripts/prepare-go-sidecars.mjs --host-only
 
+      - name: Prepare ad-hoc macOS computer-use helper for native tests
+        if: matrix.platform == 'macos'
+        # Why: Cargo evaluates Tauri's resource paths before beforeBundleCommand;
+        # the release build later rebuilds this helper with its real identity.
+        env:
+          PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY: '-'
+        run: node config/scripts/build-computer-macos.mjs
+
       - name: Test native Tauri host
         # Why: cfg-gated platform code must execute on its release runner;
         # compilation alone cannot catch platform-only startup regressions.
