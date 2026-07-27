@@ -43,6 +43,7 @@ import EmulatorPaneOverlayLayer from './emulator-pane/EmulatorPaneOverlayLayer'
 import { useBrowserAutomationVisibilityForAny } from './browser-pane/browser-automation-visibility'
 import { useBrowserMobileDriverForAny } from '@/lib/pane-manager/browser-mobile-driver-state'
 import TerminalPaneOverlayLayer from './terminal-pane/TerminalPaneOverlayLayer'
+import { useColdParkedTerminalPresentation } from './terminal-pane/use-cold-parked-terminal-presentation'
 import {
   collectBrowserWebviewIds,
   destroyRemovedBrowserWebview,
@@ -225,6 +226,38 @@ function Terminal(): React.JSX.Element | null {
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
   const renderedActiveWorktreeId = activeWorktreeId
   const activeView = useAppStore((s) => s.activeView)
+  // Why: when switching worktrees, keep the previous surface painted until the
+  // newly activated terminal has a settled first paint (or the 1s fallback).
+  // Upstream Orca #10871; without cold-parked tracking, treat every mounted
+  // worktree as needing settle so hidden→shown switches cannot flash empty.
+  const desiredPresentedWorktree = useMemo(
+    () =>
+      new Map([['terminal-worktree', activeView === 'terminal' ? renderedActiveWorktreeId : null]]),
+    [activeView, renderedActiveWorktreeId]
+  )
+  const availablePresentedWorktreeIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const workspace of workspaceSurfaces) {
+      if (mountedWorktreeIdsRef.current.has(workspace.id)) {
+        ids.add(workspace.id)
+      }
+    }
+    // Force identity change when active worktree changes so a just-mounted
+    // surface is observed even though the ref update is not reactive.
+    void renderedActiveWorktreeId
+    void activeView
+    return ids
+  }, [workspaceSurfaces, renderedActiveWorktreeId, activeView])
+  const {
+    presentationByScope: worktreePresentationByScope,
+    settleTarget: settleWorktreePresentation
+  } = useColdParkedTerminalPresentation({
+    desiredTargetByScope: desiredPresentedWorktree,
+    coldParkedTargetIds: availablePresentedWorktreeIds,
+    availableTargetIds: availablePresentedWorktreeIds
+  })
+  const presentedWorktreeId =
+    worktreePresentationByScope.get('terminal-worktree')?.presentedTargetId ?? null
   const tabsByWorktree = useAppStore((s) => s.tabsByWorktree)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const createTab = useAppStore((s) => s.createTab)
@@ -1816,6 +1849,7 @@ function Terminal(): React.JSX.Element | null {
               // so the terminal/browser surface hides on the tasks page too.
               const isVisible =
                 activeView === 'terminal' && workspace.id === renderedActiveWorktreeId
+              const isPresented = workspace.id === presentedWorktreeId
               const shouldMeasureHiddenWorktree =
                 !isVisible && measurableBackgroundWorktreeIdsRef.current.has(workspace.id)
               return (
@@ -1826,8 +1860,10 @@ function Terminal(): React.JSX.Element | null {
                   layout={layout}
                   focusedGroupId={activeGroupIdByWorktree[workspace.id]}
                   isVisible={isVisible}
+                  isPresented={isPresented}
                   shouldMeasureHiddenWorktree={shouldMeasureHiddenWorktree}
                   activityTerminalPortals={activityTerminalPortals}
+                  onInitialTerminalRenderSettled={() => settleWorktreePresentation(workspace.id)}
                 />
               )
             })}
@@ -1876,21 +1912,29 @@ function Terminal(): React.JSX.Element | null {
                 // so the terminal/browser surface hides on the tasks page too.
                 const isVisible =
                   activeView === 'terminal' && workspace.id === renderedActiveWorktreeId
+                const isPresented = workspace.id === presentedWorktreeId
                 const shouldMeasureHiddenWorktree =
                   !isVisible && measurableBackgroundWorktreeIdsRef.current.has(workspace.id)
                 return (
                   <div
                     key={workspace.id}
                     className={
-                      isVisible
+                      isPresented
                         ? 'absolute inset-0'
-                        : shouldMeasureHiddenWorktree
+                        : isVisible || shouldMeasureHiddenWorktree
                           ? 'absolute inset-0 opacity-0 pointer-events-none'
                           : 'absolute inset-0 hidden'
                     }
-                    aria-hidden={!isVisible}
+                    inert={!isPresented}
+                    aria-hidden={!isPresented}
                   >
-                    <CodexRestartChip isVisible={isVisible} worktreeId={workspace.id} />
+                    <CodexRestartChip isVisible={isPresented} worktreeId={workspace.id} />
+                    {isVisible ? (
+                      <WorktreePresentationSettler
+                        worktreeId={workspace.id}
+                        onSettled={settleWorktreePresentation}
+                      />
+                    ) : null}
                     {(tabsByWorktree[workspace.id] ?? []).map((tab) => {
                       const activityTerminalPortal = findActivityTerminalPortal(
                         activityTerminalPortals,
@@ -2104,22 +2148,49 @@ function Terminal(): React.JSX.Element | null {
 // BrowserPaneOverlayLayer and its BrowserPane subtrees. Memoizing here means
 // the surface only re-renders when its own props (worktreeId / layout /
 // focusedGroupId / isVisible) actually change.
+function WorktreePresentationSettler({
+  worktreeId,
+  onSettled
+}: {
+  worktreeId: string
+  onSettled: (worktreeId: string) => void
+}): null {
+  useEffect(() => {
+    // Why: without a full pane-lifecycle settle signal on every surface model,
+    // dual rAF is enough to outlast the empty first paint of a cold worktree
+    // mount; the presentation hook also has a 1s hard fallback.
+    let frame2 = 0
+    const frame1 = requestAnimationFrame(() => {
+      frame2 = requestAnimationFrame(() => onSettled(worktreeId))
+    })
+    return () => {
+      cancelAnimationFrame(frame1)
+      cancelAnimationFrame(frame2)
+    }
+  }, [onSettled, worktreeId])
+  return null
+}
+
 const WorktreeSplitSurface = React.memo(function WorktreeSplitSurface({
   worktreeId,
   worktreePath,
   layout,
   focusedGroupId,
   isVisible,
+  isPresented,
   shouldMeasureHiddenWorktree,
-  activityTerminalPortals
+  activityTerminalPortals,
+  onInitialTerminalRenderSettled
 }: {
   worktreeId: string
   worktreePath: string
   layout: TabGroupLayoutNode
   focusedGroupId?: string
   isVisible: boolean
+  isPresented: boolean
   shouldMeasureHiddenWorktree: boolean
   activityTerminalPortals: ActivityTerminalPortalTarget[]
+  onInitialTerminalRenderSettled?: () => void
 }): React.JSX.Element {
   const browserPageIds = useAppStore(
     useShallow((state) =>
@@ -2131,23 +2202,40 @@ const WorktreeSplitSurface = React.memo(function WorktreeSplitSurface({
   const hasAutomationVisibleBrowser = useBrowserAutomationVisibilityForAny(browserPageIds)
   const hasMobileDrivenBrowser = useBrowserMobileDriverForAny(browserPageIds)
   const shouldKeepPaintable =
-    shouldMeasureHiddenWorktree || hasAutomationVisibleBrowser || hasMobileDrivenBrowser
+    isVisible ||
+    shouldMeasureHiddenWorktree ||
+    hasAutomationVisibleBrowser ||
+    hasMobileDrivenBrowser
+
+  useEffect(() => {
+    if (!isVisible || !onInitialTerminalRenderSettled) {
+      return
+    }
+    let frame2 = 0
+    const frame1 = requestAnimationFrame(() => {
+      frame2 = requestAnimationFrame(() => onInitialTerminalRenderSettled())
+    })
+    return () => {
+      cancelAnimationFrame(frame1)
+      cancelAnimationFrame(frame2)
+    }
+  }, [isVisible, onInitialTerminalRenderSettled, worktreeId])
 
   return (
     <div
       className={
-        isVisible
+        isPresented
           ? 'absolute inset-0 flex'
           : shouldKeepPaintable
             ? 'absolute inset-0 flex opacity-0 pointer-events-none'
             : 'absolute inset-0 hidden'
       }
-      // Why: automation and mobile control need paintable webviews, but hidden
-      // worktree controls cannot remain reachable by Tab or assistive tech.
-      inert={!isVisible}
-      aria-hidden={!isVisible}
+      // Why: automation and mobile control need paintable webviews, but only the
+      // presented worktree should take Tab/AT focus (upstream #10871).
+      inert={!isPresented}
+      aria-hidden={!isPresented}
     >
-      <CodexRestartChip isVisible={isVisible} worktreeId={worktreeId} />
+      <CodexRestartChip isVisible={isPresented} worktreeId={worktreeId} />
       <TabGroupSplitLayout
         layout={layout}
         worktreeId={worktreeId}

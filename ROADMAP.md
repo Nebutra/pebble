@@ -1500,15 +1500,19 @@ are the next candidate Zig boundaries.
 > The per-product `/pebble` prefix on the shared API host is deliberate: it
 > keeps `/v1/*` unclaimed so other Nebutra products can coexist without a later
 > namespace split.
+>
+> Platform edge (also in infra-index): **Cloudflare → Vercel (landing/docs) +
+> ECS (app/auth/api/sso/router/forge)**. OIDC issuer is `sso.nebutra.com` with
+> **no path prefix**.
 
 `https://pebble.nebutra.com` is the brand-facing product origin. DNS, TLS,
 CDN/origin routing, and compatibility handling remain deployment work and must
 be ready before a public release consumes these routes.
 
 This section is the ecosystem-preparation contract for the first public desktop
-release. Client URL migration alone does not satisfy it: the canonical host,
+release. Client URL migration alone does not satisfy it: the brand host,
 machine endpoints, storage, monitoring, privacy handling, and deletion path must
-be deployed and exercised in production-like staging.
+be deployed and exercised in production-like staging (or env isolation).
 
 Domain namespace:
 
