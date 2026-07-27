@@ -1,5 +1,6 @@
 /* oxlint-disable max-lines */
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { getRepoMapFromState, useAllWorktrees } from '@/store/selectors'
+import { selectPaletteStatusInputs } from './worktree-jump-palette-status-inputs'
 import {
   CommandDialog,
   CommandInput,
@@ -193,6 +195,10 @@ type PaletteListEntry = PaletteItem | CreateWorktreePaletteItem | SectionHeader 
 
 const CREATE_WORKSPACE_QUICK_ACTION_ITEM_ID = `quick-action:${CREATE_WORKSPACE_QUICK_ACTION_ID}`
 
+// Why: comfortably outlast the CommandDialog close animation (~150–200ms) so the
+// gated status maps stay live until the fading rows are gone from the DOM.
+const PALETTE_STATUS_INPUTS_LINGER_MS = 300
+
 function getComposerPrefetchRepoId(
   state: ReturnType<typeof useAppStore.getState>,
   initialRepoId?: string
@@ -337,21 +343,36 @@ export default function WorktreeJumpPalette(): React.JSX.Element | null {
   const projectHostSetups = useAppStore((s) => s.projectHostSetups)
   const detectedWorktreesByRepo = useAppStore((s) => s.detectedWorktreesByRepo)
   const pendingWorktreeCreations = useAppStore((s) => s.pendingWorktreeCreations)
-  const tabsByWorktree = useAppStore((s) => s.tabsByWorktree)
-  // Why: getWorktreeStatus needs per-pane titles so split-pane tabs with a
-  // working agent in a non-focused pane still surface as 'working' in the
-  // jump palette. Without this, clicking between panes would desync the
-  // palette's spinner from the sidebar's spinner.
-  const runtimePaneTitlesByTabId = useAppStore((s) => s.runtimePaneTitlesByTabId)
-  // Why: ptyIdsByTabId is the live-pty source of truth — without it,
-  // getWorktreeStatus would treat slept tabs as live (their preserved
-  // tab.ptyId is a wake-hint sessionId, not a liveness signal) and the jump
-  // palette dot would lie green even though the sidebar dot is correctly grey.
-  const ptyIdsByTabId = useAppStore((s) => s.ptyIdsByTabId)
-  const terminalLayoutsByTabId = useAppStore((s) => s.terminalLayoutsByTabId)
+  // Why: keep the (very hot) status maps subscribed through the dialog's close
+  // animation. `visible` flips false synchronously on close, but CommandDialog
+  // content stays mounted while it fades — dropping maps to empty would flash
+  // switcher rows mid-animation. Linger past close, then drop the gate.
+  const [statusInputsLingering, setStatusInputsLingering] = useState(false)
+  useEffect(() => {
+    if (visible) {
+      setStatusInputsLingering(true)
+      return
+    }
+    const timer = window.setTimeout(
+      () => setStatusInputsLingering(false),
+      PALETTE_STATUS_INPUTS_LINGER_MS
+    )
+    return () => window.clearTimeout(timer)
+  }, [visible])
+  // Why: five status maps drive live/working dots and switcher sort, but only
+  // while the palette is active. agentStatus/runtimePaneTitles churn app-wide,
+  // so gated empty constant + useShallow stops closed-palette re-renders.
+  // - runtimePaneTitlesByTabId: split-pane working agents still surface as working
+  // - ptyIdsByTabId: live-pty SoT (slept tabs keep wake-hint tab.ptyId)
+  const {
+    tabsByWorktree,
+    runtimePaneTitlesByTabId,
+    ptyIdsByTabId,
+    terminalLayoutsByTabId,
+    agentStatusByPaneKey
+  } = useAppStore(useShallow((s) => selectPaletteStatusInputs(s, visible || statusInputsLingering)))
   const prCache = useAppStore((s) => s.prCache)
   const issueCache = useAppStore((s) => s.issueCache)
-  const agentStatusByPaneKey = useAppStore((s) => s.agentStatusByPaneKey)
   const migrationUnsupportedByPtyId = useAppStore((s) => s.migrationUnsupportedByPtyId)
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
   const activeTabType = useAppStore((s) => s.activeTabType)
