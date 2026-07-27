@@ -289,7 +289,7 @@ func (s *Server) findLegacySharedControlHostedReview(ctx context.Context, projec
 	github, err := s.manager.GetGitHubPRForBranch(ctx, projectID, worktreeID, providercli.GitHubPRForBranchRequest{Branch: branch, LinkedPRNumber: linkedGitHub, CurrentHeadOID: params.CurrentHeadOID})
 	if err == nil && github != nil {
 		state := legacySharedControlReviewState(github.State)
-		return map[string]interface{}{"provider": "github", "number": github.Number, "title": github.Title, "state": state, "url": github.URL, "status": github.ChecksStatus, "updatedAt": github.UpdatedAt, "mergeable": github.Mergeable, "reviewDecision": github.ReviewDecision, "autoMergeEnabled": github.AutoMergeEnabled, "mergeStateStatus": github.MergeStateStatus, "headSha": github.HeadSHA, "confirmedContainedHeadOid": github.ConfirmedHeadOID, "baseRefName": github.BaseRefName, "conflictSummary": github.ConflictSummary}
+		return map[string]interface{}{"provider": "github", "number": github.Number, "title": github.Title, "state": state, "url": github.URL, "status": github.ChecksStatus, "updatedAt": github.UpdatedAt, "mergeable": github.Mergeable, "reviewDecision": github.ReviewDecision, "autoMergeEnabled": github.AutoMergeEnabled, "mergeStateStatus": github.MergeStateStatus, "headSha": github.HeadSHA, "confirmedContainedHeadOid": github.ConfirmedHeadOID, "headDivergedFromMergedPRAtOid": github.HeadDivergedFromMergedPRAtOID, "baseRefName": github.BaseRefName, "conflictSummary": github.ConflictSummary}
 	}
 	linkedGitLab := 0
 	if params.LinkedGitLabMR != nil {
