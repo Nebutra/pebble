@@ -47,7 +47,7 @@ import { getProjectGroupSubtreeIds } from '../../../../shared/project-groups'
 import { isPathInsideOrEqual } from '../../../../shared/cross-platform-path'
 import { getRepoIdFromWorktreeId } from '../../../../shared/worktree-id'
 import { selectProjectGroupRemovalTargets } from './project-group-removal-targets'
-import { reconcileFetchedRepos } from './repo-identity-reconcile'
+import { reconcileActiveRepoWithWorktree, reconcileFetchedRepos } from './repo-identity-reconcile'
 import { splitRepoReorderByHost } from './repo-reorder-host-split'
 import {
   findRepoForHost,
@@ -1308,7 +1308,12 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
           repos: reconciledRepos,
           ...mergedProjectCompatibility,
           folderWorkspacePathStatuses: {},
-          activeRepoId: s.activeRepoId && validRepoIds.has(s.activeRepoId) ? s.activeRepoId : null,
+          activeRepoId: reconcileActiveRepoWithWorktree({
+            activeRepoId: s.activeRepoId,
+            activeWorktreeId: s.activeWorktreeId,
+            worktreesByRepo: s.worktreesByRepo,
+            validRepoIds
+          }),
           filterRepoIds: s.filterRepoIds.filter((projectId) => validRepoIds.has(projectId)),
           setupScriptPromptDismissedRepoIds: filterSetupScriptPromptDismissalsToValidRepos(
             s.setupScriptPromptDismissedRepoIds,
@@ -1347,7 +1352,12 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         return {
           repos: reconciledRepos,
           ...mergedProjectCompatibility,
-          activeRepoId: s.activeRepoId && validRepoIds.has(s.activeRepoId) ? s.activeRepoId : null,
+          activeRepoId: reconcileActiveRepoWithWorktree({
+            activeRepoId: s.activeRepoId,
+            activeWorktreeId: s.activeWorktreeId,
+            worktreesByRepo: s.worktreesByRepo,
+            validRepoIds
+          }),
           filterRepoIds: s.filterRepoIds.filter((projectId) => validRepoIds.has(projectId)),
           setupScriptPromptDismissedRepoIds: filterSetupScriptPromptDismissalsToValidRepos(
             s.setupScriptPromptDismissedRepoIds,
@@ -1390,7 +1400,12 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
           repos: result.repos,
           ...mergedProjectCompatibility,
           folderWorkspacePathStatuses: {},
-          activeRepoId: s.activeRepoId && validRepoIds.has(s.activeRepoId) ? s.activeRepoId : null,
+          activeRepoId: reconcileActiveRepoWithWorktree({
+            activeRepoId: s.activeRepoId,
+            activeWorktreeId: s.activeWorktreeId,
+            worktreesByRepo: s.worktreesByRepo,
+            validRepoIds
+          }),
           filterRepoIds: s.filterRepoIds.filter((projectId) => validRepoIds.has(projectId)),
           setupScriptPromptDismissedRepoIds: filterSetupScriptPromptDismissalsToValidRepos(
             s.setupScriptPromptDismissedRepoIds,

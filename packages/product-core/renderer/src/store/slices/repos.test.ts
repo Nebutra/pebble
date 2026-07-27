@@ -119,6 +119,27 @@ describe('repo slice runtime routing', () => {
     expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
   })
 
+  it('repairs a restored repo selection from the active worktree owner', async () => {
+    const canonicalRepo = { ...localRepo, id: 'canonical-repo' }
+    const duplicateRepo = { ...localRepo, id: 'duplicate-repo' }
+    const activeWorktree = makeWorktree({
+      id: 'canonical-worktree',
+      repoId: canonicalRepo.id,
+      projectId: canonicalRepo.id
+    })
+    reposList.mockResolvedValue([canonicalRepo, duplicateRepo])
+    const store = createTestStore()
+    store.setState({
+      activeRepoId: duplicateRepo.id,
+      activeWorktreeId: activeWorktree.id,
+      worktreesByRepo: { [canonicalRepo.id]: [activeWorktree] }
+    })
+
+    await store.getState().fetchRepos()
+
+    expect(store.getState().activeRepoId).toBe(canonicalRepo.id)
+  })
+
   it('fetches repos from the active remote runtime environment', async () => {
     runtimeEnvironmentCall.mockResolvedValue({
       id: 'rpc-1',

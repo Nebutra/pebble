@@ -113,6 +113,7 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	migratedProjectIdentities := reconcilePersistedProjectIdentities(&state)
 	manager := &Manager{
 		startedAt:                time.Now().UTC(),
 		store:                    store,
@@ -287,7 +288,7 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 	for _, layout := range state.SessionTabLayouts {
 		manager.sessionTabLayouts[layout.WorktreeID] = layout
 	}
-	if migratedWorktreeInstances || migratedSshPortForwardIDs {
+	if migratedProjectIdentities || migratedWorktreeInstances || migratedSshPortForwardIDs {
 		if err := manager.saveLocked(); err != nil {
 			return nil, err
 		}
@@ -313,6 +314,11 @@ func (m *Manager) Status() RuntimeStatus {
 }
 
 func (m *Manager) CreateProject(req CreateProjectRequest) (Project, error) {
+	project, _, err := m.createProject(req)
+	return project, err
+}
+
+func (m *Manager) createProject(req CreateProjectRequest) (Project, bool, error) {
 	name := strings.TrimSpace(req.Name)
 	path := strings.TrimSpace(req.Path)
 	if name == "" {
@@ -320,21 +326,21 @@ func (m *Manager) CreateProject(req CreateProjectRequest) (Project, error) {
 	}
 	locationKind, err := normalizeProjectLocationKind(req.LocationKind, true)
 	if err != nil {
-		return Project{}, err
+		return Project{}, false, err
 	}
 	if path == "" || !isAbsoluteForHost(path) {
-		return Project{}, ErrInvalidPath
+		return Project{}, false, ErrInvalidPath
 	}
 	if locationKind == "local" {
 		normalized, err := normalizeLocalPath(path)
 		if err != nil {
-			return Project{}, err
+			return Project{}, false, err
 		}
 		path = normalized
 	}
 	hostID := strings.TrimSpace(req.HostID)
 	if locationKind == "ssh" && hostID == "" {
-		return Project{}, errors.New("ssh project host id is required")
+		return Project{}, false, errors.New("ssh project host id is required")
 	}
 	now := time.Now().UTC()
 	project := Project{
@@ -352,15 +358,20 @@ func (m *Manager) CreateProject(req CreateProjectRequest) (Project, error) {
 		CreatedAt:              now,
 		UpdatedAt:              now,
 	}
+	identity, _ := normalizedProjectIdentity(project)
 	m.mu.Lock()
+	if existing, ok := m.findProjectByIdentityLocked(identity); ok {
+		m.mu.Unlock()
+		return existing, false, nil
+	}
 	m.projects[project.ID] = project
 	err = m.saveLocked()
 	m.mu.Unlock()
 	if err != nil {
-		return Project{}, err
+		return Project{}, false, err
 	}
 	m.emit("project.changed", project)
-	return project, nil
+	return project, true, nil
 }
 
 func (m *Manager) CloneProject(ctx context.Context, req CloneProjectRequest) (Project, error) {
@@ -793,6 +804,12 @@ func (m *Manager) CreateWorktree(ctx context.Context, req CreateWorktreeRequest)
 		UpdatedAt:      now,
 	}
 	m.mu.Lock()
+	for _, existing := range m.worktrees {
+		if existing.ProjectID == project.ID && worktreePathsEqual(project, existing.Path, worktree.Path) {
+			m.mu.Unlock()
+			return existing, nil
+		}
+	}
 	m.worktrees[worktree.ID] = worktree
 	err := m.saveLocked()
 	m.mu.Unlock()
