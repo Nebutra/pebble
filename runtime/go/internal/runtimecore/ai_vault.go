@@ -249,7 +249,7 @@ func ScanLocalAiVaultSessions(req AiVaultListRequest) AiVaultListResult {
 		if len(sessions) >= limit {
 			break
 		}
-		session, err := parseAiVaultCandidate(candidate, codexHome)
+		session, err := parseAiVaultCandidateCached(candidate, codexHome)
 		if err != nil {
 			issues = append(issues, AiVaultScanIssue{ExecutionHostID: "local", Agent: candidate.agent, Path: candidate.path, Message: err.Error()})
 			continue
@@ -287,7 +287,7 @@ func scanScopedAiVaultCandidates(candidates []aiVaultCandidate, parsedPaths map[
 			continue
 		}
 		parsed++
-		session, err := parseAiVaultCandidate(candidate, codexHome)
+		session, err := parseAiVaultCandidateCached(candidate, codexHome)
 		if err != nil {
 			issues = append(issues, AiVaultScanIssue{ExecutionHostID: "local", Agent: candidate.agent, Path: candidate.path, Message: err.Error()})
 			continue

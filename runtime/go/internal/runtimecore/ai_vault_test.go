@@ -460,6 +460,53 @@ func TestAiVaultScopeIncludesNestedCwdAndRejectsSibling(t *testing.T) {
 	}
 }
 
+func TestAiVaultParseCacheReusesUnchangedTranscripts(t *testing.T) {
+	resetAiVaultParseCacheForTests()
+	t.Cleanup(resetAiVaultParseCacheForTests)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "session.jsonl")
+	content := `{"sessionId":"cache-1","timestamp":"2026-07-12T10:00:00Z","cwd":"/work","type":"user","message":{"role":"user","content":"hello"}}
+{"sessionId":"cache-1","timestamp":"2026-07-12T10:01:00Z","type":"assistant","message":{"role":"assistant","content":"hi"}}
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate := aiVaultCandidate{agent: "claude", path: path, info: info}
+
+	first, err := parseAiVaultCandidateCached(candidate, "/tmp/codex")
+	if err != nil || first == nil || first.SessionID != "cache-1" {
+		t.Fatalf("first parse failed: %#v %v", first, err)
+	}
+	// Mutate the returned session; a cache hit must not share the pointer.
+	first.Title = "mutated"
+	second, err := parseAiVaultCandidateCached(candidate, "/tmp/codex")
+	if err != nil || second == nil || second.Title == "mutated" {
+		t.Fatalf("cache must return an independent copy: %#v %v", second, err)
+	}
+	if second.SessionID != "cache-1" {
+		t.Fatalf("unexpected cached session: %#v", second)
+	}
+
+	// Grow the file so mtime/size invalidate the cache.
+	time.Sleep(20 * time.Millisecond)
+	if err := os.WriteFile(path, []byte(content+`{"sessionId":"cache-1","timestamp":"2026-07-12T10:02:00Z","type":"user","message":{"role":"user","content":"again"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err = os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	third, err := parseAiVaultCandidateCached(aiVaultCandidate{agent: "claude", path: path, info: info}, "/tmp/codex")
+	if err != nil || third == nil || third.MessageCount < 2 {
+		t.Fatalf("expected reparse after growth: %#v %v", third, err)
+	}
+}
+
 func TestAiVaultScopeMatchesNFDWorkspaceAgainstNFCCwd(t *testing.T) {
 	// Regression for upstream #10841: macOS scope paths arrive NFD while Claude
 	// session transcripts record NFC cwd strings.
