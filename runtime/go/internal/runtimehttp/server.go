@@ -557,6 +557,11 @@ func (s *Server) handleWorktreeByID(w http.ResponseWriter, r *http.Request) {
 		writeRuntimeError(w, err)
 		return
 	}
+	// Why: labeled-localhost reverse-proxy routes were only ever registered; drop
+	// the removed worktree's labels so they cannot grow unbounded (#7557).
+	if s.localhostLabels != nil {
+		s.localhostLabels.unregisterWorktree(id)
+	}
 	writeJSON(w, http.StatusOK, worktree)
 }
 

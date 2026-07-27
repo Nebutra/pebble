@@ -245,6 +245,11 @@ func (s *Server) runLegacySharedControlWorkspaceMutation(method string, raw json
 		removed, err := s.manager.DeleteWorktree(context.Background(), worktree.ID, runtimecore.DeleteWorktreeRequest{
 			ExecuteGit: true, Force: request.Force, SkipArchiveHook: !request.RunHooks,
 		})
+		// Why: keep labeled-localhost routes bounded when mobile/shared-control
+		// removes a worktree (#7557).
+		if err == nil && s.localhostLabels != nil {
+			s.localhostLabels.unregisterWorktree(worktree.ID)
+		}
 		return map[string]interface{}{"removed": err == nil, "preservedBranch": removed.PreservedBranch}, true, err
 	case "projectGroup.create":
 		var request runtimecore.CreateProjectGroupRequest

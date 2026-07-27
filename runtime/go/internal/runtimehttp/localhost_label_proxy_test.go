@@ -88,3 +88,62 @@ func TestLocalhostLabelRouteKeysAreIsolatedBySshConnection(t *testing.T) {
 		t.Fatalf("SSH route keys collided: %q", firstKey)
 	}
 }
+
+func TestLocalhostLabelProxyUnregistersWorktreeRoutes(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer backend.Close()
+
+	server := &Server{
+		mux:             http.NewServeMux(),
+		bearerToken:     "secret",
+		localhostLabels: newLocalhostLabelProxy(),
+	}
+	server.mux.HandleFunc("/v1/localhost-worktree-labels/register", server.handleLocalhostLabelRegister)
+
+	register := func(worktreeID, worktreeName string) localhostLabelRegisterResult {
+		t.Helper()
+		body := `{"targetUrl":"` + backend.URL + `/","projectName":"Pebble","worktreeName":"` + worktreeName + `","worktreeId":"` + worktreeID + `"}`
+		req := httptest.NewRequest(http.MethodPost, "/v1/localhost-worktree-labels/register", strings.NewReader(body))
+		req.Host = "127.0.0.1:17777"
+		req.Header.Set("Authorization", "Bearer secret")
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("register %s failed: %d %s", worktreeID, rec.Code, rec.Body.String())
+		}
+		var result localhostLabelRegisterResult
+		if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+
+	a := register("wt-a", "feature-a")
+	b := register("wt-b", "feature-b")
+
+	proxyOK := func(label string) int {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "http://"+label+".pebble.localhost:17777/", nil)
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	if code := proxyOK(a.Label); code != http.StatusOK {
+		t.Fatalf("expected a 200, got %d", code)
+	}
+	if code := proxyOK(b.Label); code != http.StatusOK {
+		t.Fatalf("expected b 200, got %d", code)
+	}
+
+	server.localhostLabels.unregisterWorktree("wt-a")
+
+	if code := proxyOK(a.Label); code != http.StatusNotFound {
+		t.Fatalf("removed worktree label should 404, got %d", code)
+	}
+	if code := proxyOK(b.Label); code != http.StatusOK {
+		t.Fatalf("sibling worktree label should remain 200, got %d", code)
+	}
+}
