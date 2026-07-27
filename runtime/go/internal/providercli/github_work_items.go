@@ -368,12 +368,14 @@ func classifyGitHubIssueListError(err error) *ProviderClassifiedError {
 	message := strings.TrimSpace(err.Error())
 	lower := strings.ToLower(message)
 	switch {
+	// Why: primary rate-limit errors also carry "HTTP 403" — check rate limit
+	// first so they don't misclassify as a token-scope problem (Orca #7595).
+	case strings.Contains(lower, "rate limit"), strings.Contains(lower, "http 429"):
+		return &ProviderClassifiedError{Type: "rate_limited", Message: "GitHub rate limit hit. Try again in a few minutes."}
 	case errors.Is(err, ErrCLIUnauthenticated), strings.Contains(lower, "http 403"), strings.Contains(lower, "forbidden"):
 		return &ProviderClassifiedError{Type: "permission_denied", Message: "You don't have permission to read issues for this repository. Check your GitHub token scopes."}
 	case isProviderNotFound(err):
 		return &ProviderClassifiedError{Type: "not_found", Message: "Repository not found."}
-	case strings.Contains(lower, "rate limit"), strings.Contains(lower, "http 429"):
-		return &ProviderClassifiedError{Type: "rate_limited", Message: "GitHub rate limit hit. Try again in a few minutes."}
 	case errors.Is(err, context.DeadlineExceeded), strings.Contains(lower, "timeout"), strings.Contains(lower, "network"), strings.Contains(lower, "could not resolve host"):
 		return &ProviderClassifiedError{Type: "network_error", Message: "Network error — check your connection."}
 	default:

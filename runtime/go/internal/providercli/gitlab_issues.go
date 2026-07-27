@@ -192,12 +192,14 @@ func classifyGitLabIssueListError(err error) *ProviderClassifiedError {
 	message := strings.TrimSpace(err.Error())
 	lower := strings.ToLower(message)
 	switch {
+	// Why: primary rate-limit errors also carry "HTTP 403" — check rate limit
+	// first so they don't misclassify as a token-scope problem (Orca #7595).
+	case strings.Contains(lower, "rate limit"), strings.Contains(lower, "http 429"):
+		return &ProviderClassifiedError{Type: "rate_limited", Message: "GitLab rate limit hit. Try again in a few minutes."}
 	case errors.Is(err, ErrCLIUnauthenticated), strings.Contains(lower, "http 403"), strings.Contains(lower, "forbidden"), strings.Contains(lower, "insufficient_scope"):
 		return &ProviderClassifiedError{Type: "permission_denied", Message: "You don't have permission to read issues for this project. Check your GitLab token scopes."}
 	case strings.Contains(lower, "http 404"), strings.Contains(lower, "project not found"), strings.Contains(lower, "could not resolve gitlab project"):
 		return &ProviderClassifiedError{Type: "not_found", Message: "Project not found."}
-	case strings.Contains(lower, "rate limit"), strings.Contains(lower, "http 429"):
-		return &ProviderClassifiedError{Type: "rate_limited", Message: "GitLab rate limit hit. Try again in a few minutes."}
 	case errors.Is(err, context.DeadlineExceeded), strings.Contains(lower, "timeout"), strings.Contains(lower, "no such host"), strings.Contains(lower, "network"), strings.Contains(lower, "could not resolve host"):
 		return &ProviderClassifiedError{Type: "network_error", Message: "Network error — check your connection."}
 	default:

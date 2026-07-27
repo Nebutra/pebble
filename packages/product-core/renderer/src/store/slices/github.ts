@@ -2805,6 +2805,10 @@ export const createGitHubSlice: StateCreator<AppState, [], [], GitHubSlice> = (s
     }
     const counts = await Promise.all(
       repos.map(async (r) => {
+        // Why: same stampede cap as the item-fetch paths — without a slot,
+        // a 90-repo selection dispatches 90 concurrent count IPCs before the
+        // runtime-side rate-limit guard can see the first 403 (#7595).
+        await acquireWorkItemSlot()
         try {
           const requestState = get()
           const repo = findRepoForGitHubOwner(requestState, r.repoId, r.path)
@@ -2823,6 +2827,8 @@ export const createGitHubSlice: StateCreator<AppState, [], [], GitHubSlice> = (s
           return await countGitHubWorkItemsForRepo(requestContext, { query: query || undefined })
         } catch {
           return 0
+        } finally {
+          releaseWorkItemSlot()
         }
       })
     )

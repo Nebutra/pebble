@@ -2,6 +2,7 @@ package providercli
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -125,4 +126,11 @@ esac
 		t.Fatal(err)
 	}
 	return dir, logPath
+}
+
+func TestClassifyGitHubIssueListErrorPrefersRateLimitOverHTTP403(t *testing.T) {
+	err := classifyGitHubIssueListError(errors.New("HTTP 403: API rate limit exceeded for user"))
+	if err == nil || err.Type != "rate_limited" {
+		t.Fatalf("expected rate_limited, got %#v", err)
+	}
 }

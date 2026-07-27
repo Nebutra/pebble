@@ -1,10 +1,20 @@
 import { createGitConfigSnapshotRunner } from '../shared/git-config-snapshot-runner'
-import { getEffectiveGitUpstreamStatus } from '../shared/git-effective-upstream'
+import {
+  getEffectiveGitUpstreamStatus,
+  getGitUpstreamStatusForUpstreamName
+} from '../shared/git-effective-upstream'
 import type { GitCommandRunner } from '../shared/git-effective-upstream'
 import type { GitUpstreamStatus } from '../shared/types'
 
 const NO_EFFECTIVE_UPSTREAM_CACHE_TTL_MS = 5 * 60_000
 const MAX_NO_EFFECTIVE_UPSTREAM_CACHE_ENTRIES = 512
+// Why: the effective-upstream resolution chain (symbolic-ref + rev-parse ×2-3
+// + config snapshot) costs 4-5 subprocess spawns and only changes when branch
+// or git config changes. Ahead/behind is a pure function of the two rev-list
+// endpoints, so a recently-resolved name can be revalidated with one rev-list
+// spawn per poll tick; a failed rev-list (deleted ref) falls back to a full
+// re-resolve. Upstream Orca #7595 / #7576: this path dominated idle spawn churn.
+const RESOLVED_UPSTREAM_NAME_CACHE_TTL_MS = 60_000
 
 type NoEffectiveUpstreamCacheIdentity = {
   worktreePath: string
@@ -17,10 +27,16 @@ type NoEffectiveUpstreamCacheEntry = {
   expiresAt: number
 }
 
+type ResolvedUpstreamNameCacheEntry = {
+  upstreamName: string
+  expiresAt: number
+}
+
 const noEffectiveUpstreamByIdentity = new Map<string, NoEffectiveUpstreamCacheEntry>()
 const noEffectiveUpstreamInFlight = new Map<string, Promise<GitUpstreamStatus>>()
 const retiredNoEffectiveUpstreamInFlight = new Map<string, Promise<GitUpstreamStatus>>()
 const noEffectiveUpstreamWriteGeneration = new Map<string, number>()
+const resolvedUpstreamNameByIdentity = new Map<string, ResolvedUpstreamNameCacheEntry>()
 
 function noEffectiveUpstreamCacheKey(identity: NoEffectiveUpstreamCacheIdentity): string {
   return [identity.worktreePath, identity.branchName, identity.upstreamName ?? ''].join('\0')
@@ -59,6 +75,28 @@ function trimNoEffectiveUpstreamWriteGeneration(): void {
   }
 }
 
+function rememberResolvedUpstreamName(
+  cacheKey: string,
+  status: GitUpstreamStatus,
+  nowMs = Date.now()
+): void {
+  if (!status.hasUpstream || !status.upstreamName) {
+    resolvedUpstreamNameByIdentity.delete(cacheKey)
+    return
+  }
+  resolvedUpstreamNameByIdentity.set(cacheKey, {
+    upstreamName: status.upstreamName,
+    expiresAt: nowMs + RESOLVED_UPSTREAM_NAME_CACHE_TTL_MS
+  })
+  while (resolvedUpstreamNameByIdentity.size > MAX_NO_EFFECTIVE_UPSTREAM_CACHE_ENTRIES) {
+    const oldest = resolvedUpstreamNameByIdentity.keys().next()
+    if (oldest.done) {
+      break
+    }
+    resolvedUpstreamNameByIdentity.delete(oldest.value)
+  }
+}
+
 function cacheNoEffectiveUpstreamStatus(
   cacheKey: string,
   status: GitUpstreamStatus,
@@ -66,6 +104,7 @@ function cacheNoEffectiveUpstreamStatus(
   writeGeneration: number,
   nowMs = Date.now()
 ): void {
+  rememberResolvedUpstreamName(cacheKey, status, nowMs)
   // Why: hasConfiguredPushTarget controls publish behavior; keep that signal
   // fresh rather than serving a stale positive from status polling.
   if (status.hasUpstream || status.hasConfiguredPushTarget) {
@@ -97,22 +136,53 @@ function cacheNoEffectiveUpstreamStatus(
   trimNoEffectiveUpstreamWriteGeneration()
 }
 
+async function revalidateResolvedUpstreamName(
+  cacheKey: string,
+  runGit: GitCommandRunner,
+  bypassCache: boolean
+): Promise<GitUpstreamStatus | null> {
+  const now = Date.now()
+  const cached = resolvedUpstreamNameByIdentity.get(cacheKey)
+  if (!cached) {
+    return null
+  }
+  if (bypassCache || cached.expiresAt <= now) {
+    resolvedUpstreamNameByIdentity.delete(cacheKey)
+    return null
+  }
+  try {
+    return await getGitUpstreamStatusForUpstreamName(runGit, cached.upstreamName)
+  } catch {
+    // Ref deleted or repo state changed — fall through to a full re-resolve.
+    resolvedUpstreamNameByIdentity.delete(cacheKey)
+    return null
+  }
+}
+
 export async function readOrProbeNoEffectiveUpstreamStatus(
   identity: NoEffectiveUpstreamCacheIdentity,
   runGit: GitCommandRunner,
   options: { bypassCache?: boolean } = {}
 ): Promise<GitUpstreamStatus> {
   const cacheKey = noEffectiveUpstreamCacheKey(identity)
-  if (options.bypassCache !== true) {
+  const bypassCache = options.bypassCache === true
+  if (!bypassCache) {
     const cachedStatus = readCachedNoEffectiveUpstreamStatus(cacheKey)
     if (cachedStatus) {
       return cachedStatus
+    }
+
+    const revalidated = await revalidateResolvedUpstreamName(cacheKey, runGit, bypassCache)
+    if (revalidated) {
+      return revalidated
     }
 
     const inFlight = noEffectiveUpstreamInFlight.get(cacheKey)
     if (inFlight) {
       return inFlight
     }
+  } else {
+    resolvedUpstreamNameByIdentity.delete(cacheKey)
   }
 
   let probedSameNameOriginRef = false
@@ -127,7 +197,7 @@ export async function readOrProbeNoEffectiveUpstreamStatus(
     cacheNoEffectiveUpstreamStatus(cacheKey, status, probedSameNameOriginRef, writeGeneration)
     return status
   })
-  if (options.bypassCache !== true) {
+  if (!bypassCache) {
     noEffectiveUpstreamInFlight.set(cacheKey, probe)
   }
   try {
@@ -145,6 +215,7 @@ export function clearNoEffectiveUpstreamStatusCache(): void {
   noEffectiveUpstreamInFlight.clear()
   retiredNoEffectiveUpstreamInFlight.clear()
   noEffectiveUpstreamWriteGeneration.clear()
+  resolvedUpstreamNameByIdentity.clear()
 }
 
 export function clearNoEffectiveUpstreamStatusCacheEntry(
@@ -154,6 +225,7 @@ export function clearNoEffectiveUpstreamStatusCacheEntry(
   retireNoEffectiveUpstreamProbe(cacheKey)
   noEffectiveUpstreamByIdentity.delete(cacheKey)
   noEffectiveUpstreamInFlight.delete(cacheKey)
+  resolvedUpstreamNameByIdentity.delete(cacheKey)
   noEffectiveUpstreamWriteGeneration.set(
     cacheKey,
     (noEffectiveUpstreamWriteGeneration.get(cacheKey) ?? 0) + 1

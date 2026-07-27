@@ -360,4 +360,93 @@ describe('relay upstream negative cache', () => {
     expect(configGetCalls).toHaveLength(0)
     expect(status.hasUpstream).toBe(false)
   })
+
+  it('revalidates a resolved upstream name with a single rev-list on later polls', async () => {
+    let revListCalls = 0
+    let fullResolveCalls = 0
+    const runGit = vi.fn(async (args: string[]): Promise<{ stdout: string }> => {
+      if (args[0] === 'symbolic-ref') {
+        fullResolveCalls += 1
+        return { stdout: 'feature\n' }
+      }
+      if (args[0] === 'rev-parse' && args.includes('HEAD@{u}')) {
+        throw new Error('fatal: no upstream configured for branch feature')
+      }
+      if (isConfigListSnapshotCommand(args)) {
+        return emptyGitConfigSnapshot()
+      }
+      if (args[0] === 'rev-parse' && args.includes('refs/remotes/origin/feature')) {
+        return { stdout: 'abc123\n' }
+      }
+      if (args[0] === 'rev-list' && args.includes('HEAD...origin/feature')) {
+        revListCalls += 1
+        return { stdout: `${revListCalls}\t0\n` }
+      }
+      throw new Error(`No upstream fixture for git ${args.join(' ')}`)
+    })
+    const identity = { worktreePath: '/repo', branchName: 'feature' }
+
+    const first = await readOrProbeNoEffectiveUpstreamStatus(identity, runGit)
+    const second = await readOrProbeNoEffectiveUpstreamStatus(identity, runGit)
+
+    expect(first).toEqual({
+      hasUpstream: true,
+      upstreamName: 'origin/feature',
+      ahead: 1,
+      behind: 0
+    })
+    expect(second).toEqual({
+      hasUpstream: true,
+      upstreamName: 'origin/feature',
+      ahead: 2,
+      behind: 0
+    })
+    // Full resolution once; second poll is name-cache + rev-list only.
+    expect(fullResolveCalls).toBe(1)
+    expect(revListCalls).toBe(2)
+  })
+
+  it('falls back to full resolve when a cached upstream name rev-list fails', async () => {
+    let failNextRevList = false
+    let symbolicRefCalls = 0
+    const runGit = vi.fn(async (args: string[]): Promise<{ stdout: string }> => {
+      if (args[0] === 'symbolic-ref') {
+        symbolicRefCalls += 1
+        return { stdout: 'feature\n' }
+      }
+      if (args[0] === 'rev-parse' && args.includes('HEAD@{u}')) {
+        throw new Error('fatal: no upstream configured for branch feature')
+      }
+      if (isConfigListSnapshotCommand(args)) {
+        return emptyGitConfigSnapshot()
+      }
+      if (args[0] === 'rev-parse' && args.includes('refs/remotes/origin/feature')) {
+        return { stdout: 'abc123\n' }
+      }
+      if (args[0] === 'rev-list' && args.includes('HEAD...origin/feature')) {
+        if (failNextRevList) {
+          failNextRevList = false
+          throw new Error('fatal: ambiguous argument')
+        }
+        return { stdout: '1\t0\n' }
+      }
+      throw new Error(`No upstream fixture for git ${args.join(' ')}`)
+    })
+    const identity = { worktreePath: '/repo', branchName: 'feature' }
+
+    const first = await readOrProbeNoEffectiveUpstreamStatus(identity, runGit)
+    expect(first.upstreamName).toBe('origin/feature')
+    expect(symbolicRefCalls).toBe(1)
+
+    failNextRevList = true
+    const recovered = await readOrProbeNoEffectiveUpstreamStatus(identity, runGit)
+    expect(recovered).toEqual({
+      hasUpstream: true,
+      upstreamName: 'origin/feature',
+      ahead: 1,
+      behind: 0
+    })
+    // Name-cache rev-list failed once, then full resolve ran again.
+    expect(symbolicRefCalls).toBe(2)
+  })
 })
