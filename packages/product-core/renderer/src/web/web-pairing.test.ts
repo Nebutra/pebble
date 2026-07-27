@@ -41,6 +41,12 @@ describe('web pairing input', () => {
   it('rejects pebble URLs outside the exact pairing route', () => {
     expect(parseWebPairingInput(`pebble://pairing?code=${encodeOffer()}`)).toBeNull()
     expect(parseWebPairingInput(`pebble://pair-extra?code=${encodeOffer()}`)).toBeNull()
+    expect(parseWebPairingInput(`orca://pairing?code=${encodeOffer()}`)).toBeNull()
+  })
+
+  it('accepts Orca pairing URLs with the same offer payload', () => {
+    expect(parseWebPairingInput(`orca://pair?code=${encodeOffer()}`)).toEqual(offer)
+    expect(parseWebPairingInput(`orca://pair#${encodeOffer()}`)).toEqual(offer)
   })
 
   it('auto-saves scoped runtime offers during web startup', () => {

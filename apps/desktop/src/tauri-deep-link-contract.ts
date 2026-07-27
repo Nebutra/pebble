@@ -1,7 +1,7 @@
 import type { SettingsNavTarget } from '@/lib/settings-navigation-types'
 import type { ExecutionHostId } from '../../../packages/product-core/shared/execution-host'
+import { parsePairingDeepLinkAction, type DeepLinkPairAction } from './tauri-deep-link-pairing'
 
-const MAX_VALUE_LENGTH = 512
 const SETTINGS_TARGETS = new Set<SettingsNavTarget>([
   'general',
   'integrations',
@@ -34,10 +34,8 @@ const SETTINGS_TARGETS = new Set<SettingsNavTarget>([
 ])
 const TASK_SOURCES = new Set(['github', 'gitlab', 'linear', 'jira'])
 
-type PairingOffer = { endpoint: string; deviceToken: string; publicKeyB64: string }
-
 export type DeepLinkAction =
-  | { kind: 'pair'; url: string; offer: PairingOffer; key: string }
+  | DeepLinkPairAction
   | {
       kind: 'settings'
       pane: SettingsNavTarget
@@ -57,13 +55,19 @@ export type DeepLinkAction =
     }
 
 export function parseDeepLinkAction(input: string): DeepLinkAction | null {
-  const parsed = parsePebbleUrl(input)
+  const trimmed = input.trim()
+  const pairingAction = parsePairingDeepLinkAction(trimmed)
+  if (pairingAction) {
+    return pairingAction
+  }
+  const parsed = parsePebbleUrl(trimmed)
   if (!parsed) {
     return null
   }
   switch (parsed.hostname) {
     case 'pair':
-      return parsePairingAction(parsed, input.trim())
+      // Pair host is handled above (pebble + orca schemes).
+      return null
     case 'settings':
       return parseSettingsAction(parsed)
     case 'tasks':
@@ -93,26 +97,6 @@ function parsePebbleUrl(input: string): URL | null {
   } catch {
     return null
   }
-}
-
-function parsePairingAction(parsed: URL, url: string): DeepLinkAction | null {
-  if (!isRootPath(parsed.pathname) || !hasOnlyParams(parsed, ['code'])) {
-    return null
-  }
-  const queryCode = parsed.searchParams.get('code')?.trim()
-  const hashCode = parsed.hash.slice(1).trim()
-  if ((!queryCode && !hashCode) || (queryCode && hashCode)) {
-    return null
-  }
-  const offer = decodePairingOffer(queryCode ?? hashCode)
-  return offer
-    ? {
-        kind: 'pair',
-        url,
-        offer,
-        key: `pair:${offer.endpoint}:${offer.publicKeyB64}:${fingerprint(offer.deviceToken)}`
-      }
-    : null
 }
 
 function parseSettingsAction(parsed: URL): DeepLinkAction | null {
@@ -189,66 +173,6 @@ function parseAutomationsAction(parsed: URL): DeepLinkAction | null {
   }
 }
 
-function decodePairingOffer(code: string): PairingOffer | null {
-  try {
-    const value = JSON.parse(new TextDecoder().decode(base64UrlToBytes(code))) as Record<
-      string,
-      unknown
-    >
-    if (
-      value.v !== 2 ||
-      !isBoundedString(value.endpoint) ||
-      !isBoundedString(value.deviceToken) ||
-      !isBoundedString(value.publicKeyB64)
-    ) {
-      return null
-    }
-    // Why: a mobile-scoped token cannot authorize desktop project/runtime RPC;
-    // importing it as a server would create a permanently degraded host.
-    if (value.scope !== undefined && value.scope !== 'runtime') {
-      return null
-    }
-    const endpoint = normalizePairingEndpoint(value.endpoint)
-    return endpoint
-      ? { endpoint, deviceToken: value.deviceToken, publicKeyB64: value.publicKeyB64 }
-      : null
-  } catch {
-    return null
-  }
-}
-
-function normalizePairingEndpoint(value: string): string | null {
-  try {
-    const parsed = new URL(value)
-    if (
-      !['http:', 'https:', 'ws:', 'wss:'].includes(parsed.protocol) ||
-      parsed.username ||
-      parsed.password ||
-      !parsed.hostname
-    ) {
-      return null
-    }
-    if (parsed.protocol === 'http:') {
-      parsed.protocol = 'ws:'
-    }
-    if (parsed.protocol === 'https:') {
-      parsed.protocol = 'wss:'
-    }
-    return parsed.toString()
-  } catch {
-    return null
-  }
-}
-
-function base64UrlToBytes(value: string): Uint8Array {
-  if (!/^[A-Za-z0-9_-]+={0,2}$/.test(value) || value.length > 7 * 1024) {
-    throw new Error('invalid pairing code')
-  }
-  const base64 = value.replace(/-/g, '+').replace(/_/g, '/')
-  const binary = globalThis.atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0))
-}
-
 function decodeSinglePathSegment(pathname: string): string | null {
   return decodeOptionalSinglePathSegment(pathname) ?? null
 }
@@ -291,26 +215,14 @@ function hasOnlyParams(url: URL, allowed: string[]): boolean {
 function isRootPath(pathname: string): boolean {
   return pathname === '' || pathname === '/'
 }
+
 function isBarePageUrl(url: URL): boolean {
   return isRootPath(url.pathname) && !url.search && !url.hash
 }
-function isBoundedString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0 && value.length <= MAX_VALUE_LENGTH
-}
+
 function hasControlCharacter(value: string): boolean {
   return [...value].some((character) => {
     const codePoint = character.codePointAt(0) ?? 0
     return codePoint < 0x20 || codePoint === 0x7f
   })
-}
-
-function fingerprint(value: string): string {
-  // Why: replay suppression must distinguish rotated credentials without
-  // retaining the pairing token itself in a process-lifetime lookup key.
-  let hash = 0x811c9dc5
-  for (const character of value) {
-    hash ^= character.codePointAt(0) ?? 0
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0')
 }

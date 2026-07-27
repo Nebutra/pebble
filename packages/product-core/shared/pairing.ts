@@ -32,7 +32,9 @@ export function encodePairingOffer(offer: PairingOffer): string {
 export function decodePairingOffer(url: string): PairingOffer {
   const code = extractPairingCodeFromUrl(url)
   if (!code) {
-    throw new Error('Invalid pairing URL: must start with pebble://pair and include a pairing code')
+    throw new Error(
+      'Invalid pairing URL: must start with pebble://pair (or orca://pair) and include a pairing code'
+    )
   }
   return decodePairingBase64(code)
 }
@@ -44,9 +46,12 @@ function extractPairingCodeFromUrl(url: string): string | null {
   } catch {
     return null
   }
-  // Why: prefix checks accepted routes like `pebble://pairing?...`; only the
+  // Why: Orca and Pebble share the same pairing-offer payload; accept the
+  // sibling product's scheme so remote-server paste works across rebrands.
+  // Prefix checks alone accepted routes like `pebble://pairing?...`; only the
   // pairing deep-link host may carry runtime auth material.
-  if (parsed.protocol !== 'pebble:' || parsed.hostname !== 'pair') {
+  // Why: non-special schemes may keep host case (`ORCA://PAIR`); normalize.
+  if (!isPairingUrlProtocol(parsed.protocol) || parsed.hostname.toLowerCase() !== 'pair') {
     return null
   }
   if (parsed.pathname !== '' && parsed.pathname !== '/') {
@@ -59,22 +64,30 @@ function extractPairingCodeFromUrl(url: string): string | null {
   return parsed.hash ? parsed.hash.slice(1) || null : null
 }
 
-// Why: accept either an `pebble://pair?...` URL or the bare base64
-// string so the mobile paste-pair flow can take whichever the user
-// actually copied from desktop.
+// Why: accept either a product pairing URL (`pebble://` / `orca://`) or the bare
+// base64 string so paste-pair can take whichever the user actually copied.
 export function parsePairingCode(input: string): PairingOffer | null {
   const trimmed = input.trim()
   if (!trimmed) {
     return null
   }
   try {
-    if (trimmed.toLowerCase().startsWith('pebble://')) {
+    if (hasPairingUrlScheme(trimmed)) {
       return decodePairingOffer(trimmed)
     }
     return decodePairingBase64(trimmed)
   } catch {
     return null
   }
+}
+
+function isPairingUrlProtocol(protocol: string): boolean {
+  return protocol === 'pebble:' || protocol === 'orca:'
+}
+
+function hasPairingUrlScheme(input: string): boolean {
+  const lower = input.toLowerCase()
+  return lower.startsWith('pebble://') || lower.startsWith('orca://')
 }
 
 function decodePairingBase64(base64url: string): PairingOffer {

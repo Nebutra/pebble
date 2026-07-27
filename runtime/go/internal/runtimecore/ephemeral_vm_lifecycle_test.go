@@ -53,8 +53,22 @@ func TestEphemeralVMLifecyclePersistsProvisionAttachAndCleanup(t *testing.T) {
 }
 
 func TestEphemeralVMProvisionDiagnosticsRedactPairingCode(t *testing.T) {
-	input := "connect pebble://pair?code=abc_DEF-123 now"
-	if got := redactEphemeralVMText(input); got != "connect pebble://pair?code=[redacted] now" {
-		t.Fatalf("pairing code leaked: %q", got)
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{
+			input: "connect pebble://pair?code=abc_DEF-123 now",
+			want:  "connect pebble://pair?code=[redacted] now",
+		},
+		{
+			input: "connect orca://pair?code=abc_DEF-123 now",
+			want:  "connect orca://pair?code=[redacted] now",
+		},
+	}
+	for _, tc := range cases {
+		if got := redactEphemeralVMText(tc.input); got != tc.want {
+			t.Fatalf("pairing code leaked for %q: got %q want %q", tc.input, got, tc.want)
+		}
 	}
 }

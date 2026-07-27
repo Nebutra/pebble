@@ -22,7 +22,9 @@ export function decodePairingUrl(url: string): PairingOffer | null {
 // accept the same URL shapes.
 export function extractPairingCodeFromUrl(url: string): string | null {
   const trimmed = url.trim()
-  const match = /^pebble:\/\/([^/?#]*)([^?#]*)?/i.exec(trimmed)
+  // Why: Orca remote servers emit `orca://pair?...` with the same offer payload
+  // as Pebble; accept both product schemes for paste/QR interop.
+  const match = /^(?:pebble|orca):\/\/([^/?#]*)([^?#]*)?/i.exec(trimmed)
   if (!match) {
     return null
   }
@@ -49,16 +51,15 @@ export function extractPairingCodeFromUrl(url: string): string | null {
   return null
 }
 
-// Why: accept either an `pebble://pair?...` URL or the bare base64
-// string so the paste-pair flow can take whichever the user actually
-// copied from desktop.
+// Why: accept either a product pairing URL (`pebble://` / `orca://`) or the bare
+// base64 string so paste-pair can take whichever the user actually copied.
 export function parsePairingCode(input: string): PairingOffer | null {
   const trimmed = input.trim()
   if (!trimmed) {
     return null
   }
   try {
-    if (/^pebble:\/\//i.test(trimmed)) {
+    if (/^(?:pebble|orca):\/\//i.test(trimmed)) {
       return decodePairingUrl(trimmed)
     }
     return decodePairingBase64(trimmed)

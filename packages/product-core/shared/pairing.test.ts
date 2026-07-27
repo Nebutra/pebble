@@ -37,12 +37,23 @@ describe('pairing offer', () => {
     expect(() => decodePairingOffer('https://example.com#abc')).toThrow('Invalid pairing URL')
   })
 
+  it('accepts Orca pairing URLs with the same offer payload', () => {
+    const url = encodePairingOffer(offer)
+    const code = new URLSearchParams(url.slice(url.indexOf('?') + 1)).get('code')!
+    expect(decodePairingOffer(`orca://pair?code=${code}`)).toEqual(offer)
+    expect(parsePairingCode(`orca://pair?code=${code}`)).toEqual(offer)
+    expect(parsePairingCode(`ORCA://PAIR?code=${code}`)).toEqual(offer)
+    expect(decodePairingOffer(`orca://pair#${code}`)).toEqual(offer)
+  })
+
   it('rejects pebble URLs outside the exact pairing route', () => {
     const url = encodePairingOffer(offer)
     const code = new URLSearchParams(url.slice(url.indexOf('?') + 1)).get('code')!
 
     expect(parsePairingCode(`pebble://pairing?code=${code}`)).toBeNull()
     expect(parsePairingCode(`pebble://pair-extra?code=${code}`)).toBeNull()
+    expect(parsePairingCode(`orca://pairing?code=${code}`)).toBeNull()
+    expect(parsePairingCode(`orca://pair-extra?code=${code}`)).toBeNull()
     expect(() => decodePairingOffer(`pebble://pairing?code=${code}`)).toThrow('Invalid pairing URL')
   })
 

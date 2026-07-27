@@ -448,10 +448,12 @@ func ephemeralVMFailure(err error, stdout, stderr string) EphemeralVMProvisionRe
 	return EphemeralVMProvisionResult{OK: false, Error: err.Error(), Stdout: redactEphemeralVMText(stdout), Stderr: redactEphemeralVMText(stderr), Warnings: []interface{}{}}
 }
 
-var ephemeralVMPairingCodePattern = regexp.MustCompile(`pebble://pair\?code=[A-Za-z0-9_-]+`)
+// Why: Orca remote offers use `orca://pair?code=…` with the same secret payload;
+// redact both product schemes when logging recipe diagnostics.
+var ephemeralVMPairingCodePattern = regexp.MustCompile(`((?:pebble|orca)://pair\?code=)[A-Za-z0-9_-]+`)
 
 func redactEphemeralVMText(value string) string {
-	return ephemeralVMPairingCodePattern.ReplaceAllString(value, "pebble://pair?code=[redacted]")
+	return ephemeralVMPairingCodePattern.ReplaceAllString(value, "${1}[redacted]")
 }
 func EphemeralVMCleanupCommand(command string, runtime EphemeralVMRuntimeRecord) string {
 	payload, _ := json.Marshal(map[string]interface{}{"schemaVersion": 1, "mode": "destroy", "recipeId": runtime.RecipeID, "instanceId": runtime.ID, "projectId": runtime.ProjectID, "workspaceId": runtime.WorkspaceID, "workspaceName": runtime.WorkspaceName, "recipeResult": json.RawMessage(runtime.RecipeResult)})

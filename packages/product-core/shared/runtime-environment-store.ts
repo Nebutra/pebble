@@ -43,7 +43,7 @@ export function addEnvironmentFromPairingCode(
   if (!offer) {
     throw new RuntimeEnvironmentStoreError(
       'invalid_argument',
-      'Invalid pairing code. Expected an pebble://pair?... URL or bare pairing payload.'
+      'Invalid pairing code. Expected a pebble://pair?... or orca://pair?... URL or bare pairing payload.'
     )
   }
   const store = readEnvironmentStore(userDataPath)
@@ -93,7 +93,7 @@ export function updateEnvironmentFromPairingCode(
   if (!offer) {
     throw new RuntimeEnvironmentStoreError(
       'invalid_argument',
-      'Invalid pairing code. Expected an pebble://pair?... URL or bare pairing payload.'
+      'Invalid pairing code. Expected a pebble://pair?... or orca://pair?... URL or bare pairing payload.'
     )
   }
   const store = readEnvironmentStore(userDataPath)

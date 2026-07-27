@@ -40,7 +40,11 @@ import { installTauriDeepLinkApi } from './tauri-deep-link-api'
 
 type DeepLinkHandler = (event: { payload: string }) => void
 
-function makePairingUrl(endpoint: string, scope: 'runtime' | 'mobile' = 'runtime'): string {
+function makePairingUrl(
+  endpoint: string,
+  scope: 'runtime' | 'mobile' = 'runtime',
+  scheme: 'pebble' | 'orca' = 'pebble'
+): string {
   const payload = Buffer.from(
     JSON.stringify({
       v: 2,
@@ -50,7 +54,7 @@ function makePairingUrl(endpoint: string, scope: 'runtime' | 'mobile' = 'runtime
       scope
     })
   ).toString('base64url')
-  return `pebble://pair?code=${payload}`
+  return `${scheme}://pair?code=${payload}`
 }
 
 describe('installTauriDeepLinkApi', () => {
@@ -122,6 +126,22 @@ describe('installTauriDeepLinkApi', () => {
       })
     )
     expect(setRuntimeEnvironments).toHaveBeenCalledWith([])
+    expect(refreshRuntimeEnvironmentStatus).toHaveBeenCalledWith('env-1')
+    expect(deepLinkMocks.toast.success).toHaveBeenCalledWith('Remote server added.')
+  })
+
+  it('imports Orca pairing URLs into runtime environments', async () => {
+    const pairingUrl = makePairingUrl('https://orca-runtime.example.com', 'runtime', 'orca')
+    deepLinkMocks.invoke.mockResolvedValueOnce([pairingUrl])
+
+    installTauriDeepLinkApi()
+
+    await vi.waitFor(() =>
+      expect(addFromPairingCode).toHaveBeenCalledWith({
+        name: 'Pebble orca-runtime.example.com',
+        pairingCode: pairingUrl
+      })
+    )
     expect(refreshRuntimeEnvironmentStatus).toHaveBeenCalledWith('env-1')
     expect(deepLinkMocks.toast.success).toHaveBeenCalledWith('Remote server added.')
   })

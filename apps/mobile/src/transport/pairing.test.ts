@@ -32,6 +32,13 @@ describe('pairing deep links', () => {
   it('rejects lookalike routes', () => {
     expect(extractPairingCodeFromUrl('pebble://pairing?code=abc123')).toBeNull()
     expect(extractPairingCodeFromUrl('pebble://pair-extra?code=abc123')).toBeNull()
+    expect(extractPairingCodeFromUrl('orca://pairing?code=abc123')).toBeNull()
+  })
+
+  it('extracts code from Orca pairing URLs', () => {
+    expect(extractPairingCodeFromUrl('orca://pair?code=abc123')).toBe('abc123')
+    expect(extractPairingCodeFromUrl('orca://pair#abc123')).toBe('abc123')
+    expect(extractPairingCodeFromUrl('  ORCA://PAIR?code=abc123\n')).toBe('abc123')
   })
 
   it('prefers the query pairing code when both query and hash are present', () => {
@@ -59,6 +66,7 @@ describe('pairing deep links', () => {
     const code = encodeOffer()
 
     expect(parsePairingCode(`pebble://pair?code=${code}`)).toEqual(offer)
+    expect(parsePairingCode(`orca://pair?code=${code}`)).toEqual(offer)
     expect(parsePairingCode(code)).toEqual(offer)
   })
 })
