@@ -9,9 +9,10 @@ async function source(path) {
 }
 
 test('focused gate mounts and registers a production child WebView', async () => {
-  const [runner, gate, packageJson, functionalConfig] = await Promise.all([
+  const [runner, gate, browserGate, packageJson, functionalConfig] = await Promise.all([
     source('config/scripts/run-tauri-real-runtime-gate.mjs'),
     source('apps/desktop/src/tauri-real-runtime-gate.ts'),
+    source('apps/desktop/src/tauri-real-runtime-gate-browser.ts'),
     source('package.json'),
     source('apps/desktop/config/tauri.functional.conf.json')
   ])
@@ -22,26 +23,22 @@ test('focused gate mounts and registers a production child WebView', async () =>
   assert.match(runner, /--native-drag-only/)
   assert.match(runner, /VITE_TAURI_REAL_RUNTIME_NATIVE_INPUT_ONLY/)
   assert.match(runner, /VITE_TAURI_REAL_RUNTIME_NATIVE_DRAG_ONLY/)
-  assert.match(
-    runner,
-    /\['reset', 'Accessibility', 'nebutra\.pebble\.functional-gate'\]/
-  )
+  assert.match(runner, /\['reset', 'Accessibility', 'nebutra\.pebble\.functional-gate'\]/)
   assert.match(runner, /browserFunctionalGateAccessibilityReset/)
   assert.equal(JSON.parse(functionalConfig).identifier, 'nebutra.pebble.functional-gate')
-  assert.match(gate, /ensureTauriBrowserPageWebview/)
-  assert.match(gate, /browserPageId = focusedNativeInputGate\s*\? crypto\.randomUUID\(\)/)
-  assert.match(gate, /addEventListener\('dom-ready'/)
-  assert.match(gate, /window\.api\.browser\.registerGuest/)
+  assert.match(gate, /verifyNativeBrowser/)
+  assert.match(browserGate, /ensureTauriBrowserPageWebview/)
+  assert.match(browserGate, /browserPageId = focusedNativeInputGate\s*\? crypto\.randomUUID\(\)/)
+  assert.match(browserGate, /addEventListener\('dom-ready'/)
+  assert.match(browserGate, /window\.api\.browser\.registerGuest/)
   assert.ok(
-    gate.indexOf('await mountNativeInputGateWebview') <
-      gate.indexOf('await verifyMacosTrustedBrowserInput')
+    browserGate.indexOf('await mountNativeInputGateWebview') <
+      browserGate.indexOf('await verifyMacosTrustedBrowserInput')
   )
 })
 
 test('runtime evidence separates permission-free input from helper-authorized drag', async () => {
-  const evidence = await source(
-    'apps/desktop/src/tauri-real-runtime-native-input-evidence.ts'
-  )
+  const evidence = await source('apps/desktop/src/tauri-real-runtime-native-input-evidence.ts')
 
   assert.match(evidence, /accessibilityStatus !== 'not-granted'/)
   assert.match(evidence, /backend !== 'appkit-async-responder'/)

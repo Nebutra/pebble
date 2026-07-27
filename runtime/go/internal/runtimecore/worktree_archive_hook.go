@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -131,17 +129,11 @@ func runWorktreeHookScript(
 ) (string, bool, error) {
 	hookCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		// Electron routes Windows hooks through ComSpec (cmd.exe) rather than bash.
-		comSpec := os.Getenv("ComSpec")
-		if comSpec == "" {
-			comSpec = "cmd.exe"
-		}
-		cmd = exec.CommandContext(hookCtx, comSpec, "/d", "/s", "/c", script)
-	} else {
-		cmd = exec.CommandContext(hookCtx, "/bin/bash", "-c", script)
+	cmd, cleanup, err := worktreeHookCommand(hookCtx, script)
+	if err != nil {
+		return "", false, err
 	}
+	defer cleanup()
 	cmd.Dir = worktreePath
 	cmd.Env = append(os.Environ(),
 		"PEBBLE_ROOT_PATH="+repoPath,
@@ -151,7 +143,6 @@ func runWorktreeHookScript(
 		"CONDUCTOR_ROOT_PATH="+repoPath,
 		"GHOSTX_ROOT_PATH="+repoPath,
 	)
-	configureWorktreeHookProcess(cmd)
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		return "", false, nil

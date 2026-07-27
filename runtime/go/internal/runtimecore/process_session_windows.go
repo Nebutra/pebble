@@ -4,9 +4,12 @@ package runtimecore
 
 import (
 	"context"
+	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	terminalpty "github.com/aymanbagabas/go-pty"
 )
@@ -34,6 +37,8 @@ func startPlatformProcessSession(ctx context.Context, session *processSession, r
 		launchCommand = configured.Args
 		commandEnvironment = configured.Env
 	}
+	launchCommand = append([]string(nil), launchCommand...)
+	launchCommand[0] = resolveWindowsPtyExecutable(launchCommand[0])
 	cmd := pty.CommandContext(ctx, launchCommand[0], launchCommand[1:]...)
 	cmd.Dir = session.cwd
 	// Why: Windows cannot use a WSL UNC directory as CreateProcess cwd. The
@@ -63,11 +68,35 @@ func startPlatformProcessSession(ctx context.Context, session *processSession, r
 	session.pid = cmd.Process.Pid
 	session.stdin = pty
 	session.waitProcess = cmd.Wait
-	session.killProcess = cmd.Process.Kill
+	session.killProcess = func() error {
+		// Why: ConPTY commands can own descendants; killing only cmd.exe leaves
+		// those children and inherited handles alive after a user stops a run.
+		if err := runWindowsTaskkill(cmd.Process.Pid, true); err == nil {
+			return nil
+		}
+		err := cmd.Process.Kill()
+		if err == nil || errors.Is(err, os.ErrProcessDone) || errors.Is(err, syscall.EINVAL) {
+			return nil
+		}
+		return err
+	}
 	session.resizePty = pty.Resize
 	session.cleanupProcess = cleanup
 	session.mu.Unlock()
 	go session.readStream("stdout", pty)
 	go session.wait()
 	return nil
+}
+
+func resolveWindowsPtyExecutable(command string) string {
+	if filepath.IsAbs(command) || strings.ContainsAny(command, `\\/`) {
+		return command
+	}
+	if strings.EqualFold(command, "cmd") || strings.EqualFold(command, "cmd.exe") {
+		return windowsSystemExecutable("cmd.exe")
+	}
+	if resolved, err := exec.LookPath(command); err == nil {
+		return resolved
+	}
+	return command
 }

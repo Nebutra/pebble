@@ -127,6 +127,9 @@ jobs:
       - name: Verify Tauri mainline contract
         run: pnpm verify:tauri-mainline
 
+      - name: Verify Zig static archive contract
+        run: node config/scripts/verify-zig-static-archive-contract.mjs
+
       - name: Test Tauri renderer bridge
         run: pnpm --filter @pebble/desktop typecheck && pnpm --filter @pebble/desktop exec vitest run
 
@@ -142,10 +145,13 @@ jobs:
       - name: Prepare ad-hoc macOS computer-use helper for native tests
         if: matrix.platform == 'macos'
         # Why: Cargo evaluates Tauri's resource paths before beforeBundleCommand;
-        # the release build later rebuilds this helper with its real identity.
+        # placeholders satisfy its library scan, and the release build later
+        # replaces them while rebuilding the helper with its real identity.
         env:
           PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY: '-'
-        run: node config/scripts/build-computer-macos.mjs
+        run: |
+          node apps/desktop/scripts/prepare-macos-native-test-resources.mjs
+          node config/scripts/build-computer-macos.mjs
 
       - name: Test native Tauri host
         # Why: cfg-gated platform code must execute on its release runner;

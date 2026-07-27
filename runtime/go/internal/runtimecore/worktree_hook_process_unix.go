@@ -3,10 +3,17 @@
 package runtimecore
 
 import (
+	"context"
 	"os/exec"
 	"syscall"
 	"time"
 )
+
+func worktreeHookCommand(ctx context.Context, script string) (*exec.Cmd, func(), error) {
+	command := exec.CommandContext(ctx, "/bin/bash", "-c", script)
+	configureWorktreeHookProcess(command)
+	return command, func() {}, nil
+}
 
 func configureWorktreeHookProcess(command *exec.Cmd) {
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -19,4 +26,14 @@ func configureWorktreeHookProcess(command *exec.Cmd) {
 		return nil
 	}
 	command.WaitDelay = 2 * time.Second
+}
+
+func configureAutomationPrecheckProcess(command *exec.Cmd) {
+	configureWorktreeHookProcess(command)
+}
+
+func automationPrecheckCommand(ctx context.Context, script string) *exec.Cmd {
+	command := exec.CommandContext(ctx, "/bin/sh", "-c", script)
+	configureAutomationPrecheckProcess(command)
+	return command
 }

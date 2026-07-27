@@ -139,6 +139,9 @@ describe('Tauri release workflow signing gate', () => {
     const steps = releaseWorkflow().jobs.build.steps
     const byName = Object.fromEntries(steps.map((step) => [step.name, step]))
 
+    expect(byName['Verify Zig static archive contract'].run).toBe(
+      'node config/scripts/verify-zig-static-archive-contract.mjs'
+    )
     expect(byName['Test Tauri renderer bridge'].run).toContain('exec vitest run')
     expect(byName['Test Go runtime']).toEqual(
       expect.objectContaining({
@@ -222,9 +225,17 @@ describe('Tauri release workflow signing gate', () => {
       expect.objectContaining({
         if: "matrix.platform == 'macos'",
         env: { PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY: '-' },
-        run: 'node config/scripts/build-computer-macos.mjs'
+        run: expect.stringContaining('node config/scripts/build-computer-macos.mjs')
       })
     )
+    expect(steps[helperIndex].run).toContain(
+      'node apps/desktop/scripts/prepare-macos-native-test-resources.mjs'
+    )
+    expect(
+      steps[helperIndex].run.indexOf(
+        'node apps/desktop/scripts/prepare-macos-native-test-resources.mjs'
+      )
+    ).toBeLessThan(steps[helperIndex].run.indexOf('node config/scripts/build-computer-macos.mjs'))
     expect(JSON.parse(readFileSync(tauriMacosConfigPath, 'utf8')).build.beforeBundleCommand).toBe(
       'node scripts/prepare-macos-bundle-resources.mjs'
     )

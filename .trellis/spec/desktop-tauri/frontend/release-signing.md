@@ -39,9 +39,10 @@
 - `tauri.macos.conf.json` adds the helper app as a macOS-only resource. Tauri's
   RFC 7396 merge preserves the base resource map.
 - Release runners prepare host Go sidecars before native Cargo tests. The macOS
-  leg also builds the computer-use helper with ad-hoc identity `-` before Cargo
-  evaluates Tauri resource paths; `beforeBundleCommand` later rebuilds it with
-  the release identity before the outer app is sealed.
+  leg creates empty speech-library placeholders and builds the computer-use
+  helper with ad-hoc identity `-` before Cargo evaluates Tauri resource paths;
+  `beforeBundleCommand` later replaces the placeholders with real libraries and
+  rebuilds the helper with the release identity before the outer app is sealed.
 - Updater public-key rotation is not routine maintenance: installed clients pin
   the key, so rotation requires an explicit compatibility and rollout plan.
 
@@ -57,8 +58,9 @@
 - `APPLE_API_KEY_P8` on a non-macOS runner -> fail before writing any file.
 - Missing macOS pre-bundle hook, helper resource, hardened runtime, or main
   entitlements path -> fail preflight.
-- Missing ad-hoc helper before macOS Cargo tests -> fail before native tests;
-  using the ad-hoc helper as the final bundled resource -> fail signing inspection.
+- Missing speech-library placeholders or ad-hoc helper before macOS Cargo tests
+  -> fail before native tests; shipping placeholders or using the ad-hoc helper
+  as the final bundled resource -> fail bundle/signing inspection.
 - Ad-hoc signature, wrong Team ID, missing entitlement, invalid updater
   signature, or unstapled app/DMG -> fail artifact inspection.
 
@@ -94,7 +96,10 @@
   and stapled app/DMG tickets.
 - `tauri-release-workflow.test.mjs`: assert platform-gated credential wiring and
   `PEBBLE_MAC_RELEASE=1`, runner-temporary API-key materialization, and ordering
-  of host sidecars -> ad-hoc macOS helper -> Cargo tests -> release bundle build.
+  of host sidecars -> macOS resource placeholders -> ad-hoc helper -> Cargo
+  tests -> release bundle build.
+- `prepare-macos-native-test-resources.test.mjs`: assert macOS-only placeholder
+  creation, exact resource names, and preservation of already-built libraries.
 - Run `verify:tauri-mainline`, relevant lint/typecheck, and `git diff --check`.
 
 ### 7. Wrong vs Correct
@@ -221,6 +226,19 @@ build products or repository contents.
   resolves `taskkill.exe` from `SystemRoot/System32`, then `PATH`, and falls
   back to `Process.Kill()` if the tree command fails. Every runtime `taskkill`
   call site uses the resolver.
+- Windows ConPTY resolves bare launch executables before applying a worktree as
+  the child directory, so `cmd.exe` cannot be interpreted relative to that
+  worktree. Stopping a ConPTY session terminates the whole process tree with the
+  same bounded `taskkill.exe` fallback contract.
+- Windows worktree hooks run through a temporary `.cmd` file because inline
+  `cmd.exe /c` reparses quoted paths. Automation prechecks use the same
+  platform process-tree cancellation policy as worktree hooks.
+- On headless Linux, a missing desktop downloads directory falls back to the
+  Pebble app-data `downloads` directory so creating a child WebView does not
+  depend on `XDG_DOWNLOAD_DIR`.
+- Linux Zig static archives bundle compiler-rt because Cargo/rust-lld is the
+  final linker and does not otherwise supply Zig runtime symbols such as
+  `__zig_probe_stack`.
 - Cross-platform tests use native absolute paths, set `HOME` and `USERPROFILE`
   when isolating home state, and normalize only CRLF when output is otherwise exact.
 
@@ -229,13 +247,22 @@ build products or repository contents.
 - Exit callback completes -> shutdown observes persisted stats before returning.
 - Exit callback exceeds the shared deadline -> shutdown returns without hanging.
 - Windows `PATH` omits System32 -> resolve through `SystemRoot`.
+- Bare `cmd.exe` launched from a worktree -> resolve it before assigning the
+  working directory; never allow worktree-relative executable rebasing.
 - `taskkill.exe` fails -> kill the direct process as the bounded fallback.
+- Headless Linux has no `XDG_DOWNLOAD_DIR` -> create and use the app-data
+  `downloads` directory.
+- Linux archive lacks compiler-rt -> the Cargo link fails on Zig runtime symbols.
 - Output differs beyond CRLF vs LF -> fail the exact assertion.
 
 ### 5. Good/Base/Bad Cases
 
 - Good: cancellation terminates descendants holding inherited output pipes,
   then bounded shutdown joins exit persistence.
+- Good: quoted Windows hook paths survive by executing a temporary `.cmd`, and
+  that file is removed after the hook exits.
+- Good: Linux child WebViews start in minimal sessions and Zig archives link
+  under rust-lld without external Zig runtime inputs.
 - Base: an already-exited session closes its barrier immediately.
 - Bad: killing only the shell leaves descendants holding pipes; waiting on an
   unbounded channel can hang Pebble shutdown and the release job.
@@ -245,6 +272,10 @@ build products or repository contents.
 - `go test ./...` and `go vet ./...` on the host platform.
 - `GOOS=windows GOARCH=amd64 go test -exec=/usr/bin/true ./...` compiles every
   Windows-only file and test package.
+- Cross-build the Zig static archive for Linux targets, then link a minimal Rust
+  consumer with rust-lld and verify compiler-rt symbols resolve.
+- Focused Zig and native-input contract tests pin the Linux compiler-rt archive
+  behavior and the real-runtime browser evidence owner.
 - Exit-barrier tests cover completed and cancelled contexts.
 - Shared-control wait tests use `terminal.stopExact` so shell line discipline
   cannot obscure the long-poll concurrency contract.

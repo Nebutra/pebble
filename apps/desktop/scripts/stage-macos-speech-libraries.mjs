@@ -2,21 +2,23 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } fr
 import { resolve } from 'node:path'
 import process from 'node:process'
 
-const requiredLibraries = ['libonnxruntime.1.17.1.dylib', 'libsherpa-onnx-c-api.dylib']
+import { macosSpeechLibraryNames } from './macos-speech-library-names.mjs'
 
 export function stageMacosSpeechLibraries({ sourceRoot, stagingRoot }) {
   const sourceDirectory = findReleaseLibraryDirectory(sourceRoot)
   rmSync(stagingRoot, { force: true, recursive: true })
   mkdirSync(stagingRoot, { recursive: true })
-  for (const library of requiredLibraries) {
+  for (const library of macosSpeechLibraryNames) {
     copyFileSync(resolve(sourceDirectory, library), resolve(stagingRoot, library))
   }
-  return { libraries: [...requiredLibraries], sourceDirectory, stagingRoot }
+  return { libraries: [...macosSpeechLibraryNames], sourceDirectory, stagingRoot }
 }
 
 export function findReleaseLibraryDirectory(sourceRoot) {
   const candidates = collectReleaseDirectories(sourceRoot)
-    .filter((directory) => requiredLibraries.every((name) => existsSync(resolve(directory, name))))
+    .filter((directory) =>
+      macosSpeechLibraryNames.every((name) => existsSync(resolve(directory, name)))
+    )
     .sort((left, right) => candidateScore(right) - candidateScore(left))
   if (candidates.length === 0) {
     throw new Error(
@@ -50,7 +52,7 @@ function collectReleaseDirectories(root) {
 function candidateScore(directory) {
   const directReleaseBonus = directory.endsWith('/release') ? 1_000_000_000_000_000 : 0
   const newestLibrary = Math.max(
-    ...requiredLibraries.map((name) => statSync(resolve(directory, name)).mtimeMs)
+    ...macosSpeechLibraryNames.map((name) => statSync(resolve(directory, name)).mtimeMs)
   )
   return directReleaseBonus + newestLibrary
 }

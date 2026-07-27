@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -132,12 +131,7 @@ func runAutomationPrecheck(ctx context.Context, precheck AutomationPrecheck, cwd
 	runCtx, cancel := context.WithTimeout(ctx, time.Duration(precheck.TimeoutSeconds)*time.Second)
 	defer cancel()
 
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.CommandContext(runCtx, "cmd", "/C", precheck.Command)
-	} else {
-		cmd = exec.CommandContext(runCtx, "/bin/sh", "-c", precheck.Command)
-	}
+	cmd := automationPrecheckCommand(runCtx, precheck.Command)
 	cmd.Dir = cwd
 	stdout := &automationPrecheckTail{}
 	stderr := &automationPrecheckTail{}

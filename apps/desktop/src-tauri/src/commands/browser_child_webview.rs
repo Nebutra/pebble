@@ -309,10 +309,7 @@ pub fn browser_child_webview_create(
             .data_store_identifier(stable_profile_identifier(profile_key));
     }
     let download_app = app.clone();
-    let download_directory = app
-        .path()
-        .download_dir()
-        .map_err(|error| error.to_string())?;
+    let download_directory = browser_download_directory(&app)?;
     let download_state = download_registry.0.clone();
     let tracking_state = download_state.clone();
     let tracking_app = app.clone();
@@ -1355,6 +1352,22 @@ fn browser_profile_data_directory(app: &AppHandle, profile_key: &str) -> Result<
         .app_data_dir()
         .map(|directory| browser_profile_data_directory_from_root(&directory, profile_key))
         .map_err(|error| error.to_string())
+}
+
+fn browser_download_directory(app: &AppHandle) -> Result<PathBuf, String> {
+    let directory = app
+        .path()
+        .download_dir()
+        .or_else(|_| {
+            // Why: headless/minimal Linux sessions may not define XDG_DOWNLOAD_DIR;
+            // child WebViews must still start before any download is requested.
+            app.path()
+                .app_data_dir()
+                .map(|directory| directory.join("downloads"))
+        })
+        .map_err(|error| error.to_string())?;
+    std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    Ok(directory)
 }
 
 fn browser_profile_data_directory_from_root(root: &Path, profile_key: &str) -> PathBuf {

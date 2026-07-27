@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestEventSubscriberCloseDoesNotRaceConcurrentEmit(t *testing.T) {
@@ -1970,8 +1972,10 @@ func TestAgentProfileAndRun(t *testing.T) {
 	}
 	found := false
 	for _, chunk := range tail.Chunks {
-		// Why: PTY-backed sessions emit CRLF line endings; accept both framings.
-		if strings.TrimRight(chunk.Content, "\r\n") == "pebble" {
+		// Why: Windows ConPTY may prefix a short command with screen-clear and
+		// title sequences; strip only terminal framing before exact comparison.
+		content := strings.TrimRight(ansi.Strip(chunk.Content), "\r\n")
+		if content == "pebble" {
 			found = true
 		}
 	}

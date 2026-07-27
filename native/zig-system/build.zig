@@ -10,6 +10,11 @@ pub fn build(b: *std.Build) void {
         .name = "pebble_system",
         .root_module = systemModule(b, target, optimize),
     });
+    // Linux Cargo is the final linker and does not supply Zig-only runtime
+    // symbols such as __zig_probe_stack, so keep them inside the archive.
+    if (target.result.os.tag == .linux) {
+        static_lib.bundle_compiler_rt = true;
+    }
     static_lib.installHeader(b.path("include/pebble_system.h"), "pebble_system.h");
     b.installArtifact(static_lib);
 
