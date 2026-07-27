@@ -261,7 +261,7 @@ func TestLegacySharedControlFileMethodsUseRemoteWorktreeScope(t *testing.T) {
 	}
 }
 
-func TestLegacySharedControlFileMethodsAreDeniedToMobileScope(t *testing.T) {
+func TestLegacySharedControlMutatingFileMethodsAreDeniedToMobileScope(t *testing.T) {
 	manager, err := runtimecore.NewManager(t.TempDir(), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -276,11 +276,15 @@ func TestLegacySharedControlFileMethodsAreDeniedToMobileScope(t *testing.T) {
 	defer rawConn.Close()
 	conn := &websocketConn{conn: rawConn, reader: reader}
 	sharedKey := authenticateLegacySharedControlTestClient(t, rawConn, conn, pairing)
-	writeEncryptedLegacySharedControlTestFrame(t, rawConn, sharedKey, map[string]interface{}{"id": "mobile-files", "deviceToken": pairing.DeviceToken, "method": "files.readDir", "params": map[string]string{"worktree": "id:any"}})
+	// Why: mobile may browse with files.readDir; broad list/mutate stay forbidden.
+	writeEncryptedLegacySharedControlTestFrame(t, rawConn, sharedKey, map[string]interface{}{"id": "mobile-files", "deviceToken": pairing.DeviceToken, "method": "files.list", "params": map[string]string{"worktree": "id:any"}})
 	response := readEncryptedLegacySharedControlTestFrame(t, conn, sharedKey)
 	errorValue, _ := response["error"].(map[string]interface{})
 	if response["ok"] != false || errorValue["code"] != "forbidden" {
 		t.Fatalf("mobile file method was not denied: %#v", response)
+	}
+	if !legacySharedControlMobileMethodAllowed("files.readDir") {
+		t.Fatal("files.readDir must be available for mobile tree browsing")
 	}
 }
 

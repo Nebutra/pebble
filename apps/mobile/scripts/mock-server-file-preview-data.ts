@@ -13,13 +13,19 @@ const MOCK_FILE_CONTENT: Record<string, string> = {
   'public/index.html': '<main><h1>Mobile preview</h1><p>HTML preview is ready.</p></main>'
 }
 
-const MOCK_FILE_LIST = [
-  { relativePath: 'README.md', basename: 'README.md', kind: 'text' },
-  { relativePath: 'src/app.ts', basename: 'app.ts', kind: 'text' },
-  { relativePath: 'public/index.html', basename: 'index.html', kind: 'text' },
-  { relativePath: 'assets/logo.png', basename: 'logo.png', kind: 'binary' },
-  { relativePath: 'dist/archive.zip', basename: 'archive.zip', kind: 'binary' }
-]
+const MOCK_DIR_ENTRIES: Record<string, Array<{ name: string; isDirectory: boolean }>> = {
+  '': [
+    { name: 'README.md', isDirectory: false },
+    { name: 'src', isDirectory: true },
+    { name: 'public', isDirectory: true },
+    { name: 'assets', isDirectory: true },
+    { name: 'dist', isDirectory: true }
+  ],
+  src: [{ name: 'app.ts', isDirectory: false }],
+  public: [{ name: 'index.html', isDirectory: false }],
+  assets: [{ name: 'logo.png', isDirectory: false }],
+  dist: [{ name: 'archive.zip', isDirectory: false }]
+}
 
 export function handleMockFilePreviewRequest(
   request: RpcRequest,
@@ -28,13 +34,30 @@ export function handleMockFilePreviewRequest(
   error: ErrorResponse
 ): boolean {
   switch (request.method) {
+    case 'files.readDir': {
+      const relativePath = String(request.params?.relativePath ?? '')
+      const entries = MOCK_DIR_ENTRIES[relativePath]
+      if (!entries) {
+        respond(error(request.id, 'not_found', 'Directory not found'))
+        return true
+      }
+      respond(success(request.id, entries))
+      return true
+    }
+
     case 'files.list':
       respond(
         success(request.id, {
           worktree: request.params?.worktree ?? 'id:mock',
           rootPath: '/tmp/pebble-mobile-repro/pebble',
-          files: MOCK_FILE_LIST,
-          totalCount: MOCK_FILE_LIST.length,
+          files: [
+            { relativePath: 'README.md', basename: 'README.md', kind: 'text' },
+            { relativePath: 'src/app.ts', basename: 'app.ts', kind: 'text' },
+            { relativePath: 'public/index.html', basename: 'index.html', kind: 'text' },
+            { relativePath: 'assets/logo.png', basename: 'logo.png', kind: 'binary' },
+            { relativePath: 'dist/archive.zip', basename: 'archive.zip', kind: 'binary' }
+          ],
+          totalCount: 5,
           truncated: false
         })
       )
