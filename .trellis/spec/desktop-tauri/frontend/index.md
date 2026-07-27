@@ -23,6 +23,7 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [Retired Product Identity](./retired-product-identity.md) | Repository identity-removal contract                 | Active  |
 | [Release Signing](./release-signing.md)                   | Signing, updater, and release-observability contracts | Active  |
 | [Repository Identity](./repository-identity.md)           | Runtime identity, migration, and renderer recovery     | Active  |
+| [Bundled Skill Sync](./bundled-skill-sync.md)             | Version-matched guides and semantic upstream reports   | Active  |
 | [Type Safety](./type-safety.md)                           | Type patterns, validation                            | To fill |
 
 ---

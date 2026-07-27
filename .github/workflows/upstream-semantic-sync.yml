@@ -1,0 +1,32 @@
+name: Upstream semantic sync
+
+on:
+  schedule:
+    - cron: '17 3 * * 1,4'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Generate semantic report
+        run: node config/scripts/upstream-semantic-sync.mjs --fetch
+      - name: Verify sync tooling
+        run: pnpm exec vitest run --config config/vitest.config.ts config/scripts/upstream-semantic-sync.test.mjs config/scripts/publish-upstream-semantic-issue.test.mjs
+      - name: Publish canonical tracking issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node config/scripts/publish-upstream-semantic-issue.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: upstream-semantic-sync
+          path: artifacts/upstream-semantic-sync
+          if-no-files-found: error

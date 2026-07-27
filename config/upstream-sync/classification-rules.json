@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "prefixes": ["skills/", "skill-stubs/", "skill-guides/", "resources/skills/"],
+      "area": "skills",
+      "risk": "low"
+    },
+    {
+      "prefixes": ["src/renderer/", "src/shared/", "packages/"],
+      "area": "renderer-shared",
+      "risk": "medium"
+    },
+    { "prefixes": ["src/main/", "src/preload/"], "area": "desktop-host", "risk": "high" },
+    {
+      "prefixes": ["src/daemon/", "src/relay/", "src/runtime/"],
+      "area": "runtime-relay",
+      "risk": "high"
+    },
+    { "prefixes": ["apps/mobile/", "mobile/"], "area": "mobile", "risk": "medium" },
+    {
+      "prefixes": [".github/", "config/", "resources/build/", "package.json"],
+      "area": "build-release",
+      "risk": "medium"
+    }
+  ],
+  "fallback": { "area": "unclassified", "risk": "high" }
+}

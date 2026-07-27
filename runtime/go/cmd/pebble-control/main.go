@@ -67,6 +67,8 @@ func run(client controlClient, args []string) error {
 		return client.printJSON(http.MethodGet, "/v1/status", nil)
 	case "serve":
 		return runServe(args[1:], client.token, os.Stdout, os.Stderr)
+	case "skills":
+		return runSkills(args[1:], os.Stdout)
 	case "events":
 		return runEvents(client, args[1:])
 	case "project":
@@ -1813,5 +1815,5 @@ func isEscapableCommandRune(char rune) bool {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: pebble-control [--endpoint URL] <status|serve|events|project|worktree|session|agent|task|message|dispatch|automation|external-task|file|release|settings|source-control|browser|computer|emulator|mobile-relay|git|provider|subsystem> ...")
+	fmt.Fprintln(os.Stderr, "usage: pebble-control [--endpoint URL] <status|serve|skills|events|project|worktree|session|agent|task|message|dispatch|automation|external-task|file|release|settings|source-control|browser|computer|emulator|mobile-relay|git|provider|subsystem> ...")
 }

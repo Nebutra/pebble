@@ -3,8 +3,8 @@ import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const projectDir = resolve(import.meta.dirname, '../..')
-const canonicalSkillPath = join(projectDir, 'skills', 'pebble-linear', 'SKILL.md')
-const legacySkillPath = join(projectDir, 'skills', 'linear-tickets', 'SKILL.md')
+const canonicalSkillPath = join(projectDir, 'skill-guides', 'pebble-linear.md')
+const legacySkillPath = join(projectDir, 'skill-guides', 'linear-tickets.md')
 const legacyIntro =
   '`linear-tickets` is the legacy bundled name for `pebble-linear`. This copy remains complete; its CLI commands are identical to `pebble-linear` and always use `pebble linear ...`.'
 

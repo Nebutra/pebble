@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const projectDir = resolve(import.meta.dirname, '../..')
-const skillPath = join(projectDir, 'skills', 'computer-use', 'SKILL.md')
+const skillPath = join(projectDir, 'skill-guides', 'computer-use.md')
 
 describe('computer-use skill guidance', () => {
   it('keeps web-app targeting on the computer-use surface', () => {

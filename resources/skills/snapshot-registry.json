@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "skills": {
+    "computer-use": [
+      {
+        "releaseRevision": 1,
+        "upstreamRef": "58ef46d2522da100f1b49cac25413f0b42290b46",
+        "sha256": "98cfeb850bb58ad9d1a8f32cdf9ee68cd022d38bccb807a322fe1c2eea067b2d",
+        "size": 10482
+      }
+    ],
+    "linear-tickets": [
+      {
+        "releaseRevision": 1,
+        "upstreamRef": "58ef46d2522da100f1b49cac25413f0b42290b46",
+        "sha256": "bc3172c0e03ea9bec7de27e089d54fb8d9a54f16c6a870ebb0426680175ef0c1",
+        "size": 9729
+      }
+    ],
+    "orchestration": [
+      {
+        "releaseRevision": 1,
+        "upstreamRef": "58ef46d2522da100f1b49cac25413f0b42290b46",
+        "sha256": "47c68ed2651a9b6a3ce4a2b73f62dd6dc5ba35afdfc9dc6f9d242e21835f6acc",
+        "size": 18414
+      }
+    ],
+    "pebble-cli": [
+      {
+        "releaseRevision": 1,
+        "upstreamRef": "58ef46d2522da100f1b49cac25413f0b42290b46",
+        "sha256": "7e332de20599a029be0108e930c99595c25abcc9f6c49e71687236a81568865d",
+        "size": 17533
+      }
+    ],
+    "pebble-emulator": [
+      {
+        "releaseRevision": 1,
+        "upstreamRef": "58ef46d2522da100f1b49cac25413f0b42290b46",
+        "sha256": "47c601a987bc6bdd724e0eeec1b123080395af136563ad464a6a0bf8e9442c78",
+        "size": 10992
+      }
+    ],
+    "pebble-emulator-android": [
+      {
+        "releaseRevision": 1,
+        "upstreamRef": "58ef46d2522da100f1b49cac25413f0b42290b46",
+        "sha256": "44c7c9405d452108739aa873636a36cbeb1e2bb727f710a8503395f34b63b1f3",
+        "size": 8419
+      }
+    ],
+    "pebble-linear": [
+      {
+        "releaseRevision": 1,
+        "upstreamRef": "58ef46d2522da100f1b49cac25413f0b42290b46",
+        "sha256": "3ca6d5aa1562f222bb0d84a768cde4f6b2a961b5b34f3cb2bc16633112675a0f",
+        "size": 9449
+      }
+    ],
+    "pebble-per-workspace-env": [
+      {
+        "releaseRevision": 1,
+        "upstreamRef": "58ef46d2522da100f1b49cac25413f0b42290b46",
+        "sha256": "c23003d06ddfe71bb4ed01e1baf0fc95063451aa7b8fe83dde606ade70696e3b",
+        "size": 43770
+      }
+    ]
+  }
+}

@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const projectDir = resolve(import.meta.dirname, '../..')
-const skillPath = join(projectDir, 'skills', 'pebble-cli', 'SKILL.md')
+const skillPath = join(projectDir, 'skill-guides', 'pebble-cli.md')
 
 function readSkill() {
   return readFileSync(skillPath, 'utf8')

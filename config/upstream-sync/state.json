@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "repository": {
+    "host": "github.com",
+    "owner": "stablyai",
+    "nameParts": ["or", "ca"]
+  },
+  "forkBaseline": {
+    "tag": "v1.4.124-rc.8",
+    "commit": "dacb84bbb5e2f17ce8a7dc02017663a7e395570e"
+  },
+  "lastAudited": {
+    "stableTag": "v1.4.158",
+    "prereleaseTag": "v1.4.159-rc.0",
+    "commit": "58ef46d2522da100f1b49cac25413f0b42290b46",
+    "auditedAt": "2026-07-27"
+  },
+  "lastObserved": {
+    "stableTag": "v1.4.159",
+    "commit": "2b244fa0ea7b82e611d33de554a89766489d1baa",
+    "observedAt": "2026-07-27"
+  }
+}

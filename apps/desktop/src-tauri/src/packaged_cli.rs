@@ -24,6 +24,7 @@ const CONTROL_COMMANDS: &[&str] = &[
     "serve",
     "session",
     "settings",
+    "skills",
     "source-control",
     "status",
     "subsystem",

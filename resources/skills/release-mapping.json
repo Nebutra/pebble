@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "releases": [
+    {
+      "appVersion": "1.4.124-rc.8",
+      "skills": {
+        "computer-use": 1,
+        "linear-tickets": 1,
+        "orchestration": 1,
+        "pebble-cli": 1,
+        "pebble-emulator": 1,
+        "pebble-emulator-android": 1,
+        "pebble-linear": 1,
+        "pebble-per-workspace-env": 1
+      }
+    }
+  ]
+}
