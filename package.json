@@ -2,7 +2,7 @@
   "name": "pebble",
   "version": "1.4.124-rc.8",
   "description": "Next-gen IDE for parallel agentic development",
-  "homepage": "https://github.com/nebutra/pebble",
+  "homepage": "https://pebble.nebutra.com",
   "author": "Nebutra",
   "bin": {
     "pebble": "./out/cli/index.js",
