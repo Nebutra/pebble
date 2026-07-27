@@ -45,8 +45,42 @@ func TestGitHubPRForBranchUsesUpstreamBaseOriginHeadAndCommitContainment(t *test
 		t.Fatal(readErr)
 	}
 	log := string(commands)
-	if !strings.Contains(log, "repos/nebutra/pebble/pulls?head=contributor%3Afeature%2Ffork") || !strings.Contains(log, "repos/nebutra/pebble/commits/abc123/pulls?per_page=100") {
+	if !strings.Contains(log, "repos/nebutra/pebble/pulls?head=contributor%3Afeature%2Ffork") || !strings.Contains(log, "repos/nebutra/pebble/commits/abc123/pulls?per_page=100&page=1") {
 		t.Fatalf("expected candidate and membership API calls, got:\n%s", log)
+	}
+}
+
+func TestGitHubPRForBranchStampsLinkedMergedDivergence(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake CLI stub uses a POSIX shell script")
+	}
+	dir := t.TempDir()
+	// Linked merged PR whose head moved: empty pulls page → not-contained.
+	// OIDs must be hex — membership rejects non-hex as unknown.
+	script := `#!/bin/sh
+case "$*" in
+  "pr view 42"*) printf '%s' '{"number":42,"title":"Fix","state":"MERGED","url":"https://github.com/nebutra/pebble/pull/42","updatedAt":"2026-07-15T00:00:00Z","headRefOid":"aaaa1111","baseRefName":"main","mergeable":"MERGEABLE","autoMergeRequest":null,"statusCheckRollup":[]}' ;;
+  *"commits/bbbb2222/pulls"*) printf '%s' '[]' ;;
+  *) exit 1 ;;
+esac
+`
+	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	withPath(t, dir)
+	number := 42
+	head := "bbbb2222"
+	result, err := GetGitHubPRForBranch(context.Background(), t.TempDir(), GitHubPRForBranchRequest{
+		Branch: "feature", LinkedPRNumber: &number, CurrentHeadOID: &head,
+	})
+	if err != nil || result == nil || result.Number != 42 {
+		t.Fatalf("unexpected linked merged result: %+v err=%v", result, err)
+	}
+	if result.HeadDivergedFromMergedPRAtOID != head {
+		t.Fatalf("expected headDivergedFromMergedPRAtOid=%s, got %+v", head, result)
+	}
+	if result.ConfirmedHeadOID != "" {
+		t.Fatalf("expected no confirmed containment, got %+v", result)
 	}
 }
 
@@ -135,7 +169,7 @@ printf 'gh %s\n' "$*" >> "$PEBBLE_TEST_COMMAND_LOG"
 case "$*" in
   *"repos/nebutra/pebble/pulls?head=contributor%3Afeature%2Ffork"*) printf '%s' '[{"number":77}]' ;;
   "pr view 77 --repo nebutra/pebble"*) printf '%s' '{"number":77,"title":"Fork fix","state":"MERGED","url":"https://github.test/pr/77","updatedAt":"2026-07-15T00:00:00Z","headRefOid":"remote-head","headRefName":"feature/fork","baseRefOid":"base-old","baseRefName":"main","mergeable":"MERGEABLE","autoMergeRequest":null,"statusCheckRollup":[]}' ;;
-  *"repos/nebutra/pebble/commits/abc123/pulls?per_page=100"*) printf '%s' '[{"number":77}]' ;;
+  *"repos/nebutra/pebble/commits/abc123/pulls?per_page=100&page=1"*) printf '%s' '[{"number":77}]' ;;
   *) exit 1 ;;
 esac
 `
