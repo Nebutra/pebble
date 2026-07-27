@@ -638,13 +638,15 @@ fn parse_pairing_code(input: &str) -> Result<PairingOffer, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
         return Err(
-            "Invalid pairing code. Expected an pebble://pair?... URL or bare pairing payload."
+            "Invalid pairing code. Expected a pebble://pair?... or orca://pair?... URL or bare pairing payload."
                 .to_string(),
         );
     }
-    let payload = if trimmed.to_ascii_lowercase().starts_with("pebble://") {
+    // Why: Orca remote servers emit the same pairing-offer payload under
+    // `orca://pair`; accept both product schemes so Settings paste works.
+    let payload = if has_pairing_url_scheme(trimmed) {
         extract_pairing_code_from_url(trimmed).ok_or_else(|| {
-            "Invalid pairing URL: must start with pebble://pair and include a pairing code."
+            "Invalid pairing URL: must start with pebble://pair (or orca://pair) and include a pairing code."
                 .to_string()
         })?
     } else {
@@ -653,11 +655,25 @@ fn parse_pairing_code(input: &str) -> Result<PairingOffer, String> {
     decode_pairing_payload(&payload)
 }
 
+fn has_pairing_url_scheme(input: &str) -> bool {
+    let lower = input.to_ascii_lowercase();
+    lower.starts_with("pebble://") || lower.starts_with("orca://")
+}
+
 fn extract_pairing_code_from_url(url: &str) -> Option<String> {
-    let without_scheme = url.get("pebble://".len()..)?;
+    let lower = url.to_ascii_lowercase();
+    let scheme_len = if lower.starts_with("pebble://") {
+        "pebble://".len()
+    } else if lower.starts_with("orca://") {
+        "orca://".len()
+    } else {
+        return None;
+    };
+    let without_scheme = url.get(scheme_len..)?;
     let host_end = without_scheme
         .find(['/', '?', '#'])
         .unwrap_or(without_scheme.len());
+    // Why: non-special schemes may keep host case (`ORCA://PAIR`); normalize.
     if without_scheme.get(..host_end)?.to_ascii_lowercase() != "pair" {
         return None;
     }
@@ -950,10 +966,26 @@ mod tests {
     }
 
     #[test]
+    fn parses_orca_pairing_url_with_same_offer_payload() {
+        let payload = r#"{"v":2,"endpoint":"ws://100.77.78.147:6768","deviceToken":"token","publicKeyB64":"key","scope":"runtime"}"#;
+        let code = URL_SAFE_NO_PAD.encode(payload.as_bytes());
+        let offer = parse_pairing_code(&format!("orca://pair?code={code}")).unwrap();
+        assert_eq!(offer.endpoint, "ws://100.77.78.147:6768");
+        assert_eq!(offer.device_token, "token");
+        assert_eq!(
+            parse_pairing_code(&format!("ORCA://PAIR?code={code}"))
+                .unwrap()
+                .endpoint,
+            "ws://100.77.78.147:6768"
+        );
+    }
+
+    #[test]
     fn rejects_non_pairing_deep_link_hosts() {
         let payload = r#"{"v":2,"endpoint":"ws://runtime.example.com","deviceToken":"token","publicKeyB64":"key"}"#;
         let code = URL_SAFE_NO_PAD.encode(payload.as_bytes());
         assert!(parse_pairing_code(&format!("pebble://pairing?code={code}")).is_err());
+        assert!(parse_pairing_code(&format!("orca://pairing?code={code}")).is_err());
     }
 
     #[test]
