@@ -39,4 +39,12 @@ describe('getRelativePathInsideRoot', () => {
   it('keeps POSIX path checks case-sensitive', () => {
     expect(getRelativePathInsideRoot('/Repo/Docs/Plan.md', '/repo')).toBeNull()
   })
+
+  it('matches macOS NFD workspace roots against NFC file paths', () => {
+    const nfcRoot = '/Users/ada/프로젝트'
+    const nfdRoot = nfcRoot.normalize('NFD')
+    expect(nfdRoot).not.toBe(nfcRoot)
+    expect(getRelativePathInsideRoot(`${nfcRoot}/src/a.ts`, nfdRoot)).toBe('src/a.ts')
+    expect(getRelativePathInsideRoot(`${nfdRoot}/src/a.ts`, nfcRoot)).toBe('src/a.ts')
+  })
 })

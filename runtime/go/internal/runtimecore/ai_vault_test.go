@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 func TestParseAiVaultClaudeAndCodexJSONL(t *testing.T) {
@@ -455,6 +457,30 @@ func TestAiVaultScopeIncludesNestedCwdAndRejectsSibling(t *testing.T) {
 	}
 	if aiVaultSessionInScope(AiVaultSession{Cwd: &sibling}, []string{scope}) {
 		t.Fatal("expected sibling cwd to remain out of scope")
+	}
+}
+
+func TestAiVaultScopeMatchesNFDWorkspaceAgainstNFCCwd(t *testing.T) {
+	// Regression for upstream #10841: macOS scope paths arrive NFD while Claude
+	// session transcripts record NFC cwd strings.
+	nfc := "/Users/ada/" + "내 드라이브" + "/" + "한국농어촌공사"
+	nfd := norm.NFD.String(nfc)
+	if nfc == nfd {
+		t.Fatal("expected NFD and NFC spellings to differ for Hangul path")
+	}
+	if !aiVaultSessionInScope(AiVaultSession{Cwd: &nfc}, []string{nfd}) {
+		t.Fatal("expected NFC cwd to match NFD scope")
+	}
+	if !aiVaultSessionInScope(AiVaultSession{Cwd: &nfd}, []string{nfc}) {
+		t.Fatal("expected NFD cwd to match NFC scope")
+	}
+	nested := nfc + "/packages/app"
+	if !aiVaultSessionInScope(AiVaultSession{Cwd: &nested}, []string{nfd}) {
+		t.Fatal("expected nested NFC cwd under NFD scope")
+	}
+	sibling := "/Users/ada/" + "내 드라이브" + "/" + "다른프로젝트"
+	if aiVaultSessionInScope(AiVaultSession{Cwd: &sibling}, []string{nfd}) {
+		t.Fatal("expected sibling project to remain out of scope")
 	}
 }
 

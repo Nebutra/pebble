@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/text/unicode/norm"
 	_ "modernc.org/sqlite"
 )
 
@@ -308,13 +309,22 @@ func normalizeAiVaultScopePaths(paths []string) []string {
 	return result
 }
 
+// Why NFC: macOS hands the UI NFD workspace paths while Claude Code records cwd
+// (and names ~/.claude/projects dirs) in NFC. Comparing the raw strings never
+// matches, so scoped AI Vault discovery listed zero sessions for non-ASCII paths
+// (upstream #10841 / #10832).
+func normalizeAiVaultPathForComparison(path string) string {
+	return filepath.Clean(norm.NFC.String(path))
+}
+
 func aiVaultSessionInScope(session AiVaultSession, scopePaths []string) bool {
 	if session.Cwd == nil || strings.TrimSpace(*session.Cwd) == "" {
 		return false
 	}
-	cwd := filepath.Clean(*session.Cwd)
+	cwd := normalizeAiVaultPathForComparison(*session.Cwd)
 	for _, scopePath := range scopePaths {
-		relative, err := filepath.Rel(scopePath, cwd)
+		scope := normalizeAiVaultPathForComparison(scopePath)
+		relative, err := filepath.Rel(scope, cwd)
 		if err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 			return true
 		}
