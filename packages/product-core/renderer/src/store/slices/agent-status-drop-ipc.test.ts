@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import type { TerminalTab } from '../../../../shared/types'
 import type { RetainedAgentEntry } from './agent-status'
+import { RECENTLY_CLOSED_AGENT_STATUS_TAB_IDS_MAX } from './agent-status'
 import { createTestStore } from './store-test-helpers'
 
 // Why: dropAgentStatus and dismissRetainedAgentsByWorktree mirror the renderer-
@@ -119,6 +120,22 @@ describe('dropAgentStatusByTabPrefix -> IPC fan-out', () => {
       'tab-new': true
     })
   })
+})
+
+it('FIFO-caps recentlyClosedAgentStatusTabIds so it cannot grow unbounded', () => {
+  stubWindowApi()
+  const store = createTestStore()
+  const cap = RECENTLY_CLOSED_AGENT_STATUS_TAB_IDS_MAX
+
+  for (let i = 0; i < cap + 5; i++) {
+    store.getState().dropAgentStatusByTabPrefix(`tab-${i}`)
+  }
+
+  const closed = store.getState().recentlyClosedAgentStatusTabIds
+  expect(Object.keys(closed)).toHaveLength(cap)
+  expect(closed['tab-0']).toBeUndefined()
+  expect(closed['tab-4']).toBeUndefined()
+  expect(closed[`tab-${cap + 4}`]).toBe(true)
 })
 
 describe('dismissRetainedAgentsByWorktree → IPC fan-out', () => {

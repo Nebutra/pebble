@@ -215,6 +215,35 @@ export type AgentStatusSlice = {
   clearRetentionSuppressedPaneKeys: (paneKeys: string[]) => void
 }
 
+// Why: the renderer twin of the main-process closedAgentStatusTabIds set that
+// #7561 FIFO-capped. It suppresses late hook/status events for a just-closed tab,
+// so it must outlive the tab briefly — but tabId is ephemeral and it was only
+// ever added to, growing one entry per tab-close for the renderer's whole life.
+export const RECENTLY_CLOSED_AGENT_STATUS_TAB_IDS_MAX = 1024
+
+// delete-then-set for LRU recency, then evict the oldest keys past the cap (Record
+// key order is insertion order for non-integer string keys). A status event for a
+// tab closed >MAX tabs ago cannot still arrive, so eviction is safe.
+function boundRecentlyClosedAgentStatusTabIds(
+  existing: Record<string, true>,
+  tabId: string
+): Record<string, true> {
+  const next: Record<string, true> = {}
+  for (const key of Object.keys(existing)) {
+    if (key !== tabId) {
+      next[key] = true
+    }
+  }
+  next[tabId] = true
+  const keys = Object.keys(next)
+  if (keys.length > RECENTLY_CLOSED_AGENT_STATUS_TAB_IDS_MAX) {
+    for (const stale of keys.slice(0, keys.length - RECENTLY_CLOSED_AGENT_STATUS_TAB_IDS_MAX)) {
+      delete next[stale]
+    }
+  }
+  return next
+}
+
 // Why: retainedAgentsByPaneKey snapshots a completed agent (a full
 // AgentStatusEntry — up to ~24KB of prompt/message text — plus a TerminalTab)
 // per ephemeral paneKey. paneKeys never recur, and the map is pruned only on
@@ -1630,10 +1659,12 @@ export const createAgentStatusSlice: StateCreator<AppState, [], [], AgentStatusS
             delete nextAck[k]
           }
         }
-        const nextClosedTabs: Record<string, true> = {
-          ...s.recentlyClosedAgentStatusTabIds,
-          [tabIdPrefix]: true
-        }
+        // Why: FIFO-cap so closed-tab suppression cannot grow unbounded with
+        // every tab close for the session (renderer twin of Orca #7561 / #7645).
+        const nextClosedTabs = boundRecentlyClosedAgentStatusTabIds(
+          s.recentlyClosedAgentStatusTabIds,
+          tabIdPrefix
+        )
 
         if (
           liveKeys.length === 0 &&
