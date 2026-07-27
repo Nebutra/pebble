@@ -79,7 +79,7 @@ import { useTabStripDragScrollHandlers } from './tab-strip-drag-scroll'
 import { shouldShowWindowsShellMenu } from './windows-shell-menu-visibility'
 import { canToggleNativeChat } from '../native-chat/native-chat-availability'
 import { findTabAgentEntry } from '../native-chat/native-chat-tab-agent-entry'
-import { resolveTabAgentFromTitle } from '@/lib/use-tab-agent'
+import { resolveCommittedTitleAgentType } from '@/lib/pane-agent-evidence'
 
 const isWindows = navigator.userAgent.includes('Windows')
 const isMacOs = navigator.userAgent.includes('Mac')
@@ -1104,8 +1104,8 @@ function TabBarInner({
                 // Carry the agent *identity* (not just "an agent exists") so the
                 // native-chat gate can reject unsupported agents like Grok.
                 const resolvedAgent =
-                  resolveTabAgentFromTitle(unifiedTabForItem?.label ?? '') ??
-                  resolveTabAgentFromTitle(terminalTab.title)
+                  resolveCommittedTitleAgentType(unifiedTabForItem?.label ?? '') ??
+                  resolveCommittedTitleAgentType(terminalTab.title)
                 // Key the live-agent lookup by the backing terminal tab id —
                 // agent-status pane keys are `${terminalTab.id}:${leafId}`, and
                 // the unified tab id can differ from it.

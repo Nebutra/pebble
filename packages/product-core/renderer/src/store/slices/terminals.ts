@@ -35,7 +35,8 @@ import type { AgentStartedTelemetry } from '../../lib/worktree-activation'
 import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
 import { forgetAgentHibernationTabOutput } from '@/lib/agent-hibernation-output-activity'
 import { clearTransientTerminalState, emptyLayoutSnapshot } from './terminal-helpers'
-import { isClaudeAgent, detectAgentStatusFromTitle } from '@/lib/agent-status'
+import { isClaudeAgent } from '@/lib/agent-status'
+import { classifyTitleActivity } from '@/lib/pane-agent-evidence'
 import { buildOrphanTerminalCleanupPatch, getOrphanTerminalIds } from './terminal-orphan-helpers'
 import {
   dedupeTabOrder,
@@ -771,7 +772,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
         if (!tab.title || !isClaudeAgent(tab.title)) {
           continue
         }
-        const status = detectAgentStatusFromTitle(tab.title)
+        const status = classifyTitleActivity(tab.title)
         if (status === null || status === 'working') {
           continue
         }
@@ -1530,7 +1531,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
       // event fires. Bumping only on classification change keeps incidental
       // title noise (spinner frame, prompt suffix) from churning the sidebar.
       const classificationChanged =
-        detectAgentStatusFromTitle(prevTitle ?? '') !== detectAgentStatusFromTitle(title)
+        classifyTitleActivity(prevTitle ?? '') !== classifyTitleActivity(title)
       // Why: locate the owning worktree so we can suppress the sortEpoch
       // bump when the changing pane lives in the active worktree. Title
       // changes there are side-effects of the user's click (PTY remount on
@@ -1573,7 +1574,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
       // Why: clearing a 'working'/'permission'-classified title back to none
       // changes the title-heuristic verdict for that pane, so the smart sort
       // needs a re-sort. See setRuntimePaneTitle for the rationale.
-      const hadClassification = detectAgentStatusFromTitle(prevTitle ?? '') !== null
+      const hadClassification = classifyTitleActivity(prevTitle ?? '') !== null
       // Why: same active-worktree gate as setRuntimePaneTitle — clears that
       // fire as a side-effect of a click-driven PTY teardown in the active
       // worktree must not re-rank the sidebar. Skip bumping when no owner is
