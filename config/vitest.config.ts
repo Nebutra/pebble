@@ -5,7 +5,13 @@ const windowsTestWorkerOptions = process.platform === 'win32' ? { maxWorkers: 4 
 
 export default defineConfig({
   define: {
-    PEBBLE_FEATURE_WALL_ENABLED: 'true'
+    PEBBLE_FEATURE_WALL_ENABLED: 'true',
+    // Pinned to null so tests assert the production-default origins rather than
+    // whatever the developer's shell happens to export.
+    PEBBLE_PRODUCT_ORIGIN: 'null',
+    PEBBLE_DOCS_ORIGIN: 'null',
+    PEBBLE_API_ORIGIN: 'null',
+    PEBBLE_STATUS_ORIGIN: 'null'
   },
   resolve: {
     alias: {

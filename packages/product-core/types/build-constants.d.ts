@@ -19,3 +19,13 @@ declare const PEBBLE_POSTHOG_WRITE_KEY: string | null
 // point a packaged build at a staging server without re-running the
 // release pipeline.
 declare const PEBBLE_DIAGNOSTICS_TOKEN_URL: string | null
+
+// Public origins Pebble links to or calls. `null` in every ordinary build, at
+// which point `shared/product-origins.ts` falls back to the production Nebutra
+// platform hosts. Substituted only when a fork, self-host, or staging build
+// needs to retarget — staging is an env/project concern, never a subdomain.
+// See docs/reference/infra-index.md.
+declare const PEBBLE_PRODUCT_ORIGIN: string | null
+declare const PEBBLE_DOCS_ORIGIN: string | null
+declare const PEBBLE_API_ORIGIN: string | null
+declare const PEBBLE_STATUS_ORIGIN: string | null

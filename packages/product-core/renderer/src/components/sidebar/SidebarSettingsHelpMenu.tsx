@@ -34,8 +34,9 @@ import { useSetupGuideProgress } from '../setup-guide/use-setup-guide-progress'
 import { SidebarFeedbackDialog } from './SidebarFeedbackDialog'
 import { translate } from '@/i18n/i18n'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
+import { DOCS_BASE_URL } from '../../../../shared/product-origins'
 
-const DOCS_URL = 'https://pebble.nebutra.com/docs'
+const DOCS_URL = DOCS_BASE_URL
 const CHANGELOG_URL = 'https://github.com/nebutra/pebble/releases'
 const GITHUB_URL = 'https://github.com/nebutra/pebble'
 const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'

@@ -98,7 +98,15 @@ export default defineConfig({
     PEBBLE_BUILD_IDENTITY: 'null',
     PEBBLE_POSTHOG_WRITE_KEY: 'null',
     PEBBLE_DIAGNOSTICS_TOKEN_URL: 'null',
-    PEBBLE_FEATURE_WALL_ENABLED: 'true'
+    PEBBLE_FEATURE_WALL_ENABLED: 'true',
+    // Why: `shared/product-origins.ts` falls back to the production Nebutra
+    // hosts when these are null, so an ordinary build needs no configuration.
+    // A fork, self-host, or staging build exports the env var instead of
+    // editing call sites. See docs/reference/infra-index.md.
+    PEBBLE_PRODUCT_ORIGIN: JSON.stringify(process.env.PEBBLE_PRODUCT_ORIGIN?.trim() || null),
+    PEBBLE_DOCS_ORIGIN: JSON.stringify(process.env.PEBBLE_DOCS_ORIGIN?.trim() || null),
+    PEBBLE_API_ORIGIN: JSON.stringify(process.env.PEBBLE_API_ORIGIN?.trim() || null),
+    PEBBLE_STATUS_ORIGIN: JSON.stringify(process.env.PEBBLE_STATUS_ORIGIN?.trim() || null)
   },
   resolve: {
     alias: {

@@ -87,7 +87,10 @@ export default function SettingsScreen() {
       <View style={[styles.section, styles.sectionSpacer]}>
         <Pressable
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => void Linking.openURL('https://pebble.nebutra.com/docs/privacy')}
+          // Canonical docs host, not the brand front — mobile is a separate
+          // workspace and cannot read the desktop build constants in
+          // `product-core/shared/product-origins.ts`. Keep this in step with it.
+          onPress={() => void Linking.openURL('https://docs.nebutra.com/pebble/privacy')}
         >
           <Shield size={16} color={colors.textSecondary} />
           <Text style={styles.rowLabel}>Privacy Policy</Text>

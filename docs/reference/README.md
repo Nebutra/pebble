@@ -7,6 +7,7 @@ Keep this folder for versioned reference docs that are meant to survive past a s
 - Stable reference material.
 - Public-facing docs that are not part of the root README.
 - Docs that other checked-in files link to.
+- The live infrastructure map: which Nebutra platform hosts Pebble runs on, the auth constraints it inherits, ports, and how client origins are configured. See [Infra Index](./infra-index.md) — it is the source of truth wherever `ROADMAP.md` disagrees.
 - Telemetry availability notes that dashboard authors need after the original design or implementation branch is gone. See [Telemetry Availability](./telemetry-availability.md).
 - Headless Linux server setup for remote `pebble serve` hosts. See [Headless Linux Server](./headless-linux-server.md).
 - Feature education state, interaction tracking, and retention analytics notes that define how contextual tours are persisted and measured. See [Feature Education State](./feature-education-state.md), [Feature Discovery Interaction Tracking](./feature-discovery-interaction-tracking.md), and [Feature Education Retention Analytics](./feature-education-retention-analytics.md).

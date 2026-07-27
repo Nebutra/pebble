@@ -1,3 +1,5 @@
+import { DOCS_BASE_URL } from './product-origins'
+
 export type FeatureWallTileId =
   | 'tile-01'
   | 'tile-02'
@@ -20,10 +22,8 @@ type FeatureWallTileBase = {
   docsUrl: string
 }
 
-const PEBBLE_DOCS_BASE_URL = 'https://pebble.nebutra.com/docs'
-
 function pebbleDocsUrl(path: string): string {
-  return `${PEBBLE_DOCS_BASE_URL}${path}`
+  return `${DOCS_BASE_URL}${path}`
 }
 
 export type FeatureWallTile =

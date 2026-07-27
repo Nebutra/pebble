@@ -3968,12 +3968,28 @@ const checks = [
     file: 'packages/product-core/shared/updater-changelog-selection.ts',
     expect: (text) =>
       text.includes('export function selectChangelogData') &&
-      text.includes("'pebble.nebutra.com'") &&
+      // The host itself is pinned in shared/product-origins.ts (see the
+      // dedicated check below); this file must reach it through that module
+      // rather than re-declaring the literal.
+      text.includes("import { PRODUCT_HOST } from './product-origins'") &&
+      text.includes('PRODUCT_CHANGELOG_HOST = PRODUCT_HOST') &&
       text.includes("parts[0] === 'changelog'") &&
       text.includes('https://github.com/nebutra/pebble/releases/tag/') &&
       text.includes('releaseNotesUrl: CHANGELOG_URL') &&
       text.includes('function canonicalReleaseNotesUrl') &&
       text.includes('export function compareReleaseVersions')
+  },
+  {
+    name: 'Product origins pin the Nebutra platform hosts and the /pebble API namespace',
+    file: 'packages/product-core/shared/product-origins.ts',
+    expect: (text) =>
+      text.includes("DEFAULT_PRODUCT_ORIGIN = 'https://pebble.nebutra.com'") &&
+      text.includes("DEFAULT_DOCS_ORIGIN = 'https://docs.nebutra.com'") &&
+      text.includes("DEFAULT_API_ORIGIN = 'https://api.nebutra.com'") &&
+      text.includes("DEFAULT_STATUS_ORIGIN = 'https://status.nebutra.com'") &&
+      text.includes("PRODUCT_NAMESPACE = 'pebble'") &&
+      text.includes('API_BASE_URL = `${API_ORIGIN}/${PRODUCT_NAMESPACE}`') &&
+      text.includes('DOCS_BASE_URL = `${DOCS_ORIGIN}/${PRODUCT_NAMESPACE}`')
   },
   {
     name: 'Shared updater changelog tests pin the canonical Pebble release-note origin',
@@ -3984,10 +4000,10 @@ const checks = [
       text.includes('https://github.com/nebutra/pebble/releases/tag/v1.4.128')
   },
   {
-    name: 'Tauri release workflow compiles diagnostics against the canonical Pebble origin',
+    name: 'Tauri release workflow compiles diagnostics against the platform API host',
     file: '.github/workflows/tauri-desktop-release.yml',
     expect: (text) =>
-      text.includes('PEBBLE_DIAGNOSTICS_TOKEN_URL: https://pebble.nebutra.com/diagnostics/token')
+      text.includes('PEBBLE_DIAGNOSTICS_TOKEN_URL: https://api.nebutra.com/pebble/diagnostics/token')
   },
   {
     name: 'Tauri updater and process plugins are registered in the native shell',

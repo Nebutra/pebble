@@ -4,6 +4,7 @@ import {
   type FeatureWallMediaTile,
   type FeatureWallMediaTileId
 } from './feature-wall-tiles'
+import { DOCS_BASE_URL } from './product-origins'
 
 export type FeatureWallWorkflowId =
   | 'tasks'
@@ -22,10 +23,8 @@ export type FeatureWallWorkflow = {
   docsUrl: string
 }
 
-const PEBBLE_DOCS_BASE_URL = 'https://pebble.nebutra.com/docs'
-
 function pebbleDocsUrl(path: string): string {
-  return `${PEBBLE_DOCS_BASE_URL}${path}`
+  return `${DOCS_BASE_URL}${path}`
 }
 
 export const FEATURE_WALL_WORKFLOWS: readonly FeatureWallWorkflow[] = [

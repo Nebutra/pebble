@@ -1489,10 +1489,21 @@ are the next candidate Zig boundaries.
 
 ## Pebble product origin rollout
 
-The canonical product origin is `https://pebble.nebutra.com`. Public links and
-new application builds use this origin without a `/pebble` path prefix. DNS,
-TLS, CDN/origin routing, and compatibility handling remain deployment work and
-must be ready before a public release consumes these routes.
+> **Live alignment — read [`docs/reference/infra-index.md`](docs/reference/infra-index.md) first.**
+> That file records where traffic actually lands and supersedes this section
+> wherever the two disagree. In short (frozen 2026-07-27):
+> `pebble.nebutra.com` is a **brand front only** — landing, download, and a docs
+> redirect, with no backend. Docs are canonically `docs.nebutra.com/pebble/*`,
+> feedback and diagnostics are `api.nebutra.com/pebble/*`, and status is
+> `status.nebutra.com`. There is **no** `status.pebble.*`, `staging.pebble.*`,
+> or `api.pebble.*`, and staging is env/project isolation rather than a host.
+> The per-product `/pebble` prefix on the shared API host is deliberate: it
+> keeps `/v1/*` unclaimed so other Nebutra products can coexist without a later
+> namespace split.
+
+`https://pebble.nebutra.com` is the brand-facing product origin. DNS, TLS,
+CDN/origin routing, and compatibility handling remain deployment work and must
+be ready before a public release consumes these routes.
 
 This section is the ecosystem-preparation contract for the first public desktop
 release. Client URL migration alone does not satisfy it: the canonical host,
@@ -1501,17 +1512,18 @@ be deployed and exercised in production-like staging.
 
 Domain namespace:
 
-- Deploy `pebble.nebutra.com`, `status.pebble.nebutra.com`, and
-  `staging.pebble.nebutra.com` now. The status host must remain reachable when
-  the product origin or application API is impaired; staging must use isolated
-  data, secrets, storage, and routing.
-- Reserve `app.pebble.nebutra.com`, `cloud.pebble.nebutra.com`,
-  `relay.pebble.nebutra.com`, `telemetry.pebble.nebutra.com`, and
-  `assets.pebble.nebutra.com`. `api.pebble.nebutra.com` is optional if a future
-  public API needs a separate origin.
-- `telemetry.pebble.nebutra.com` is reservation-only while PostHog Cloud and
-  Sentry Cloud are the production destinations. It needs no DNS record, origin,
-  database, or storage for the first release.
+- Deploy `pebble.nebutra.com` as a brand front (CF CNAME → static + redirects).
+  It carries no API, no database, and no storage.
+- Status lives on the platform's `status.nebutra.com`, which stays reachable
+  when the product origin or application API is impaired. Do **not** stand up
+  `status.pebble.nebutra.com`.
+- Staging is env / secrets / project isolation, not a hostname. Do **not** stand
+  up `staging.pebble.nebutra.com`.
+- Do **not** reserve or deploy `api.pebble.*`, `app.pebble.*`, `cloud.pebble.*`,
+  `relay.pebble.*`, `telemetry.pebble.*`, or `assets.pebble.*`. Each of those
+  capabilities maps onto an existing platform host — see the mapping table in
+  `docs/reference/infra-index.md`. Telemetry remains PostHog Cloud + Sentry
+  Cloud and needs no Nebutra-side host at all.
 - Current desktop and mobile clients remain path-based on
   `https://pebble.nebutra.com`; reserved hosts are namespace protection, not
   permission to move an existing route without a client migration.
@@ -1564,7 +1576,7 @@ Diagnostics protocol:
 
 1. The client calls `POST /diagnostics/token` with JSON
    `{"bundle_submission_id":"<id>","bytes":<integer>}`. The service returns
-   `{"token":"<bearer>","upload_url":"https://pebble.nebutra.com/diagnostics/upload","max_bytes":4194304}`.
+   `{"token":"<bearer>","upload_url":"https://api.nebutra.com/pebble/diagnostics/upload","max_bytes":4194304}`.
 2. The upload URL must use HTTP(S), remain HTTPS when the token endpoint is
    HTTPS, and have the same host and effective port as the token endpoint. The
    client rejects a cross-host upload URL.
@@ -1614,15 +1626,15 @@ Required canonical routes:
 | ----------------------------------------------- | --------------------------------------------------------- | -------------------------- | ----------------------------------------------------------- |
 | `https://www.nebutra.com/pebble`                | `https://pebble.nebutra.com`                              | Product landing page       | Human `GET` may redirect after the new host is healthy.      |
 | `https://onpebble.dev/download`                 | `https://pebble.nebutra.com/download`                     | Download page              | Human `GET` may redirect after artifact links are verified. |
-| `https://onpebble.dev/docs/*`                   | `https://pebble.nebutra.com/docs/*`                       | Product documentation      | Preserve path and query strings on redirect.                |
+| `https://onpebble.dev/docs/*`                   | `https://docs.nebutra.com/pebble/*`                       | Product documentation      | Preserve path and query strings on redirect. `pebble.nebutra.com/docs/*` also 301s here. |
 | `https://onpebble.dev/whats-new/changelog.json` | `https://pebble.nebutra.com/whats-new/changelog.json`     | Update changelog feed      | Mirror or internally proxy; never redirect clients.         |
 | `https://onpebble.dev/whats-new/nudge.json`     | `https://pebble.nebutra.com/whats-new/nudge.json`         | Update nudge feed          | Mirror or internally proxy; never redirect clients.         |
 | `https://onpebble.dev/media/*`                  | `https://pebble.nebutra.com/media/*`                      | Changelog media assets     | Mirror or internally proxy immutable assets.                |
-| `https://www.onpebble.dev/diagnostics/token`    | `https://pebble.nebutra.com/diagnostics/token`            | Diagnostics token `POST`   | Reverse-proxy method, JSON, and response without redirect.   |
-| None                                            | `https://pebble.nebutra.com/diagnostics/upload`           | Diagnostics upload `POST`  | Required direct handler; no redirect.                        |
-| None                                            | `https://pebble.nebutra.com/diagnostics/delete/:ticketId` | Diagnostics delete `POST`  | Required direct handler; no redirect.                        |
-| `https://www.onpebble.dev/v1/feedback`          | `https://pebble.nebutra.com/v1/feedback`                  | Feedback/crash `POST`      | Reverse-proxy JSON or multipart without redirect.            |
-| `https://api.onpebble.dev/v1/feedback`          | `https://pebble.nebutra.com/v1/feedback`                  | Feedback fallback `POST`   | Retain only as a compatibility proxy for older clients.     |
+| `https://www.onpebble.dev/diagnostics/token`    | `https://api.nebutra.com/pebble/diagnostics/token`        | Diagnostics token `POST`   | Reverse-proxy method, JSON, and response without redirect.   |
+| None                                            | `https://api.nebutra.com/pebble/diagnostics/upload`       | Diagnostics upload `POST`  | Required direct handler; no redirect. Same host as token.    |
+| None                                            | `https://api.nebutra.com/pebble/diagnostics/delete/:ticketId` | Diagnostics delete `POST` | Required direct handler; no redirect.                     |
+| `https://www.onpebble.dev/v1/feedback`          | `https://api.nebutra.com/pebble/v1/feedback`              | Feedback/crash `POST`      | Reverse-proxy JSON or multipart without redirect.            |
+| `https://api.onpebble.dev/v1/feedback`          | `https://api.nebutra.com/pebble/v1/feedback`              | Feedback fallback `POST`   | Retain only as a compatibility proxy for older clients.     |
 
 ## Nebutra package namespace backfill
 
@@ -1641,7 +1653,7 @@ entries.
 
 Canonical docs base:
 
-- `https://pebble.nebutra.com/docs`
+- `https://docs.nebutra.com/pebble`
 
 Routes currently referenced by the app, README, localized READMEs, telemetry surfaces, mobile settings, and feature-wall entry points:
 
@@ -1679,10 +1691,10 @@ The dynamic API routes and their operational requirements are defined by the
 Pebble product origin rollout contract above. All four require a Nebutra-owned
 handler or internal reverse proxy with no client-visible redirect:
 
-- `POST https://pebble.nebutra.com/diagnostics/token`
-- `POST https://pebble.nebutra.com/diagnostics/upload`
-- `POST https://pebble.nebutra.com/diagnostics/delete/:ticketId`
-- `POST https://pebble.nebutra.com/v1/feedback`
+- `POST https://api.nebutra.com/pebble/diagnostics/token`
+- `POST https://api.nebutra.com/pebble/diagnostics/upload`
+- `POST https://api.nebutra.com/pebble/diagnostics/delete/:ticketId`
+- `POST https://api.nebutra.com/pebble/v1/feedback`
 
 The in-app changelog and update card currently link release notes to GitHub Releases:
 

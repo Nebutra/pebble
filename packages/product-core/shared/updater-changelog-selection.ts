@@ -1,3 +1,4 @@
+import { PRODUCT_HOST } from './product-origins'
 import type { ChangelogData } from './types'
 
 export type ChangelogEntry = {
@@ -10,7 +11,7 @@ export type ChangelogEntry = {
 
 const CHANGELOG_URL = 'https://github.com/nebutra/pebble/releases'
 const PEBBLE_RELEASE_TAG_URL_PREFIX = 'https://github.com/nebutra/pebble/releases/tag/'
-const PRODUCT_CHANGELOG_HOST = 'pebble.nebutra.com'
+const PRODUCT_CHANGELOG_HOST = PRODUCT_HOST
 
 export function selectChangelogData(
   json: unknown,

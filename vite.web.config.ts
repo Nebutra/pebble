@@ -10,7 +10,14 @@ export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss()],
   define: {
-    PEBBLE_FEATURE_WALL_ENABLED: 'true'
+    PEBBLE_FEATURE_WALL_ENABLED: 'true',
+    // Why: `shared/product-origins.ts` falls back to the production Nebutra
+    // hosts when these are null; a fork or staging build overrides them here.
+    // See docs/reference/infra-index.md.
+    PEBBLE_PRODUCT_ORIGIN: 'null',
+    PEBBLE_DOCS_ORIGIN: 'null',
+    PEBBLE_API_ORIGIN: 'null',
+    PEBBLE_STATUS_ORIGIN: 'null'
   },
   resolve: {
     alias: {

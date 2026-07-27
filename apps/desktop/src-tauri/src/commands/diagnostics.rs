@@ -1144,12 +1144,12 @@ mod tests {
     fn rejects_upload_url_host_mismatch() {
         assert!(validate_upload_url(
             "https://evil.example/upload",
-            "https://pebble.nebutra.com/diagnostics/token"
+            "https://api.nebutra.com/pebble/diagnostics/token"
         )
         .is_err());
         assert!(validate_upload_url(
-            "https://pebble.nebutra.com/diagnostics/upload",
-            "https://pebble.nebutra.com/diagnostics/token"
+            "https://api.nebutra.com/pebble/diagnostics/upload",
+            "https://api.nebutra.com/pebble/diagnostics/token"
         )
         .is_ok());
     }
