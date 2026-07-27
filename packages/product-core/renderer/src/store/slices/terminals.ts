@@ -34,6 +34,8 @@ import { WINDOWS_GIT_BASH_SHELL } from '../../../../shared/windows-terminal-shel
 import type { AgentStartedTelemetry } from '../../lib/worktree-activation'
 import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
 import { forgetAgentHibernationTabOutput } from '@/lib/agent-hibernation-output-activity'
+import { forgetForegroundTerminalTabs } from '@/lib/foreground-terminal-tabs'
+import { forgetAgentStartupDeliveriesForTabs } from '@/lib/agent-startup-delivery-guards'
 import { clearTransientTerminalState, emptyLayoutSnapshot } from './terminal-helpers'
 import { isClaudeAgent } from '@/lib/agent-status'
 import { classifyTitleActivity } from '@/lib/pane-agent-evidence'
@@ -1237,6 +1239,10 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
     // a fresh leafId at epoch 0), so drop the panes' hibernation output epochs to
     // keep that module-level map from growing for the renderer's whole lifetime.
     forgetAgentHibernationTabOutput(tabId)
+    // Why: same rationale for the tab's foreground last-seen timestamp and any
+    // consumed agent-startup delivery guards — retired tab ids never recur.
+    forgetForegroundTerminalTabs([tabId])
+    forgetAgentStartupDeliveriesForTabs([tabId])
     for (const tabs of Object.values(get().unifiedTabsByWorktree)) {
       const workspaceItem = tabs.find(
         (entry) => entry.contentType === 'terminal' && entry.entityId === tabId

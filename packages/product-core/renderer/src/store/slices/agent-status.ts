@@ -215,6 +215,30 @@ export type AgentStatusSlice = {
   clearRetentionSuppressedPaneKeys: (paneKeys: string[]) => void
 }
 
+// Why: retainedAgentsByPaneKey snapshots a completed agent (a full
+// AgentStatusEntry — up to ~24KB of prompt/message text — plus a TerminalTab)
+// per ephemeral paneKey. paneKeys never recur, and the map is pruned only on
+// worktree removal or manual dismissal, so a long-lived worktree in a busy
+// multi-agent session grows it without bound — the dominant driver of the
+// renderer JS-heap OOM. Cap by insertion order (== retention order), evicting
+// the oldest completions first so the newest always survive (Orca #7528).
+const MAX_RETAINED_AGENTS = 500
+
+function capRetainedAgents(
+  retained: Record<string, RetainedAgentEntry>,
+  maxEntries = MAX_RETAINED_AGENTS
+): Record<string, RetainedAgentEntry> {
+  const keys = Object.keys(retained)
+  if (keys.length <= maxEntries) {
+    return retained
+  }
+  const next: Record<string, RetainedAgentEntry> = {}
+  for (const key of keys.slice(keys.length - maxEntries)) {
+    next[key] = retained[key]!
+  }
+  return next
+}
+
 function paneKeyMatchesAnyTabPrefix(paneKey: string, tabPrefixes: string[]): boolean {
   for (const prefix of tabPrefixes) {
     if (paneKey.startsWith(prefix)) {
@@ -2147,7 +2171,7 @@ export const createAgentStatusSlice: StateCreator<AppState, [], [], AgentStatusS
           next[retained.entry.paneKey] =
             entry === retained.entry ? retained : { ...retained, entry }
         }
-        return { retainedAgentsByPaneKey: next }
+        return { retainedAgentsByPaneKey: capRetainedAgents(next) }
       })
     },
 

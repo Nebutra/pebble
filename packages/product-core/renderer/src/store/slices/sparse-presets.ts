@@ -26,6 +26,59 @@ export type SparsePresetsSlice = {
   removeSparsePreset: (args: { repoId: string; presetId: string }) => Promise<void>
 }
 
+type SparsePresetsMaps = Pick<
+  AppState,
+  | 'sparsePresetsByRepo'
+  | 'sparsePresetsLoadingByRepo'
+  | 'sparsePresetsLoadStatusByRepo'
+  | 'sparsePresetsErrorByRepo'
+>
+
+// Why: the four per-repo sparse-preset maps are populated lazily but were never
+// pruned on repo removal, so orphaned UUID repoIds accumulated for the whole
+// session (Orca #7564).
+export function omitSparsePresetsForRepos(
+  state: SparsePresetsMaps,
+  removedRepoIds: readonly string[]
+): Partial<SparsePresetsMaps> {
+  if (removedRepoIds.length === 0) {
+    return {}
+  }
+  const removed = new Set(removedRepoIds)
+  const nextPresets = { ...state.sparsePresetsByRepo }
+  const nextLoading = { ...state.sparsePresetsLoadingByRepo }
+  const nextStatus = { ...state.sparsePresetsLoadStatusByRepo }
+  const nextError = { ...state.sparsePresetsErrorByRepo }
+  let changed = false
+  for (const repoId of removed) {
+    if (repoId in nextPresets) {
+      delete nextPresets[repoId]
+      changed = true
+    }
+    if (repoId in nextLoading) {
+      delete nextLoading[repoId]
+      changed = true
+    }
+    if (repoId in nextStatus) {
+      delete nextStatus[repoId]
+      changed = true
+    }
+    if (repoId in nextError) {
+      delete nextError[repoId]
+      changed = true
+    }
+  }
+  if (!changed) {
+    return {}
+  }
+  return {
+    sparsePresetsByRepo: nextPresets,
+    sparsePresetsLoadingByRepo: nextLoading,
+    sparsePresetsLoadStatusByRepo: nextStatus,
+    sparsePresetsErrorByRepo: nextError
+  }
+}
+
 export const createSparsePresetsSlice: StateCreator<AppState, [], [], SparsePresetsSlice> = (
   set,
   get
