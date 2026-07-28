@@ -36,8 +36,35 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
 }))
 
 vi.mock('lucide-react', () => ({
+  ArrowDown: function ArrowDown(props: Record<string, unknown>) {
+    return { type: 'ArrowDown', props }
+  },
+  ArrowLeft: function ArrowLeft(props: Record<string, unknown>) {
+    return { type: 'ArrowLeft', props }
+  },
+  ArrowRight: function ArrowRight(props: Record<string, unknown>) {
+    return { type: 'ArrowRight', props }
+  },
+  ArrowUp: function ArrowUp(props: Record<string, unknown>) {
+    return { type: 'ArrowUp', props }
+  },
+  X: function X(props: Record<string, unknown>) {
+    return { type: 'X', props }
+  },
+  ListX: function ListX(props: Record<string, unknown>) {
+    return { type: 'ListX', props }
+  },
+  Eye: function Eye(props: Record<string, unknown>) {
+    return { type: 'Eye', props }
+  },
+  PanelRightClose: function PanelRightClose(props: Record<string, unknown>) {
+    return { type: 'PanelRightClose', props }
+  },
   Copy: function Copy(props: Record<string, unknown>) {
     return { type: 'Copy', props }
+  },
+  CopyX: function CopyX(props: Record<string, unknown>) {
+    return { type: 'CopyX', props }
   },
   ExternalLink: function ExternalLink(props: Record<string, unknown>) {
     return { type: 'ExternalLink', props }

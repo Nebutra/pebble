@@ -17,7 +17,8 @@
   },
   "lastObserved": {
     "stableTag": "v1.4.159",
-    "commit": "2b244fa0ea7b82e611d33de554a89766489d1baa",
-    "observedAt": "2026-07-27"
+    "prereleaseTag": "v1.4.160-rc.2",
+    "commit": "77d4c64f7a05e7fb2caa48e3d0acad5db39ff1f2",
+    "observedAt": "2026-07-28"
   }
 }

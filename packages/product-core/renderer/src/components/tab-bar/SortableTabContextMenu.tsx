@@ -1,10 +1,13 @@
 import {
+  CopyX,
   MessageSquare,
   PanelBottomClose,
   PanelRightClose,
+  Pencil,
   Pin,
   PinOff,
-  SquareTerminal
+  SquareTerminal,
+  X
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -20,6 +23,7 @@ import { formatShortcutLabel, useOptionalShortcutLabel } from '@/hooks/useShortc
 import { translate } from '@/i18n/i18n'
 import { TabWorkspaceLayoutMenuSection } from './TabWorkspaceLayoutMenuSection'
 import { requestActiveTerminalPaneSplit } from './request-active-terminal-pane-split'
+import { TAB_CONTEXT_MENU_CONTENT_CLASS } from './tab-context-menu-sizing'
 
 const TAB_COLORS = [
   {
@@ -157,7 +161,7 @@ export function SortableTabContextMenu({
           style={{ left: point.x, top: point.y }}
         />
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" sideOffset={0} align="start">
+      <DropdownMenuContent className={TAB_CONTEXT_MENU_CONTENT_CLASS} sideOffset={0} align="start">
         {canToggleViewMode && onToggleViewMode && (
           <>
             <DropdownMenuItem onSelect={onToggleViewMode}>
@@ -180,7 +184,7 @@ export function SortableTabContextMenu({
           </>
         )}
         <DropdownMenuItem onSelect={() => splitActiveTerminalPane('vertical')}>
-          <PanelRightClose />
+          <PanelRightClose className="mr-1.5 size-3.5" />
           {translate(
             'auto.components.tab.bar.SortableTabContextMenu.splitTerminalRight',
             'Split terminal right'
@@ -188,7 +192,7 @@ export function SortableTabContextMenu({
           <DropdownMenuShortcut>{splitRightShortcut}</DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => splitActiveTerminalPane('horizontal')}>
-          <PanelBottomClose />
+          <PanelBottomClose className="mr-1.5 size-3.5" />
           {translate(
             'auto.components.tab.bar.SortableTabContextMenu.splitTerminalDown',
             'Split terminal down'
@@ -205,13 +209,16 @@ export function SortableTabContextMenu({
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => !isPinned && onClose(tab.id)} disabled={isPinned}>
+          <X className="mr-1.5 size-3.5" />
           {translate('auto.components.tab.bar.SortableTabContextMenu.89359a36f7', 'Close')}
           {closeShortcut ? <DropdownMenuShortcut>{closeShortcut}</DropdownMenuShortcut> : null}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => onCloseOthers(tab.id)} disabled={tabCount <= 1}>
+          <CopyX className="mr-1.5 size-3.5" />
           {translate('auto.components.tab.bar.SortableTabContextMenu.8d16f9cd30', 'Close Others')}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => onCloseToRight(tab.id)} disabled={!hasTabsToRight}>
+          <PanelRightClose className="mr-1.5 size-3.5" />
           {translate(
             'auto.components.tab.bar.SortableTabContextMenu.c1ee099c7e',
             'Close Tabs To The Right'
@@ -219,6 +226,7 @@ export function SortableTabContextMenu({
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onRenameOpen}>
+          <Pencil className="mr-1.5 size-3.5" />
           {translate('auto.components.tab.bar.SortableTabContextMenu.2f697b3c31', 'Change Title')}
           {renameShortcut ? <DropdownMenuShortcut>{renameShortcut}</DropdownMenuShortcut> : null}
         </DropdownMenuItem>

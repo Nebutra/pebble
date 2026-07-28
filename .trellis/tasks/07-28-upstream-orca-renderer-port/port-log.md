@@ -50,7 +50,41 @@ subsystem Pebble replaced: `worktree-operation-route.ts`, `editor-file-operation
 `terminal-tab-activity-status.ts`, `useEphemeralVmRecipeOptions.ts` (carries the upstream
 `OrcaVmRecipe` type), `git-binary-compatibility.test.ts`, `pane-divider-stray-touch.test.ts`.
 
-## Deferred
+## Batch B
 
-Batch B (heavy conflicts) — `b59f893ee28f`, `b60164396046`, `e4b113b11d94`,
-`974447175f66`, `9de4519c820d`, `e73b1a1dd096`, `1fd0f731fc0d`.
+### Ported
+
+| upstream | change |
+| --- | --- |
+| `b60164396046` | sidebar: stop worktree cycling from reopening collapsed groups |
+| `b59f893ee28f` | tab-bar: keep tab menu items on one line and give every item an icon |
+
+Adaptations:
+
+- `worktree-keyboard-cycle.ts` was written against Pebble's row model. Upstream's version
+  takes a `pinnedDisplayPolicy` and calls `getPreferredWorktreeRows` from
+  `worktree-sidebar-row-preference.ts`; Pebble has neither, so the helper dedupes the
+  rendered rows directly. `repoOrder` became unused on the viewport and was dropped, as
+  upstream did.
+- Tab menus: Pebble has no "Close Others"/"Close Tabs To The Left" on the browser tab and
+  routes splits through `TabWorkspaceLayoutMenuSection`, not upstream's
+  `TerminalTabSplitMenuSection`, so those hunks and that module were dropped. Icons were
+  added to Pebble's own icon-less items using upstream's icon choices for the same
+  actions, in Pebble's `mr-1.5 size-3.5` convention. The consistency guard was widened to
+  accept that convention and Pebble's older `w-3.5 h-3.5` ordering.
+
+### Not applicable
+
+| upstream | reason |
+| --- | --- |
+| `e4b113b11d94` | native-chat: Pebble's loading guard is already unconditional (`if (loading)`), so known sessions already stay loading; upstream's `liveStatusOverride` takes five arguments to Pebble's two. |
+| `974447175f66`, `9de4519c820d` | terminal manual parking: Pebble's `Terminal.tsx` carries no `parkedTerminalWorktreeIds` / `terminalParkingRevision` state, so the developer action and its Option gate have nothing to hang off. Porting would mean rebuilding the parking subsystem — new feature work, not fork maintenance. |
+
+### Not attempted
+
+| upstream | size |
+| --- | --- |
+| `e73b1a1dd096` | new-workspace type-ahead pickers: 11 new modules, 21 conflicts, rewrites `NewWorkspaceComposerCard` and `ProjectCombobox`. |
+| `1fd0f731fc0d` | automations / agent background sessions: 31 conflicts across `launch-agent-background-session` and SSH folder-workspace host routing. |
+
+Both are feature-scale ports into subsystems Pebble reworked; they need their own task.

@@ -285,6 +285,7 @@ import {
   getProjectGroupExecutionHostIdForRows
 } from './worktree-list-host-filtering'
 import { getFolderWorkspaceCardPrDisplay } from './folder-workspace-card-pr-display'
+import { getCyclableWorktreeIds, resolveCycledWorktreeId } from './worktree-keyboard-cycle'
 
 export {
   getScrollTopToRevealBounds,
@@ -667,7 +668,6 @@ type VirtualizedWorktreeViewportProps = {
   worktreeMap: Map<string, Worktree>
   worktreeLineageById: Record<string, WorktreeLineage>
   workspaceLineageByChildKey: Record<string, WorkspaceLineage>
-  repoOrder: Map<string, number>
   // The full canonical state.repos id ordering — the drag controller commits
   // permutations of this list, even when some repos aren't currently visible
   // (filtered out / collapsed-only). Visible-only ids would silently drop the
@@ -1303,7 +1303,6 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
   worktreeMap,
   worktreeLineageById,
   workspaceLineageByChildKey,
-  repoOrder,
   allRepoIds,
   onReorderHostSections,
   onHostDragActiveChange,
@@ -2427,61 +2426,18 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
 
   const navigateWorktree = useCallback(
     (direction: 'up' | 'down') => {
-      // Why: derive the cycling order from an all-expanded layout, not the
-      // rendered rows. Otherwise Cmd+Shift+Up/Down would skip any worktree
-      // hidden in a collapsed group — in particular it couldn't cross the
-      // Pinned/All boundary when either section is collapsed. Reveal will
-      // uncollapse the target section (see pendingRevealWorktree effect).
-      const allWorktreeRows = buildRows(
-        groupBy,
-        worktrees,
-        repoMap,
-        prCache,
-        new Set<string>(),
-        repoOrder,
-        workspaceStatuses,
-        projectOrderBy,
-        worktreeLineageById,
-        worktreeMap,
-        true,
-        settings,
-        projectGroups,
-        new Set(),
-        new Map(),
-        new Map(),
-        [],
-        projectGrouping
-      ).filter((r): r is Extract<Row, { type: 'item' }> => r.type === 'item')
-      const seenWorktreeIds = new Set<string>()
-      const worktreeRows = allWorktreeRows.filter((row) => {
-        if (seenWorktreeIds.has(row.worktree.id)) {
-          return false
-        }
-        seenWorktreeIds.add(row.worktree.id)
-        return true
+      // Why: cycle over the rows the sidebar actually rendered — collapsing a group
+      // means "not now", and a rebuilt all-expanded near-copy would drift from what
+      // is on screen (host sections, folder workspaces) and reopen collapsed groups.
+      const nextWorktreeId = resolveCycledWorktreeId({
+        worktreeIds: getCyclableWorktreeIds(rows),
+        activeWorktreeId,
+        direction
       })
-      if (worktreeRows.length === 0) {
+      if (nextWorktreeId === null) {
         return
       }
 
-      let nextIndex = 0
-      const currentIndex = worktreeRows.findIndex((r) => r.worktree.id === activeWorktreeId)
-
-      if (currentIndex !== -1) {
-        if (direction === 'up') {
-          nextIndex = currentIndex - 1
-          if (nextIndex < 0) {
-            nextIndex = worktreeRows.length - 1
-          }
-        } else {
-          nextIndex = currentIndex + 1
-          if (nextIndex >= worktreeRows.length) {
-            nextIndex = 0
-          }
-        }
-      }
-
-      const nextWorktreeId = worktreeRows[nextIndex].worktree.id
       // Why: keyboard cycling between worktrees is still real navigation, so
       // it must flow through the same activation helper that records history.
       activateAndRevealWorktree(nextWorktreeId)
@@ -2491,23 +2447,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
         virtualizer.scrollToIndex(rowIndex, { align: 'auto' })
       }
     },
-    [
-      renderRows,
-      activeWorktreeId,
-      virtualizer,
-      groupBy,
-      projectOrderBy,
-      worktrees,
-      repoMap,
-      prCache,
-      repoOrder,
-      workspaceStatuses,
-      worktreeLineageById,
-      worktreeMap,
-      settings,
-      projectGroups,
-      projectGrouping
-    ]
+    [rows, renderRows, activeWorktreeId, virtualizer]
   )
 
   useEffect(() => {
@@ -6870,7 +6810,6 @@ const WorktreeList = React.memo(function WorktreeList({
         worktreeMap={worktreeMap}
         worktreeLineageById={worktreeLineageById}
         workspaceLineageByChildKey={workspaceLineageByChildKey}
-        repoOrder={repoOrder}
         allRepoIds={allRepoIds}
         onReorderHostSections={handleReorderHostSections}
         onHostDragActiveChange={setHostDragActive}

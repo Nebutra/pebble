@@ -58,8 +58,32 @@ vi.mock('@dnd-kit/sortable', () => ({
 }))
 
 vi.mock('lucide-react', () => ({
+  ArrowDown: function ArrowDown(props: Record<string, unknown>) {
+    return { type: 'ArrowDown', props }
+  },
+  ArrowLeft: function ArrowLeft(props: Record<string, unknown>) {
+    return { type: 'ArrowLeft', props }
+  },
+  ArrowRight: function ArrowRight(props: Record<string, unknown>) {
+    return { type: 'ArrowRight', props }
+  },
+  ArrowUp: function ArrowUp(props: Record<string, unknown>) {
+    return { type: 'ArrowUp', props }
+  },
+  ListX: function ListX(props: Record<string, unknown>) {
+    return { type: 'ListX', props }
+  },
+  PanelRightClose: function PanelRightClose(props: Record<string, unknown>) {
+    return { type: 'PanelRightClose', props }
+  },
   Columns2: function Columns2(props: Record<string, unknown>) {
     return { type: 'Columns2', props }
+  },
+  CopyX: function CopyX(props: Record<string, unknown>) {
+    return { type: 'CopyX', props }
+  },
+  PanelLeftClose: function PanelLeftClose(props: Record<string, unknown>) {
+    return { type: 'PanelLeftClose', props }
   },
   Copy: function Copy(props: Record<string, unknown>) {
     return { type: 'Copy', props }

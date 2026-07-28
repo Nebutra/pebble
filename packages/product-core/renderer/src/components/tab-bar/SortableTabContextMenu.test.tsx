@@ -50,7 +50,16 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
 }))
 
 vi.mock('lucide-react', () => ({
+  ArrowDown: () => null,
+  ArrowLeft: () => null,
+  ArrowRight: () => null,
+  ArrowUp: () => null,
+  Columns2: () => null,
+  X: () => null,
+  CopyX: () => null,
+  Pencil: () => null,
   PanelBottomClose: () => null,
+  PanelLeftClose: () => null,
   PanelRightClose: () => null,
   Pin: () => null,
   PinOff: () => null
