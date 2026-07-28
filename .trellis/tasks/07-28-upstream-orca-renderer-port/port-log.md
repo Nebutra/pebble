@@ -80,11 +80,52 @@ Adaptations:
 | `e4b113b11d94` | native-chat: Pebble's loading guard is already unconditional (`if (loading)`), so known sessions already stay loading; upstream's `liveStatusOverride` takes five arguments to Pebble's two. |
 | `974447175f66`, `9de4519c820d` | terminal manual parking: Pebble's `Terminal.tsx` carries no `parkedTerminalWorktreeIds` / `terminalParkingRevision` state, so the developer action and its Option gate have nothing to hang off. Porting would mean rebuilding the parking subsystem — new feature work, not fork maintenance. |
 
-### Not attempted
+## Batch C — the two feature-scale commits, split by what Pebble can carry
 
-| upstream | size |
-| --- | --- |
-| `e73b1a1dd096` | new-workspace type-ahead pickers: 11 new modules, 21 conflicts, rewrites `NewWorkspaceComposerCard` and `ProjectCombobox`. |
-| `1fd0f731fc0d` | automations / agent background sessions: 31 conflicts across `launch-agent-background-session` and SSH folder-workspace host routing. |
+### `e73b1a1dd096` — new-workspace type-ahead pickers
 
-Both are feature-scale ports into subsystems Pebble reworked; they need their own task.
+**Project picker: ported.** Pebble's `ProjectCombobox.tsx` was within 37 lines of the
+upstream pre-image, and the new implementation is self-contained (type-ahead hook, styles,
+matching, recency, row components). Taken wholesale along with its 297-line test.
+`onAddProject` is optional upstream, so Pebble simply does not pass it and the pinned
+"Add a new project" row is skipped — Pebble's composer owns that affordance elsewhere.
+
+**Run-target picker: not ported.** Upstream extracted its run-target block into
+`RunTargetCombobox` / `RunTargetField` / `RunTargetSubmenus` / `run-target-options`, built
+around a host-connect model Pebble does not have: upstream passes
+`readonly ProjectHostSetupOption[]` (ready + needs-setup, with connect buttons, connect
+timeouts and an add-host submenu), while Pebble's composer passes
+`readyProjectHostSetupOptions` and keeps a simpler inline `WorkspaceRunTargetCombobox`.
+`run-target-options.ts` also carries the upstream `OrcaHooks` type. Those five modules and
+the composer's 572-line extraction were left out, and the composer's clean-merged hunks
+that assumed the new picker were reverted.
+
+i18n: only the `ProjectCombobox` keys were taken. Upstream shipped them untranslated in
+es/ja/ko/zh; they were translated here to match each locale's existing project wording.
+
+### `1fd0f731fc0d` — automations
+
+This commit fixes three defects. Pebble has all three, but only two are portable.
+
+**Ported — folder-workspace resolution.** `launchAgentBackgroundSession` resolved the
+target through `store.allWorktrees()`, which reads only `worktreesByRepo`, so every folder
+workspace read as absent and its automation died at resolution. Now uses
+`store.getKnownWorktreeById`, which is folder-aware.
+
+**Ported — SSH folder-workspace launch routing.** A folder workspace's synthetic
+`folder-workspace:<groupId>` repoId has no repo row, so `repos.find(...)` returned null and
+platform, remote-ness, trust marking and the SSH connection id all degraded to a local
+default — the agent ran on the client while the files lived on the SSH host. Added
+`agent-background-session-launch-host.ts` (upstream's resolver, whose dependencies all
+exist in Pebble) and routed the launcher through it. Upstream's own test file did not
+cover the SSH-folder case, so a regression test for it was added here.
+
+**Not ported — bind the PTY before publishing the run tab.** Pebble has this defect
+(`createTab` at the top, `updateTabPtyId` only after the awaited spawn, leaving a window
+where the store holds a tab with `ptyId: null`). Upstream's fix needs
+`reserveAgentBackgroundSessionIdentity` / `adoptAgentBackgroundSessionTab`, which require
+`store.createTab` to accept `{ id, initialPtyId }` — Pebble's accepts only
+`{ index, activate, recordInteraction }` — plus `isTerminalTabPresent`,
+`bindAutomationTerminal` and `retire-unowned-background-terminal`, none of which Pebble
+has. That is a change to the tabs slice and a new ownership layer, not a merge; it needs
+its own task.

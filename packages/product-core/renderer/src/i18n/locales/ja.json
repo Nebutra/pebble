@@ -10128,8 +10128,12 @@
             "placeholder": "Choose host"
           },
           "ProjectCombobox": {
-            "search": "Search projects...",
-            "empty": "No projects match your search."
+            "empty": "検索に一致するプロジェクトがありません。",
+            "addProject": "プロジェクトを追加",
+            "label": "プロジェクト",
+            "browse": "プロジェクトを参照",
+            "listLabel": "プロジェクト",
+            "noProjects": "プロジェクトがまだありません。"
           }
         }
       },

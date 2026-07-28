@@ -10128,8 +10128,12 @@
             "placeholder": "选择主机"
           },
           "ProjectCombobox": {
-            "search": "搜索项目...",
-            "empty": "没有匹配搜索的项目。"
+            "empty": "没有匹配搜索的项目。",
+            "addProject": "添加项目",
+            "label": "项目",
+            "browse": "浏览项目",
+            "listLabel": "项目",
+            "noProjects": "还没有项目。"
           }
         }
       },

@@ -63,6 +63,13 @@ const state = {
     ]
   },
   allWorktrees: vi.fn(() => state.worktreesByRepo['repo-1']),
+  // Why: folder workspaces only resolve through getKnownWorktreeById, which is the
+  // lookup the launcher uses; the repo-backed fixture resolves the same way here.
+  getKnownWorktreeById: vi.fn((worktreeId: string) =>
+    Object.values(state.worktreesByRepo)
+      .flat()
+      .find((entry) => entry.id === worktreeId)
+  ),
   createTab: mockCreateTab,
   setTabCustomTitle: mockSetTabCustomTitle,
   updateTabPtyId: mockUpdateTabPtyId,

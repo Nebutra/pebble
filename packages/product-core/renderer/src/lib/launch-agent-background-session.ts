@@ -4,19 +4,16 @@ import type {
   LaunchAgentBackgroundSessionArgs,
   LaunchAgentBackgroundSessionResult
 } from '@/lib/agent-background-session-contract'
-import { getAgentLaunchPlatformForRepo } from '@/lib/agent-launch-platform'
-import { CLIENT_PLATFORM } from '@/lib/new-workspace'
 import { tuiAgentToAgentKind } from '@/lib/telemetry'
 import { pasteDraftWhenAgentReady } from '@/lib/agent-paste-draft'
 import { showAutomationPromptNotSentToast } from '@/lib/agent-background-session-timeout-toast'
-import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
+import { resolveAgentBackgroundLaunchHost } from '@/lib/agent-background-session-launch-host'
 import { BACKGROUND_MOUNT_TERMINAL_WORKTREE_EVENT } from '@/constants/terminal'
 import {
   resolveTuiAgentLaunchArgs,
   resolveTuiAgentLaunchEnv
 } from '../../../shared/tui-agent-launch-defaults'
 import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
-import { repoIsRemote } from '../../../shared/agent-launch-remote'
 import { makePaneKey } from '../../../shared/stable-pane-id'
 import {
   registerEagerPtyBuffer,
@@ -43,18 +40,29 @@ export async function launchAgentBackgroundSession(
 ): Promise<LaunchAgentBackgroundSessionResult | null> {
   const { agent, worktreeId, prompt, launchSource, title, onData, onExit, onAgentStatus } = args
   const store = useAppStore.getState()
-  const worktree = store.allWorktrees().find((entry) => entry.id === worktreeId)
+  // Why: folder workspaces never land in worktreesByRepo, so allWorktrees() reported
+  // them absent and every folder-workspace automation died at resolution.
+  const worktree = store.getKnownWorktreeById(worktreeId)
   const repo = worktree ? store.repos.find((entry) => entry.id === worktree.repoId) : null
   if (!worktree) {
     throw new Error('The target workspace is no longer available.')
   }
+  // Why: a folder workspace has a synthetic repoId with no repo row, so every
+  // repo-derived launch input silently degraded to a local default and SSH folder
+  // workspaces ran their agent on the client instead of their own host.
+  const launchHost = resolveAgentBackgroundLaunchHost({
+    store,
+    worktreeId,
+    worktreePath: worktree.path,
+    repo
+  })
   const preflight = TUI_AGENT_CONFIG[agent].preflightTrust
   if (preflight && worktree.path && window.api.agentTrust?.markTrusted) {
     try {
       await window.api.agentTrust.markTrusted({
         preset: preflight,
         workspacePath: worktree.path,
-        ...(repo?.connectionId ? { connectionId: repo.connectionId } : {})
+        ...(launchHost.connectionId ? { connectionId: launchHost.connectionId } : {})
       })
     } catch {
       // Best-effort: continue with launch. The user can still accept the trust menu.
@@ -63,14 +71,8 @@ export async function launchAgentBackgroundSession(
   const cmdOverrides = store.settings?.agentCmdOverrides ?? {}
   const agentArgs = resolveTuiAgentLaunchArgs(agent, store.settings?.agentDefaultArgs)
   const agentEnv = resolveTuiAgentLaunchEnv(agent, store.settings?.agentDefaultEnv)
-  const launchPlatform = repo
-    ? getAgentLaunchPlatformForRepo(
-        repo,
-        repo.connectionId ? undefined : getLocalProjectExecutionRuntimeContext(store, worktreeId)
-      )
-    : CLIENT_PLATFORM
   // Why: preserve the SSH signal so remote launch routing remains relay-owned.
-  const isRemote = repo ? repoIsRemote(repo) : false
+  const { platform: launchPlatform, isRemote } = launchHost
   const trimmedPrompt = prompt?.trim() ?? ''
   const hasPrompt = trimmedPrompt.length > 0
   const isFollowupPath = TUI_AGENT_CONFIG[agent].promptInjectionMode === 'stdin-after-start'
@@ -145,7 +147,7 @@ export async function launchAgentBackgroundSession(
     PEBBLE_WORKTREE_ID: worktreeId,
     PEBBLE_AGENT_LAUNCH_TOKEN: launchToken
   }
-  const sshConnectionId = repo?.connectionId ?? null
+  const sshConnectionId = launchHost.connectionId
   const sshStartupDelivery = createSshBackgroundStartupDelivery({
     command: sshConnectionId ? startupPlan.launchCommand : null,
     waitForShellReady:

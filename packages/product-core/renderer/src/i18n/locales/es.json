@@ -10128,8 +10128,12 @@
             "placeholder": "Elegir host"
           },
           "ProjectCombobox": {
-            "search": "Buscar proyectos...",
-            "empty": "Ningún proyecto coincide con tu búsqueda."
+            "empty": "Ningún proyecto coincide con tu búsqueda.",
+            "addProject": "Añadir un proyecto",
+            "label": "Proyecto",
+            "browse": "Explorar proyectos",
+            "listLabel": "Proyectos",
+            "noProjects": "Aún no hay proyectos."
           }
         }
       },
