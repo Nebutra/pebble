@@ -755,17 +755,25 @@ function queueSetupAndIssueCommands(
   }
 }
 
-// Why: break the import cycle — the nav-history slice must activate workspace
-// entries from goBack/goForward, but it lives under @/store, which activation
-// already imports from. Registering here keeps folder workspace replay on the
-// same path as direct folder activation.
-setWorktreeNavActivator((workspaceId) => {
+/**
+ * Activates a sidebar workspace id of either shape. Rendered sidebar order mixes
+ * plain worktree ids with `folder:` keys, so every caller that navigates by that
+ * order must dispatch here — the folder branch is what enforces the path-status
+ * gate that blocks a missing/unmounted/disconnected-SSH folder.
+ */
+export function activateAndRevealWorkspace(workspaceId: string): ActivateAndRevealResult | false {
   const workspaceScope = parseWorkspaceKey(workspaceId)
   if (workspaceScope?.type === 'folder') {
     return activateAndRevealFolderWorkspace(workspaceScope.folderWorkspaceId)
   }
   return activateAndRevealWorktree(workspaceId)
-})
+}
+
+// Why: break the import cycle — the nav-history slice must activate workspace
+// entries from goBack/goForward, but it lives under @/store, which activation
+// already imports from. Registering here keeps folder workspace replay on the
+// same path as direct folder activation.
+setWorktreeNavActivator(activateAndRevealWorkspace)
 
 // Why: page entries in nav history replay through setActiveView(...)
 // (not open*Page) so back/forward does not mutate previousViewBefore* or

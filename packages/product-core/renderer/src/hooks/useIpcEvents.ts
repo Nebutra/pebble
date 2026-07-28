@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { useAppStore } from '../store'
 import { getWorktreeMapFromState, getRepoMapFromState } from '@/store/selectors'
 import { applyUIZoom } from '@/lib/ui-zoom'
-import { activateAndRevealWorktree } from '@/lib/worktree-activation'
+import { activateAndRevealWorktree, activateAndRevealWorkspace } from '@/lib/worktree-activation'
 import { buildLinearIssueLinkedWorkItem } from '@/lib/linear-linked-work-item'
 import { runWorktreeDelete } from '@/components/sidebar/delete-worktree-flow'
 import { runSleepWorktree } from '@/components/sidebar/sleep-worktree-flow'
@@ -1291,7 +1291,7 @@ export function useIpcEvents(): void {
         }
         const visibleIds = getVisibleWorktreeIds()
         if (index < visibleIds.length) {
-          activateAndRevealWorktree(visibleIds[index])
+          activateAndRevealWorkspace(visibleIds[index])
         }
       })
     )

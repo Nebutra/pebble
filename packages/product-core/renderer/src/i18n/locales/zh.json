@@ -2546,6 +2546,13 @@
                           "failed": "无法复制终端 ID"
                         }
                       }
+                    },
+                    "pane": {
+                      "id": {
+                        "copy": {
+                          "failed": "Unable to copy pane ID"
+                        }
+                      }
                     }
                   }
                 }
@@ -10690,8 +10697,25 @@
           "agents": {
             "orchestration": {
               "OrchestrationPage": {
-                "30b509a467": "2名儿童",
-                "862605d066": "2 个子平行宇宙"
+                "30b509a467": "2 个子平行宇宙",
+                "862605d066": "2 个子平行宇宙",
+                "coordinatorName": "重新设计身份验证流程",
+                "childPr1Name": "PR 1/2: 迁移 users.sql",
+                "childPr2Name": "PR 2/2: withSession 中间件"
+              },
+              "types": {
+                "coordinatorInitial": "将身份验证重写拆分为 2 个 PR…",
+                "codexInitial": "编写 users 表迁移…",
+                "claudeInitial": "草拟 withSession 中间件…",
+                "codexBeat1": "添加 email_verified 列…",
+                "claudeBeat1": "连接 withSession 中间件…",
+                "coordinatorBeat1": "PR 1/2 就绪",
+                "coordinatorBeat2": "PR 2/2 就绪"
+              },
+              "steps": {
+                "name": "编排",
+                "subtitle": "编排",
+                "description": "让智能体管理和协调 Pebble 平行宇宙，以执行更大的任务。"
               },
               "StatusesPage": {
                 "2f549fc0ba": "src/auth/session.test.ts",

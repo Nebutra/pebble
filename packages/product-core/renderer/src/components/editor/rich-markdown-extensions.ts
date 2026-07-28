@@ -5,7 +5,6 @@ import { Code } from '@tiptap/extension-code'
 import Image from '@tiptap/extension-image'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import Placeholder from '@tiptap/extension-placeholder'
-import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Table } from '@tiptap/extension-table'
 import { TableCell } from '@tiptap/extension-table-cell'
@@ -26,6 +25,7 @@ import { RichMarkdownCodeBlock } from './RichMarkdownCodeBlock'
 import { safeReactNodeViewRenderer } from './safe-react-node-view-renderer'
 import { DragSelectionGuard } from './drag-selection-guard'
 import { createRichMarkdownAnnotationHighlightExtension } from './rich-markdown-annotation-highlight'
+import { RichMarkdownTaskList } from './rich-markdown-task-list'
 
 const lowlight = createLowlight(common)
 
@@ -174,7 +174,7 @@ export function createRichMarkdownExtensions({
     }).configure({
       allowBase64: true
     }),
-    TaskList,
+    RichMarkdownTaskList,
     TaskItem.configure({
       nested: true
     }),

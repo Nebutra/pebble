@@ -135,12 +135,14 @@ import { useFolderWorkspaceComposerPathStatus } from '@/components/sidebar/folde
 import { submitFolderWorkspaceCreate } from '@/components/sidebar/folder-workspace-composer-submit'
 import { buildExecutionHostRegistry } from '../../../shared/execution-host-registry'
 import {
+  getRepoExecutionHostId,
   normalizeExecutionHostId,
   parseExecutionHostId,
+  LOCAL_EXECUTION_HOST_ID,
   type ExecutionHostId
 } from '../../../shared/execution-host'
 import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overrides'
-import { queueNewWorkspaceTerminalFocus } from '@/lib/new-workspace-terminal-focus'
+import { queueWorkspaceActivationTerminalFocus } from '@/lib/workspace-activation-terminal-focus'
 import { getSettingsForRepoRuntimeOwner } from '@/lib/repo-runtime-owner'
 import { getSuggestedCreatureName } from '@/components/sidebar/worktree-name-suggestions'
 import type { SmartWorkspaceNameSelection } from '@/components/new-workspace/SmartWorkspaceNameField'
@@ -847,6 +849,9 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
   // reset the user's manually-chosen recipe via setSelectedEphemeralVmRecipeId(null).
   const selectedRecipeRepoId = selectedRepo?.id ?? null
   const selectedRecipeRepoConnectionId = selectedRepo?.connectionId ?? null
+  const selectedRecipeRepoExecutionHostId = selectedRepo
+    ? getRepoExecutionHostId(selectedRepo)
+    : null
   // Why: the experimental toggle must hide the composer target and avoid probing
   // repo recipes, since recipe discovery can surface setup errors for a hidden feature.
   const ephemeralVmsEnabled = settings?.experimentalEphemeralVms === true
@@ -855,11 +860,14 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     setEphemeralVmRecipes([])
     setSelectedEphemeralVmRecipeId(null)
     setEphemeralVmRecipeError(null)
+    // Why: recipe discovery only runs against the local host, so probing a repo
+    // owned by an SSH or runtime host surfaced a setup error the user could not act on.
     if (
       !ephemeralVmsEnabled ||
       !selectedRecipeRepoId ||
       !selectedRepoIsGit ||
       selectedRecipeRepoConnectionId ||
+      selectedRecipeRepoExecutionHostId !== LOCAL_EXECUTION_HOST_ID ||
       isProjectGroupTarget
     ) {
       return () => {
@@ -905,6 +913,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     initialEphemeralVmRecipeId,
     isProjectGroupTarget,
     selectedRecipeRepoConnectionId,
+    selectedRecipeRepoExecutionHostId,
     selectedRecipeRepoId,
     selectedRepoIsGit
   ])
@@ -3718,7 +3727,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         clearNewWorkspaceDraft()
       }
       onCreated?.()
-      queueNewWorkspaceTerminalFocus(worktree.id, activation)
+      queueWorkspaceActivationTerminalFocus(worktree.id, activation)
     } catch (error) {
       const formattedError = formatWorkspaceCreateError(error)
       setCreateError(formattedError)
