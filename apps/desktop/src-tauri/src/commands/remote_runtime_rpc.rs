@@ -13,11 +13,20 @@ use tokio::{
     task::JoinHandle,
     time::timeout,
 };
-use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{Error as WsError, Message},
+    MaybeTlsStream, WebSocketStream,
+};
 use uuid::Uuid;
 
 const NONCE_LENGTH: usize = 24;
 const BOX_OVERHEAD_LENGTH: usize = 16;
+
+// Why: `remote-runtime-tailscale-hint.ts` regex-matches these phrases, so detail is
+// appended after a colon to keep the prefixes byte-identical and the hint firing.
+const DIAL_FAILURE_PREFIX: &str = "Could not connect to the remote Pebble runtime";
+const STREAM_FAILURE_PREFIX: &str = "Remote Pebble runtime closed the connection";
 
 pub struct RemoteRuntimePairing {
     pub endpoint: String,
@@ -76,7 +85,7 @@ async fn call_remote_runtime_inner(
     .map_err(|_| "Could not send the remote Pebble runtime request.".to_string())?;
 
     loop {
-        let frame = match next_remote_runtime_frame(&mut ws, &cipher).await? {
+        let frame = match next_remote_runtime_frame(&mut ws, &cipher, &pairing.endpoint).await? {
             RemoteRuntimeFrame::Json(frame) => frame,
             RemoteRuntimeFrame::Binary(_) => {
                 return Err("Remote Pebble runtime returned an unexpected binary frame.".to_string())
@@ -134,6 +143,7 @@ async fn subscribe_remote_runtime_request_inner(
     let (binary_tx, mut binary_rx) = mpsc::unbounded_channel::<Vec<u8>>();
     let (cancel_tx, mut cancel_rx) = oneshot::channel::<()>();
     let request_id_for_task = request_id.clone();
+    let endpoint_for_task = pairing.endpoint.clone();
     let task = tokio::spawn(async move {
         let cipher = Arc::new(cipher);
         loop {
@@ -154,7 +164,7 @@ async fn subscribe_remote_runtime_request_inner(
                         break;
                     }
                 }
-                frame = next_remote_runtime_frame(&mut ws, &cipher) => {
+                frame = next_remote_runtime_frame(&mut ws, &cipher, &endpoint_for_task) => {
                     match frame {
                         Ok(RemoteRuntimeFrame::Json(value)) => {
                             if value.get("_keepalive").and_then(Value::as_bool).unwrap_or(false) {
@@ -219,6 +229,53 @@ impl Drop for RemoteRuntimeSubscription {
     }
 }
 
+/// Why: `connect_async` funnels every network-layer failure into `Error::Io`, so the only
+/// actionable distinction (refused vs. no route vs. timed out) lives on `io::ErrorKind`.
+fn describe_ws_error(error: &WsError) -> String {
+    match error {
+        WsError::Io(io_error) => match io_error.kind() {
+            std::io::ErrorKind::ConnectionRefused => {
+                "connection refused — the address is reachable but nothing is listening".to_string()
+            }
+            std::io::ErrorKind::HostUnreachable
+            | std::io::ErrorKind::NetworkUnreachable
+            | std::io::ErrorKind::NetworkDown => {
+                "no route to host — the machine is not on this network".to_string()
+            }
+            std::io::ErrorKind::TimedOut => "timed out — no response from the address".to_string(),
+            // Why: DNS lookup failures arrive here as `Uncategorized`, which is unstable and
+            // cannot be matched; the io message still names the real cause.
+            _ => io_error.to_string(),
+        },
+        WsError::Url(_) => "the saved address is not a valid WebSocket URL".to_string(),
+        WsError::Tls(tls_error) => format!("TLS failure: {tls_error}"),
+        WsError::Http(response) => format!(
+            "the server rejected the connection (HTTP {})",
+            response.status().as_u16()
+        ),
+        // Why: every tungstenite error enum is `#[non_exhaustive]`, so unmapped and future
+        // variants both fall back to their `Display`, which is still better than nothing.
+        _ => error.to_string(),
+    }
+}
+
+/// Formats a dial failure as `<canonical prefix>: <cause> (<endpoint>)`. The endpoint is a bare
+/// `ws://host:port` and carries no credential, so it is safe to surface; the device token is not.
+fn describe_dial_failure(endpoint: &str, error: &WsError) -> String {
+    format!(
+        "{DIAL_FAILURE_PREFIX}: {} ({endpoint})",
+        describe_ws_error(error)
+    )
+}
+
+/// Same shape as [`describe_dial_failure`], for failures on an already-open socket.
+fn describe_stream_failure(endpoint: &str, error: &WsError) -> String {
+    format!(
+        "{STREAM_FAILURE_PREFIX}: {} ({endpoint})",
+        describe_ws_error(error)
+    )
+}
+
 async fn connect_authenticated_socket(
     pairing: &RemoteRuntimePairing,
 ) -> Result<(RemoteRuntimeSocket, SalsaBox), String> {
@@ -228,7 +285,7 @@ async fn connect_authenticated_socket(
     let cipher = SalsaBox::new(&server_public_key, &secret_key);
     let (mut ws, _) = connect_async(&pairing.endpoint)
         .await
-        .map_err(|_| "Could not connect to the remote Pebble runtime.".to_string())?;
+        .map_err(|error| describe_dial_failure(&pairing.endpoint, &error))?;
 
     ws.send(Message::Text(
         json!({
@@ -239,9 +296,9 @@ async fn connect_authenticated_socket(
         .into(),
     ))
     .await
-    .map_err(|_| "Could not connect to the remote Pebble runtime.".to_string())?;
+    .map_err(|error| describe_dial_failure(&pairing.endpoint, &error))?;
 
-    assert_ready_frame(next_text_frame(&mut ws).await?)?;
+    assert_ready_frame(next_text_frame(&mut ws, &pairing.endpoint).await?)?;
     send_runtime_json(
         &mut ws,
         &cipher,
@@ -253,7 +310,10 @@ async fn connect_authenticated_socket(
     .await
     .map_err(|_| "Could not authenticate with the remote Pebble runtime.".to_string())?;
 
-    assert_authenticated_frame(&decrypt_json(&cipher, &next_text_frame(&mut ws).await?)?)?;
+    assert_authenticated_frame(&decrypt_json(
+        &cipher,
+        &next_text_frame(&mut ws, &pairing.endpoint).await?,
+    )?)?;
     Ok((ws, cipher))
 }
 
@@ -267,12 +327,12 @@ async fn send_runtime_json(
         .map_err(|_| "Could not send the remote Pebble runtime request.".to_string())
 }
 
-async fn next_text_frame<S>(ws: &mut S) -> Result<String, String>
+async fn next_text_frame<S>(ws: &mut S, endpoint: &str) -> Result<String, String>
 where
-    S: StreamExt<Item = Result<Message, tokio_tungstenite::tungstenite::Error>> + Unpin,
+    S: StreamExt<Item = Result<Message, WsError>> + Unpin,
 {
     while let Some(message) = ws.next().await {
-        match message.map_err(|_| "Remote Pebble runtime closed the connection.".to_string())? {
+        match message.map_err(|error| describe_stream_failure(endpoint, &error))? {
             Message::Text(text) => return Ok(text.to_string()),
             Message::Binary(_) => {
                 return Err("Remote Pebble runtime returned an unexpected binary frame.".to_string())
@@ -294,9 +354,10 @@ enum RemoteRuntimeFrame {
 async fn next_remote_runtime_frame(
     ws: &mut RemoteRuntimeSocket,
     cipher: &SalsaBox,
+    endpoint: &str,
 ) -> Result<RemoteRuntimeFrame, String> {
     while let Some(message) = ws.next().await {
-        match message.map_err(|_| "Remote Pebble runtime closed the connection.".to_string())? {
+        match message.map_err(|error| describe_stream_failure(endpoint, &error))? {
             Message::Text(text) => {
                 return Ok(RemoteRuntimeFrame::Json(decrypt_json(cipher, &text)?))
             }
@@ -432,6 +493,107 @@ fn is_subscription_end_response(frame: &Value) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio_tungstenite::tungstenite::{error::UrlError, http::Response};
+
+    const TEST_ENDPOINT: &str = "ws://192.168.1.9:6768/v1/shared-control";
+
+    fn io_error(kind: std::io::ErrorKind) -> WsError {
+        WsError::Io(std::io::Error::from(kind))
+    }
+
+    #[test]
+    fn dial_failures_keep_the_canonical_prefix_and_name_the_endpoint() {
+        // Why: remote-runtime-tailscale-hint.ts regex-matches this prefix; losing it
+        // silently drops the Tailscale remedy from every unreachable-runtime error.
+        for error in [
+            io_error(std::io::ErrorKind::ConnectionRefused),
+            io_error(std::io::ErrorKind::HostUnreachable),
+            io_error(std::io::ErrorKind::NetworkUnreachable),
+            io_error(std::io::ErrorKind::NetworkDown),
+            io_error(std::io::ErrorKind::TimedOut),
+            io_error(std::io::ErrorKind::PermissionDenied),
+            WsError::Url(UrlError::UnsupportedUrlScheme),
+            WsError::Http(Response::builder().status(401).body(None).unwrap()),
+        ] {
+            let message = describe_dial_failure(TEST_ENDPOINT, &error);
+            assert!(
+                message.starts_with("Could not connect to the remote Pebble runtime: "),
+                "unexpected prefix: {message}"
+            );
+            assert!(
+                message.ends_with(&format!("({TEST_ENDPOINT})")),
+                "{message}"
+            );
+        }
+    }
+
+    #[test]
+    fn maps_each_dial_failure_class_to_a_distinct_cause() {
+        assert!(describe_dial_failure(
+            TEST_ENDPOINT,
+            &io_error(std::io::ErrorKind::ConnectionRefused)
+        )
+        .contains("connection refused"));
+        assert!(describe_dial_failure(
+            TEST_ENDPOINT,
+            &io_error(std::io::ErrorKind::HostUnreachable)
+        )
+        .contains("no route to host"));
+        assert!(describe_dial_failure(
+            TEST_ENDPOINT,
+            &io_error(std::io::ErrorKind::NetworkUnreachable)
+        )
+        .contains("no route to host"));
+        assert!(
+            describe_dial_failure(TEST_ENDPOINT, &io_error(std::io::ErrorKind::TimedOut))
+                .contains("timed out")
+        );
+        assert!(describe_dial_failure(
+            TEST_ENDPOINT,
+            &WsError::Url(UrlError::UnsupportedUrlScheme)
+        )
+        .contains("not a valid WebSocket URL"));
+        assert!(describe_dial_failure(
+            TEST_ENDPOINT,
+            &WsError::Http(Response::builder().status(401).body(None).unwrap())
+        )
+        .contains("the server rejected the connection (HTTP 401)"));
+    }
+
+    #[test]
+    fn stream_failures_keep_the_close_prefix() {
+        let message = describe_stream_failure(
+            TEST_ENDPOINT,
+            &io_error(std::io::ErrorKind::ConnectionReset),
+        );
+        assert!(
+            message.starts_with("Remote Pebble runtime closed the connection: "),
+            "unexpected prefix: {message}"
+        );
+        assert!(message.contains(TEST_ENDPOINT));
+    }
+
+    #[test]
+    fn never_leaks_the_device_token() {
+        let pairing = RemoteRuntimePairing {
+            endpoint: TEST_ENDPOINT.to_string(),
+            device_token: "super-secret-device-token".to_string(),
+            public_key_b64: STANDARD.encode([7u8; 32]),
+        };
+        for error in [
+            io_error(std::io::ErrorKind::ConnectionRefused),
+            WsError::Url(UrlError::UnsupportedUrlScheme),
+            WsError::Http(Response::builder().status(403).body(None).unwrap()),
+        ] {
+            for message in [
+                describe_dial_failure(&pairing.endpoint, &error),
+                describe_stream_failure(&pairing.endpoint, &error),
+            ] {
+                assert!(!message.contains(&pairing.device_token), "{message}");
+                assert!(!message.contains(&pairing.public_key_b64), "{message}");
+            }
+        }
+    }
 
     #[test]
     fn validates_runtime_rpc_success_and_failure_frames() {

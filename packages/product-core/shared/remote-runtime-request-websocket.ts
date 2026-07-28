@@ -7,6 +7,7 @@ import {
   publicKeyToBase64
 } from './e2ee-crypto'
 import { RemoteRuntimeClientError } from './remote-runtime-client'
+import { describeRemoteRuntimeDialFailure } from './remote-runtime-dial-failure'
 import {
   invalidRemoteRuntimeResponseError,
   remoteRuntimeUnavailableError
@@ -45,10 +46,12 @@ export function openRemoteRuntimeWebSocket(
       })
     )
   }
-  const onError = (): void => {
+  // Why: the ws 'error' event carries the syscall code (ECONNREFUSED/EHOSTUNREACH) and the
+  // address; discarding it made every transport failure read as one identical sentence.
+  const onError = (error: Error): void => {
     callbacks.onError(
       ws,
-      remoteRuntimeUnavailableError('Could not connect to the remote Pebble runtime.')
+      remoteRuntimeUnavailableError(describeRemoteRuntimeDialFailure(pairing.endpoint, error))
     )
   }
   const onClose = (code: number, reason: Buffer): void => callbacks.onClose(ws, code, reason)

@@ -75,6 +75,27 @@ describe('withRemoteRuntimeTailscaleHint', () => {
     ).toContain('Funnel reverted to tailnet-only')
   })
 
+  it('still fires against the detailed dial-failure message shape', () => {
+    // Why: the transport now appends the real cause and endpoint after the canonical
+    // prefix. If that prefix ever drifts, the hint silently stops firing — this is the
+    // regression guard for exactly that.
+    const detailed =
+      'Could not connect to the remote Pebble runtime: no route to host — the machine is not on this network (ws://192.168.1.9:6768)'
+    expect(withRemoteRuntimeTailscaleHint(detailed, 'ws://192.168.1.9:6768')).toContain(
+      'connect both devices to Tailscale'
+    )
+    const tailnet =
+      'Could not connect to the remote Pebble runtime: no route to host — the machine is not on this network (ws://100.64.1.20:6768)'
+    expect(withRemoteRuntimeTailscaleHint(tailnet, 'ws://100.64.1.20:6768')).toContain(
+      'Funnel reverted to tailnet-only'
+    )
+    const closed =
+      'Remote Pebble runtime closed the connection: connection reset by peer (ws://192.168.1.9:6768)'
+    expect(withRemoteRuntimeTailscaleHint(closed, 'ws://192.168.1.9:6768')).toContain(
+      'connect both devices to Tailscale'
+    )
+  })
+
   it('leaves non-connectivity errors untouched', () => {
     const auth = 'Remote Pebble runtime rejected the pairing token.'
     expect(withRemoteRuntimeTailscaleHint(auth, 'ws://192.168.1.10:6768')).toBe(auth)

@@ -20,6 +20,7 @@ import {
   RuntimeRpcEnvelopeSchema,
   type RuntimeRpcResponse
 } from './runtime-rpc-envelope'
+import { describeRemoteRuntimeDialFailure } from './remote-runtime-dial-failure'
 // Re-export so existing value importers of `RemoteRuntimeClientError` are
 // unaffected; the class lives in a ws-free module so type-only consumers
 // (and mobile's typecheck) don't compile this file's Node-only deps.
@@ -157,12 +158,14 @@ export async function sendRemoteRuntimeRequest<TResult>(
       )
     }
 
-    function onError(): void {
+    // Why: the ws 'error' event carries the syscall code (ECONNREFUSED/EHOSTUNREACH) and the
+    // address; discarding it made every transport failure read as one identical sentence.
+    function onError(error: Error): void {
       finish({
         ok: false,
         error: new RemoteRuntimeClientError(
           'remote_runtime_unavailable',
-          'Could not connect to the remote Pebble runtime.'
+          describeRemoteRuntimeDialFailure(pairing.endpoint, error)
         )
       })
     }
@@ -459,11 +462,13 @@ export async function subscribeRemoteRuntimeRequest<TResult>(
       )
     }
 
-    function onError(): void {
+    // Why: same as the one-shot path — keep the syscall code and address the ws 'error'
+    // event carries instead of collapsing every failure into one sentence.
+    function onError(error: Error): void {
       fail(
         new RemoteRuntimeClientError(
           'remote_runtime_unavailable',
-          'Could not connect to the remote Pebble runtime.'
+          describeRemoteRuntimeDialFailure(pairing.endpoint, error)
         )
       )
     }

@@ -6,5 +6,9 @@
   <string>Pebble allows a website you approve to use the camera in its browser tab.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Pebble allows a website you approve to use the microphone in its browser tab.</string>
+  <!-- Why: macOS 15+ gates outgoing TCP to local-network addresses; without this string
+       dialing a saved runtime at ws://192.168.x.x is denied with no explanation. -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Pebble connects to Pebble runtimes running on your local network.</string>
 </dict>
 </plist>
