@@ -120,12 +120,31 @@ default — the agent ran on the client while the files lived on the SSH host. A
 exist in Pebble) and routed the launcher through it. Upstream's own test file did not
 cover the SSH-folder case, so a regression test for it was added here.
 
-**Not ported — bind the PTY before publishing the run tab.** Pebble has this defect
-(`createTab` at the top, `updateTabPtyId` only after the awaited spawn, leaving a window
-where the store holds a tab with `ptyId: null`). Upstream's fix needs
-`reserveAgentBackgroundSessionIdentity` / `adoptAgentBackgroundSessionTab`, which require
-`store.createTab` to accept `{ id, initialPtyId }` — Pebble's accepts only
-`{ index, activate, recordInteraction }` — plus `isTerminalTabPresent`,
-`bindAutomationTerminal` and `retire-unowned-background-terminal`, none of which Pebble
-has. That is a change to the tabs slice and a new ownership layer, not a merge; it needs
-its own task.
+**Ported — bind the PTY before publishing the run tab.** Pebble had this defect too:
+`createTab` ran first and `updateTabPtyId` only after the awaited spawn, so the store held
+a tab with `ptyId: null` across the whole spawn. Terminal.tsx re-renders on that write, and
+for an already-visited worktree the tab can neither cold-park nor defer — a TerminalPane
+mounts, finds nothing to adopt, and starts a fresh default shell. The agent PTY is then
+rebound in state while the mounted pane still holds the shell: a bare prompt for the user
+and an orphaned agent.
+
+Pebble's store turned out to need no change — `createTab` already accepts both `options.id`
+(a caller-supplied id hint, used by the CLI background-terminal path) and
+`options.initialPtyId`. The launcher now mints the tab id, leaf id and launch token up
+front, bakes them into the spawn env, and publishes the tab only once the PTY exists,
+already bound. `createTab` mints a fresh id when the reserved one collides, which can never
+work here because `PEBBLE_TAB_ID` / `PEBBLE_PANE_KEY` are already baked into the spawned
+process — that case now closes the re-keyed tab, releases the launch config and kills the
+PTY rather than leaving routing and hook identity disagreeing. A failed spawn no longer has
+a tab to clean up, only the reserved launch config.
+
+Upstream's `bindAutomationTerminal` / `isTerminalTabPresent` /
+`retire-unowned-background-terminal` layer was not imported; the retirement path here is a
+local best-effort helper covering both the local `pty.kill` and runtime `terminal.close`
+routes.
+
+The reserve / publish / retire steps live in `agent-background-session-tab-adoption.ts`:
+inlining them pushed `launch-agent-background-session.ts` to 305 lines, over the 300-line
+`max-lines` cap, and that cap must be met by splitting rather than disabling.
+
+Coverage added: the publish-order regression, and the id-collision retirement.

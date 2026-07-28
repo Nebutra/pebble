@@ -14,7 +14,6 @@ import {
   resolveTuiAgentLaunchEnv
 } from '../../../shared/tui-agent-launch-defaults'
 import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
-import { makePaneKey } from '../../../shared/stable-pane-id'
 import {
   registerEagerPtyBuffer,
   subscribeToPtyExit
@@ -23,8 +22,6 @@ import { subscribeToPtyData } from '@/components/terminal-pane/pty-data-sidecar-
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { getSettingsForWorktreeRuntimeOwner } from '@/lib/worktree-runtime-owner'
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
-import { singlePaneLayoutSnapshot } from '@/store/slices/terminal-helpers'
-import { createBrowserUuid } from '@/lib/browser-uuid'
 import {
   getRemoteRuntimeTerminalHandle,
   subscribeToRuntimeTerminalData,
@@ -34,6 +31,10 @@ import { createAgentStatusOscProcessor } from '../../../shared/agent-status-osc'
 import type { RuntimeTerminalCreate } from '../../../shared/runtime-types'
 import { createSshBackgroundStartupDelivery } from '@/lib/ssh-background-startup-delivery'
 import { shouldUseShellReadyStartupDelivery } from '../../../shared/codex-startup-delivery'
+import {
+  publishAgentBackgroundSessionTab,
+  reserveAgentBackgroundSessionIdentity
+} from '@/lib/agent-background-session-tab-adoption'
 
 export async function launchAgentBackgroundSession(
   args: LaunchAgentBackgroundSessionArgs
@@ -108,7 +109,6 @@ export async function launchAgentBackgroundSession(
   }
 
   // Why: automation runs should start without revealing the workspace.
-  // Spawn the PTY immediately, then attach an inactive tab to the live session.
   // Background-mount the hidden worktree first so its off-screen terminal surface
   // gets a measurable layout box and the eager PTY buffer flushes on the first
   // mount — mirroring the renderer-backed Codex startup path in useIpcEvents.
@@ -117,36 +117,16 @@ export async function launchAgentBackgroundSession(
       detail: { worktreeId }
     })
   )
-  const tab = store.createTab(worktreeId, undefined, undefined, {
-    activate: false,
-    recordInteraction: false
+  // Why: reserve identities before the spawn so the tab can be published already bound
+  // to its live PTY; see agent-background-session-tab-adoption for the failure it closes.
+  const reserved = reserveAgentBackgroundSessionIdentity({
+    store,
+    agent,
+    worktreeId,
+    launchConfig: startupPlan.launchConfig,
+    env: startupPlan.env
   })
-  if (title) {
-    store.setTabCustomTitle(tab.id, title, { recordInteraction: false })
-  }
-  // Why: agent hook callbacks are keyed by pane, and background automation
-  // tabs never mount a TerminalPane to inject this env for us. createBrowserUuid
-  // (not crypto.randomUUID) because the latter is undefined in non-secure
-  // browser contexts — the LAN web client served over plain HTTP.
-  const leafId = createBrowserUuid()
-  const paneKey = makePaneKey(tab.id, leafId)
-  const launchToken = createBrowserUuid()
-  store.registerAgentLaunchConfig(paneKey, startupPlan.launchConfig, {
-    agentType: agent,
-    launchToken,
-    tabId: tab.id,
-    leafId
-  })
-  // Why: `title` labels the tab/worktree entry. Pane titles render as an
-  // in-terminal title row, so background sessions must not persist it there.
-  store.setTabLayout(tab.id, singlePaneLayoutSnapshot(leafId))
-  const paneEnv = {
-    ...startupPlan.env,
-    PEBBLE_PANE_KEY: paneKey,
-    PEBBLE_TAB_ID: tab.id,
-    PEBBLE_WORKTREE_ID: worktreeId,
-    PEBBLE_AGENT_LAUNCH_TOKEN: launchToken
-  }
+  const { reservedTabId, leafId, paneKey, launchToken, launchRegistration, paneEnv } = reserved
   const sshConnectionId = launchHost.connectionId
   const sshStartupDelivery = createSshBackgroundStartupDelivery({
     command: sshConnectionId ? startupPlan.launchCommand : null,
@@ -181,7 +161,7 @@ export async function launchAgentBackgroundSession(
             : {}),
           env: paneEnv,
           title,
-          tabId: tab.id,
+          tabId: reservedTabId,
           leafId,
           // Why: local renderer owns the hidden tab; remote runtime should not reveal UI.
           presentation: 'background'
@@ -204,7 +184,7 @@ export async function launchAgentBackgroundSession(
         launchAgent: agent,
         connectionId: sshConnectionId,
         worktreeId,
-        tabId: tab.id,
+        tabId: reservedTabId,
         leafId,
         telemetry: {
           agent_kind: tuiAgentToAgentKind(agent),
@@ -214,20 +194,21 @@ export async function launchAgentBackgroundSession(
       })
       ptyId = result.id
       if (result.launchConfig) {
-        store.registerAgentLaunchConfig(paneKey, result.launchConfig, {
-          agentType: agent,
-          launchToken,
-          tabId: tab.id,
-          leafId
-        })
+        store.registerAgentLaunchConfig(paneKey, result.launchConfig, launchRegistration)
       }
     }
   } catch (error) {
-    store.closeTab(tab.id, { recordInteraction: false })
+    store.clearAgentLaunchConfig(paneKey)
     throw error
   }
-  store.updateTabPtyId(tab.id, ptyId)
-  store.setTabLayout(tab.id, singlePaneLayoutSnapshot(leafId, ptyId))
+  const tab = await publishAgentBackgroundSessionTab({
+    store,
+    worktreeId,
+    reserved,
+    ptyId,
+    runtimeTarget,
+    ...(title ? { title } : {})
+  })
   if (agent === 'command-code' && hasPrompt && !isFollowupPath) {
     // Why: Command Code does not expose a prompt-start hook; seed working for
     // hidden prompt launches so sidebar/activity surfaces do not stay idle.

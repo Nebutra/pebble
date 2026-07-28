@@ -23,6 +23,18 @@ const mockMarkTrusted = vi.fn()
 const mockDispatchEvent = vi.fn()
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
+// Why: the launcher reserves its tab id before the spawn, so the id is minted rather
+// than handed back by createTab. A deterministic uuid sequence keeps the reserved id
+// assertable while still satisfying UUID_RE.
+const uuidState = vi.hoisted(() => ({ next: 0 }))
+vi.mock('@/lib/browser-uuid', () => ({
+  createBrowserUuid: () => {
+    uuidState.next += 1
+    return `00000000-0000-4000-8000-${String(uuidState.next).padStart(12, '0')}`
+  }
+}))
+const RESERVED_TAB_ID = '00000000-0000-4000-8000-000000000001'
+
 function expectStablePaneSpawn(): string {
   const spawnArgs = mockSpawn.mock.calls[0]?.[0]
   const paneKey = spawnArgs?.env?.PEBBLE_PANE_KEY
@@ -30,7 +42,7 @@ function expectStablePaneSpawn(): string {
   expect(typeof paneKey).toBe('string')
   expect(typeof leafId).toBe('string')
   expect(leafId).toMatch(UUID_RE)
-  expect(paneKey).toBe(`tab-1:${leafId}`)
+  expect(paneKey).toBe(`${RESERVED_TAB_ID}:${leafId}`)
   return paneKey
 }
 
@@ -134,7 +146,13 @@ describe('launchAgentBackgroundSession', () => {
         }
       ]
     }
-    mockCreateTab.mockReturnValue({ id: 'tab-1', title: 'Terminal 1' })
+    uuidState.next = 0
+    mockCreateTab.mockImplementation(
+      (_worktreeId: string, _groupId: unknown, _shell: unknown, options?: { id?: string }) => ({
+        id: options?.id ?? RESERVED_TAB_ID,
+        title: 'Terminal 1'
+      })
+    )
     mockSpawn.mockResolvedValue({ id: 'pty-1' })
     mockRuntimeEnvironmentCall.mockResolvedValue({
       ok: true,
@@ -178,6 +196,8 @@ describe('launchAgentBackgroundSession', () => {
     })
 
     expect(mockCreateTab).toHaveBeenCalledWith('wt-1', undefined, undefined, {
+      id: RESERVED_TAB_ID,
+      initialPtyId: 'pty-1',
       activate: false,
       recordInteraction: false
     })
@@ -192,18 +212,18 @@ describe('launchAgentBackgroundSession', () => {
         cwd: '/repo/worktree',
         command: "claude '--dangerously-skip-permissions' 'run the automation'",
         env: expect.objectContaining({
-          PEBBLE_TAB_ID: 'tab-1',
+          PEBBLE_TAB_ID: RESERVED_TAB_ID,
           PEBBLE_WORKTREE_ID: 'wt-1'
         }),
         connectionId: null,
         worktreeId: 'wt-1',
-        tabId: 'tab-1'
+        tabId: RESERVED_TAB_ID
       })
     )
     const paneKey = expectStablePaneSpawn()
-    const leafId = paneKey.slice('tab-1:'.length)
+    const leafId = paneKey.slice(`${RESERVED_TAB_ID}:`.length)
     expect(mockSetTabLayout).toHaveBeenCalledWith(
-      'tab-1',
+      RESERVED_TAB_ID,
       expect.objectContaining({
         root: { type: 'leaf', leafId },
         activeLeafId: leafId,
@@ -223,14 +243,16 @@ describe('launchAgentBackgroundSession', () => {
     expect(mockSpawn.mock.calls[0]?.[0].launchToken).toBe(
       mockSpawn.mock.calls[0]?.[0].env.PEBBLE_AGENT_LAUNCH_TOKEN
     )
-    expect(mockSetTabCustomTitle).toHaveBeenCalledWith('tab-1', 'Nightly audit', {
+    expect(mockSetTabCustomTitle).toHaveBeenCalledWith(RESERVED_TAB_ID, 'Nightly audit', {
       recordInteraction: false
     })
-    expect(mockUpdateTabPtyId).toHaveBeenCalledWith('tab-1', 'pty-1')
+    // Why: the tab is created already bound, so nothing rebinds it afterwards — that
+    // post-hoc write is exactly what let a default shell mount over the agent PTY.
+    expect(mockUpdateTabPtyId).not.toHaveBeenCalled()
     expect(mockRegisterEagerPtyBuffer).toHaveBeenCalledWith('pty-1', expect.any(Function))
     expect(mockSubscribeToPtyData).toHaveBeenCalledWith('pty-1', expect.any(Function))
     expect(mockSubscribeToPtyExit).toHaveBeenCalledWith('pty-1', expect.any(Function))
-    expect(result).toMatchObject({ tabId: 'tab-1', paneKey, ptyId: 'pty-1' })
+    expect(result).toMatchObject({ tabId: RESERVED_TAB_ID, paneKey, ptyId: 'pty-1' })
   })
 
   it('records effective launch config returned by local PTY spawn', async () => {
@@ -249,11 +271,11 @@ describe('launchAgentBackgroundSession', () => {
     })
 
     const paneKey = expectStablePaneSpawn()
-    const leafId = paneKey.slice('tab-1:'.length)
+    const leafId = paneKey.slice(`${RESERVED_TAB_ID}:`.length)
     expect(mockRegisterAgentLaunchConfig).toHaveBeenLastCalledWith(paneKey, effectiveLaunchConfig, {
       agentType: 'claude',
       launchToken: mockSpawn.mock.calls[0]?.[0].env.PEBBLE_AGENT_LAUNCH_TOKEN,
-      tabId: 'tab-1',
+      tabId: RESERVED_TAB_ID,
       leafId
     })
   })
@@ -292,7 +314,7 @@ describe('launchAgentBackgroundSession', () => {
         command: "claude '--dangerously-skip-permissions' 'don'\\''t use powershell quoting'",
         connectionId: null,
         worktreeId: 'wt-1',
-        tabId: 'tab-1'
+        tabId: RESERVED_TAB_ID
       })
     )
   })
@@ -409,13 +431,64 @@ describe('launchAgentBackgroundSession', () => {
     const sidecar = mockSubscribeToPtyExit.mock.calls[0]?.[1] as (code: number) => void
     sidecar(0)
 
-    expect(state.clearTabPtyId).toHaveBeenCalledWith('tab-1', 'pty-1')
-    expect(state.clearAgentLaunchConfig).toHaveBeenCalledWith(expect.stringMatching(/^tab-1:/))
+    expect(state.clearTabPtyId).toHaveBeenCalledWith(RESERVED_TAB_ID, 'pty-1')
+    expect(state.clearAgentLaunchConfig).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`^${RESERVED_TAB_ID}:`))
+    )
     expect(onExit).toHaveBeenCalledWith('pty-1', 0)
     expect(unsubscribe).toHaveBeenCalled()
   })
 
-  it('removes the inactive tab if PTY spawn fails', async () => {
+  it('binds the PTY before the tab is ever published', async () => {
+    // Why: #2989 — a tab published with ptyId: null re-renders Terminal.tsx, and for an
+    // already-visited worktree the pane can neither cold-park nor defer, so it mounts a
+    // fresh default shell and the agent PTY ends up orphaned behind a bare prompt.
+    const publishOrder: string[] = []
+    mockSpawn.mockImplementationOnce(async () => {
+      publishOrder.push('spawn')
+      return { id: 'pty-1' }
+    })
+    mockCreateTab.mockImplementationOnce(
+      (_worktreeId: string, _groupId: unknown, _shell: unknown, options?: { id?: string }) => {
+        publishOrder.push('createTab')
+        return { id: options?.id ?? RESERVED_TAB_ID, title: 'Terminal 1' }
+      }
+    )
+    const { launchAgentBackgroundSession } = await import('./launch-agent-background-session')
+
+    await launchAgentBackgroundSession({
+      agent: 'claude',
+      worktreeId: 'wt-1',
+      prompt: 'run the automation'
+    })
+
+    expect(publishOrder).toEqual(['spawn', 'createTab'])
+    expect(mockCreateTab.mock.calls[0]?.[3]).toMatchObject({ initialPtyId: 'pty-1' })
+  })
+
+  it('retires the launch when the reserved tab id collides', async () => {
+    // Why: PEBBLE_TAB_ID and PEBBLE_PANE_KEY are already baked into the spawned process,
+    // so accepting a re-keyed tab would leave routing and hook identity permanently
+    // disagreeing. Kill the PTY and fail instead.
+    const mockKill = vi.fn().mockResolvedValue(undefined)
+    ;(window as unknown as { api: { pty: { kill: unknown } } }).api.pty.kill = mockKill
+    mockCreateTab.mockImplementationOnce(() => ({ id: 'some-other-tab', title: 'Terminal 1' }))
+    const { launchAgentBackgroundSession } = await import('./launch-agent-background-session')
+
+    await expect(
+      launchAgentBackgroundSession({
+        agent: 'claude',
+        worktreeId: 'wt-1',
+        prompt: 'run the automation'
+      })
+    ).rejects.toThrow('could not reserve its terminal identity')
+
+    expect(mockCloseTab).toHaveBeenCalledWith('some-other-tab', { recordInteraction: false })
+    expect(state.clearAgentLaunchConfig).toHaveBeenCalled()
+    expect(mockKill).toHaveBeenCalledWith('pty-1')
+  })
+
+  it('never publishes a tab when the PTY spawn fails', async () => {
     mockSpawn.mockRejectedValueOnce(new Error('spawn failed'))
     const { launchAgentBackgroundSession } = await import('./launch-agent-background-session')
 
@@ -427,8 +500,12 @@ describe('launchAgentBackgroundSession', () => {
       })
     ).rejects.toThrow('spawn failed')
 
-    expect(mockCloseTab).toHaveBeenCalledWith('tab-1', { recordInteraction: false })
+    // Why: the tab is only published once a PTY exists, so a failed spawn leaves
+    // nothing behind to close — only the reserved launch config to release.
+    expect(mockCreateTab).not.toHaveBeenCalled()
+    expect(mockCloseTab).not.toHaveBeenCalled()
     expect(mockUpdateTabPtyId).not.toHaveBeenCalled()
+    expect(state.clearAgentLaunchConfig).toHaveBeenCalled()
   })
 
   it('submits prompts for stdin-after-start agents in background mode', async () => {
@@ -445,7 +522,7 @@ describe('launchAgentBackgroundSession', () => {
     )
     expect(mockPasteDraftWhenAgentReady).toHaveBeenCalledWith(
       expect.objectContaining({
-        tabId: 'tab-1',
+        tabId: RESERVED_TAB_ID,
         content: 'run the automation',
         agent: 'aider',
         submit: true
@@ -598,10 +675,10 @@ describe('launchAgentBackgroundSession', () => {
     expect(mockSpawn).not.toHaveBeenCalled()
     const params = mockRuntimeEnvironmentCall.mock.calls[0]?.[0]?.params
     const paneKey = params?.env?.PEBBLE_PANE_KEY
-    const leafId = typeof paneKey === 'string' ? paneKey.slice('tab-1:'.length) : ''
+    const leafId = typeof paneKey === 'string' ? paneKey.slice(`${RESERVED_TAB_ID}:`.length) : ''
     expect(leafId).toMatch(UUID_RE)
     expect(mockRegisterAgentLaunchConfig).toHaveBeenCalledWith(
-      `tab-1:${leafId}`,
+      `${RESERVED_TAB_ID}:${leafId}`,
       {
         agentCommand: "claude '--dangerously-skip-permissions'",
         agentArgs: '--dangerously-skip-permissions',
@@ -610,12 +687,12 @@ describe('launchAgentBackgroundSession', () => {
       {
         agentType: 'claude',
         launchToken: expect.stringMatching(UUID_RE),
-        tabId: 'tab-1',
+        tabId: RESERVED_TAB_ID,
         leafId
       }
     )
     expect(mockSetTabLayout).toHaveBeenCalledWith(
-      'tab-1',
+      RESERVED_TAB_ID,
       expect.objectContaining({
         root: { type: 'leaf', leafId },
         activeLeafId: leafId,
@@ -630,17 +707,17 @@ describe('launchAgentBackgroundSession', () => {
         command: "claude '--dangerously-skip-permissions' 'run the automation'",
         launchAgent: 'claude',
         env: expect.objectContaining({
-          PEBBLE_PANE_KEY: `tab-1:${leafId}`,
-          PEBBLE_TAB_ID: 'tab-1',
+          PEBBLE_PANE_KEY: `${RESERVED_TAB_ID}:${leafId}`,
+          PEBBLE_TAB_ID: RESERVED_TAB_ID,
           PEBBLE_WORKTREE_ID: 'wt-1'
         }),
-        tabId: 'tab-1',
+        tabId: RESERVED_TAB_ID,
         leafId,
         presentation: 'background'
       }),
       timeoutMs: 15_000
     })
-    expect(mockUpdateTabPtyId).toHaveBeenCalledWith('tab-1', 'remote:env-1@@terminal-1')
+    expect(mockUpdateTabPtyId).not.toHaveBeenCalled()
     expect(mockRegisterEagerPtyBuffer).not.toHaveBeenCalled()
     expect(mockRuntimeEnvironmentSubscribe).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -651,8 +728,8 @@ describe('launchAgentBackgroundSession', () => {
       expect.any(Object)
     )
     expect(result).toMatchObject({
-      tabId: 'tab-1',
-      paneKey: `tab-1:${leafId}`,
+      tabId: RESERVED_TAB_ID,
+      paneKey: `${RESERVED_TAB_ID}:${leafId}`,
       ptyId: 'remote:env-1@@terminal-1'
     })
   })
