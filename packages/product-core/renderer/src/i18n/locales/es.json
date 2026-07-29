@@ -1179,7 +1179,15 @@
         "noRunTargets": "No hay destinos de ejecución listos para este proyecto.",
         "perWorkspaceEnvHint": "Provisiona un entorno bajo demanda a partir de una receta",
         "branchName": "Nombre de rama",
-        "branchNamePlaceholder": "feature/my-branch"
+        "branchNamePlaceholder": "feature/my-branch",
+        "addHost": "Añadir host",
+        "addSshHost": "Añadir host SSH",
+        "addSshHostHint": "Usa una máquina existente por SSH",
+        "addRemoteServer": "Añadir servidor remoto",
+        "addRemoteServerHint": "Empareja con Pebble en otro equipo",
+        "connectHost": "Conectar",
+        "connectingHost": "Conectando…",
+        "connectTimedOut": "Se agotó el tiempo de conexión. Puede seguir conectándose en segundo plano."
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "Crear worktree",
@@ -10134,6 +10142,11 @@
             "browse": "Explorar proyectos",
             "listLabel": "Proyectos",
             "noProjects": "Aún no hay proyectos."
+          },
+          "RunTargetCombobox": {
+            "label": "Ejecutar en",
+            "browse": "Explorar destinos de ejecución",
+            "listLabel": "Destinos de ejecución"
           }
         }
       },

@@ -1179,7 +1179,15 @@
         "noRunTargets": "이 프로젝트에는 실행 대상이 준비되어 있지 않습니다.",
         "perWorkspaceEnvHint": "레시피에서 온디맨드 환경 프로비저닝",
         "branchName": "브랜치 이름",
-        "branchNamePlaceholder": "feature/my-branch"
+        "branchNamePlaceholder": "feature/my-branch",
+        "addHost": "호스트 추가",
+        "addSshHost": "SSH 호스트 추가",
+        "addSshHostHint": "기존 머신을 SSH로 사용합니다",
+        "addRemoteServer": "원격 서버 추가",
+        "addRemoteServerHint": "다른 컴퓨터에서 실행 중인 Pebble과 페어링합니다",
+        "connectHost": "연결",
+        "connectingHost": "연결 중…",
+        "connectTimedOut": "연결 시간이 초과되었습니다. 백그라운드에서 계속 연결 중일 수 있습니다."
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "작업 트리 만들기",
@@ -10134,6 +10142,11 @@
             "browse": "프로젝트 찾아보기",
             "listLabel": "프로젝트",
             "noProjects": "아직 프로젝트가 없습니다."
+          },
+          "RunTargetCombobox": {
+            "label": "실행 위치",
+            "browse": "실행 대상 찾아보기",
+            "listLabel": "실행 대상"
           }
         }
       },

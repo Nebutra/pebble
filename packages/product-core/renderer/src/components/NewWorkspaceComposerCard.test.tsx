@@ -197,6 +197,16 @@ function changeInputValue(input: HTMLInputElement, value: string): void {
 
 let current: { container: HTMLDivElement; root: Root } | null = null
 
+// Why: the field itself is the search box now, so clicking the shell focuses it and
+// opens the list — there is no separate trigger button to press.
+function openRunTargetPicker(container: HTMLElement): void {
+  const runTargetShell = container.querySelector<HTMLElement>(
+    'div[data-run-target-combobox-root="true"]'
+  )
+  expect(runTargetShell).toBeTruthy()
+  act(() => runTargetShell?.click())
+}
+
 describe('NewWorkspaceComposerCard folder task source mode', () => {
   afterEach(() => {
     act(() => current?.root.unmount())
@@ -455,10 +465,7 @@ describe('NewWorkspaceComposerCard folder task source mode', () => {
     expect(current.container.textContent).toContain('Run on')
     expect(current.container.textContent).not.toContain('VM recipe')
 
-    const runTargetButton =
-      current.container.querySelector<HTMLButtonElement>('button[role="combobox"]')
-    expect(runTargetButton).toBeTruthy()
-    act(() => runTargetButton?.click())
+    openRunTargetPicker(current.container)
 
     expect(document.body.textContent).toContain('Per-Workspace Environment')
     const ephemeralVmItem = [
@@ -467,7 +474,7 @@ describe('NewWorkspaceComposerCard folder task source mode', () => {
     expect(ephemeralVmItem).toBeTruthy()
     act(() => ephemeralVmItem?.click())
 
-    const recipeItem = [...document.body.querySelectorAll<HTMLElement>('[cmdk-item]')].find(
+    const recipeItem = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')].find(
       (item) => item.textContent?.includes('Vercel Sandbox')
     )
     expect(recipeItem).toBeTruthy()
@@ -509,12 +516,13 @@ describe('NewWorkspaceComposerCard folder task source mode', () => {
       onEphemeralVmRecipeChange: (recipeId) => recipeChanges.push(recipeId)
     })
 
-    const runTargetButton =
-      current.container.querySelector<HTMLButtonElement>('button[role="combobox"]')
-    expect(runTargetButton?.textContent).toContain('Per-Workspace Environment')
-    act(() => runTargetButton?.click())
+    const runTargetShell = current.container.querySelector<HTMLElement>(
+      'div[data-run-target-combobox-root="true"]'
+    )
+    expect(runTargetShell?.textContent).toContain('Per-Workspace Environment')
+    openRunTargetPicker(current.container)
 
-    const builderItem = [...document.body.querySelectorAll<HTMLElement>('[cmdk-item]')].find(
+    const builderItem = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')].find(
       (item) => item.textContent?.includes('Builder')
     )
     expect(builderItem).toBeTruthy()

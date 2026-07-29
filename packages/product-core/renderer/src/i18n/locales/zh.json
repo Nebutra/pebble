@@ -1179,7 +1179,15 @@
         "noRunTargets": "此项目还没有可用的运行目标。",
         "perWorkspaceEnvHint": "通过环境模板按需创建环境",
         "branchName": "分支名称",
-        "branchNamePlaceholder": "feature/my-branch"
+        "branchNamePlaceholder": "feature/my-branch",
+        "addHost": "添加主机",
+        "addSshHost": "添加 SSH 主机",
+        "addSshHostHint": "通过 SSH 使用一台已有机器",
+        "addRemoteServer": "添加远程服务器",
+        "addRemoteServerHint": "与运行在另一台电脑上的 Pebble 配对",
+        "connectHost": "连接",
+        "connectingHost": "连接中…",
+        "connectTimedOut": "连接超时。它可能仍在后台连接。"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "创建平行宇宙",
@@ -10134,6 +10142,11 @@
             "browse": "浏览项目",
             "listLabel": "项目",
             "noProjects": "还没有项目。"
+          },
+          "RunTargetCombobox": {
+            "label": "运行于",
+            "browse": "浏览运行目标",
+            "listLabel": "运行目标"
           }
         }
       },

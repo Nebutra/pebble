@@ -90,15 +90,32 @@ matching, recency, row components). Taken wholesale along with its 297-line test
 `onAddProject` is optional upstream, so Pebble simply does not pass it and the pinned
 "Add a new project" row is skipped — Pebble's composer owns that affordance elsewhere.
 
-**Run-target picker: not ported.** Upstream extracted its run-target block into
-`RunTargetCombobox` / `RunTargetField` / `RunTargetSubmenus` / `run-target-options`, built
-around a host-connect model Pebble does not have: upstream passes
-`readonly ProjectHostSetupOption[]` (ready + needs-setup, with connect buttons, connect
-timeouts and an add-host submenu), while Pebble's composer passes
-`readyProjectHostSetupOptions` and keeps a simpler inline `WorkspaceRunTargetCombobox`.
-`run-target-options.ts` also carries the upstream `OrcaHooks` type. Those five modules and
-the composer's 572-line extraction were left out, and the composer's clean-merged hunks
-that assumed the new picker were reverted.
+**Run-target picker: ported (second pass).** The first pass skipped this half on the
+reading that Pebble lacked upstream's host-connect model. That was wrong: Pebble already
+builds the full `ProjectHostSetupOption` union including `needs-setup`, and already ships
+`AddRemoteHostDialog` — the composer was simply filtering the needs-setup options away at
+the call site. Only two things were genuinely missing, both small:
+
+- `NeedsSetupProjectHostOption` gained `attention` (alarm glyph only for a real error, not
+  a dormant disconnected host) and an optional `connectAction`, derived from the host
+  registry entry exactly as upstream does.
+- The composer gained an SSH connect handler and hosts `AddRemoteHostDialog` itself, so
+  adding a host no longer means leaving the composer and discarding the in-progress form.
+
+Pebble's 215-line inline `WorkspaceRunTargetCombobox` was replaced by the five upstream
+modules; `run-target-options.ts` already exported Pebble's own recipe helpers, so nothing
+was lost. `OrcaHooks` became `PebbleHooks`, and "Add Remote Orca Server" / "Pair another
+Orca runtime" became Pebble's established "Add remote server" / "Pair with Pebble running
+on another computer".
+
+Two defects were fixed while porting rather than carried over: a rejected connect escaped
+as an unhandled promise rejection (the click handler cannot await it), and the failure was
+invisible to the user. The component now logs and the composer surfaces a toast.
+
+Coverage: upstream's run-target tests lived inside `NewWorkspaceComposerCard.test.tsx`;
+here they are a focused `RunTargetCombobox.test.tsx` covering needs-setup rows, the row not
+being selectable, connect-without-select, one stalled connect not blocking others,
+re-enabling after a failed connect, and the add-host submenu.
 
 i18n: only the `ProjectCombobox` keys were taken. Upstream shipped them untranslated in
 es/ja/ko/zh; they were translated here to match each locale's existing project wording.

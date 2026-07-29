@@ -1179,7 +1179,15 @@
         "noRunTargets": "このプロジェクトには実行ターゲットが準備されていません。",
         "perWorkspaceEnvHint": "レシピからオンデマンド環境をプロビジョニングする",
         "branchName": "ブランチ名",
-        "branchNamePlaceholder": "feature/my-branch"
+        "branchNamePlaceholder": "feature/my-branch",
+        "addHost": "ホストを追加",
+        "addSshHost": "SSH ホストを追加",
+        "addSshHostHint": "既存のマシンを SSH 経由で使用します",
+        "addRemoteServer": "リモートサーバーを追加",
+        "addRemoteServerHint": "別のコンピューターで動作する Pebble とペアリングします",
+        "connectHost": "接続",
+        "connectingHost": "接続中…",
+        "connectTimedOut": "接続がタイムアウトしました。バックグラウンドで接続が続いている可能性があります。"
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "ワークツリーを作成する",
@@ -10134,6 +10142,11 @@
             "browse": "プロジェクトを参照",
             "listLabel": "プロジェクト",
             "noProjects": "プロジェクトがまだありません。"
+          },
+          "RunTargetCombobox": {
+            "label": "実行先",
+            "browse": "実行先を参照",
+            "listLabel": "実行先"
           }
         }
       },

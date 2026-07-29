@@ -1179,7 +1179,15 @@
         "noRunTargets": "No run targets are ready for this project.",
         "perWorkspaceEnvHint": "Provision an on-demand environment from a recipe",
         "branchName": "Branch name",
-        "branchNamePlaceholder": "feature/my-branch"
+        "branchNamePlaceholder": "feature/my-branch",
+        "addHost": "Add host",
+        "addSshHost": "Add SSH host",
+        "addSshHostHint": "Use an existing machine over SSH",
+        "addRemoteServer": "Add remote server",
+        "addRemoteServerHint": "Pair with Pebble running on another computer",
+        "connectHost": "Connect",
+        "connectingHost": "Connecting…",
+        "connectTimedOut": "Connection timed out. It may still be connecting in the background."
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "Create worktree",
@@ -10134,6 +10142,11 @@
             "browse": "Browse projects",
             "listLabel": "Projects",
             "noProjects": "No projects yet."
+          },
+          "RunTargetCombobox": {
+            "label": "Run on",
+            "browse": "Browse run targets",
+            "listLabel": "Run targets"
           }
         }
       },
