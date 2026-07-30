@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 1
-- **Last Active**: 2026-07-27
+- **Total Sessions**: 2
+- **Last Active**: 2026-07-30
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~40 | Active |
+| `journal-1.md` | ~76 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 2 | 2026-07-30 | Main closeout: branches, WIP commits, Trellis archive | `1ee3376e9`, `5c316ebfc`, `6e308cef0`, `5bfe7ce32` | `main` |
 | 1 | 2026-07-27 | Bundled skills and upstream semantic sync | `05830a06f` | `main` |
 <!-- @@@/auto:session-history -->
 

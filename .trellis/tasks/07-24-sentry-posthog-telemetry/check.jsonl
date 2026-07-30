@@ -1,0 +1,4 @@
+{"file":".trellis/spec/desktop-tauri/frontend/quality-guidelines.md","reason":"Verify startup diagnostics, renderer bootstrap isolation, and release-native checks still pass."}
+{"file":".trellis/spec/desktop-tauri/frontend/product-origin.md","reason":"Verify server-owned feedback/diagnostic routes and privacy boundaries remain accurate."}
+{"file":".trellis/spec/desktop-tauri/frontend/release-signing.md","reason":"Verify Sentry artifact steps do not expose credentials or break signed release sequencing."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check that consent, release metadata, and payload normalization have single owners rather than duplicated logic."}

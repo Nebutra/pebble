@@ -1,0 +1,4 @@
+{"file":".trellis/spec/desktop-tauri/frontend/quality-guidelines.md","reason":"Preserve the Tauri renderer bootstrap and native runtime quality gates while adding startup observability."}
+{"file":".trellis/spec/desktop-tauri/frontend/product-origin.md","reason":"Keep ordinary feedback and independent diagnostics on the canonical Pebble origin while moving only crash telemetry to Sentry."}
+{"file":".trellis/spec/desktop-tauri/frontend/release-signing.md","reason":"Integrate artifact upload without weakening the existing cross-platform release signing and notarization trust chain."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace consent, crash payloads, release identifiers, and credentials across renderer, Rust, build scripts, and CI."}

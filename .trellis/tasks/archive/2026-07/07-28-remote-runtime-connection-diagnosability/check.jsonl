@@ -1,0 +1,6 @@
+{"file": ".trellis/tasks/07-28-remote-runtime-connection-diagnosability/research/tokio-tungstenite-error-taxonomy.md", "reason": "verify the error classification is faithful to the real enum and that no #[non_exhaustive] match arm was omitted"}
+{"file": ".trellis/tasks/07-28-remote-runtime-connection-diagnosability/research/runtime-environment-store.md", "reason": "verify the endpoint mutation preserves device_token/public_key_b64 and every existing store invariant (sort order, preferred_endpoint_id, atomic write)"}
+{"file": ".trellis/tasks/07-28-remote-runtime-connection-diagnosability/research/platform-permissions-macos-windows.md", "reason": "verify no multicast entitlement was added and the plist change is correct"}
+{"file": "docs/STYLEGUIDE.md", "reason": "verify the new settings UI follows the design system and introduces no new primitives"}
+{"file": ".trellis/spec/desktop-tauri/frontend/quality-guidelines.md", "reason": "repo quality gates for the desktop frontend changes"}
+{"file": ".trellis/spec/desktop-tauri/frontend/type-safety.md", "reason": "D3 adds a PreloadApi surface; type-safety rules apply"}
