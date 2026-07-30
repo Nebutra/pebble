@@ -51,6 +51,25 @@ LIBGL_ALWAYS_SOFTWARE=1 /opt/pebble/pebble-linux-x86_64.AppImage serve \
   --pairing-address 100.64.1.20
 ```
 
+### Bind vs advertise (LAN shared-control)
+
+`pebble serve` always talks to its local control plane on loopback
+(`http://127.0.0.1:<port>`). Pairing URLs are different:
+
+- **Advertise** — `--pairing-address` is the host clients put in the pairing
+  WebSocket URL (`ws://<host>:<port>/v1/shared-control`).
+- **Serve** — when `--pairing-address` is a non-loopback host (or you pass
+  `--lan-shared-control` explicitly), the runtime widens the **shared-control
+  WebSocket** bind so that advertised address can accept connections on the same
+  port.
+- **Control API stays loopback-only** — routes such as `POST /v1/sessions` and
+  the localhost-label reverse proxy remain unreachable from off-loopback clients
+  even when LAN shared-control is enabled. Empty-bearer local control is not
+  exposed on the LAN.
+
+Default (no non-loopback `--pairing-address` and no `--lan-shared-control`) keeps
+today's loopback-only bind for the whole runtime.
+
 The command prints the runtime endpoint and pairing URL. Stop it with `Ctrl+C`.
 
 ## Systemd Service
@@ -177,7 +196,12 @@ depend on an interactive shell profile.
 - Chromium sandbox errors: confirm the service is running as the non-root
   `pebble` user and that `/opt/pebble` is readable by that user.
 - Clients cannot connect: make sure `--pairing-address` is an address reachable
-  from the client, and make sure firewalls allow the selected `--port`.
+  from the client (not a loopback-only advertise when the peer is remote), that
+  LAN shared-control is active for that non-loopback advertise (automatic when
+  `--pairing-address` is non-loopback, or pass `--lan-shared-control`), and that
+  firewalls allow the selected `--port` for the **shared-control WebSocket**
+  only. A successful LAN connect to `/v1/sessions` would be a bug — that control
+  API is intentionally loopback-only.
 - Diagnosing other missing libraries: extract the AppImage without launching it
   with `./pebble-linux-x86_64.AppImage --appimage-extract`, then run
   `ldd squashfs-root/pebble` to list any shared libraries the host is missing.

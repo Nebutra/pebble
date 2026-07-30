@@ -3,7 +3,7 @@
   "name": "restore-lan-reachable-serving",
   "title": "Restore LAN-reachable runtime serving lost in the Tauri migration",
   "description": "Upstream Orca binds 0.0.0.0 for the shared-control WebSocket; the Tauri/Go rewrite hardcoded loopback while keeping the advertise-only interface picker. Restore upstream's layering without exposing the unauthenticated control API.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

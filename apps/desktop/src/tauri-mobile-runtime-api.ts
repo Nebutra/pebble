@@ -100,6 +100,9 @@ async function createPairingMaterial(
       }
     }
   )
+  // Why: the desktop runtime is started with --lan-shared-control so this
+  // advertise host is the address actually served for shared-control, while
+  // the desktop-owned control HTTP client still uses the loopback listen URL.
   const endpoint = `ws://${formatPairingHost(address)}:17777/v1/shared-control`
   const pairingUrl = encodePairingOffer({
     v: 2,

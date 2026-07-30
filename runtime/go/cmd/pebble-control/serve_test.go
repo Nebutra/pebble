@@ -12,13 +12,26 @@ func TestParseServeOptionsPreservesNativeContract(t *testing.T) {
 	root := t.TempDir()
 	options, err := parseServeOptions([]string{
 		"--port", "6768", "--pairing-address", "wss://sandbox.example.com",
-		"--project-root", root, "--recipe-json",
+		"--project-root", root, "--recipe-json", "--lan-shared-control",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if options.port != 6768 || options.pairingAddress != "wss://sandbox.example.com" || options.projectRoot != root || !options.recipeJSON {
+	if options.port != 6768 || options.pairingAddress != "wss://sandbox.example.com" || options.projectRoot != root || !options.recipeJSON || !options.lanSharedControl {
 		t.Fatalf("unexpected options: %+v", options)
+	}
+}
+
+func TestPairingAddressRequiresLanSharedControl(t *testing.T) {
+	for _, address := range []string{"", "127.0.0.1", "localhost", "ws://127.0.0.1:6768/v1/shared-control", "0.0.0.0"} {
+		if pairingAddressRequiresLanSharedControl(address) {
+			t.Fatalf("%q must not force LAN shared-control", address)
+		}
+	}
+	for _, address := range []string{"100.64.1.20", "192.168.1.20", "wss://sandbox.example.com", "my-box.local"} {
+		if !pairingAddressRequiresLanSharedControl(address) {
+			t.Fatalf("%q must enable LAN shared-control so advertise matches bind", address)
+		}
 	}
 }
 

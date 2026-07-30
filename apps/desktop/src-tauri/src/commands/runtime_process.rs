@@ -299,6 +299,10 @@ impl RuntimeProcessState {
 
 fn runtime_process_args(input: &RuntimeProcessStartCommand, listen: &str) -> Vec<String> {
     let mut args = vec!["--listen".to_string(), listen.to_string()];
+    // Why: Settings/mobile pairing mints non-loopback shared-control URLs for the
+    // selected interface. The desktop-owned HTTP control client still uses the
+    // loopback listen address; the runtime widens only the pairing WebSocket.
+    args.push("--lan-shared-control".to_string());
     if let Some(data_dir) = normalize_optional_text(input.data_dir.as_deref()) {
         args.extend(["--data-dir".to_string(), data_dir]);
     }
@@ -518,6 +522,7 @@ mod tests {
             vec![
                 "--listen",
                 "127.0.0.1:18888",
+                "--lan-shared-control",
                 "--data-dir",
                 "/tmp/pebble",
                 "--verbose"
@@ -537,7 +542,7 @@ mod tests {
 
         assert_eq!(
             runtime_process_args(&input, "127.0.0.1:17777"),
-            vec!["--listen", "127.0.0.1:17777"]
+            vec!["--listen", "127.0.0.1:17777", "--lan-shared-control"]
         );
     }
 

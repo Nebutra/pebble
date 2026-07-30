@@ -27,18 +27,25 @@ type Server struct {
 	bearerToken string
 	// hookToken authorizes /hook/{source} ingest posts, which carry
 	// X-Pebble-Agent-Hook-Token instead of a bearer header.
-	hookToken              string
-	nestedScanMu           sync.Mutex
-	nestedScanCancels      map[string]*nestedScanCancellation
-	localhostLabels        *localhostLabelProxy
-	browserScreencasts     *browserScreencastFrameRegistry
-	remoteWorkspaceWatches *remoteWorkspaceWatchRegistry
+	hookToken string
+	// allowNonLoopbackSharedControl permits only the pairing-authenticated
+	// shared-control WebSocket from non-loopback remotes when the process
+	// binds beyond loopback. Control HTTP and localhost-label stay loopback-only.
+	allowNonLoopbackSharedControl bool
+	nestedScanMu                  sync.Mutex
+	nestedScanCancels             map[string]*nestedScanCancellation
+	localhostLabels               *localhostLabelProxy
+	browserScreencasts            *browserScreencastFrameRegistry
+	remoteWorkspaceWatches        *remoteWorkspaceWatchRegistry
 }
 
 type ServerOptions struct {
 	BearerToken string
 	// HookToken overrides the agent-hook ingest token; defaults to BearerToken.
 	HookToken string
+	// AllowNonLoopbackSharedControl widens the bind for shared-control while
+	// keeping unauthenticated control routes loopback-only (see ServeHTTP).
+	AllowNonLoopbackSharedControl bool
 }
 
 func NewServer(manager *runtimecore.Manager) *Server {
@@ -51,14 +58,15 @@ func NewServerWithOptions(manager *runtimecore.Manager, options ServerOptions) *
 		hookToken = strings.TrimSpace(options.BearerToken)
 	}
 	server := &Server{
-		manager:                manager,
-		mux:                    http.NewServeMux(),
-		bearerToken:            strings.TrimSpace(options.BearerToken),
-		hookToken:              hookToken,
-		nestedScanCancels:      make(map[string]*nestedScanCancellation),
-		localhostLabels:        newLocalhostLabelProxy(),
-		browserScreencasts:     newBrowserScreencastFrameRegistry(),
-		remoteWorkspaceWatches: newRemoteWorkspaceWatchRegistry(manager),
+		manager:                       manager,
+		mux:                           http.NewServeMux(),
+		bearerToken:                   strings.TrimSpace(options.BearerToken),
+		hookToken:                     hookToken,
+		allowNonLoopbackSharedControl: options.AllowNonLoopbackSharedControl,
+		nestedScanCancels:             make(map[string]*nestedScanCancellation),
+		localhostLabels:               newLocalhostLabelProxy(),
+		browserScreencasts:            newBrowserScreencastFrameRegistry(),
+		remoteWorkspaceWatches:        newRemoteWorkspaceWatchRegistry(manager),
 	}
 	server.routes()
 	return server
@@ -69,7 +77,15 @@ type nestedScanCancellation struct {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if s.localhostLabels.serve(w, r) {
+	// Why: empty bearer authorizes every control route. Off-loopback clients may
+	// only reach the pairing-authenticated shared-control WebSocket when LAN
+	// serving is opted in; localhost-label proxy must never run for them.
+	if !requestFromLoopback(r) {
+		if !s.allowNonLoopbackSharedControl || !isNonLoopbackSharedControlPath(r) {
+			writeError(w, http.StatusForbidden, "runtime control API is loopback-only")
+			return
+		}
+	} else if s.localhostLabels.serve(w, r) {
 		return
 	}
 	if !s.authorize(r) {
@@ -2070,6 +2086,7 @@ func StartWithOptions(ctx context.Context, listen string, manager *runtimecore.M
 	if options.HookToken == "" {
 		options.HookToken = randomAgentHookToken()
 	}
+	listen = resolveListenAddress(listen, options.AllowNonLoopbackSharedControl)
 	listener, err := net.Listen("tcp", listen)
 	if err != nil {
 		return err
@@ -2079,7 +2096,8 @@ func StartWithOptions(ctx context.Context, listen string, manager *runtimecore.M
 	if addr, ok := listener.Addr().(*net.TCPAddr); ok {
 		manager.ConfigureSessionHookEndpoint(addr.Port, options.HookToken)
 	}
-	server := &http.Server{Handler: NewServerWithOptions(manager, options)}
+	handler := NewServerWithOptions(manager, options)
+	server := &http.Server{Handler: handler}
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- server.Serve(listener)

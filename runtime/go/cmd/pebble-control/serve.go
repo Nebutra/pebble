@@ -26,13 +26,14 @@ import (
 const sharedControlPath = "/v1/shared-control"
 
 type serveOptions struct {
-	port           int
-	pairingAddress string
-	noPairing      bool
-	mobilePairing  bool
-	recipeJSON     bool
-	projectRoot    string
-	jsonOutput     bool
+	port              int
+	pairingAddress    string
+	lanSharedControl  bool
+	noPairing         bool
+	mobilePairing     bool
+	recipeJSON        bool
+	projectRoot       string
+	jsonOutput        bool
 }
 
 type pairingMaterial struct {
@@ -67,12 +68,15 @@ func runServe(args []string, token string, output, errorOutput io.Writer) error 
 			return fmt.Errorf("choose runtime port: %w", err)
 		}
 	}
+	// Why: control process always talks to the runtime over loopback. LAN
+	// reachability is a runtime-side bind + path filter when opted in.
 	listen := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
 	runtimeHTTP := "http://" + listen
+	lanSharedControl := options.lanSharedControl || pairingAddressRequiresLanSharedControl(options.pairingAddress)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	token = strings.TrimSpace(token)
-	command, err := runtimeCommand(ctx, listen)
+	command, err := runtimeCommand(ctx, listen, lanSharedControl)
 	if err != nil {
 		return err
 	}
@@ -156,6 +160,12 @@ func parseServeOptions(args []string) (serveOptions, error) {
 	flags.SetOutput(io.Discard)
 	flags.IntVar(&options.port, "port", 17777, "runtime listen port")
 	flags.StringVar(&options.pairingAddress, "pairing-address", "", "client-visible host or WebSocket URL")
+	flags.BoolVar(
+		&options.lanSharedControl,
+		"lan-shared-control",
+		false,
+		"make pairing shared-control reachable beyond loopback; control HTTP stays loopback-only",
+	)
 	flags.BoolVar(&options.noPairing, "no-pairing", false, "disable pairing output")
 	flags.BoolVar(&options.mobilePairing, "mobile-pairing", false, "create a mobile-scoped pairing")
 	flags.BoolVar(&options.recipeJSON, "recipe-json", false, "print one workspace recipe JSON object")
@@ -192,11 +202,17 @@ func parseServeOptions(args []string) (serveOptions, error) {
 	return options, nil
 }
 
-func runtimeCommand(ctx context.Context, listen string) (*exec.Cmd, error) {
+func runtimeCommand(ctx context.Context, listen string, lanSharedControl bool) (*exec.Cmd, error) {
+	args := []string{"--listen", listen}
+	if lanSharedControl {
+		// Why: advertised non-loopback pairing endpoints only work when the
+		// runtime widens the shared-control bind with a control-plane filter.
+		args = append(args, "--lan-shared-control")
+	}
 	if executable, err := os.Executable(); err == nil {
 		for _, candidate := range siblingRuntimeCandidates(executable) {
 			if info, statErr := os.Stat(candidate); statErr == nil && !info.IsDir() {
-				return exec.CommandContext(ctx, candidate, "--listen", listen), nil
+				return exec.CommandContext(ctx, candidate, args...), nil
 			}
 		}
 	}
@@ -204,9 +220,45 @@ func runtimeCommand(ctx context.Context, listen string) (*exec.Cmd, error) {
 	if root == "" {
 		return nil, errors.New("could not locate the bundled pebble-runtime executable")
 	}
-	command := exec.CommandContext(ctx, "go", "run", "./cmd/pebble-runtime", "--listen", listen)
+	commandArgs := append([]string{"run", "./cmd/pebble-runtime"}, args...)
+	command := exec.CommandContext(ctx, "go", commandArgs...)
 	command.Dir = root
 	return command, nil
+}
+
+// pairingAddressRequiresLanSharedControl turns on LAN shared-control when the
+// operator advertises a non-loopback host so --pairing-address is not a lie.
+func pairingAddressRequiresLanSharedControl(address string) bool {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return false
+	}
+	if strings.Contains(address, "://") {
+		parsed, err := url.Parse(address)
+		if err != nil || parsed.Hostname() == "" {
+			return false
+		}
+		return !isLoopbackOrUnspecifiedHost(parsed.Hostname())
+	}
+	host := address
+	if h, _, err := net.SplitHostPort(strings.Trim(address, "[]")); err == nil {
+		host = h
+	}
+	return !isLoopbackOrUnspecifiedHost(host)
+}
+
+func isLoopbackOrUnspecifiedHost(host string) bool {
+	host = strings.Trim(strings.TrimSpace(host), "[]")
+	if host == "" || strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		// Hostnames (e.g. my-box.local, sandbox.example.com) are treated as
+		// requiring LAN/shared reachability — the advertise host is not loopback.
+		return false
+	}
+	return ip.IsLoopback() || ip.IsUnspecified()
 }
 
 func siblingRuntimeCandidates(controlExecutable string) []string {

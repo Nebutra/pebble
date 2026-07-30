@@ -25,6 +25,11 @@ func main() {
 	listen := flag.String("listen", "127.0.0.1:17777", "HTTP listen address")
 	dataDir := flag.String("data-dir", runtimeauth.DefaultDataDir(), "runtime data directory")
 	token := flag.String("token", os.Getenv("PEBBLE_RUNTIME_TOKEN"), "optional runtime bearer token")
+	lanSharedControl := flag.Bool(
+		"lan-shared-control",
+		false,
+		"bind shared-control beyond loopback; control HTTP and localhost-label stay loopback-only",
+	)
 	flag.Parse()
 
 	unavailable := detectUnavailableTools()
@@ -54,8 +59,12 @@ func main() {
 	go manager.RunAutomationScheduler(ctx, time.Minute)
 
 	fmt.Fprintf(os.Stderr, "pebble runtime listening on http://%s\n", *listen)
+	if *lanSharedControl {
+		fmt.Fprintln(os.Stderr, "LAN shared-control enabled: pairing WebSocket may be reached off-loopback; control API remains loopback-only")
+	}
 	if err := runtimehttp.StartWithOptions(ctx, *listen, manager, runtimehttp.ServerOptions{
-		BearerToken: *token,
+		BearerToken:                   *token,
+		AllowNonLoopbackSharedControl: *lanSharedControl,
 	}); err != nil && err != context.Canceled {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
