@@ -30,6 +30,10 @@
         "resourceUsageToggleDescription": "リソースマネージャーを表示します。これをクリックすると、CPU、メモリ、セッション、デーモン コントロール、およびワークスペース ディスク スキャンが行われます。",
         "portsToggleDescription": "ライブワークスペースポートを表示します。ワークスペーススコープのポートと外部リスナーの場合はこれをクリックします。"
       }
+    },
+    "accounts": {
+      "tauriManagedAccountsTitle": "System CLI accounts are active",
+      "tauriManagedAccountsDescription": "Managed Claude and Codex account switching requires the native credential service and is not available in this Tauri build. Existing system CLI authentication continues to work."
     }
   },
   "menu": {
@@ -4722,7 +4726,8 @@
           "copyCommandAria": "コマンドをコピー",
           "runCommandDescription": "Enter を押してコマンドを実行します。",
           "5f818f12ab": "準備中...",
-          "4c05b9d7cb": "セットアップ用ターミナルを準備しています。"
+          "4c05b9d7cb": "セットアップ用ターミナルを準備しています。",
+          "loadingTerminal": "Loading terminal"
         },
         "AgentsPane": {
           "d83834f5e6": "インストールされている agents を検出しています…",
@@ -6126,7 +6131,10 @@
           "serverDetails": "サーバーの詳細",
           "advertiseThisApp": "このアプリをサーバーとして公開",
           "advertiseThisAppHelp": "ブラウザー、モバイルクライアント、または別の Pebble クライアントがこの実行中のアプリへ接続できるように、アクセスリンクを作成します。",
-          "runtimeReachable": "{{value0}} に到達できます。"
+          "runtimeReachable": "{{value0}} に到達できます。",
+          "updatedServerAddress": "Updated the address for {{value0}}.",
+          "editServerAddress": "Edit address for {{value0}}",
+          "editAddress": "Edit address"
         },
         "RuntimePairingGeneratedUrlRows": {
           "0495f68959": "{{value0}}をコピー"
@@ -8795,6 +8803,13 @@
           "reviewFirst": "Review first",
           "singular": "Global saves won't change 1 repository with its own recipe.",
           "tooltipTitle": "Repository overrides"
+        },
+        "RuntimeEnvironmentAddressForm": {
+          "serverAddress": "Server address",
+          "serverAddressPlaceholder": "ws://192.168.1.9:6768",
+          "serverAddressHelp": "Use this when the server moved to a new address. Pebble keeps the existing pairing, so you do not need a new pairing code.",
+          "cancel": "Cancel",
+          "saveAddress": "Save Address"
         }
       },
       "right": {
@@ -8914,7 +8929,8 @@
             "b234ab25b4": "ファイルをクリップボードにコピーできませんでした",
             "f9d7ca753d": "パスのコピー",
             "3161c4e425": "フォルダ",
-            "e887fa4b2e": "ターミナルで開く"
+            "e887fa4b2e": "ターミナルで開く",
+            "1d8e182c32": "View File"
           },
           "FileExplorerToolbar": {
             "d238264654": "Git で無視されたファイルを表示",
@@ -9433,7 +9449,9 @@
                   "41252bc53f": "ブランチは公開されていません",
                   "05e4aec17b": "{{value0}} チェックは操作の完了後に利用可能になります",
                   "d77c513c1e": "{{value0}} が進行中です",
-                  "b597440265": "Refresh GitHub status for this branch to load checks and review."
+                  "b597440265": "Refresh GitHub status for this branch to load checks and review.",
+                  "0a7d6a8e2b": "Hosted review unavailable",
+                  "1a2d4f9730": "Creating a {{value0}} is not available in this environment yet."
                 }
               }
             }
@@ -9591,7 +9609,8 @@
                   "e9b5d1f470": "Check out a branch before creating a {{value0}}.",
                   "f0c6e2a581": "This branch is not ready for a {{value0}} yet.",
                   "8f9a0b1c2d": "コミットするものがありません。ブランチは最新です。",
-                  "h3i4j5k607": "Checking whether this branch can create a {{value0}}…"
+                  "h3i4j5k607": "Checking whether this branch can create a {{value0}}…",
+                  "5a49f8a19c": "Creating a {{value0}} is not available in this environment yet."
                 }
               }
             }
@@ -9982,7 +10001,8 @@
           "111d3f8d92": "プロジェクトのセットアップにスキップ"
         },
         "OnboardingInlineCommandTerminal": {
-          "4123609efd": "terminal を起動しています..."
+          "4123609efd": "terminal を起動しています...",
+          "retry": "Retry"
         },
         "OnboardingSkipConfirmationDialog": {
           "9f47f345a4": "それほど時間はかかりません！",
@@ -12517,6 +12537,12 @@
           "githubPullRequestNumber": "PR #{{value0}}"
         }
       }
+    }
+  },
+  "tauri": {
+    "deepLink": {
+      "runtimeAdded": "Remote server added.",
+      "unsupported": "This Pebble link is not supported."
     }
   }
 }

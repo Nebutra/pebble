@@ -2485,6 +2485,11 @@ export type PreloadApi = {
       pairingCode: string
     }) => Promise<{ environment: PublicKnownRuntimeEnvironment }>
     resolve: (args: { selector: string }) => Promise<PublicKnownRuntimeEnvironment>
+    /** Repairs a saved server whose address moved. Keeps the existing pairing credentials. */
+    updateEndpoint: (args: {
+      selector: string
+      endpoint: string
+    }) => Promise<{ environment: PublicKnownRuntimeEnvironment }>
     remove: (args: { selector: string }) => Promise<{ removed: PublicKnownRuntimeEnvironment }>
     disconnect: (args: {
       selector: string

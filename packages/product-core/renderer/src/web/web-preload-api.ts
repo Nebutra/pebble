@@ -1093,6 +1093,11 @@ function createRuntimeEnvironmentsApi(): NonNullable<Partial<PreloadApi>['runtim
     },
     resolve: async ({ selector }) =>
       redactStoredWebRuntimeEnvironment(resolveEnvironment(selector)),
+    updateEndpoint: async () => {
+      // Why: the web client is served by the runtime it talks to, so there is no saved-server
+      // record to rewrite; a no-op would read as an edit that silently did nothing.
+      throw new Error('Editing a saved server address is not supported in the web client.')
+    },
     remove: async ({ selector }) => {
       const environment = resolveEnvironment(selector)
       if (activeEnvironment?.id === environment.id) {

@@ -30,6 +30,10 @@
         "resourceUsageToggleDescription": "显示资源管理器。点击可查看 CPU、内存、会话、守护进程控制和平行宇宙磁盘扫描。",
         "portsToggleDescription": "显示实时平行宇宙端口。单击它可获取平行宇宙范围的端口和外部侦听器。"
       }
+    },
+    "accounts": {
+      "tauriManagedAccountsTitle": "System CLI accounts are active",
+      "tauriManagedAccountsDescription": "Managed Claude and Codex account switching requires the native credential service and is not available in this Tauri build. Existing system CLI authentication continues to work."
     }
   },
   "menu": {
@@ -4722,7 +4726,8 @@
           "copyCommandAria": "复制命令",
           "runCommandDescription": "按 Enter 运行命令。",
           "5f818f12ab": "正在准备...",
-          "4c05b9d7cb": "正在准备设置终端。"
+          "4c05b9d7cb": "正在准备设置终端。",
+          "loadingTerminal": "Loading terminal"
         },
         "AgentsPane": {
           "d83834f5e6": "检测已安装的智能体...",
@@ -6089,7 +6094,10 @@
           "serverDetails": "服务器详细信息",
           "advertiseThisApp": "将此应用作为服务器公布",
           "advertiseThisAppHelp": "创建访问链接，让浏览器、移动客户端或另一个 Pebble 客户端连接回这个正在运行的应用。",
-          "runtimeReachable": "可连接到 {{value0}}。"
+          "runtimeReachable": "可连接到 {{value0}}。",
+          "updatedServerAddress": "Updated the address for {{value0}}.",
+          "editServerAddress": "Edit address for {{value0}}",
+          "editAddress": "Edit address"
         },
         "RuntimePairingGeneratedUrlRows": {
           "0495f68959": "复制 {{value0}}"
@@ -8795,6 +8803,13 @@
           "reviewFirst": "Review first",
           "singular": "Global saves won't change 1 repository with its own recipe.",
           "tooltipTitle": "Repository overrides"
+        },
+        "RuntimeEnvironmentAddressForm": {
+          "serverAddress": "Server address",
+          "serverAddressPlaceholder": "ws://192.168.1.9:6768",
+          "serverAddressHelp": "Use this when the server moved to a new address. Pebble keeps the existing pairing, so you do not need a new pairing code.",
+          "cancel": "Cancel",
+          "saveAddress": "Save Address"
         }
       },
       "right": {
@@ -8914,7 +8929,8 @@
             "b234ab25b4": "无法将文件复制到剪贴板",
             "f9d7ca753d": "复制路径",
             "3161c4e425": "文件夹",
-            "e887fa4b2e": "在终端中打开"
+            "e887fa4b2e": "在终端中打开",
+            "1d8e182c32": "View File"
           },
           "FileExplorerToolbar": {
             "d238264654": "显示 Git 忽略的文件",
@@ -9433,7 +9449,9 @@
                   "41252bc53f": "分支未发布",
                   "05e4aec17b": "{{value0}} 检查将在操作完成后可用",
                   "d77c513c1e": "{{value0}} 正在进行中",
-                  "b597440265": "刷新此分支的 GitHub 状态以加载检查和审核。"
+                  "b597440265": "刷新此分支的 GitHub 状态以加载检查和审核。",
+                  "0a7d6a8e2b": "Hosted review unavailable",
+                  "1a2d4f9730": "Creating a {{value0}} is not available in this environment yet."
                 }
               }
             }
@@ -9591,7 +9609,8 @@
                   "e9b5d1f470": "在创建 {{value0}} 之前检出一个分支。",
                   "f0c6e2a581": "此分支尚未准备好创建 {{value0}}。",
                   "8f9a0b1c2d": "没有可提交的内容。分支已是最新状态。",
-                  "h3i4j5k607": "正在检查此分支是否可以创建 {{value0}}…"
+                  "h3i4j5k607": "正在检查此分支是否可以创建 {{value0}}…",
+                  "5a49f8a19c": "Creating a {{value0}} is not available in this environment yet."
                 }
               }
             }
@@ -9982,7 +10001,8 @@
           "111d3f8d92": "跳至项目设置"
         },
         "OnboardingInlineCommandTerminal": {
-          "4123609efd": "启动终端..."
+          "4123609efd": "启动终端...",
+          "retry": "Retry"
         },
         "OnboardingSkipConfirmationDialog": {
           "9f47f345a4": "不会花很长时间的！",
@@ -12517,6 +12537,12 @@
           "githubPullRequestNumber": "PR #{{value0}}"
         }
       }
+    }
+  },
+  "tauri": {
+    "deepLink": {
+      "runtimeAdded": "Remote server added.",
+      "unsupported": "This Pebble link is not supported."
     }
   }
 }

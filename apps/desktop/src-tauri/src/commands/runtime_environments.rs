@@ -44,6 +44,13 @@ pub struct RuntimeEnvironmentUpdatePairingInput {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RuntimeEnvironmentUpdateEndpointInput {
+    selector: String,
+    endpoint: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RuntimeEnvironmentSelectorInput {
     selector: String,
 }
@@ -288,6 +295,27 @@ pub fn runtime_environments_update_pairing_code(
         .collect();
     sort_environments(&mut store);
     write_store(&path, &store)?;
+    Ok(RuntimeEnvironmentResult {
+        environment: redact_environment(&updated),
+    })
+}
+
+/// Why: a peer whose DHCP address changed is the same runtime at a new address.
+/// Re-pairing would mint a new device token and public key; this rewrites only
+/// the address so the existing SalsaBox handshake keeps working.
+#[tauri::command]
+pub fn runtime_environments_update_endpoint(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, RuntimeEnvironmentSubscriptionsState>,
+    input: RuntimeEnvironmentUpdateEndpointInput,
+) -> Result<RuntimeEnvironmentResult, String> {
+    let path = environment_store_path(&app)?;
+    let mut store = read_store(&path)?;
+    let updated = apply_endpoint_update(&mut store, input.selector.trim(), &input.endpoint)?;
+    write_store(&path, &store)?;
+    // Why: live subscriptions hold sockets to the old address, so leaving them open
+    // would keep the environment looking connected at an address it no longer uses.
+    close_runtime_environment_subscriptions_for_id(&state, &updated.id)?;
     Ok(RuntimeEnvironmentResult {
         environment: redact_environment(&updated),
     })
@@ -731,6 +759,61 @@ fn normalize_websocket_endpoint(endpoint: &str) -> String {
     }
 }
 
+fn parse_endpoint_input(endpoint: &str) -> Result<String, String> {
+    let trimmed = endpoint.trim();
+    if trimmed.is_empty() {
+        return Err("Server address is required.".to_string());
+    }
+    if trimmed.chars().any(char::is_whitespace) {
+        return Err("Server address must not contain spaces.".to_string());
+    }
+    let normalized = normalize_websocket_endpoint(trimmed);
+    let rest = normalized
+        .strip_prefix("ws://")
+        .or_else(|| normalized.strip_prefix("wss://"))
+        .ok_or_else(|| {
+            "Server address must start with ws://, wss://, http://, or https://.".to_string()
+        })?;
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    if authority.is_empty() || authority.starts_with(':') {
+        return Err("Server address is missing a host.".to_string());
+    }
+    Ok(normalized)
+}
+
+/// Mutates the saved endpoint in place. `device_token` and `public_key_b64` are
+/// deliberately left untouched: the pairing is still valid, only the address moved.
+fn apply_endpoint_update(
+    store: &mut RuntimeEnvironmentStore,
+    selector: &str,
+    endpoint: &str,
+) -> Result<KnownRuntimeEnvironment, String> {
+    let normalized = parse_endpoint_input(endpoint)?;
+    let environment_id = resolve_environment(store, selector)?.id.clone();
+    let environment = store
+        .environments
+        .iter_mut()
+        .find(|environment| environment.id == environment_id)
+        .ok_or_else(|| format!("Unknown environment: {selector}"))?;
+    let preferred_endpoint_id = environment.preferred_endpoint_id.clone();
+    // Mirrors runtime_environment_pairing_for_selector so the edited endpoint is
+    // the one the dial path actually uses.
+    let index = environment
+        .endpoints
+        .iter()
+        .position(|endpoint| endpoint.id == preferred_endpoint_id)
+        .or_else(|| {
+            environment
+                .endpoints
+                .iter()
+                .position(|endpoint| endpoint.kind == "websocket")
+        })
+        .ok_or_else(|| "Runtime environment has no WebSocket endpoint.".to_string())?;
+    environment.endpoints[index].endpoint = normalized;
+    environment.updated_at = current_time_millis();
+    Ok(environment.clone())
+}
+
 fn resolve_environment<'a>(
     store: &'a RuntimeEnvironmentStore,
     selector: &str,
@@ -986,6 +1069,97 @@ mod tests {
         let code = URL_SAFE_NO_PAD.encode(payload.as_bytes());
         assert!(parse_pairing_code(&format!("pebble://pairing?code={code}")).is_err());
         assert!(parse_pairing_code(&format!("orca://pairing?code={code}")).is_err());
+    }
+
+    fn store_with_environment(endpoint: &str) -> RuntimeEnvironmentStore {
+        RuntimeEnvironmentStore {
+            version: 1,
+            environments: vec![create_environment_from_pairing_offer(
+                "env-1".to_string(),
+                "Dev box".to_string(),
+                1000,
+                PairingOffer {
+                    v: 2,
+                    endpoint: endpoint.to_string(),
+                    device_token: "secret-token".to_string(),
+                    public_key_b64: "secret-key".to_string(),
+                },
+            )],
+        }
+    }
+
+    #[test]
+    fn updates_saved_endpoint_in_place() {
+        let mut store = store_with_environment("ws://192.168.1.9:6768");
+        let updated =
+            apply_endpoint_update(&mut store, "env-1", " ws://192.168.1.42:6768 ").unwrap();
+        assert_eq!(updated.endpoints[0].endpoint, "ws://192.168.1.42:6768");
+        assert_eq!(
+            store.environments[0].endpoints[0].endpoint,
+            "ws://192.168.1.42:6768"
+        );
+        assert_eq!(store.environments[0].endpoints.len(), 1);
+        assert_eq!(store.environments[0].preferred_endpoint_id, "ws-env-1");
+        assert!(store.environments[0].updated_at >= 1000);
+    }
+
+    #[test]
+    fn coerces_http_endpoint_to_websocket_scheme() {
+        let mut store = store_with_environment("ws://192.168.1.9:6768");
+        apply_endpoint_update(&mut store, "Dev box", "http://192.168.1.42:6768").unwrap();
+        assert_eq!(
+            store.environments[0].endpoints[0].endpoint,
+            "ws://192.168.1.42:6768"
+        );
+        apply_endpoint_update(&mut store, "Dev box", "https://runtime.example.com").unwrap();
+        assert_eq!(
+            store.environments[0].endpoints[0].endpoint,
+            "wss://runtime.example.com"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_endpoint_and_leaves_store_untouched() {
+        let mut store = store_with_environment("ws://192.168.1.9:6768");
+        for invalid in [
+            "",
+            "   ",
+            "192.168.1.42:6768",
+            "ws://",
+            "ws://host name:6768",
+        ] {
+            assert!(apply_endpoint_update(&mut store, "env-1", invalid).is_err());
+        }
+        assert_eq!(
+            store.environments[0].endpoints[0].endpoint,
+            "ws://192.168.1.9:6768"
+        );
+    }
+
+    #[test]
+    fn preserves_pairing_secrets_across_endpoint_update() {
+        let mut store = store_with_environment("ws://192.168.1.9:6768");
+        let updated = apply_endpoint_update(&mut store, "env-1", "ws://192.168.1.42:6768").unwrap();
+        assert_eq!(updated.endpoints[0].device_token, "secret-token");
+        assert_eq!(updated.endpoints[0].public_key_b64, "secret-key");
+        assert_eq!(
+            store.environments[0].endpoints[0].device_token,
+            "secret-token"
+        );
+        assert_eq!(
+            store.environments[0].endpoints[0].public_key_b64,
+            "secret-key"
+        );
+        assert_eq!(store.environments[0].name, "Dev box");
+        assert_eq!(store.environments[0].created_at, 1000);
+    }
+
+    #[test]
+    fn rejects_endpoint_update_for_unknown_selector() {
+        let mut store = store_with_environment("ws://192.168.1.9:6768");
+        let error =
+            apply_endpoint_update(&mut store, "missing", "ws://192.168.1.42:6768").unwrap_err();
+        assert!(error.contains("Unknown environment"));
     }
 
     #[test]

@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ChevronDown,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
   Server,
@@ -46,6 +47,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '../ui/dialog'
+import { RuntimeEnvironmentAddressForm } from './RuntimeEnvironmentAddressForm'
 import { RuntimePairingUrlGenerator } from './RuntimePairingUrlGenerator'
 import { EphemeralVmRuntimesSection } from './EphemeralVmRuntimesSection'
 import {
@@ -65,6 +67,7 @@ type RuntimeEnvironmentsPaneProps = {
   switchRuntimeEnvironment: (environmentId: string | null) => Promise<boolean>
   canGeneratePairingUrl?: boolean
   allowLocalRuntime?: boolean
+  canEditServerAddress?: boolean
 }
 
 export type RuntimeHostDetails = {
@@ -243,11 +246,21 @@ function getRuntimeServerDotClass(state: RuntimeServerConnectionState): string {
   }
 }
 
+// Why: mirrors runtime_environment_pairing_for_selector so the address shown for editing
+// is the one the dial path uses, not just the first endpoint in the list.
+function getEditableEndpoint(environment: PublicKnownRuntimeEnvironment): string {
+  const endpoint =
+    environment.endpoints.find((entry) => entry.id === environment.preferredEndpointId) ??
+    environment.endpoints[0]
+  return endpoint?.endpoint ?? ''
+}
+
 export function RuntimeEnvironmentsPane({
   settings,
   switchRuntimeEnvironment,
   canGeneratePairingUrl = true,
-  allowLocalRuntime = true
+  allowLocalRuntime = true,
+  canEditServerAddress = true
 }: RuntimeEnvironmentsPaneProps): React.JSX.Element {
   const [environments, setEnvironments] = useState<PublicKnownRuntimeEnvironment[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -259,6 +272,8 @@ export function RuntimeEnvironmentsPane({
   const [switchingValue, setSwitchingValue] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null)
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null)
+  const [savingAddressId, setSavingAddressId] = useState<string | null>(null)
   const [pendingSwitchValue, setPendingSwitchValue] = useState<string | null>(null)
   const [pendingRemove, setPendingRemove] = useState<PublicKnownRuntimeEnvironment | null>(null)
   const [addServerFormOpen, setAddServerFormOpen] = useState(false)
@@ -277,7 +292,8 @@ export function RuntimeEnvironmentsPane({
     connectingId !== null ||
     switchingValue !== null ||
     removingId !== null ||
-    disconnectingId !== null
+    disconnectingId !== null ||
+    savingAddressId !== null
   const removingActiveServer = pendingRemove?.id === settings.activeRuntimeEnvironmentId
   const searchEntry = canGeneratePairingUrl
     ? getRuntimeEnvironmentsSearchEntry()
@@ -473,6 +489,44 @@ export function RuntimeEnvironmentsPane({
     } finally {
       if (mountedRef.current) {
         setIsSaving(false)
+      }
+    }
+  }
+
+  const saveEnvironmentAddress = async (
+    environment: PublicKnownRuntimeEnvironment,
+    endpoint: string
+  ): Promise<void> => {
+    setSavingAddressId(environment.id)
+    try {
+      // Why: the runtime moved, the pairing did not. updateEndpoint rewrites only
+      // the address and keeps the device token and server key intact.
+      await window.api.runtimeEnvironments.updateEndpoint({
+        selector: environment.id,
+        endpoint
+      })
+      if (mountedRef.current) {
+        setEditingAddressId(null)
+      }
+      await loadEnvironments()
+      if (mountedRef.current) {
+        toast.success(
+          translate(
+            'auto.components.settings.RuntimeEnvironmentsPane.updatedServerAddress',
+            'Updated the address for {{value0}}.',
+            { value0: environment.name }
+          )
+        )
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to update the server address.'
+      if (mountedRef.current) {
+        toast.error(message)
+      }
+    } finally {
+      if (mountedRef.current) {
+        setSavingAddressId(null)
       }
     }
   }
@@ -866,7 +920,9 @@ export function RuntimeEnvironmentsPane({
                 <div
                   key={environment.id}
                   data-settings-section={environment.id}
-                  className="flex items-center gap-3 px-4 py-3"
+                  // Why: flex-wrap lets the inline address editor take a full-width
+                  // second line under the row without nesting another container.
+                  className="flex flex-wrap items-center gap-3 px-4 py-3"
                 >
                   {(() => {
                     const details = detailsByEnvironmentId[environment.id]
@@ -879,7 +935,8 @@ export function RuntimeEnvironmentsPane({
                       connectingId === environment.id ||
                       switchingValue === environment.id ||
                       disconnectingId === environment.id ||
-                      removingId === environment.id
+                      removingId === environment.id ||
+                      savingAddressId === environment.id
                     return (
                       <>
                         <Server className="size-4 shrink-0 text-muted-foreground" />
@@ -962,6 +1019,36 @@ export function RuntimeEnvironmentsPane({
                               )}
                             </Button>
                           )}
+                          {canEditServerAddress ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                setEditingAddressId((current) =>
+                                  current === environment.id ? null : environment.id
+                                )
+                              }
+                              className="size-7 text-muted-foreground"
+                              disabled={isBusy}
+                              aria-expanded={editingAddressId === environment.id}
+                              aria-label={translate(
+                                'auto.components.settings.RuntimeEnvironmentsPane.editServerAddress',
+                                'Edit address for {{value0}}',
+                                { value0: environment.name }
+                              )}
+                              title={translate(
+                                'auto.components.settings.RuntimeEnvironmentsPane.editAddress',
+                                'Edit address'
+                              )}
+                            >
+                              {savingAddressId === environment.id ? (
+                                <Loader2 className="size-3 animate-spin" />
+                              ) : (
+                                <Pencil className="size-3" />
+                              )}
+                            </Button>
+                          ) : null}
                           <Button
                             type="button"
                             variant="ghost"
@@ -985,6 +1072,17 @@ export function RuntimeEnvironmentsPane({
                             )}
                           </Button>
                         </div>
+                        {canEditServerAddress && editingAddressId === environment.id ? (
+                          <RuntimeEnvironmentAddressForm
+                            environmentId={environment.id}
+                            currentEndpoint={getEditableEndpoint(environment)}
+                            isSaving={savingAddressId === environment.id}
+                            onCancel={() => setEditingAddressId(null)}
+                            onSave={(endpoint) =>
+                              void saveEnvironmentAddress(environment, endpoint)
+                            }
+                          />
+                        ) : null}
                       </>
                     )
                   })()}

@@ -338,6 +338,7 @@ pub fn run() {
             commands::preflight::preflight_hydrate_shell_path,
             commands::runtime_environments::runtime_environments_add_from_pairing_code,
             commands::runtime_environments::runtime_environments_update_pairing_code,
+            commands::runtime_environments::runtime_environments_update_endpoint,
             commands::runtime_environments::runtime_environments_call,
             commands::runtime_environments::runtime_environments_disconnect,
             commands::runtime_environments::runtime_environments_list,

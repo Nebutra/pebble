@@ -18,6 +18,8 @@ import {
   type DirEntry
 } from './remote-file-browser-helpers'
 import { browseRuntimeServerDirectory } from '@/runtime/runtime-server-directory-browser'
+import { clearRuntimeCompatibilityCache } from '@/runtime/runtime-rpc-client'
+import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 
 type RemoteFileBrowserProps = (
@@ -117,29 +119,42 @@ export function RemoteFileBrowser({
     [invalidateBrowseRequests]
   )
 
+  const refreshRuntimeEnvironmentStatus = useAppStore((s) => s.refreshRuntimeEnvironmentStatus)
+
   const fetchListing = useCallback(
     async (dirPath: string): Promise<BrowseResult> => {
       const cached = listingCacheRef.current.get(dirPath)
       if (cached) {
         return cached
       }
-      const result = targetId
-        ? await window.api.ssh.browseDir({ targetId, dirPath })
-        : await browseRuntimeServerDirectory(
-            requireRuntimeEnvironmentId(runtimeEnvironmentId),
-            dirPath
-          )
-      listingCacheRef.current.set(result.resolvedPath, result)
-      // Also cache under the requested dirPath when it differs from the
-      // server-resolved canonical path (e.g. `~`, `~/foo`, or a relative
-      // input). Without this, the next identical request would miss the
-      // cache and re-hit the SSH backend.
-      if (dirPath !== result.resolvedPath) {
-        listingCacheRef.current.set(dirPath, result)
+      try {
+        const result = targetId
+          ? await window.api.ssh.browseDir({ targetId, dirPath })
+          : await browseRuntimeServerDirectory(
+              requireRuntimeEnvironmentId(runtimeEnvironmentId),
+              dirPath
+            )
+        listingCacheRef.current.set(result.resolvedPath, result)
+        // Also cache under the requested dirPath when it differs from the
+        // server-resolved canonical path (e.g. `~`, `~/foo`, or a relative
+        // input). Without this, the next identical request would miss the
+        // cache and re-hit the SSH backend.
+        if (dirPath !== result.resolvedPath) {
+          listingCacheRef.current.set(dirPath, result)
+        }
+        return result
+      } catch (err) {
+        // Why: a failed remote browse means the host is not actually reachable for
+        // RPC; clear the false-Connected health and compat cache so the host
+        // picker stops disagreeing with the browser error.
+        if (runtimeEnvironmentId) {
+          clearRuntimeCompatibilityCache(runtimeEnvironmentId)
+          void refreshRuntimeEnvironmentStatus(runtimeEnvironmentId)
+        }
+        throw err
       }
-      return result
     },
-    [runtimeEnvironmentId, targetId]
+    [refreshRuntimeEnvironmentStatus, runtimeEnvironmentId, targetId]
   )
 
   const loadDir = useCallback(

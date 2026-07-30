@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { invoke } from '@tauri-apps/api/core'
 import type { PreloadApi } from '../../../packages/product-core/shared/preload-api-types'
-import { createPebbleRuntimeApi } from './pebble-tauri-runtime-control-api'
+import {
+  createPebbleRuntimeApi,
+  createPebbleRuntimeEnvironmentsApi
+} from './pebble-tauri-runtime-control-api'
 import { deliverRuntimeBrowserDriver } from './tauri-runtime-browser-driver-relay'
 
 const { readReposMock, readWorktreesMock, emitActivateWorktreeMock, requestRuntimeJsonMock } =
@@ -670,5 +674,52 @@ describe('createPebbleRuntimeApi', () => {
       '/v1/providers/gitlab/auth-diagnostic'
     ])
   })
+})
 
+describe('createPebbleRuntimeEnvironmentsApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('probes the selected remote environment via status.get (not local runtime status)', async () => {
+    const remoteStatus = {
+      runtimeProtocolVersion: 3,
+      hostPlatform: 'linux',
+      capabilities: ['files.browseServerDir']
+    }
+    vi.mocked(invoke).mockResolvedValueOnce({
+      id: 'rpc-1',
+      ok: true,
+      result: remoteStatus,
+      _meta: { runtimeId: 'env-air' }
+    })
+    const api = createPebbleRuntimeEnvironmentsApi({} as PreloadApi['runtimeEnvironments'])
+
+    await expect(api.getStatus({ selector: 'env-air', timeoutMs: 7_000 })).resolves.toMatchObject({
+      ok: true,
+      result: remoteStatus
+    })
+    expect(invoke).toHaveBeenCalledWith('runtime_environments_call', {
+      input: {
+        selector: 'env-air',
+        method: 'status.get',
+        timeoutMs: 7_000
+      }
+    })
+  })
+
+  it('maps transport failures to remote_runtime_unavailable for getStatus', async () => {
+    vi.mocked(invoke).mockRejectedValueOnce(
+      new Error('Could not connect to the remote Pebble runtime.')
+    )
+    const api = createPebbleRuntimeEnvironmentsApi({} as PreloadApi['runtimeEnvironments'])
+
+    await expect(api.getStatus({ selector: 'env-air' })).resolves.toMatchObject({
+      ok: false,
+      error: {
+        code: 'remote_runtime_unavailable',
+        message: 'Could not connect to the remote Pebble runtime.'
+      }
+    })
+  })
 })

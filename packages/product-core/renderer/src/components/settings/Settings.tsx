@@ -1432,6 +1432,9 @@ function Settings(): React.JSX.Element {
                       switchRuntimeEnvironment={switchRuntimeEnvironment}
                       canGeneratePairingUrl={!isWebClient}
                       allowLocalRuntime={!isWebClient}
+                      // Why: the web client has no saved-server store to rewrite;
+                      // editing an address is a desktop-only repair path.
+                      canEditServerAddress={!isWebClient}
                     />
                   ) : null}
                 </SettingsSection>
