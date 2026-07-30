@@ -174,6 +174,9 @@ function delay(ms: number): Promise<void> {
 }
 
 function parseRuntimeJsonResult<T>(result: RuntimeResourceGetResult): T {
+  if (result.transport === 'http-error') {
+    throw new Error(readRuntimeHttpError(result.body, result.httpStatus))
+  }
   if (result.transport !== 'connected') {
     throw new Error(result.error ?? `Runtime transport failed: ${result.transport}`)
   }
@@ -184,6 +187,21 @@ function parseRuntimeJsonResult<T>(result: RuntimeResourceGetResult): T {
     throw new Error('Runtime returned an empty JSON response.')
   }
   return JSON.parse(result.body) as T
+}
+
+function readRuntimeHttpError(body: string | null, status: number | null): string {
+  if (body) {
+    try {
+      const payload = JSON.parse(body) as { error?: unknown }
+      if (typeof payload.error === 'string' && payload.error.trim()) {
+        return payload.error
+      }
+    } catch {
+      return body
+    }
+    return body
+  }
+  return status === null ? 'Runtime request failed.' : `Runtime request failed with HTTP ${status}`
 }
 
 export function hasTauriInternals(): boolean {

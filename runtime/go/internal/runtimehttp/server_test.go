@@ -1033,6 +1033,35 @@ func TestWorktreeDeleteEndpoint(t *testing.T) {
 	}
 }
 
+func TestWorktreeDeleteEndpointRejectsMainWorktree(t *testing.T) {
+	manager, err := runtimecore.NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProjectWithMainWorktree(context.Background(), runtimecore.CreateProjectRequest{
+		Name: "repo", Path: t.TempDir(), Provider: "folder",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	worktree := manager.ListWorktrees(project.ID)[0]
+	server := NewServer(manager)
+
+	req := httptest.NewRequest(http.MethodDelete, "/v1/worktrees/"+worktree.ID, strings.NewReader(`{"executeGit":true}`))
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "main worktree cannot be deleted; remove the project instead") {
+		t.Fatalf("unexpected main-worktree error: %s", rec.Body.String())
+	}
+	if worktrees := manager.ListWorktrees(project.ID); len(worktrees) != 1 {
+		t.Fatalf("main worktree record was removed: %#v", worktrees)
+	}
+}
+
 func TestBrowserTabDeleteEndpoint(t *testing.T) {
 	manager, err := runtimecore.NewManager(t.TempDir(), nil)
 	if err != nil {

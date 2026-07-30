@@ -125,7 +125,7 @@ func (s *processSession) write(req SessionInputRequest) error {
 	}
 	text := req.Text
 	if req.AppendNewline {
-		text += "\n"
+		text += platformSessionNewline()
 	}
 	_, err := io.WriteString(stdin, text)
 	return err

@@ -24,6 +24,11 @@
 - Startup keeps the oldest project and same-path worktree, then rewrites typed
   persisted project/worktree references before serving requests.
 - Migration never removes filesystem directories or Git worktrees.
+- The runtime derives `isMainWorktree` from the normalized project/worktree
+  paths when listing worktrees; legacy persisted rows are not trusted to carry
+  that flag.
+- Main-worktree deletion is rejected by the runtime even when a stale client
+  submits it, and non-2xx JSON error messages survive the Rust/Tauri transport.
 - When restored `activeRepoId` conflicts with the owner of
   `activeWorktreeId`, the available worktree owner is authoritative.
 
@@ -51,6 +56,9 @@
   canonical worktree layout.
 - Go: equal SSH paths on different hosts remain separate.
 - Renderer: repository refresh selects the active worktree's available owner.
+- Desktop/runtime: the repository root maps to `isMainWorktree: true`, cannot be
+  deleted as a worktree, and surfaces the runtime's typed error instead of a
+  generic transport failure.
 - Run `go test ./internal/runtimecore/...`, focused renderer Vitest, desktop
   typecheck, `go vet ./...`, and `git diff --check`.
 

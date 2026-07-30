@@ -5,6 +5,7 @@ package runtimecore
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,12 @@ import (
 
 	terminalpty "github.com/aymanbagabas/go-pty"
 )
+
+func platformSessionNewline() string {
+	// Why: ConPTY consumes virtual-terminal input, where Enter is carriage return;
+	// a bare line feed is rendered by cmd.exe without submitting the command.
+	return "\r"
+}
 
 func startPlatformProcessSession(ctx context.Context, session *processSession, req StartSessionRequest) error {
 	launchCommand := req.launchCommand
@@ -66,7 +73,7 @@ func startPlatformProcessSession(ctx context.Context, session *processSession, r
 	}
 	session.mu.Lock()
 	session.pid = cmd.Process.Pid
-	session.stdin = pty
+	session.stdin = windowsSessionInput(pty)
 	session.waitProcess = cmd.Wait
 	session.killProcess = func() error {
 		// Why: ConPTY commands can own descendants; killing only cmd.exe leaves
@@ -86,6 +93,15 @@ func startPlatformProcessSession(ctx context.Context, session *processSession, r
 	go session.readStream("stdout", pty)
 	go session.wait()
 	return nil
+}
+
+func windowsSessionInput(pty terminalpty.Pty) io.WriteCloser {
+	if conPty, ok := pty.(terminalpty.ConPty); ok {
+		// Why: stop closes stdin before killing the process. Closing the whole
+		// ConPTY here would make wait cleanup close its native handle twice.
+		return conPty.InputPipe()
+	}
+	return pty
 }
 
 func resolveWindowsPtyExecutable(command string) string {

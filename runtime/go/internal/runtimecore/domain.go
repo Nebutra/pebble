@@ -281,6 +281,7 @@ type Worktree struct {
 	InstanceID     string `json:"instanceId,omitempty"`
 	ProjectID      string `json:"projectId"`
 	Path           string `json:"path"`
+	IsMainWorktree bool   `json:"isMainWorktree,omitempty"`
 	Branch         string `json:"branch,omitempty"`
 	Base           string `json:"base,omitempty"`
 	CreatedBaseSHA string `json:"createdBaseSha,omitempty"`

@@ -10,6 +10,12 @@ import (
 	"testing"
 )
 
+type recordingSessionInput struct {
+	strings.Builder
+}
+
+func (*recordingSessionInput) Close() error { return nil }
+
 func testEchoCommand() []string {
 	if runtime.GOOS == "windows" {
 		return testWindowsShellCommand("/d", "/s", "/c", "echo pebble")
@@ -68,5 +74,21 @@ func TestProcessSessionWaitForExitHandlingObservesCompletion(t *testing.T) {
 	session := &processSession{exitHandled: exitHandled}
 	if !session.waitForExitHandling(context.Background()) {
 		t.Fatal("completed exit handling was not observed")
+	}
+}
+
+func TestProcessSessionWriteUsesPlatformEnterSequence(t *testing.T) {
+	input := &recordingSessionInput{}
+	session := &processSession{stdin: input, status: SessionRunning}
+
+	if err := session.write(SessionInputRequest{Text: "echo pebble", AppendNewline: true}); err != nil {
+		t.Fatal(err)
+	}
+	want := "echo pebble\n"
+	if runtime.GOOS == "windows" {
+		want = "echo pebble\r"
+	}
+	if got := input.String(); got != want {
+		t.Fatalf("session input = %q, want %q", got, want)
 	}
 }

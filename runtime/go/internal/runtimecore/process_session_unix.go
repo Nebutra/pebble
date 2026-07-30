@@ -9,6 +9,10 @@ import (
 	terminalpty "github.com/creack/pty"
 )
 
+func platformSessionNewline() string {
+	return "\n"
+}
+
 func startPlatformProcessSession(ctx context.Context, session *processSession, req StartSessionRequest) error {
 	launchCommand := req.launchCommand
 	if len(launchCommand) == 0 {

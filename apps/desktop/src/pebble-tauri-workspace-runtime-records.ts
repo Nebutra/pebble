@@ -33,6 +33,7 @@ export type PebbleRuntimeWorktree = {
   instanceId?: string
   projectId: string
   path: string
+  isMainWorktree?: boolean
   branch?: string
   base?: string
   createdBaseSha?: string
@@ -110,7 +111,7 @@ export function mapRuntimeWorktreeToWorktree(worktree: PebbleRuntimeWorktree): W
     branch: worktree.branch ?? '',
     isBare: false,
     isSparse: false,
-    isMainWorktree: false,
+    isMainWorktree: worktree.isMainWorktree ?? false,
     displayName: worktree.displayName || pathBasename(worktree.path),
     comment: worktree.comment ?? '',
     linkedIssue: worktree.linkedIssue ?? null,

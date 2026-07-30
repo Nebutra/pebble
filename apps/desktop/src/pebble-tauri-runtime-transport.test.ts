@@ -188,6 +188,21 @@ describe('Pebble runtime readiness coordinator', () => {
     expect(bridge.startRuntimeProcess).not.toHaveBeenCalled()
   })
 
+  it('surfaces the runtime JSON error for HTTP failures', async () => {
+    bridge.probeRuntimeStatus.mockResolvedValue({ transport: 'connected', body: '{}' })
+    bridge.requestRuntimeResourceJson.mockResolvedValue({
+      transport: 'http-error',
+      httpStatus: 400,
+      body: '{"error":"main worktree cannot be deleted; remove the project instead"}',
+      error: null
+    })
+    const { requestRuntimeJson } = await import('./pebble-tauri-runtime-transport')
+
+    await expect(requestRuntimeJson('/v1/worktrees/wt-main', { method: 'DELETE' })).rejects.toThrow(
+      'main worktree cannot be deleted; remove the project instead'
+    )
+  })
+
   it('recovers the process without replaying an unreachable write', async () => {
     bridge.probeRuntimeStatus
       .mockResolvedValueOnce({ transport: 'connected', body: '{}' })

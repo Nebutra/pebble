@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,6 +50,7 @@ func TestLegacySharedControlRuntimeScopeClonesAndRemovesRealGitWorktree(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer manager.Shutdown()
 	pairing, err := manager.CreateLegacySharedControlPairing("git-runtime", "runtime", false)
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +85,7 @@ func TestLegacySharedControlRuntimeScopeClonesAndRemovesRealGitWorktree(t *testi
 			"displayName": "Universe", "comment": "created remotely", "isPinned": true,
 			"sparseCheckout": map[string]interface{}{"directories": []string{"src"}, "presetId": "frontend"},
 			"runHooks":       true,
-			"startupCommand": `printf "$PEBBLE_TEST_STARTUP" > startup-ran.txt`,
+			"startupCommand": runtimeRPCStartupMarkerCommand(),
 			"startupEnv":     map[string]string{"PEBBLE_TEST_STARTUP": "started"},
 			"startupAgent":   "codex",
 		},
@@ -119,7 +122,7 @@ func TestLegacySharedControlRuntimeScopeClonesAndRemovesRealGitWorktree(t *testi
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		output, err := os.ReadFile(startupPath)
-		if err == nil && string(output) == "started" {
+		if err == nil && strings.TrimSpace(string(output)) == "started" {
 			break
 		}
 		if time.Now().After(deadline) {
@@ -149,6 +152,13 @@ func TestLegacySharedControlRuntimeScopeClonesAndRemovesRealGitWorktree(t *testi
 	if _, err := os.Stat(worktreePath); !os.IsNotExist(err) {
 		t.Fatalf("git worktree directory still exists: %v", err)
 	}
+}
+
+func runtimeRPCStartupMarkerCommand() string {
+	if runtime.GOOS == "windows" {
+		return `echo %PEBBLE_TEST_STARTUP%> startup-ran.txt`
+	}
+	return `printf "$PEBBLE_TEST_STARTUP" > startup-ran.txt`
 }
 
 func stringPointer(value string) *string {

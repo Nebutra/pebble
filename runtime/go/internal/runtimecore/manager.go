@@ -1029,6 +1029,11 @@ func (m *Manager) ListWorktrees(projectID string) []Worktree {
 	worktrees := make([]Worktree, 0, len(m.worktrees))
 	for _, worktree := range m.worktrees {
 		if projectID == "" || worktree.ProjectID == projectID {
+			if project, ok := m.projects[worktree.ProjectID]; ok {
+				// Why: legacy records did not persist this flag; derive it from the
+				// runtime-owned project identity so stale renderers cannot delete the clone root.
+				worktree.IsMainWorktree = worktreePathMatchesProject(worktree, project)
+			}
 			worktrees = append(worktrees, worktree)
 		}
 	}
@@ -1119,6 +1124,9 @@ func (m *Manager) DeleteWorktree(ctx context.Context, id string, req DeleteWorkt
 		return DeleteWorktreeResponse{}, ErrNotFound
 	}
 	m.mu.RUnlock()
+	if worktreePathMatchesProject(worktree, project) {
+		return DeleteWorktreeResponse{}, errors.New("main worktree cannot be deleted; remove the project instead")
+	}
 	var preserved *PreservedWorktreeBranch
 	if req.ExecuteGit {
 		result, err := removeLocalGitWorktree(ctx, project, worktree, req)

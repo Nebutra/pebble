@@ -23,8 +23,30 @@ func TestCreateProjectWithMainWorktreeRegistersRepositoryRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	worktrees := manager.ListWorktrees(project.ID)
-	if len(worktrees) != 1 || worktrees[0].Path != project.Path || worktrees[0].Branch != "main" {
+	if len(worktrees) != 1 || worktrees[0].Path != project.Path || worktrees[0].Branch != "main" || !worktrees[0].IsMainWorktree {
 		t.Fatalf("unexpected main worktree: %#v", worktrees)
+	}
+}
+
+func TestDeleteWorktreeRejectsRepositoryRoot(t *testing.T) {
+	repo := t.TempDir()
+	manager, err := NewManager(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := manager.CreateProjectWithMainWorktree(context.Background(), CreateProjectRequest{
+		Path: repo, LocationKind: "local", Provider: "folder",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	worktree := manager.ListWorktrees(project.ID)[0]
+
+	if _, err := manager.DeleteWorktree(context.Background(), worktree.ID, DeleteWorktreeRequest{}); err == nil || err.Error() != "main worktree cannot be deleted; remove the project instead" {
+		t.Fatalf("expected main-worktree rejection, got %v", err)
+	}
+	if worktrees := manager.ListWorktrees(project.ID); len(worktrees) != 1 {
+		t.Fatalf("main worktree record was removed: %#v", worktrees)
 	}
 }
 
