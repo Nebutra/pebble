@@ -7,7 +7,7 @@ disagree, this file wins.
 
 Platform-side counterpart: `docs/DOMAINS.md` in `Nebutra/Nebutra-Sailor`.
 
-Frozen: 2026-07-27 (issue #41). Live cutover: 2026-07-30 — brand front on Vercel + CF CNAME; API on ECS `/pebble/*`.
+Frozen: 2026-07-27 (issue #41). Live cutover: 2026-07-30 — brand front on **ECS** (CF A → origin); API on ECS `/pebble/*`.
 
 ---
 
@@ -15,8 +15,8 @@ Frozen: 2026-07-27 (issue #41). Live cutover: 2026-07-30 — brand front on Verc
 
 ```
 Cloudflare (DNS · CDN · WAF · edge Workers, :443)
-  ├─ Vercel      — Git-native frontends: landing, docs, pebble brand front
-  └─ ECS origin  — 106.15.4.31: app / auth / api / sso / router / forge
+  ├─ Vercel / Workers — marketing landing, sailor-docs
+  └─ ECS origin 106.15.4.31 — app / auth / api / sso / router / forge / **pebble**
 ```
 
 | Host | Role | Runtime | Port |
@@ -28,7 +28,7 @@ Cloudflare (DNS · CDN · WAF · edge Workers, :443)
 | `app.nebutra.com` | App RP | ECS PM2 | 443 |
 | `auth.nebutra.com` | Login / session authority | ECS PM2 | 443 |
 | `sso.nebutra.com` | OIDC issuer — **no path prefix, do not casually migrate** | ECS PM2 | 443 |
-| `pebble.nebutra.com` | **Pebble brand front** — landing / download / docs redirect | Vercel (CF CNAME) | 443 |
+| `pebble.nebutra.com` | **Pebble brand front** — landing / download / feeds / docs redirect | **ECS PM2 :3017** (CF A `106.15.4.31` proxied) | 443 |
 
 The ECS origin IP is never exposed to clients; all public traffic terminates at
 Cloudflare.
@@ -42,12 +42,12 @@ Pebble-owned host; everything transactional runs on shared platform hosts.
 
 | Capability | Host + path | Notes |
 |------------|-------------|-------|
-| Landing / download | `https://pebble.nebutra.com` | Static + redirects only, no backend |
-| Docs / help | `https://docs.nebutra.com/pebble/…` | Canonical. `pebble.nebutra.com/docs/*` 301s here |
-| Feedback | `POST https://api.nebutra.com/pebble/v1/feedback` | Direct handler, no redirect |
-| Diagnostics | `POST https://api.nebutra.com/pebble/diagnostics/{token,upload,delete/:ticketId}` | Same host for token + upload |
+| Landing / download | `https://pebble.nebutra.com` | Next brand front on ECS (`apps/pebble` in Sailor monorepo). No product DB. |
+| Docs / help | `https://docs.nebutra.com/pebble/…` | Canonical. `pebble.nebutra.com/docs/*` nginx-301s here |
+| Feedback | `POST https://api.nebutra.com/pebble/v1/feedback` | Direct handler, no redirect. Brand host also reverse-proxies `POST /v1/feedback` for legacy clients. |
+| Diagnostics | `POST https://api.nebutra.com/pebble/diagnostics/{token,upload,delete/:ticketId}` | Same host for token + upload. Brand host proxies `/diagnostics/*` for legacy. |
 | Status | `https://status.nebutra.com` | Must stay reachable when `api` is impaired |
-| Changelog / nudge feeds | GitHub Releases (`github.com/nebutra/pebble/releases`) | Mirrored, never redirected |
+| Changelog / nudge feeds | `https://pebble.nebutra.com/whats-new/{changelog,nudge}.json` | Served by brand front (no client redirects). Release *artifacts* stay on GitHub. |
 | Staging | **no host** | Env / secrets / project isolation, not a subdomain |
 
 **Do not** create `api.pebble.*`, `status.pebble.*`, `staging.pebble.*`,
