@@ -6418,7 +6418,9 @@ const checks = [
     name: 'Tauri feedback uses a bounded native host submission instead of the web fallback',
     file: 'apps/desktop/src-tauri/src/commands/feedback.rs',
     expect: (text) =>
-      text.includes('const FEEDBACK_API_URL: &str = "https://pebble.nebutra.com/v1/feedback"') &&
+      text.includes(
+        'const FEEDBACK_API_URL: &str = "https://api.nebutra.com/pebble/v1/feedback"'
+      ) &&
       text.includes('Duration::from_secs(10)') &&
       text.includes('fn sanitize_identity') &&
       text.includes('if anonymous') &&
