@@ -7,7 +7,7 @@ disagree, this file wins.
 
 Platform-side counterpart: `docs/DOMAINS.md` in `Nebutra/Nebutra-Sailor`.
 
-Frozen: 2026-07-27 (issue #41).
+Frozen: 2026-07-27 (issue #41). Live cutover: 2026-07-30 — brand front on Vercel + CF CNAME; API on ECS `/pebble/*`.
 
 ---
 

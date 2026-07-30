@@ -11,7 +11,7 @@ telemetry ingestion service.
 | Desktop errors and crash issues | Sentry Cloud | Rust project `pebble-desktop` |
 | Startup performance and release health | Sentry Cloud | 5% startup trace sample, application sessions |
 | Session replay | None | Disabled; no renderer replay SDK is bundled |
-| Ordinary user feedback | Pebble API | `POST https://pebble.nebutra.com/v1/feedback` |
+| Ordinary user feedback | Platform API | `POST https://api.nebutra.com/pebble/v1/feedback` |
 | Reviewed standalone diagnostic uploads | Pebble API and private storage | `/diagnostics/token`, `/upload`, and `/delete/:ticketId` |
 
 `telemetry.pebble.nebutra.com` remains reserved for a future first-party proxy or

@@ -1,8 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tauri::AppHandle;
+use uuid::Uuid;
 
-const FEEDBACK_API_URL: &str = "https://pebble.nebutra.com/v1/feedback";
+/// Canonical support intake on the shared platform API host.
+/// Brand-front rewrites still accept legacy `pebble.nebutra.com/v1/feedback`
+/// for one release cycle of older builds.
+const FEEDBACK_API_URL: &str = "https://api.nebutra.com/pebble/v1/feedback";
 const FEEDBACK_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_FEEDBACK_CHARS: usize = 64 * 1024;
 const MAX_IDENTITY_CHARS: usize = 320;
@@ -31,16 +35,16 @@ pub enum FeedbackSubmitResult {
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
 struct FeedbackSubmitBody {
-    feedback: String,
-    submission_type: &'static str,
-    github_login: Option<String>,
-    github_email: Option<String>,
+    submission_id: String,
+    kind: &'static str,
+    message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    contact_email: Option<String>,
     app_version: String,
     platform: String,
-    os_release: String,
-    arch: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    locale: Option<String>,
 }
 
 #[tauri::command]
@@ -76,15 +80,17 @@ fn build_submit_body(
         input.github_login,
         input.github_email,
     )?;
+    // Why: contact is optional support metadata; GitHub login is not part of the
+    // platform intake schema and is intentionally dropped at this boundary.
+    let _github_login = identity.0;
     Ok(FeedbackSubmitBody {
-        feedback,
-        submission_type: "feedback",
-        github_login: identity.0,
-        github_email: identity.1,
+        submission_id: format!("desk_{}", Uuid::new_v4()),
+        kind: "feedback",
+        message: feedback,
+        contact_email: identity.1,
         app_version: app.package_info().version.to_string(),
         platform: node_platform().to_string(),
-        os_release: sysinfo::System::kernel_version().unwrap_or_else(|| "unknown".to_string()),
-        arch: node_arch().to_string(),
+        locale: None,
     })
 }
 
