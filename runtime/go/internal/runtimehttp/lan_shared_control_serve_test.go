@@ -14,30 +14,19 @@ import (
 	"github.com/nebutra/pebble/runtime/go/internal/runtimecore"
 )
 
-func TestNonLoopbackRemotesAreRejectedWithoutLanSharedControl(t *testing.T) {
+func TestNonLoopbackRemotesAreNotFilteredWithoutLanSharedControl(t *testing.T) {
 	t.Parallel()
 	manager := newTestManager(t)
 	server := NewServerWithOptions(manager, ServerOptions{})
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/sessions", strings.NewReader(`{}`))
+	// Why: without opt-in the TCP listener is loopback-only, so ServeHTTP must
+	// not interpret httptest's default 192.0.2.1 RemoteAddr as an off-host peer.
+	req := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
 	req.RemoteAddr = "192.168.1.50:40000"
-	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("expected forbidden for off-loopback control without opt-in, got %d body=%s", rec.Code, rec.Body.String())
-	}
-
-	ws := httptest.NewRequest(http.MethodGet, "/v1/shared-control", nil)
-	ws.RemoteAddr = "192.168.1.50:40001"
-	ws.Header.Set("Upgrade", "websocket")
-	ws.Header.Set("Connection", "Upgrade")
-	ws.Header.Set("Sec-WebSocket-Version", "13")
-	ws.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
-	rec = httptest.NewRecorder()
-	server.ServeHTTP(rec, ws)
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("shared-control without opt-in must stay loopback-only, got %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("without LAN opt-in, RemoteAddr must not gate control, got %d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

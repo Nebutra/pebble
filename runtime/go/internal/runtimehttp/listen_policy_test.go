@@ -12,6 +12,7 @@ func TestRequestFromLoopback(t *testing.T) {
 		remote string
 		want   bool
 	}{
+		{"", true}, // in-process / httptest
 		{"127.0.0.1:54321", true},
 		{"[::1]:54321", true},
 		{"192.168.1.20:54321", false},
@@ -20,8 +21,54 @@ func TestRequestFromLoopback(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
 		req.RemoteAddr = tc.remote
 		if got := requestFromLoopback(req); got != tc.want {
-			t.Fatalf("remote %s: got %v want %v", tc.remote, got, tc.want)
+			t.Fatalf("remote %q: got %v want %v", tc.remote, got, tc.want)
 		}
+	}
+}
+
+func TestHttptestAndEmptyRemoteAddrKeepControlPlaneWithoutLanOptIn(t *testing.T) {
+	t.Parallel()
+	manager := newTestManager(t)
+	server := NewServerWithOptions(manager, ServerOptions{})
+
+	// httptest.NewRequest defaults RemoteAddr to 192.0.2.1:1234 (TEST-NET).
+	req := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("httptest default RemoteAddr must not 403 without LAN opt-in, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	// Explicit empty RemoteAddr (in-process relay style).
+	empty := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
+	empty.RemoteAddr = ""
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, empty)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("empty RemoteAddr must keep local control plane, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestLanOptInStillForbidsControlForNonLoopbackRemote(t *testing.T) {
+	t.Parallel()
+	manager := newTestManager(t)
+	server := NewServerWithOptions(manager, ServerOptions{AllowNonLoopbackSharedControl: true})
+
+	// Empty RemoteAddr is in-process trust even with LAN opt-in (provider relay).
+	empty := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
+	empty.RemoteAddr = ""
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, empty)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("empty RemoteAddr with LAN opt-in must stay allowed, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	remote := httptest.NewRequest(http.MethodGet, "/v1/status", nil)
+	remote.RemoteAddr = "192.168.1.50:9"
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, remote)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("concrete non-loopback remote must stay forbidden with LAN opt-in, got %d", rec.Code)
 	}
 }
 

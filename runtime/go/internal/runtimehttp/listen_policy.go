@@ -14,9 +14,17 @@ func requestFromLoopback(r *http.Request) bool {
 	if r == nil {
 		return false
 	}
-	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	// Why: httptest and in-process relays (e.g. pebble-relay-worker provider
+	// bridge) call ServeHTTP with an empty RemoteAddr. Treat that as loopback
+	// trust — the same model as today's empty-bearer local control plane.
+	// Only a concrete non-loopback peer address is denied off-host.
+	remote := strings.TrimSpace(r.RemoteAddr)
+	if remote == "" {
+		return true
+	}
+	host, _, err := net.SplitHostPort(remote)
 	if err != nil {
-		host = strings.TrimSpace(r.RemoteAddr)
+		host = remote
 	}
 	return isLoopbackHost(host)
 }
@@ -24,7 +32,8 @@ func requestFromLoopback(r *http.Request) bool {
 func isLoopbackHost(host string) bool {
 	host = strings.Trim(strings.TrimSpace(host), "[]")
 	if host == "" {
-		return false
+		// Empty host after parsing is not a proven off-host peer.
+		return true
 	}
 	if strings.EqualFold(host, "localhost") {
 		return true

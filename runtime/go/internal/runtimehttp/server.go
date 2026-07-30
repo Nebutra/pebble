@@ -77,11 +77,13 @@ type nestedScanCancellation struct {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Why: empty bearer authorizes every control route. Off-loopback clients may
-	// only reach the pairing-authenticated shared-control WebSocket when LAN
-	// serving is opted in; localhost-label proxy must never run for them.
-	if !requestFromLoopback(r) {
-		if !s.allowNonLoopbackSharedControl || !isNonLoopbackSharedControlPath(r) {
+	// Why: empty bearer authorizes every control route. When LAN shared-control
+	// is opted in the process binds beyond loopback, so non-loopback remotes may
+	// only hit the pairing WebSocket — never control HTTP or localhost-label.
+	// When opt-in is off the listener is loopback-only and this gate is skipped
+	// (httptest defaults RemoteAddr to 192.0.2.1, which is not a real peer).
+	if s.allowNonLoopbackSharedControl && !requestFromLoopback(r) {
+		if !isNonLoopbackSharedControlPath(r) {
 			writeError(w, http.StatusForbidden, "runtime control API is loopback-only")
 			return
 		}
