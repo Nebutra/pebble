@@ -38,9 +38,20 @@ path to Tauri. The private key contents are never passed to Tauri or written to
 the repository.
 
 The Windows leg requires `WINDOWS_CERTIFICATE` and
-`WINDOWS_CERTIFICATE_PASSWORD`. Maintainers should also configure the
+`WINDOWS_CERTIFICATE_PASSWORD` (base64-encoded Authenticode code-signing
+`.pfx` plus password). Maintainers should also configure the
 `PEBBLE_WINDOWS_EXPECTED_SIGNERS` and `PEBBLE_WINDOWS_EXPECTED_THUMBPRINTS`
 Actions variables used by artifact inspection.
+
+### macOS import path
+
+The workflow runs `config/scripts/import-tauri-macos-certificate.sh` before
+packaging. It decodes `MAC_CERTS` into a throwaway keychain and exports
+`APPLE_SIGNING_IDENTITY` / `PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY` so
+`beforeBuildCommand` (computer-use helper codesign) can resolve the identity
+before Tauri seals the outer app. The p12 must contain a
+**Developer ID Application** certificate, not only Apple Development or
+App Store Distribution.
 
 ## Trust And Verification
 
