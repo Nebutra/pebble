@@ -3049,6 +3049,9 @@ func TestGitDiffReadsUnstagedPatch(t *testing.T) {
 	runGitCommand(t, repo, "init")
 	runGitCommand(t, repo, "config", "user.email", "dev@example.test")
 	runGitCommand(t, repo, "config", "user.name", "Dev")
+	// Why: Windows runners default to core.autocrlf=true, so checkout/discard
+	// rewrites LF fixtures to CRLF and breaks exact content assertions.
+	runGitCommand(t, repo, "config", "core.autocrlf", "false")
 	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("one\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

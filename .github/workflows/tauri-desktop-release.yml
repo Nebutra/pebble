@@ -56,7 +56,9 @@ jobs:
             rust_targets: ''
             asset_pattern: pebble-linux-x86_64[ext]
           - label: linux-arm64
-            os: ubuntu-24.04-arm
+            # Why: 24.04-arm links against GLIBC_2.39; release gate requires 2.35
+            # (Ubuntu 22.04) so installers run on older distros.
+            os: ubuntu-22.04-arm
             platform: linux
             target_triple: aarch64-unknown-linux-gnu
             target_release_dir: release
