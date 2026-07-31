@@ -774,12 +774,17 @@ fn validate_upload_url(upload_url: &str, token_endpoint: &str) -> Result<(), Str
 }
 
 fn resolve_delete_endpoint(token_endpoint: &str, ticket_id: &str) -> Result<String, String> {
-    let parsed_token = reqwest::Url::parse(token_endpoint)
+    let mut parsed_token = reqwest::Url::parse(token_endpoint)
         .map_err(|_| "invalid tokenEndpoint configuration".to_string())?;
-    parsed_token
-        .join(&format!("/diagnostics/delete/{ticket_id}"))
-        .map(|url| url.to_string())
-        .map_err(|_| "invalid tokenEndpoint configuration".to_string())
+    // Token endpoints are `.../diagnostics/token` (or `.../pebble/diagnostics/token`).
+    // Absolute-path joins like `/diagnostics/delete/...` would drop the `/pebble`
+    // prefix on the API host — keep the directory of the token path.
+    let base_path = parsed_token
+        .path()
+        .trim_end_matches('/')
+        .trim_end_matches("/token");
+    parsed_token.set_path(&format!("{base_path}/delete/{ticket_id}"));
+    Ok(parsed_token.to_string())
 }
 
 fn confirm_bundle_upload(bundle: &PendingDiagnosticBundle) -> bool {
