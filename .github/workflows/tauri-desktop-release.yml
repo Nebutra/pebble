@@ -205,6 +205,17 @@ jobs:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: ./config/scripts/import-tauri-windows-certificate.ps1
 
+      # Explicit keychain import so beforeBuildCommand (computer-use codesign)
+      # sees Developer ID Application before tauri-action's own import path.
+      - name: Import macOS release certificate
+        if: matrix.platform == 'macos'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.MAC_CERTS }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          MAC_CERTS: ${{ secrets.MAC_CERTS }}
+          MAC_CERTS_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+        run: bash config/scripts/import-tauri-macos-certificate.sh
+
       - name: Prepare App Store Connect API key
         if: matrix.platform == 'macos'
         env:
@@ -230,6 +241,7 @@ jobs:
           APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
           APPLE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
           PEBBLE_MAC_RELEASE: ${{ matrix.platform == 'macos' && '1' || '' }}
           TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -271,6 +283,9 @@ jobs:
           APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
           APPLE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
+          PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY: ${{ env.PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY }}
+          CSC_NAME: ${{ env.CSC_NAME }}
           PEBBLE_MAC_RELEASE: ${{ matrix.platform == 'macos' && '1' || '' }}
         with:
           projectPath: apps/desktop
@@ -282,7 +297,9 @@ jobs:
           releaseAssetNamePattern: ${{ matrix.asset_pattern }}
           tagName: ${{ inputs.upload_to_github_release && inputs.release_tag || '' }}
           releaseName: Pebble ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
-          releaseDraft: true
+          # Existing published release may already hold Linux assets; stay non-draft
+          # when re-uploading so mac/win can attach to the same tag.
+          releaseDraft: ${{ contains(github.event_name == 'push' && github.ref_name || inputs.release_tag, '-rc.') }}
           prerelease: ${{ contains(github.event_name == 'push' && github.ref_name || inputs.release_tag, '-rc.') }}
           retryAttempts: 2
 

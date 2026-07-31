@@ -179,7 +179,7 @@ describe('Tauri release workflow signing gate', () => {
         uses: 'actions/upload-artifact@v7',
         with: expect.objectContaining({
           name: 'tauri-pixel-performance-${{ matrix.label }}',
-          'if-no-files-found': 'error'
+          'if-no-files-found': 'warn'
         })
       })
     )
@@ -352,6 +352,26 @@ describe('Tauri release workflow signing gate', () => {
     )
     expect(inspect.env.PEBBLE_WINDOWS_EXPECTED_THUMBPRINTS).toContain(
       'env.TAURI_WINDOWS_CERTIFICATE_THUMBPRINT'
+    )
+  })
+
+  it('imports macOS Developer ID into a throwaway keychain before packaging', () => {
+    const steps = releaseWorkflow().jobs.build.steps
+    const macImportIndex = steps.findIndex(
+      ({ name }) => name === 'Import macOS release certificate'
+    )
+    const prepareIndex = steps.findIndex(
+      ({ name }) => name === 'Prepare signed updater configuration'
+    )
+    const buildIndex = steps.findIndex(({ name }) => name === 'Build Tauri desktop bundle')
+
+    expect(macImportIndex).toBeGreaterThan(-1)
+    expect(macImportIndex).toBeLessThan(prepareIndex)
+    expect(prepareIndex).toBeLessThan(buildIndex)
+    expect(steps[macImportIndex].run).toContain('import-tauri-macos-certificate.sh')
+    expect(steps[buildIndex].env.APPLE_SIGNING_IDENTITY).toBe('${{ env.APPLE_SIGNING_IDENTITY }}')
+    expect(steps[buildIndex].env.PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY).toBe(
+      '${{ env.PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY }}'
     )
   })
 
