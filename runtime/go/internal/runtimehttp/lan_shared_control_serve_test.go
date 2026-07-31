@@ -174,7 +174,14 @@ func TestStartWithOptionsLanSharedControlBindAndLayering(t *testing.T) {
 		t.Logf("LAN shared-control dial incomplete on %s (%v); bind ownership check already passed", lanHost, err)
 		return
 	}
-	_, _ = io.Copy(io.Discard, wsResp.Body)
+	// Why: a successful websocket upgrade leaves a live body stream. Draining it
+	// with io.Copy hangs forever on hosted runners (package timeout 10m). Only
+	// peek a bounded payload for non-upgrade responses.
+	if wsResp.StatusCode == http.StatusSwitchingProtocols {
+		_ = wsResp.Body.Close()
+		return
+	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(wsResp.Body, 1024))
 	_ = wsResp.Body.Close()
 	if wsResp.StatusCode == http.StatusForbidden {
 		t.Fatalf("LAN shared-control must be admitted past the loopback gate, got %d", wsResp.StatusCode)
