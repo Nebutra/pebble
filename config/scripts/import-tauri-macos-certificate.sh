@@ -46,11 +46,16 @@ if [[ ! -s "$CERT_PATH" ]]; then
   exit 1
 fi
 
-# Best-effort type probe (never print private material).
+# Best-effort type probe: subject only — never dump key material or full PEM.
 if command -v openssl >/dev/null 2>&1; then
-  if ! openssl pkcs12 -in "$CERT_PATH" -passin "pass:${CERT_PASSWORD}" -nokeys -info -legacy 2>/dev/null \
-    | head -n 40 \
-    | sed 's/^/[pkcs12] /'; then
+  subject="$(
+    openssl pkcs12 -in "$CERT_PATH" -passin "pass:${CERT_PASSWORD}" -nokeys -clcerts -legacy 2>/dev/null \
+      | openssl x509 -noout -subject 2>/dev/null \
+      || true
+  )"
+  if [[ -n "$subject" ]]; then
+    echo "[pkcs12] $subject"
+  else
     echo "[pkcs12] openssl probe failed (wrong password or not a PKCS#12 file)." >&2
   fi
 fi
