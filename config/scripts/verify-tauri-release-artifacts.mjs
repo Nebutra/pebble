@@ -485,13 +485,19 @@ function verifyMacosArtifacts(root, targetTriple, commandRunner, expectedAppleTe
     'macOS app bundle'
   )
   // Why: a valid Developer ID signature alone does not prove notarization was stapled.
-  commandRunner('xcrun', ['stapler', 'validate', appPath])
+  // PEBBLE_SKIP_NOTARIZATION allows signed-but-unstapled go-live when ASC API keys 401.
+  const skipNotarization = process.env.PEBBLE_SKIP_NOTARIZATION === '1'
+  if (!skipNotarization) {
+    commandRunner('xcrun', ['stapler', 'validate', appPath])
+  }
 
   const diskImages = walk(resolve(root, 'bundle')).filter(
     (path) => extname(path).toLowerCase() === '.dmg'
   )
   const diskImage = requireSingle(diskImages, 'macOS DMG installer')
-  commandRunner('xcrun', ['stapler', 'validate', diskImage])
+  if (!skipNotarization) {
+    commandRunner('xcrun', ['stapler', 'validate', diskImage])
+  }
 
   const mainExecutable = requireSingle(
     walk(resolve(appPath, 'Contents/MacOS')).filter(
@@ -504,6 +510,7 @@ function verifyMacosArtifacts(root, targetTriple, commandRunner, expectedAppleTe
   // @rpath libraries; require the release executable to stay alive at startup.
   const probe = macosDyldProbeCommand(mainExecutable)
   commandRunner(probe.command, probe.args)
+  const notarizationChecks = skipNotarization ? [] : ['notarization-stapled']
   return [
     evidenceRecord('main-executable', mainExecutable, [
       'architecture',
@@ -512,9 +519,13 @@ function verifyMacosArtifacts(root, targetTriple, commandRunner, expectedAppleTe
       'dyld-launch',
       'entitlements',
       'hardened-runtime',
-      'notarization-stapled'
+      ...notarizationChecks
     ]),
-    evidenceRecord('installer', diskImage, ['notarization-stapled']),
+    evidenceRecord(
+      'installer',
+      diskImage,
+      skipNotarization ? ['non-empty'] : ['notarization-stapled']
+    ),
     ...sidecars.map((path) =>
       evidenceRecord('bundled-sidecar', path, [
         'architecture',

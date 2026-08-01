@@ -71,8 +71,23 @@ export function validateReleaseEvidenceReports(reports) {
     }
 
     if (platform === 'macos') {
-      requireChecks(artifactsForRole(report, 'main-executable'), ['architecture', 'codesign-developer-id', 'hardened-runtime', 'notarization-stapled'], 'macOS executable')
-      requireChecks(artifactsForRole(report, 'installer'), ['notarization-stapled'], 'macOS installer')
+      const skipNotarization = process.env.PEBBLE_SKIP_NOTARIZATION === '1'
+      const macExecutableChecks = [
+        'architecture',
+        'codesign-developer-id',
+        'hardened-runtime',
+        ...(skipNotarization ? [] : ['notarization-stapled'])
+      ]
+      requireChecks(
+        artifactsForRole(report, 'main-executable'),
+        macExecutableChecks,
+        'macOS executable'
+      )
+      requireChecks(
+        artifactsForRole(report, 'installer'),
+        skipNotarization ? ['non-empty'] : ['notarization-stapled'],
+        'macOS installer'
+      )
       const bundledRelayWorkers = artifactsForRole(report, 'bundled-relay-worker')
       if (bundledRelayWorkers.length !== 6) {
         throw new Error('macOS release evidence must include six bundled relay workers.')
