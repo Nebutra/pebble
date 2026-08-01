@@ -19,6 +19,10 @@ export function prepareMacosBundleResources({
       stdio: 'inherit'
     })
 
+  // Why: universal packaging only lipos the main package binary; secondary
+  // cargo bins (e.g. pebble-updater-signature-verifier) must be lipo'd into
+  // universal-apple-darwin/release before Tauri copies them into the bundle.
+  runNodeScript(resolve(desktopRoot, 'scripts/prepare-macos-universal-package-bins.mjs'))
   runNodeScript(resolve(desktopRoot, 'scripts/stage-macos-speech-libraries.mjs'))
   // Why: the helper must carry its dedicated entitlements before Tauri seals
   // the outer app; copying it after bundling invalidates notarization ownership.

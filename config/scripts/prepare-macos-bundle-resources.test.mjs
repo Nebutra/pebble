@@ -13,6 +13,7 @@ describe('macOS Tauri bundle resource preparation', () => {
       prepareMacosBundleResources({ desktopRoot, environment, platform: 'darwin', run })
     ).toEqual({ prepared: true })
     expect(run.mock.calls.map(([, [path]]) => path)).toEqual([
+      resolve(desktopRoot, 'scripts/prepare-macos-universal-package-bins.mjs'),
       resolve(desktopRoot, 'scripts/stage-macos-speech-libraries.mjs'),
       resolve(desktopRoot, '../../config/scripts/build-computer-macos.mjs')
     ])
