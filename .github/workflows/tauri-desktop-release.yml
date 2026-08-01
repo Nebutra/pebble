@@ -282,16 +282,20 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}
           APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS_PASSWORD || '' }}
-          APPLE_API_KEY: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY || '' }}
-          APPLE_API_ISSUER: ${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
-          APPLE_API_KEY_PATH: ${{ matrix.platform == 'macos' && env.APPLE_API_KEY_PATH || '' }}
-          APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
-          APPLE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          # Notarization is currently skipped: App Store Connect API credentials
+          # return HTTP 401. Ship Developer-ID-signed installers; re-enable by
+          # restoring APPLE_API_KEY / ISSUER / KEY_PATH after secrets are rotated.
+          APPLE_API_KEY: ''
+          APPLE_API_ISSUER: ''
+          APPLE_API_KEY_PATH: ''
+          APPLE_ID: ''
+          APPLE_PASSWORD: ''
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
           PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY: ${{ env.PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY }}
           CSC_NAME: ${{ env.CSC_NAME }}
           PEBBLE_MAC_RELEASE: ${{ matrix.platform == 'macos' && '1' || '' }}
+          PEBBLE_SKIP_NOTARIZATION: '1'
         with:
           projectPath: apps/desktop
           tauriScript: pnpm exec tauri
@@ -329,6 +333,7 @@ jobs:
           TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
           PEBBLE_WINDOWS_EXPECTED_SIGNERS: ${{ vars.PEBBLE_WINDOWS_EXPECTED_SIGNERS }}
           PEBBLE_WINDOWS_EXPECTED_THUMBPRINTS: ${{ matrix.platform == 'windows' && env.TAURI_WINDOWS_CERTIFICATE_THUMBPRINT || vars.PEBBLE_WINDOWS_EXPECTED_THUMBPRINTS }}
+          PEBBLE_SKIP_NOTARIZATION: ${{ matrix.platform == 'macos' && '1' || '' }}
         run: >-
           node config/scripts/verify-tauri-release-artifacts.mjs
           --platform ${{ matrix.platform }}
