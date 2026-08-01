@@ -7,11 +7,14 @@
  * Lipo every secondary package binary that exists for both slices so bundling
  * can proceed. No-op when not building universal or when slices are missing.
  */
-import { existsSync, mkdirSync, readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import process from 'node:process'
 
+// Only package secondary cargo bins we know must ship next to the main app.
+// Do not scan the release dir — it contains directories like `binaries/` that
+// lipo cannot open (`can't map input file: .../release/binaries`).
 const SECONDARY_BINARIES = ['pebble-updater-signature-verifier']
 
 export function prepareMacosUniversalPackageBins({ desktopRoot, platform = process.platform }) {
@@ -30,9 +33,12 @@ export function prepareMacosUniversalPackageBins({ desktopRoot, platform = proce
 
   mkdirSync(universalDir, { recursive: true })
   const lipo = []
-  for (const name of discoverSecondaryBinaries(armDir, intelDir)) {
+  for (const name of SECONDARY_BINARIES) {
     const arm = resolve(armDir, name)
     const intel = resolve(intelDir, name)
+    if (!isRegularFile(arm) || !isRegularFile(intel)) {
+      continue
+    }
     const out = resolve(universalDir, name)
     const result = spawnSync('lipo', ['-create', '-output', out, arm, intel], {
       encoding: 'utf8'
@@ -47,17 +53,8 @@ export function prepareMacosUniversalPackageBins({ desktopRoot, platform = proce
   return { prepared: lipo.length > 0, lipo }
 }
 
-function discoverSecondaryBinaries(armDir, intelDir) {
-  const known = SECONDARY_BINARIES.filter(
-    (name) => existsSync(resolve(armDir, name)) && existsSync(resolve(intelDir, name))
-  )
-  // Also pick up any future src/bin/* that cargo placed in both slices.
-  const extras = readdirSync(armDir)
-    .filter((name) => !name.includes('.') && !name.startsWith('deps') && !name.startsWith('build'))
-    .filter((name) => name !== 'pebble-desktop-tauri')
-    .filter((name) => existsSync(resolve(intelDir, name)))
-    .filter((name) => !known.includes(name))
-  return [...new Set([...known, ...extras])]
+function isRegularFile(path) {
+  return existsSync(path) && statSync(path).isFile()
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
