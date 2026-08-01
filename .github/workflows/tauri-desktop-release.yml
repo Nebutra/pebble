@@ -216,8 +216,10 @@ jobs:
           MAC_CERTS_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
         run: bash config/scripts/import-tauri-macos-certificate.sh
 
+      # Notarization credentials currently 401; do not materialize the p8 key or
+      # export APPLE_API_KEY_PATH — empty strings still make Tauri attempt notary.
       - name: Prepare App Store Connect API key
-        if: matrix.platform == 'macos'
+        if: false
         env:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: node config/scripts/prepare-apple-api-key.mjs
@@ -235,14 +237,10 @@ jobs:
         env:
           APPLE_CERTIFICATE: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}
           APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS_PASSWORD || '' }}
-          APPLE_API_KEY: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY || '' }}
-          APPLE_API_ISSUER: ${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
-          APPLE_API_KEY_PATH: ${{ matrix.platform == 'macos' && env.APPLE_API_KEY_PATH || '' }}
-          APPLE_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}
-          APPLE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
           PEBBLE_MAC_RELEASE: ${{ matrix.platform == 'macos' && '1' || '' }}
+          PEBBLE_SKIP_NOTARIZATION: ${{ matrix.platform == 'macos' && '1' || '' }}
           TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -282,14 +280,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}
           APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS_PASSWORD || '' }}
-          # Notarization is currently skipped: App Store Connect API credentials
-          # return HTTP 401. Ship Developer-ID-signed installers; re-enable by
-          # restoring APPLE_API_KEY / ISSUER / KEY_PATH after secrets are rotated.
-          APPLE_API_KEY: ''
-          APPLE_API_ISSUER: ''
-          APPLE_API_KEY_PATH: ''
-          APPLE_ID: ''
-          APPLE_PASSWORD: ''
+          # Omit APPLE_API_* / APPLE_ID entirely — empty strings still make Tauri
+          # attempt notarytool and fail with HTTP 401 on bad ASC credentials.
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
           PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY: ${{ env.PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY }}
