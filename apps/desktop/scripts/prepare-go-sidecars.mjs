@@ -60,10 +60,12 @@ function buildSidecar(binary, triple) {
     const intel = sidecarPath(binary, 'x86_64-apple-darwin')
     buildGo(binary, arm, 'darwin', 'arm64')
     buildGo(binary, intel, 'darwin', 'amd64')
+    // Why: `tauri build --target universal-apple-darwin` compiles each slice
+    // separately and resolves externalBin as `<name>-<slice-triple>`. Deleting
+    // the arch binaries after lipo made release packaging fail with
+    // `resource path binaries/pebble-runtime-aarch64-apple-darwin doesn't exist`.
     const output = sidecarPath(binary, triple)
     run('lipo', ['-create', '-output', output, arm, intel])
-    rmSync(arm, { force: true })
-    rmSync(intel, { force: true })
     return
   }
   const resolved = goTarget(triple)
