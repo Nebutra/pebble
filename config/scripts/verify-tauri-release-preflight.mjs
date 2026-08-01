@@ -93,6 +93,14 @@ export function validateMacosReleaseEnvironment(environment) {
     throw new Error(`Missing macOS signing environment: ${missing.join(', ')}.`)
   }
 
+  // Go-live path: Developer ID codesign only when ASC notary credentials 401.
+  if (environment.PEBBLE_SKIP_NOTARIZATION === '1') {
+    if (environment.PEBBLE_MAC_RELEASE !== '1') {
+      throw new Error('PEBBLE_MAC_RELEASE must be 1 for hardened-runtime helper signing.')
+    }
+    return
+  }
+
   const apiValues = appleApiNotarizationEnvironment.filter((name) =>
     hasEnvironmentVariable(environment, name)
   )
