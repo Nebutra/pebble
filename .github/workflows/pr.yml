@@ -95,6 +95,13 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Why: tauri build.rs compiles native/zig-system; without zig on PATH the
+      # shell build fails with "failed to build Zig system library" (os error 2).
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+
       - name: Build Tauri desktop shell
         run: pnpm build:tauri:no-bundle
 
