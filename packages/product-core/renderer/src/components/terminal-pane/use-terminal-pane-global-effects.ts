@@ -119,6 +119,8 @@ export function useTerminalPaneGlobalEffects({
     if (!manager) {
       return
     }
+    // Why (#66 / Orca #12061): hidden managers must not join global atlas fanout.
+    manager.setAtlasRecoveryVisible?.(rendererVisible)
     const wasVisible = wasVisibleRef.current
     const wasWorktreeActive = wasWorktreeActiveRef.current
     isActiveRef.current = isActive

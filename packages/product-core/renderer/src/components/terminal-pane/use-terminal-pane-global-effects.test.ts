@@ -672,7 +672,7 @@ describe('useTerminalPaneGlobalEffects', () => {
     expect(mocks.enforceTerminalCurrentScrollIntent).toHaveBeenLastCalledWith(terminalA)
   })
 
-  it('clears WebGL texture atlases when the active visible terminal regains focus', () => {
+  it('preserves WebGL texture atlases when the active visible terminal regains focus', () => {
     const manager = {
       getPanes: vi.fn(() => []),
       resumeRendering: vi.fn(),
@@ -682,8 +682,7 @@ describe('useTerminalPaneGlobalEffects', () => {
       getActivePane: vi.fn(() => null)
     }
 
-    // Why: focus recovery resets every registered manager (shared glyph
-    // atlas), so the fake manager observes the reset through the registry.
+    // Why (#66 / Orca #12061): plain focus keeps the warm shared glyph atlas.
     registerManagerForReset(manager)
     beginHookRender()
     useTerminalPaneGlobalEffects({
@@ -711,9 +710,11 @@ describe('useTerminalPaneGlobalEffects', () => {
       throw new Error('expected focus listener')
     }
     manager.resetWebglTextureAtlases.mockClear()
+    manager.scheduleRevealRepaint.mockClear()
     listener(new Event('focus'))
 
-    expect(manager.resetWebglTextureAtlases).toHaveBeenCalledTimes(1)
+    expect(manager.resetWebglTextureAtlases).not.toHaveBeenCalled()
+    expect(manager.scheduleRevealRepaint).toHaveBeenCalledTimes(1)
   })
 
   it('recovers visible terminal rendering and input when the window regains focus', () => {
@@ -757,6 +758,7 @@ describe('useTerminalPaneGlobalEffects', () => {
     manager.resumeRendering.mockClear()
     manager.resetWebglTextureAtlases.mockClear()
     manager.refreshAllPanes.mockClear()
+    manager.scheduleRevealRepaint.mockClear()
     mocks.fitAndFocusPanes.mockClear()
     mocks.flushTerminalOutput.mockClear()
     mocks.requestTerminalBacklogRecovery.mockClear()
@@ -767,11 +769,13 @@ describe('useTerminalPaneGlobalEffects', () => {
     expect(mocks.flushTerminalOutput).toHaveBeenCalledWith(terminal, { maxChars: 64 * 1024 })
     expect(manager.resumeRendering).toHaveBeenCalledTimes(1)
     expect(mocks.fitAndFocusPanes).toHaveBeenCalledWith(manager)
-    expect(manager.resetWebglTextureAtlases).toHaveBeenCalledTimes(1)
-    expect(manager.refreshAllPanes).toHaveBeenCalledTimes(1)
+    // Why (#66): focus recovery must not wipe the shared atlas.
+    expect(manager.resetWebglTextureAtlases).not.toHaveBeenCalled()
+    expect(manager.refreshAllPanes).not.toHaveBeenCalled()
+    expect(manager.scheduleRevealRepaint).toHaveBeenCalledTimes(1)
   })
 
-  it('clears WebGL texture atlases when the active visible terminal document becomes visible', () => {
+  it('preserves WebGL texture atlases when the active terminal document becomes visible', () => {
     let visibilityState: DocumentVisibilityState = 'hidden'
     const documentListeners = new Map<string, EventListenerOrEventListenerObject>()
     vi.stubGlobal('document', {
@@ -819,6 +823,7 @@ describe('useTerminalPaneGlobalEffects', () => {
       throw new Error('expected visibilitychange listener')
     }
     manager.resetWebglTextureAtlases.mockClear()
+    manager.scheduleRevealRepaint.mockClear()
     siblingManager.resetWebglTextureAtlases.mockClear()
     listener(new Event('visibilitychange'))
     expect(manager.resetWebglTextureAtlases).not.toHaveBeenCalled()
@@ -827,8 +832,10 @@ describe('useTerminalPaneGlobalEffects', () => {
     visibilityState = 'visible'
     listener(new Event('visibilitychange'))
 
-    expect(manager.resetWebglTextureAtlases).toHaveBeenCalledTimes(1)
-    expect(siblingManager.resetWebglTextureAtlases).toHaveBeenCalledTimes(1)
+    // Why (#66 / Orca #12061): fullscreen visibility returns preserve atlases.
+    expect(manager.resetWebglTextureAtlases).not.toHaveBeenCalled()
+    expect(siblingManager.resetWebglTextureAtlases).not.toHaveBeenCalled()
+    expect(manager.scheduleRevealRepaint).toHaveBeenCalledTimes(1)
   })
 
   it('registers document visibility recovery for visible inactive terminals but not hidden ones', () => {

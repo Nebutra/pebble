@@ -28,9 +28,13 @@ export function useTerminalWindowWakeRecovery({
       cancelAnimationFrame(wakeRecoveryFrameId)
       wakeRecoveryFrameId = null
     }
-    const recoverVisibleWake = (): void => {
+    let settledClearGlyphAtlases = false
+    const recoverVisibleWake = (clearGlyphAtlases: boolean): void => {
       // Focus and visibility often fire together; keep one immediate recovery and one settled RAF pass.
       if (wakeRecoveryFrameId !== null) {
+        // Why: a pending settled pass may only upgrade in strength — a plain
+        // focus that lands after a genuine wake must not skip its atlas clear.
+        settledClearGlyphAtlases ||= clearGlyphAtlases
         return
       }
       const manager = managerRef.current
@@ -39,27 +43,35 @@ export function useTerminalWindowWakeRecovery({
       }
       recoverVisibleTerminalWindowWake({
         manager,
-        isActive: isActiveRef.current
+        isActive: isActiveRef.current,
+        clearGlyphAtlases
       })
       if (typeof requestAnimationFrame !== 'function') {
         return
       }
+      settledClearGlyphAtlases = clearGlyphAtlases
       wakeRecoveryFrameId = requestAnimationFrame(() => {
         wakeRecoveryFrameId = null
+        const clearGlyphAtlasesOnSettle = settledClearGlyphAtlases
+        settledClearGlyphAtlases = false
         const settledManager = managerRef.current
         if (!settledManager || !isVisibleRef.current) {
           return
         }
         recoverVisibleTerminalWindowWake({
           manager: settledManager,
-          isActive: isActiveRef.current
+          isActive: isActiveRef.current,
+          clearGlyphAtlases: clearGlyphAtlasesOnSettle
         })
       })
     }
-    const onFocus = (): void => recoverVisibleWake()
+    // Why (#66 / Orca #12061): plain refocus and fullscreen visibility returns
+    // keep the warm shared glyph atlas. Wiping it on every Space swipe fans out
+    // global resets across dozens of managers and freezes the renderer.
+    const onFocus = (): void => recoverVisibleWake(false)
     const onVisibilityChange = (): void => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        recoverVisibleWake()
+        recoverVisibleWake(false)
       }
     }
     window.addEventListener('focus', onFocus)

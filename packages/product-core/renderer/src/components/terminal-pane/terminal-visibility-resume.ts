@@ -40,6 +40,12 @@ type HideTerminalVisibilityResult = {
 type RecoverVisibleTerminalWindowWakeArgs = {
   manager: PaneManager
   isActive: boolean
+  /**
+   * When true, wipe and rebuild the shared WebGL glyph atlas (genuine OS resume).
+   * Ordinary focus / fullscreen visibility returns leave the warm atlas intact
+   * so paired traffic cannot multiply global recovery (#66 / Orca #12061).
+   */
+  clearGlyphAtlases?: boolean
 }
 
 export function resumeTerminalVisibility({
@@ -120,7 +126,8 @@ export function hideTerminalVisibility({
 
 export function recoverVisibleTerminalWindowWake({
   manager,
-  isActive
+  isActive,
+  clearGlyphAtlases = true
 }: RecoverVisibleTerminalWindowWakeArgs): void {
   // Why: macOS screensaver/display wake can leave xterm visible but with a
   // stale renderer/input surface; Pebble's own hidden-state resume never runs.
@@ -135,7 +142,11 @@ export function recoverVisibleTerminalWindowWake({
     fitPanes(manager)
   }
   enforceTerminalViewportIntents(manager)
-  resetAndRefreshAllTerminalWebglAtlases()
+  // Why (#66): fullscreen Space / plain visibility returns must not wipe the
+  // shared atlas for every mounted manager; genuine OS resume still clears.
+  if (clearGlyphAtlases) {
+    resetAndRefreshAllTerminalWebglAtlases()
+  }
   manager.scheduleRevealRepaint()
 }
 

@@ -70,6 +70,8 @@ export class PaneManager {
   private styleOptions: PaneStyleOptions = {}
   private destroyed = false
   private renderingSuspended: boolean
+  /** Visible surfaces participate in heavy shared-atlas recovery (#66 / Orca #12061). */
+  private atlasRecoveryVisible: boolean
   private identities = new PaneIdentityRegistry()
   private pendingPaneReparentFrameIds = new Set<number>()
 
@@ -80,7 +82,8 @@ export class PaneManager {
     this.root = root
     this.options = options
     this.renderingSuspended = options.initialRenderingSuspended === true
-    // Why: atlas recovery must reach every live manager — see
+    this.atlasRecoveryVisible = !this.renderingSuspended
+    // Why: atlas recovery must reach every live *visible* manager — see
     // resetAllTerminalWebglAtlases for the shared-atlas rationale.
     registerLivePaneManager(this)
   }
@@ -320,6 +323,14 @@ export class PaneManager {
 
   resetWebglTextureAtlases(): void {
     resetPaneWebglTextureAtlases(this.panes.values())
+  }
+
+  setAtlasRecoveryVisible(visible: boolean): void {
+    this.atlasRecoveryVisible = visible
+  }
+
+  isVisibleForAtlasRecovery(): boolean {
+    return this.atlasRecoveryVisible && !this.destroyed
   }
 
   scheduleRevealRepaint(): void {

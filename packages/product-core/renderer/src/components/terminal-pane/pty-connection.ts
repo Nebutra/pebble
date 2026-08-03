@@ -4376,17 +4376,23 @@ export function connectPanePty(
       const renderRefreshDecision = foregroundOutput
         ? shouldForceForegroundRenderRefresh(data)
         : { refresh: false, inPlaceRewrite: false, recoverWebglAtlasAfterParse: false }
-      const recoverHiddenWebglAtlasAfterParse =
-        !foregroundOutput && hiddenOutputNeedsAtlasRecoveryAfterParse(data)
+      if (!foregroundOutput) {
+        // Why (#66 / Orca #12061): advance hidden rewrite state only; reveal owns
+        // atlas recovery so hidden TUI/synchronized storms do not fan out global
+        // resets across dozens of mounted managers.
+        void hiddenOutputNeedsAtlasRecoveryAfterParse(data)
+      }
       const recoverWebglAtlasAfterParse =
-        renderRefreshDecision.recoverWebglAtlasAfterParse || recoverHiddenWebglAtlasAfterParse
+        foreground && renderRefreshDecision.recoverWebglAtlasAfterParse
       // Why: atlas recovery must repaint from the parsed xterm buffer, not a
       // pre-write snapshot that a late TUI redraw can immediately stale.
-      const onParsedAtlasRecovery = recoverWebglAtlasAfterParse
-        ? scheduleTerminalWebglAtlasRecovery
-        : renderRefreshDecision.inPlaceRewrite
-          ? alternateScreenRewriteAtlasRecoveryOnParsed()
-          : undefined
+      const onParsedAtlasRecovery = foreground
+        ? recoverWebglAtlasAfterParse
+          ? scheduleTerminalWebglAtlasRecovery
+          : renderRefreshDecision.inPlaceRewrite
+            ? alternateScreenRewriteAtlasRecoveryOnParsed()
+            : undefined
+        : undefined
       const foregroundRenderRefreshNeeded = renderRefreshDecision.refresh
       // Why: see nativeWindowsRewriteNeedsFollowupRenderRefresh — Claude Code's
       // in-place prompt redraws on Windows ConPTY can paint one frame late, so a
