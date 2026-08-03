@@ -24,6 +24,7 @@ const useAppStoreMock = vi.fn(
       gitStatusByWorktree: Record<string, never[]>
       unifiedTabsByWorktree: Record<string, unknown[]>
       activeGroupIdByWorktree: Record<string, string>
+      agentStatusByPaneKey: Record<string, unknown>
       pinTab: typeof pinTabMock
       unpinTab: typeof unpinTabMock
       settings: {

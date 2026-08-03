@@ -59,6 +59,7 @@ const useAppStoreMock = vi.fn(
       activeTabType: 'terminal' | 'editor' | 'browser' | 'simulator' | null
       activeWorktreeId: string | null
       gitStatusByWorktree: Record<string, never[]>
+      agentStatusByPaneKey: Record<string, unknown>
       projects: typeof appStoreSnapshot.projects
       repos: { id: string; connectionId?: string | null }[]
       sshConnectionStates: Map<string, { remotePlatform?: NodeJS.Platform }>
