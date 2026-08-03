@@ -38,7 +38,7 @@ export function collectBrowserWebviewIds(
 // Why: guest-budget eviction destroys every guest a hidden worktree retains
 // while its tabs/pages stay in the store, so a revisit rebuilds from state.
 // Eviction is not a user close — re-remember zoom past the destroy-path forget
-// (#68 / Orca #12194).
+// (#68 / upstream #12194).
 export function destroyWorktreeBrowserGuests(
   browserTabsByWorktree: Record<string, BrowserWorkspace[]>,
   browserPagesByWorkspace: Record<string, BrowserPage[]>,

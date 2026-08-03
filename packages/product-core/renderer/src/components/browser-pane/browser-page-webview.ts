@@ -28,7 +28,7 @@ export function ensureBrowserPageWebview({
       (webview.parentElement !== container ||
         webview.getAttribute('partition') !== webviewPartition)
     ) {
-      // Why (#68 / Orca #12191): same-tab parent-drift rebuild must keep zoom.
+      // Why (#68 / upstream #12191): same-tab parent-drift rebuild must keep zoom.
       destroyPersistentWebview(browserTabId, { preserveViewport: true })
       webview = undefined
       const refreshedContainer = resolveContainer()
@@ -67,7 +67,7 @@ export function ensureBrowserPageWebview({
     webview &&
     (webview.parentElement !== container || webview.getAttribute('partition') !== webviewPartition)
   ) {
-    // Why (#68 / Orca #12191): same-tab parent-drift rebuild must keep zoom.
+    // Why (#68 / upstream #12191): same-tab parent-drift rebuild must keep zoom.
     destroyPersistentWebview(browserTabId, { preserveViewport: true })
     webview = undefined
     const refreshedContainer = resolveContainer()

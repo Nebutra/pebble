@@ -1752,7 +1752,7 @@ function Terminal(): React.JSX.Element | null {
   // BrowserPanes, and the eviction veto below must see them.
   useEffect(() => installBrowserPageDownloadActivityTracking(), [])
 
-  // Browser-guest retention budget (#68 / Orca #12194): hidden worktrees keep
+  // Browser-guest retention budget (#68 / upstream #12194): hidden worktrees keep
   // webview guests alive for instant revisits, but only the most recently
   // activated few. Older ones have every guest fully destroyed through the
   // sanctioned cleanup path; a revisit rebuilds guests from store state.

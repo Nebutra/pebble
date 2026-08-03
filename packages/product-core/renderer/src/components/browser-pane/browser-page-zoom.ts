@@ -79,7 +79,7 @@ export function setBrowserPageZoomLevel(
 // Why module-level: the guest webview outlives its React pane (a worktree
 // switch parks the viewport), so a pane-local ref re-seeds from the shared
 // Settings default on every remount and would hijack a tab the user already
-// zoomed (#68 / Orca #12191 · #10800).
+// zoomed (#68 / upstream #12191 · #10800).
 const explicitPaneZoomLevels = new Map<string, number>()
 
 /** Level this tab holds because the USER zoomed it, or null on the new-tab seed. */

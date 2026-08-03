@@ -2773,7 +2773,7 @@ function BrowserPagePane({
   const setBrowserDefaultZoomLevel = useAppStore((state) => state.setBrowserDefaultZoomLevel)
   const normalizedBrowserDefaultZoomLevel = normalizeBrowserPageZoomLevel(browserDefaultZoomLevel)
   const browserDefaultZoomPercent = browserPageZoomLevelToPercent(normalizedBrowserDefaultZoomLevel)
-  // Why (#68 / Orca #10800): the level THIS pane should hold. Seeded once from
+  // Why (#68 / upstream #10800): the level THIS pane should hold. Seeded once from
   // explicit user zoom or the configured default, and moved only by zooming
   // this pane — so a reload can't adopt another tab's zoom via the shared setting.
   const paneZoomLevelRef = useRef(
@@ -3733,7 +3733,7 @@ function BrowserPagePane({
       if (!queuedAnnotationViewportBridgeSync) {
         syncBrowserAnnotationViewportBridge()
       }
-      // Why (#68 / Orca #10800): Chromium restores per-origin zoom on reload, so
+      // Why (#68 / upstream #10800): Chromium restores per-origin zoom on reload, so
       // reassert THIS pane's level after every guest load. Uses the pane-local
       // level (not the shared setting) so reloading one tab never adopts a zoom
       // the user applied to a different tab.

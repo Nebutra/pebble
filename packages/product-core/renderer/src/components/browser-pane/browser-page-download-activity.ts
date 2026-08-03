@@ -2,7 +2,7 @@
 // while its worktree is hidden, but guest-budget eviction must know which
 // hidden pages are still writing downloads — main treats a guest unregister as
 // a tab close and cancels their active downloads, so eviction has to skip those
-// pages until they finish (#68 / Orca #12194).
+// pages until they finish (#68 / upstream #12194).
 const pageIdByActiveDownloadId = new Map<string, string>()
 const activeDownloadCountByPageId = new Map<string, number>()
 

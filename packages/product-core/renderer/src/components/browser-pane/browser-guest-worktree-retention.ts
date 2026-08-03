@@ -4,7 +4,7 @@ import type { BrowserPage, BrowserWorkspace } from '../../../../shared/types'
 // guest process per page alive purely for instant revisits, so guest memory
 // grew linearly with worktrees visited. Four hidden worktrees covers the
 // common switch-back working set; older ones are destroyed and rebuild from
-// persisted tab state on the next visit (#68 / Orca #12194).
+// persisted tab state on the next visit (#68 / upstream #12194).
 export const BROWSER_GUEST_HIDDEN_WORKTREE_RETENTION_LIMIT = 4
 
 /**

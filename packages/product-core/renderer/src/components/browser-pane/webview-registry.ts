@@ -202,7 +202,7 @@ export function destroyPersistentWebview(
   browserTabId: string,
   { preserveViewport = false }: { preserveViewport?: boolean } = {}
 ): void {
-  // Why (#68 / Orca #12191): only a real close forgets user zoom; preserveViewport
+  // Why (#68 / upstream #12191): only a real close forgets user zoom; preserveViewport
   // marks a same-tab rebuild (parent-drift repair) whose zoom must survive.
   if (!preserveViewport) {
     forgetExplicitBrowserPageZoomLevel(browserTabId)
