@@ -2625,6 +2625,7 @@ describe('web GitHub preload API', () => {
           branch: 'feature',
           linkedPRNumber: null,
           fallbackPRNumber: 9,
+          currentHeadOid: null,
           acceptMergedFallbackPR: true
         }
       }
