@@ -34,8 +34,6 @@ permissions:
 jobs:
   build:
     name: ${{ matrix.label }}
-    # Soft-launch: skip Windows matrix until WINDOWS_CERTIFICATE is configured.
-    if: matrix.platform != 'windows' || secrets.WINDOWS_CERTIFICATE != ''
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -67,14 +65,16 @@ jobs:
             args: --bundles deb
             rust_targets: ''
             asset_pattern: pebble-linux-aarch64[ext]
-          - label: windows-x64
-            os: windows-2022
-            platform: windows
-            target_triple: x86_64-pc-windows-msvc
-            target_release_dir: release
-            args: --bundles nsis,msi
-            rust_targets: ''
-            asset_pattern: pebble-windows-x86_64[setup][ext]
+          # Soft-launch: Windows Authenticode secrets are not configured yet.
+          # Re-enable when WINDOWS_CERTIFICATE + PASSWORD are set on the repo:
+          # - label: windows-x64
+          #   os: windows-2022
+          #   platform: windows
+          #   target_triple: x86_64-pc-windows-msvc
+          #   target_release_dir: release
+          #   args: --bundles nsis,msi
+          #   rust_targets: ''
+          #   asset_pattern: pebble-windows-x86_64[setup][ext]
 
     steps:
       - name: Checkout

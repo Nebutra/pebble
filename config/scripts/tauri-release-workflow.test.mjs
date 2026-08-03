@@ -56,8 +56,8 @@ describe('Tauri release workflow signing gate', () => {
     ).toEqual([
       ['macos-universal', 'macos', 'universal-apple-darwin'],
       ['linux-x64', 'linux', 'x86_64-unknown-linux-gnu'],
-      ['linux-arm64', 'linux', 'aarch64-unknown-linux-gnu'],
-      ['windows-x64', 'windows', 'x86_64-pc-windows-msvc']
+      ['linux-arm64', 'linux', 'aarch64-unknown-linux-gnu']
+      // windows-x64 re-enabled when Authenticode secrets are configured
     ])
   })
 
@@ -85,11 +85,11 @@ describe('Tauri release workflow signing gate', () => {
     const matrix = releaseWorkflow().jobs.build.strategy.matrix.include
     const argumentsByLabel = Object.fromEntries(matrix.map(({ label, args }) => [label, args]))
 
+    // Soft-launch omits windows-x64 until Authenticode secrets exist.
     expect(argumentsByLabel).toEqual({
       'linux-arm64': '--bundles deb',
       'linux-x64': '--bundles deb',
-      'macos-universal': '--target universal-apple-darwin --bundles app,dmg',
-      'windows-x64': '--bundles nsis,msi'
+      'macos-universal': '--target universal-apple-darwin --bundles app,dmg'
     })
   })
 
