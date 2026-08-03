@@ -18,7 +18,7 @@ import {
 
 /**
  * Truthful control-plane lifecycle for the paired remote runtime WebSocket.
- * Why (#65 / Orca #12076): callers must observe reconnect/degrade separately
+ * Why (#65 / upstream #12076): callers must observe reconnect/degrade separately
  * from first connect, and must never treat a half-open or pre-auth socket as
  * "connected".
  */
@@ -78,7 +78,7 @@ const CONNECT_TIMEOUT_MS = 12_000
 const HANDSHAKE_TIMEOUT_MS = 10_000
 const FILE_WATCH_READY_CLEANUP_TIMEOUT_MS = 5_000
 const RECONNECT_DELAYS_MS = [500, 1000, 2000, 4000, 8000, 15_000]
-// Why (#65 / Orca #12086): after a verified session, reconnect should prefer a
+// Why (#65 / upstream #12086): after a verified session, reconnect should prefer a
 // short "fast lane" before falling back to full backoff — not a cold-start feel.
 const RECONNECT_FAST_LANE_DELAYS_MS = [200, 400, 800, 1500]
 const SHARED_CONNECTION_SUBSCRIPTION_METHODS = new Set(['files.watch'])
@@ -628,7 +628,7 @@ export class WebRuntimeClient {
     if (this.ws !== closedWs) {
       return
     }
-    // Why (#65 / Orca #12076): a socket that closed during handshaking must not
+    // Why (#65 / upstream #12076): a socket that closed during handshaking must not
     // be promoted to a live control. Drop identity and route into recovery.
     const closedDuringHandshake =
       this.state === 'handshaking' || this.state === 'connecting' || this.state === 'degraded'
