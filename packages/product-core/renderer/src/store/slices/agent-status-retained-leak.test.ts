@@ -1,5 +1,5 @@
 /**
- * Memory-leak regression: retainedAgentsByPaneKey must stay bounded (Orca #7528).
+ * Memory-leak regression: retainedAgentsByPaneKey must stay bounded (upstream #7528).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'

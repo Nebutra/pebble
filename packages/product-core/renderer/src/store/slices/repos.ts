@@ -2544,7 +2544,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         return {
           repos: nextRepos,
           // Why: drop the removed repos' sparse-preset maps so they don't outlive
-          // the repo for the renderer's whole session (Orca #7564).
+          // the repo for the renderer's whole session (upstream #7564).
           ...omitSparsePresetsForRepos(s, removedRepoIds),
           ...mergeProjectCompatibilityForHostRepoChange({
             previous: { projects: s.projects, projectHostSetups: s.projectHostSetups },
