@@ -1,5 +1,5 @@
 /**
- * Memory-leak regression: removing a repo must purge its sparse-preset maps (Orca #7564).
+ * Memory-leak regression: removing a repo must purge its sparse-preset maps (upstream #7564).
  */
 import { describe, it, expect } from 'vitest'
 import { omitSparsePresetsForRepos } from './sparse-presets'

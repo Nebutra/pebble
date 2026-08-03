@@ -118,7 +118,7 @@ func (s *Server) handleLocalhostLabelRegister(w http.ResponseWriter, r *http.Req
 
 // Why: routes are added per (worktreeId, targetUrl) but were never removed, so
 // labels for deleted worktrees accumulated in both maps for the whole session
-// (Orca #7557). Drop them when the worktree is torn down.
+// (upstream #7557). Drop them when the worktree is torn down.
 func (proxy *localhostLabelProxy) unregisterWorktree(worktreeID string) {
 	worktreeID = strings.TrimSpace(worktreeID)
 	if worktreeID == "" {

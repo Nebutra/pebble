@@ -93,7 +93,7 @@ export function DiffCommentCard({
     }
     // Why: narrow diff panes can wrap body/header text after Monaco's initial
     // estimate; observe the real card height so the zone cannot cover following
-    // editor lines (upstream orca #7803).
+    // editor lines (upstream #7803).
     const observer = new ResizeObserver(() => notifyResize())
     observer.observe(card)
     return () => {

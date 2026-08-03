@@ -59,6 +59,7 @@ const useAppStoreMock = vi.fn(
       activeTabType: 'terminal' | 'editor' | 'browser' | 'simulator' | null
       activeWorktreeId: string | null
       gitStatusByWorktree: Record<string, never[]>
+      agentStatusByPaneKey: Record<string, unknown>
       projects: typeof appStoreSnapshot.projects
       repos: { id: string; connectionId?: string | null }[]
       sshConnectionStates: Map<string, { remotePlatform?: NodeJS.Platform }>
@@ -85,6 +86,7 @@ const useAppStoreMock = vi.fn(
       activeTabType: appStoreSnapshot.activeTabType,
       activeWorktreeId: appStoreSnapshot.activeWorktreeId,
       gitStatusByWorktree: {},
+      agentStatusByPaneKey: {},
       projects: appStoreSnapshot.projects,
       repos: appStoreSnapshot.repos,
       sshConnectionStates: appStoreSnapshot.sshConnectionStates,
@@ -122,6 +124,13 @@ vi.mock('react', async () => {
     }
   }
 })
+
+// Why: TabBar wraps agent-type selection in useShallow (upstream #7559). Real
+// useShallow calls React.useRef under a hooks dispatcher; this harness invokes
+// the component without a React render, so pass the selector through.
+vi.mock('zustand/react/shallow', () => ({
+  useShallow: <T>(selector: T) => selector
+}))
 
 vi.mock('lucide-react', () => ({
   FilePlus: function FilePlus() {
@@ -161,6 +170,7 @@ useAppStoreExport.getState = vi.fn(() => ({
   activeTabType: appStoreSnapshot.activeTabType,
   activeWorktreeId: appStoreSnapshot.activeWorktreeId,
   gitStatusByWorktree: {},
+  agentStatusByPaneKey: {},
   projects: appStoreSnapshot.projects,
   repos: appStoreSnapshot.repos,
   sshConnectionStates: appStoreSnapshot.sshConnectionStates,
