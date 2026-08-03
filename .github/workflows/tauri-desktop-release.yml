@@ -34,8 +34,6 @@ permissions:
 jobs:
   build:
     name: ${{ matrix.label }}
-    # Soft-launch: skip Windows matrix until WINDOWS_CERTIFICATE is configured.
-    if: matrix.platform != 'windows' || secrets.WINDOWS_CERTIFICATE != ''
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
