@@ -458,7 +458,7 @@ function TabBarInner({
   const toggleTabViewMode = useAppStore((s) => s.toggleTabViewMode)
   // Why: only agent identity is needed for the native-chat gate. Project to
   // stable {tabId: agentType} under useShallow so working↔idle churn does not
-  // re-render the whole tab strip (Orca #7559).
+  // re-render the whole tab strip (upstream #7559).
   const agentTypeByTabId = useAppStore(
     useShallow((s) => selectTabAgentTypesByTabId(s.agentStatusByPaneKey))
   )

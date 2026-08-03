@@ -1,6 +1,6 @@
 /**
  * Memory-leak regression: bulk purgeWorktreeTerminalState must evict per-tab /
- * per-pty terminal maps (Orca #7613).
+ * per-pty terminal maps (upstream #7613).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type * as AgentStatusModule from '@/lib/agent-status'

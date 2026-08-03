@@ -250,7 +250,7 @@ function boundRecentlyClosedAgentStatusTabIds(
 // worktree removal or manual dismissal, so a long-lived worktree in a busy
 // multi-agent session grows it without bound — the dominant driver of the
 // renderer JS-heap OOM. Cap by insertion order (== retention order), evicting
-// the oldest completions first so the newest always survive (Orca #7528).
+// the oldest completions first so the newest always survive (upstream #7528).
 const MAX_RETAINED_AGENTS = 500
 
 function capRetainedAgents(
@@ -1660,7 +1660,7 @@ export const createAgentStatusSlice: StateCreator<AppState, [], [], AgentStatusS
           }
         }
         // Why: FIFO-cap so closed-tab suppression cannot grow unbounded with
-        // every tab close for the session (renderer twin of Orca #7561 / #7645).
+        // every tab close for the session (renderer twin of upstream #7561 / #7645).
         const nextClosedTabs = boundRecentlyClosedAgentStatusTabIds(
           s.recentlyClosedAgentStatusTabIds,
           tabIdPrefix

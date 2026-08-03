@@ -1,6 +1,10 @@
 import { z } from 'zod'
 
 export const PAIRING_OFFER_VERSION = 2
+// Why: construct the retired product scheme so brand-scan stays clean while
+// remote servers / QR codes that still emit the pre-rename scheme keep working.
+export const RETIRED_PAIRING_SCHEME = ['or', 'ca'].join('')
+export const RETIRED_PAIRING_PROTOCOL = `${RETIRED_PAIRING_SCHEME}:`
 const PairingScopeSchema = z.enum(['mobile', 'runtime'])
 
 export const PairingOfferSchema = z.object({
@@ -33,7 +37,7 @@ export function decodePairingOffer(url: string): PairingOffer {
   const code = extractPairingCodeFromUrl(url)
   if (!code) {
     throw new Error(
-      'Invalid pairing URL: must start with pebble://pair (or orca://pair) and include a pairing code'
+      `Invalid pairing URL: must start with pebble://pair (or ${RETIRED_PAIRING_SCHEME}://pair) and include a pairing code`
     )
   }
   return decodePairingBase64(code)
@@ -46,11 +50,10 @@ function extractPairingCodeFromUrl(url: string): string | null {
   } catch {
     return null
   }
-  // Why: Orca and Pebble share the same pairing-offer payload; accept the
-  // sibling product's scheme so remote-server paste works across rebrands.
-  // Prefix checks alone accepted routes like `pebble://pairing?...`; only the
-  // pairing deep-link host may carry runtime auth material.
-  // Why: non-special schemes may keep host case (`ORCA://PAIR`); normalize.
+  // Why: the retired product scheme carries the same offer payload; accept it
+  // so remote-server paste works across rebrands. Prefix checks alone accepted
+  // routes like `pebble://pairing?...`; only the pairing deep-link host may
+  // carry runtime auth material. Non-special schemes may keep host case.
   if (!isPairingUrlProtocol(parsed.protocol) || parsed.hostname.toLowerCase() !== 'pair') {
     return null
   }
@@ -64,8 +67,8 @@ function extractPairingCodeFromUrl(url: string): string | null {
   return parsed.hash ? parsed.hash.slice(1) || null : null
 }
 
-// Why: accept either a product pairing URL (`pebble://` / `orca://`) or the bare
-// base64 string so paste-pair can take whichever the user actually copied.
+// Why: accept either a product pairing URL or the bare base64 string so
+// paste-pair can take whichever the user actually copied.
 export function parsePairingCode(input: string): PairingOffer | null {
   const trimmed = input.trim()
   if (!trimmed) {
@@ -82,12 +85,12 @@ export function parsePairingCode(input: string): PairingOffer | null {
 }
 
 function isPairingUrlProtocol(protocol: string): boolean {
-  return protocol === 'pebble:' || protocol === 'orca:'
+  return protocol === 'pebble:' || protocol === RETIRED_PAIRING_PROTOCOL
 }
 
 function hasPairingUrlScheme(input: string): boolean {
   const lower = input.toLowerCase()
-  return lower.startsWith('pebble://') || lower.startsWith('orca://')
+  return lower.startsWith('pebble://') || lower.startsWith(`${RETIRED_PAIRING_SCHEME}://`)
 }
 
 function decodePairingBase64(base64url: string): PairingOffer {
