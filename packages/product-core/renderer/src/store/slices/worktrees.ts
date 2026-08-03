@@ -1833,7 +1833,7 @@ function buildWorktreePurgeState(s: AppState, worktreeIds: string[]): Partial<Ap
   // Why: some terminal/agent maps are keyed by ptyId, not tabId. Collect the
   // doomed panes' ptyIds now (while ptyIdsByTabId is still populated) so this
   // bulk path can evict them the same way shutdownWorktreeTerminals does on the
-  // single-removeWorktree path (Orca #7613).
+  // single-removeWorktree path (upstream #7613).
   const doomedPtyIds = new Set<string>()
   const doomedBrowserWorkspaceIds = new Set<string>()
   const doomedPageIds = new Set<string>()
@@ -2038,7 +2038,7 @@ function buildWorktreePurgeState(s: AppState, worktreeIds: string[]): Partial<Ap
     // removeWorktree path (via closeTab / shutdownWorktreeTerminals) but this bulk
     // reconcile / remove-project / hydration-stale path runs no terminal teardown,
     // so without these lines each one strands an entry per tab/pane of every
-    // externally-removed worktree for the renderer's whole session (Orca #7613).
+    // externally-removed worktree for the renderer's whole session (upstream #7613).
     lastKnownRelayPtyIdByTabId: omitByTabId(s.lastKnownRelayPtyIdByTabId),
     pendingInitialCwdByTabId: omitByTabId(s.pendingInitialCwdByTabId),
     pendingIssueCommandSplitByTabId: omitByTabId(s.pendingIssueCommandSplitByTabId),

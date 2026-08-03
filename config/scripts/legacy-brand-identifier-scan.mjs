@@ -11,9 +11,54 @@ export function containsLegacyBrandIdentifier(value) {
   return token.test(value) || legacyPrefix.test(value) || legacyDirectory.test(value)
 }
 
+// Why allowlisted: product still accepts pre-rename pairing deep-link schemes
+// (`…://pair`) so remote QR / paste from older hosts works. Those surfaces must
+// keep the retired token as runtime protocol text; rewrites to constructed
+// strings are follow-up. Brand scan still guards the rest of the tree.
+const PAIRING_COMPAT_ALLOWLIST = new Set([
+  'apps/desktop/src-tauri/src/commands/runtime_environments.rs',
+  'apps/desktop/src/tauri-deep-link-api.test.ts',
+  'apps/desktop/src/tauri-deep-link-contract.ts',
+  'apps/desktop/src/tauri-deep-link-pairing.ts',
+  'apps/mobile/src/transport/pairing.test.ts',
+  'apps/mobile/src/transport/pairing.ts',
+  'packages/product-core/cli/runtime/client.ts',
+  'packages/product-core/renderer/src/web/web-pairing.test.ts',
+  'packages/product-core/renderer/src/web/web-pairing.ts',
+  'packages/product-core/shared/pairing.test.ts',
+  'packages/product-core/shared/pairing.ts',
+  'packages/product-core/shared/runtime-environment-store.ts',
+  'runtime/go/internal/runtimecore/ephemeral_vm_lifecycle.go',
+  'runtime/go/internal/runtimecore/ephemeral_vm_lifecycle_test.go'
+])
+
+function shouldSkipLegacyBrandScan(file) {
+  // Why: agent work logs / archive tasks intentionally record upstream issue
+  // titles and paths with the retired product name. They are not product
+  // runtime surfaces; scanning them blocks every PR while history is retained.
+  if (file.startsWith('.trellis/') || file.startsWith('artifacts/')) {
+    return true
+  }
+  // Why: the scanner itself and its tests must mention the retired token.
+  if (file.includes('legacy-brand-identifier-scan')) {
+    return true
+  }
+  // Why: retired-identity / product-origin specs document the rename.
+  if (file.includes('retired-product-identity') || file.includes('product-origin')) {
+    return true
+  }
+  if (PAIRING_COMPAT_ALLOWLIST.has(file)) {
+    return true
+  }
+  return false
+}
+
 export async function scanLegacyBrandIdentifiers(repoRoot, trackedFiles) {
   const failures = []
   for (const file of trackedFiles) {
+    if (shouldSkipLegacyBrandScan(file)) {
+      continue
+    }
     if (containsLegacyBrandIdentifier(file)) {
       failures.push(`${file} (path)`)
       continue
