@@ -34,6 +34,8 @@ permissions:
 jobs:
   build:
     name: ${{ matrix.label }}
+    # Soft-launch: skip Windows matrix until WINDOWS_CERTIFICATE is configured.
+    if: matrix.platform != 'windows' || secrets.WINDOWS_CERTIFICATE != ''
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -216,10 +218,8 @@ jobs:
           MAC_CERTS_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
         run: bash config/scripts/import-tauri-macos-certificate.sh
 
-      # Notarization credentials currently 401; do not materialize the p8 key or
-      # export APPLE_API_KEY_PATH — empty strings still make Tauri attempt notary.
       - name: Prepare App Store Connect API key
-        if: false
+        if: matrix.platform == 'macos'
         env:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
         run: node config/scripts/prepare-apple-api-key.mjs
@@ -239,8 +239,10 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_KEY: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY || '' }}
+          APPLE_API_ISSUER: ${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
+          APPLE_API_KEY_PATH: ${{ matrix.platform == 'macos' && env.APPLE_API_KEY_PATH || '' }}
           PEBBLE_MAC_RELEASE: ${{ matrix.platform == 'macos' && '1' || '' }}
-          PEBBLE_SKIP_NOTARIZATION: ${{ matrix.platform == 'macos' && '1' || '' }}
           TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -280,14 +282,16 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}
           APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS_PASSWORD || '' }}
-          # Omit APPLE_API_* / APPLE_ID entirely — empty strings still make Tauri
-          # attempt notarytool and fail with HTTP 401 on bad ASC credentials.
+          # Only materialize ASC notary credentials on macOS after prepare-apple-api-key
+          # wrote APPLE_API_KEY_PATH. Empty strings on other platforms still trip Tauri.
+          APPLE_API_KEY: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY || '' }}
+          APPLE_API_ISSUER: ${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
+          APPLE_API_KEY_PATH: ${{ matrix.platform == 'macos' && env.APPLE_API_KEY_PATH || '' }}
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
           PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY: ${{ env.PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY }}
           CSC_NAME: ${{ env.CSC_NAME }}
           PEBBLE_MAC_RELEASE: ${{ matrix.platform == 'macos' && '1' || '' }}
-          PEBBLE_SKIP_NOTARIZATION: '1'
         with:
           projectPath: apps/desktop
           tauriScript: pnpm exec tauri
@@ -325,7 +329,6 @@ jobs:
           TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
           PEBBLE_WINDOWS_EXPECTED_SIGNERS: ${{ vars.PEBBLE_WINDOWS_EXPECTED_SIGNERS }}
           PEBBLE_WINDOWS_EXPECTED_THUMBPRINTS: ${{ matrix.platform == 'windows' && env.TAURI_WINDOWS_CERTIFICATE_THUMBPRINT || vars.PEBBLE_WINDOWS_EXPECTED_THUMBPRINTS }}
-          PEBBLE_SKIP_NOTARIZATION: ${{ matrix.platform == 'macos' && '1' || '' }}
         run: >-
           node config/scripts/verify-tauri-release-artifacts.mjs
           --platform ${{ matrix.platform }}
@@ -359,7 +362,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
-          TAURI_REQUIRED_UPDATER_PLATFORMS: darwin-aarch64,darwin-x86_64,windows-x86_64
+          # Soft-launch: Windows installer waits on Authenticode cert secrets.
+          TAURI_REQUIRED_UPDATER_PLATFORMS: darwin-aarch64,darwin-x86_64
           TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
         run: node config/scripts/verify-tauri-updater-manifest.mjs
 
@@ -385,4 +389,7 @@ jobs:
           path: artifacts/tauri-release-inspection
 
       - name: Verify complete release evidence matrix
+        env:
+          # Soft-launch: Windows matrix is skipped without WINDOWS_CERTIFICATE.
+          PEBBLE_RELEASE_SKIP_WINDOWS: '1'
         run: node config/scripts/verify-tauri-release-evidence.mjs artifacts/tauri-release-inspection

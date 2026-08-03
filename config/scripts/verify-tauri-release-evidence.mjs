@@ -8,12 +8,25 @@ const expectedTargets = new Map([
   ['x86_64-pc-windows-msvc', 'windows']
 ])
 
+function requiredTargets(environment = process.env) {
+  const targets = new Map(expectedTargets)
+  // Soft-launch without Authenticode secrets: Windows matrix is skipped.
+  if (environment.PEBBLE_RELEASE_SKIP_WINDOWS === '1') {
+    targets.delete('x86_64-pc-windows-msvc')
+  }
+  return targets
+}
+
 async function jsonFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true }).catch(() => [])
   const nested = await Promise.all(
     entries.map(async (entry) => {
       const path = resolve(directory, entry.name)
-      return entry.isDirectory() ? jsonFiles(path) : entry.isFile() && path.endsWith('.json') ? [path] : []
+      return entry.isDirectory()
+        ? jsonFiles(path)
+        : entry.isFile() && path.endsWith('.json')
+          ? [path]
+          : []
     })
   )
   return nested.flat()
@@ -51,7 +64,7 @@ export function validateReleaseEvidenceReports(reports) {
     byTarget.set(report.targetTriple, report)
   }
 
-  for (const [targetTriple, platform] of expectedTargets) {
+  for (const [targetTriple, platform] of requiredTargets()) {
     const report = byTarget.get(targetTriple)
     if (!report) {
       throw new Error(`Missing release evidence for ${targetTriple}.`)
@@ -59,15 +72,27 @@ export function validateReleaseEvidenceReports(reports) {
     if (report.platform !== platform) {
       throw new Error(`Release evidence ${targetTriple} has platform ${report.platform}.`)
     }
-    requireChecks(artifactsForRole(report, 'prepared-sidecar'), ['architecture'], 'prepared sidecars')
+    requireChecks(
+      artifactsForRole(report, 'prepared-sidecar'),
+      ['architecture'],
+      'prepared sidecars'
+    )
     const preparedRelayWorkers = artifactsForRole(report, 'prepared-relay-worker')
     if (preparedRelayWorkers.length !== 6) {
       throw new Error(`Release evidence ${targetTriple} must include six prepared relay workers.`)
     }
     requireChecks(preparedRelayWorkers, ['architecture'], 'prepared relay workers')
     if (platform !== 'linux') {
-      requireChecks(artifactsForRole(report, 'updater-payload'), ['cryptographic-signature-valid', 'signature-sidecar-present'], 'updater payload')
-      requireChecks(artifactsForRole(report, 'updater-signature'), ['cryptographic-signature-valid', 'non-empty'], 'updater signature')
+      requireChecks(
+        artifactsForRole(report, 'updater-payload'),
+        ['cryptographic-signature-valid', 'signature-sidecar-present'],
+        'updater payload'
+      )
+      requireChecks(
+        artifactsForRole(report, 'updater-signature'),
+        ['cryptographic-signature-valid', 'non-empty'],
+        'updater signature'
+      )
     }
 
     if (platform === 'macos') {
@@ -94,14 +119,17 @@ export function validateReleaseEvidenceReports(reports) {
       }
       requireChecks(bundledRelayWorkers, ['architecture'], 'bundled relay workers')
       if (
-        bundledRelayWorkers.filter((artifact) =>
-          artifact.checks.includes('codesign-developer-id')
-        ).length !== 2
+        bundledRelayWorkers.filter((artifact) => artifact.checks.includes('codesign-developer-id'))
+          .length !== 2
       ) {
         throw new Error('macOS release evidence must sign both Darwin relay workers.')
       }
     } else if (platform === 'windows') {
-      requireChecks(artifactsForRole(report, 'main-executable'), ['architecture', 'authenticode-valid'], 'Windows executable')
+      requireChecks(
+        artifactsForRole(report, 'main-executable'),
+        ['architecture', 'authenticode-valid'],
+        'Windows executable'
+      )
       const installers = artifactsForRole(report, 'installer')
       if (installers.length !== 2) {
         throw new Error('Windows release evidence must include NSIS and MSI installers.')
@@ -119,20 +147,27 @@ export function validateReleaseEvidenceReports(reports) {
       )
       const installers = artifactsForRole(report, 'installer')
       if (installers.length !== 1 || !installers[0].path.endsWith('.deb')) {
-        throw new Error(`Release evidence ${targetTriple} must include exactly one Debian installer.`)
+        throw new Error(
+          `Release evidence ${targetTriple} must include exactly one Debian installer.`
+        )
       }
       requireChecks(installers, ['relay-worker-matrix-contained'], 'Linux installer')
     }
   }
-  if (byTarget.size !== expectedTargets.size) {
-    throw new Error('Release evidence contains an unexpected target triple.')
+  const allowed = new Set(expectedTargets.keys())
+  for (const targetTriple of byTarget.keys()) {
+    if (!allowed.has(targetTriple)) {
+      throw new Error(`Release evidence contains an unexpected target triple ${targetTriple}.`)
+    }
   }
   return reports
 }
 
 export async function verifyReleaseEvidenceDirectory(directory) {
   const paths = await jsonFiles(directory)
-  const reports = await Promise.all(paths.map(async (path) => JSON.parse(await readFile(path, 'utf8'))))
+  const reports = await Promise.all(
+    paths.map(async (path) => JSON.parse(await readFile(path, 'utf8')))
+  )
   validateReleaseEvidenceReports(reports)
   return paths
 }
