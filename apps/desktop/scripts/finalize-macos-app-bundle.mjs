@@ -5,6 +5,14 @@ import process from 'node:process'
 
 import { resolveMacosCodeSigningIdentity } from './macos-code-signing-identity.mjs'
 
+const desktopRoot = resolve(import.meta.dirname, '..')
+const repoRoot = resolve(desktopRoot, '../..')
+const mainEntitlementsPath = resolve(repoRoot, 'resources/build/entitlements.mac.plist')
+const computerUseEntitlementsPath = resolve(
+  repoRoot,
+  'resources/build/entitlements.computer-use.mac.plist'
+)
+
 function discoverAppPath({ cwd = process.cwd(), environment = process.env } = {}) {
   if (environment.PEBBLE_MACOS_APP_PATH?.trim()) {
     return resolve(environment.PEBBLE_MACOS_APP_PATH.trim())
@@ -40,16 +48,37 @@ function walkFiles(directory) {
     const path = join(directory, entry)
     const stat = statSync(path)
     if (stat.isDirectory()) {
+      // Nested helper apps must be signed as a unit after their inner Mach-O.
+      if (entry.endsWith('.app')) {
+        return [path]
+      }
       return walkFiles(path)
     }
     return stat.isFile() ? [path] : []
   })
 }
 
+/** Re-signing without --entitlements strips the embedded plist and fails inspect/notary policy. */
+function entitlementsFor(path) {
+  if (path.includes('Pebble Computer Use.app') || path.includes('pebble-computer-use-macos')) {
+    return existsSync(computerUseEntitlementsPath) ? computerUseEntitlementsPath : null
+  }
+  if (path.endsWith('Pebble.app')) {
+    return existsSync(mainEntitlementsPath) ? mainEntitlementsPath : null
+  }
+  return null
+}
+
 function signingArgs(identity, path) {
-  return identity
-    ? ['--force', '--sign', identity, '--options', 'runtime', '--timestamp', path]
-    : ['--force', '--sign', '-', '--timestamp=none', path]
+  const args = identity
+    ? ['--force', '--sign', identity, '--options', 'runtime', '--timestamp']
+    : ['--force', '--sign', '-', '--timestamp=none']
+  const entitlements = entitlementsFor(path)
+  if (entitlements) {
+    args.push('--entitlements', entitlements)
+  }
+  args.push(path)
+  return args
 }
 
 export function finalizeMacosAppBundle({
@@ -72,11 +101,18 @@ export function finalizeMacosAppBundle({
     .flatMap((root) => walkFiles(root))
     // Nested helpers and vendor bins must carry Developer ID + hardened runtime
     // before the outer resource seal, or Apple notary returns Invalid (serve-sim-bin).
-    .filter((path) => isMachO(path))
+    .filter((path) => path.endsWith('.app') || isMachO(path))
     // Sign leaves first: deeper paths before parents (string length heuristic).
     .sort((a, b) => b.length - a.length)
 
   for (const path of nestedPaths) {
+    if (path.endsWith('.app')) {
+      // Sign nested .app's MacOS binary first, then the helper .app seal.
+      const nestedMacos = resolve(path, 'Contents/MacOS')
+      for (const nested of walkFiles(nestedMacos).filter((candidate) => isMachO(candidate))) {
+        run(signingArgs(identity, nested))
+      }
+    }
     run(signingArgs(identity, path))
   }
 

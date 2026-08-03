@@ -74,10 +74,14 @@ function notarizePath({ path, keyId, issuer, keyPath, staple = true }) {
 function buildDmgFromApp(appPath, bundleDir) {
   const dmgDir = resolve(bundleDir, 'dmg')
   execFileSync('mkdir', ['-p', dmgDir], { stdio: 'inherit' })
-  const dmgPath = resolve(dmgDir, 'Pebble.dmg')
+  // Name must match releaseAssetNamePattern pebble-macos-universal[ext] for tauri-action upload.
+  const dmgPath = resolve(dmgDir, 'pebble-macos-universal.dmg')
   // Replace any pre-finalize DMG so users never get nested-unsigned installers.
-  if (existsSync(dmgPath)) {
-    execFileSync('rm', ['-f', dmgPath], { stdio: 'inherit' })
+  for (const stale of ['Pebble.dmg', 'pebble-macos-universal.dmg']) {
+    const candidate = resolve(dmgDir, stale)
+    if (existsSync(candidate)) {
+      execFileSync('rm', ['-f', candidate], { stdio: 'inherit' })
+    }
   }
   console.log(`Creating DMG from notarized app at ${dmgPath}…`)
   run('hdiutil', [
