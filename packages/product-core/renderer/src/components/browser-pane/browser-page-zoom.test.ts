@@ -97,6 +97,22 @@ describe('applyBrowserPageZoom', () => {
 })
 
 describe('setBrowserPageZoomLevel', () => {
+  it('restores the configured level when Chromium carries zoom across reloads', () => {
+    let live = 0.5
+    const webview = {
+      getZoomLevel: vi.fn(() => live),
+      setZoomLevel: vi.fn((level: number) => {
+        live = level
+      })
+    }
+
+    expect(setBrowserPageZoomLevel(webview, 0)).toBe(0)
+    expect(live).toBe(0)
+    // Second call is a no-op when already at the target level (HostZoomMap).
+    expect(setBrowserPageZoomLevel(webview, 0)).toBe(0)
+    expect(webview.setZoomLevel).toHaveBeenCalledTimes(1)
+  })
+
   it('normalizes and applies an explicit zoom level', () => {
     const webview = {
       getZoomLevel: vi.fn(() => 0),

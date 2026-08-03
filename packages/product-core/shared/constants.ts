@@ -506,7 +506,8 @@ export function getDefaultUIState(): PersistedUIState {
     featureTipsSeenIds: [],
     featureInteractions: {},
     contextualToursSeenIds: [],
-    browserDefaultZoomLevel: DEFAULT_BROWSER_PAGE_ZOOM_LEVEL
+    browserDefaultZoomLevel: DEFAULT_BROWSER_PAGE_ZOOM_LEVEL,
+    browserGuestWorktreeRetentionBudget: true
   }
 }
 
