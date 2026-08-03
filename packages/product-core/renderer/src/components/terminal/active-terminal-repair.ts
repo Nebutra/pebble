@@ -16,3 +16,23 @@ export function shouldRepairActiveTerminalTab(args: {
   }
   return true
 }
+
+/**
+ * Resolve which terminal tab to open after a project/agent is selected, or null
+ * if no repair is needed. Prefers the remembered per-worktree tab so a transient
+ * repair does not reset selection to Terminal 1 (#66 / upstream #11950).
+ */
+export function resolveRepairedActiveTerminalTabId(args: {
+  activeTabType: WorkspaceVisibleTabType
+  activeTabId: string | null
+  rememberedTabId: string | null | undefined
+  tabs: TerminalTab[]
+}): string | null {
+  if (!shouldRepairActiveTerminalTab(args)) {
+    return null
+  }
+  if (args.rememberedTabId && args.tabs.some((tab) => tab.id === args.rememberedTabId)) {
+    return args.rememberedTabId
+  }
+  return args.tabs[0]?.id ?? null
+}

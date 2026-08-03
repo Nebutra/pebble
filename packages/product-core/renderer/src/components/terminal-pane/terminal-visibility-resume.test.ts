@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PaneManager } from '@/lib/pane-manager/pane-manager'
+import { resetAndRefreshAllTerminalWebglAtlases } from '@/lib/pane-manager/pane-manager-registry'
 import {
   recoverVisibleTerminalWindowWake,
   resumeTerminalVisibility
@@ -81,5 +82,18 @@ describe('resumeTerminalVisibility reveal repaint', () => {
     })
 
     expect(manager.scheduleRevealRepaint).toHaveBeenCalledTimes(1)
+    expect(resetAndRefreshAllTerminalWebglAtlases).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves the glyph atlas when clearGlyphAtlases is false (#66)', () => {
+    const manager = createManager()
+    recoverVisibleTerminalWindowWake({
+      manager: manager as never as PaneManager,
+      isActive: false,
+      clearGlyphAtlases: false
+    })
+
+    expect(manager.scheduleRevealRepaint).toHaveBeenCalledTimes(1)
+    expect(resetAndRefreshAllTerminalWebglAtlases).not.toHaveBeenCalled()
   })
 })

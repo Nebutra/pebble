@@ -37,6 +37,7 @@ import { forgetAgentHibernationTabOutput } from '@/lib/agent-hibernation-output-
 import { forgetForegroundTerminalTabs } from '@/lib/foreground-terminal-tabs'
 import { forgetAgentStartupDeliveriesForTabs } from '@/lib/agent-startup-delivery-guards'
 import { clearTransientTerminalState, emptyLayoutSnapshot } from './terminal-helpers'
+import { resolveActiveTabOwnerWorktreeId } from './active-tab-owner-worktree'
 import { isClaudeAgent } from '@/lib/agent-status'
 import { classifyTitleActivity } from '@/lib/pane-agent-evidence'
 import { buildOrphanTerminalCleanupPatch, getOrphanTerminalIds } from './terminal-orphan-helpers'
@@ -1310,13 +1311,16 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
       // "jump to agent" path), the tab is not yet visible and clearing would
       // silently swallow the signal. Mirrors the guard in activateTab and
       // focusGroup.
-      let tabOwnerWorktreeId: string | null = null
-      for (const [wId, tabs] of Object.entries(s.tabsByWorktree)) {
-        if (tabs.some((t) => t.id === tabId)) {
-          tabOwnerWorktreeId = wId
-          break
-        }
-      }
+      //
+      // Why prefer active worktree on duplicate ids (#66 / upstream #11950): a
+      // first-match scan can pin ownership to a background worktree, leave
+      // global activeTabId unchanged, and strand the active-terminal repair
+      // effect in a React #185 update loop.
+      const tabOwnerWorktreeId = resolveActiveTabOwnerWorktreeId(
+        s.tabsByWorktree,
+        s.activeWorktreeId,
+        tabId
+      )
       const nextUnreadTerminalTabs =
         tabOwnerWorktreeId === s.activeWorktreeId && s.unreadTerminalTabs[tabId]
           ? (() => {

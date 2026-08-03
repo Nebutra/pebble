@@ -1,0 +1,70 @@
+import { useEffect } from 'react'
+import type { TerminalTab, WorkspaceVisibleTabType } from '../../../../shared/types'
+import { resolveRepairedActiveTerminalTabId } from './active-terminal-repair'
+
+type ActiveTerminalRepairInput = {
+  activeTabType: WorkspaceVisibleTabType
+  activeTabId: string | null
+  activeTabIdByWorktree: Record<string, string | null>
+  renderedActiveWorktreeId: string | null
+  setActiveTab: (tabId: string) => void
+  tabs: TerminalTab[]
+}
+
+/**
+ * Pure repair step used by the effect and by unit tests that pin the
+ * non-convergence contract without mounting React (#66 / upstream #11950).
+ */
+export function repairActiveTerminalTab({
+  activeTabType,
+  activeTabId,
+  activeTabIdByWorktree,
+  renderedActiveWorktreeId,
+  setActiveTab,
+  tabs
+}: ActiveTerminalRepairInput): boolean {
+  const rememberedTabId =
+    renderedActiveWorktreeId !== null &&
+    Object.hasOwn(activeTabIdByWorktree, renderedActiveWorktreeId)
+      ? (activeTabIdByWorktree[renderedActiveWorktreeId] ?? null)
+      : null
+  const repairedTabId = resolveRepairedActiveTerminalTabId({
+    activeTabType,
+    activeTabId,
+    rememberedTabId,
+    tabs
+  })
+  if (!repairedTabId) {
+    return false
+  }
+  setActiveTab(repairedTabId)
+  return true
+}
+
+/**
+ * Repair after render so a Zustand mutation cannot trip React's
+ * cross-component update warning, and so ownership convergence from
+ * `resolveActiveTabOwnerWorktreeId` can terminate the loop.
+ */
+export function useActiveTerminalRepair(input: ActiveTerminalRepairInput): void {
+  const {
+    activeTabId,
+    activeTabIdByWorktree,
+    activeTabType,
+    renderedActiveWorktreeId,
+    setActiveTab,
+    tabs
+  } = input
+  useEffect(() => {
+    repairActiveTerminalTab(input)
+    // Why: `tabs` is the dependency so repair reacts to order/content changes, not just scalar ids.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activeTabId,
+    activeTabType,
+    setActiveTab,
+    tabs,
+    activeTabIdByWorktree,
+    renderedActiveWorktreeId
+  ])
+}

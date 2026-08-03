@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { TerminalTab } from '../../../../shared/types'
-import { shouldRepairActiveTerminalTab } from './active-terminal-repair'
+import {
+  resolveRepairedActiveTerminalTabId,
+  shouldRepairActiveTerminalTab
+} from './active-terminal-repair'
 
 function tab(id: string): TerminalTab {
   return {
@@ -48,5 +51,40 @@ describe('shouldRepairActiveTerminalTab', () => {
         tabs: [tab('terminal-1')]
       })
     ).toBe(false)
+  })
+})
+
+describe('resolveRepairedActiveTerminalTabId', () => {
+  it('prefers the remembered per-worktree tab over the first tab', () => {
+    expect(
+      resolveRepairedActiveTerminalTabId({
+        activeTabType: 'terminal',
+        activeTabId: 'missing',
+        rememberedTabId: 'terminal-2',
+        tabs: [tab('terminal-1'), tab('terminal-2')]
+      })
+    ).toBe('terminal-2')
+  })
+
+  it('falls back to the first tab when memory is missing or foreign', () => {
+    expect(
+      resolveRepairedActiveTerminalTabId({
+        activeTabType: 'terminal',
+        activeTabId: 'missing',
+        rememberedTabId: 'gone',
+        tabs: [tab('terminal-1'), tab('terminal-2')]
+      })
+    ).toBe('terminal-1')
+  })
+
+  it('returns null when no repair is needed', () => {
+    expect(
+      resolveRepairedActiveTerminalTabId({
+        activeTabType: 'terminal',
+        activeTabId: 'terminal-1',
+        rememberedTabId: null,
+        tabs: [tab('terminal-1')]
+      })
+    ).toBeNull()
   })
 })

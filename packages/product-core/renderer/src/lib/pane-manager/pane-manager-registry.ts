@@ -2,6 +2,8 @@ type RegisteredPaneManager = {
   resetWebglTextureAtlases(): void
   fitAllPanes?: () => void
   refreshAllPanes?: () => void
+  /** When false, heavy atlas reset/repaint is deferred until the surface is revealed. */
+  isVisibleForAtlasRecovery?: () => boolean
 }
 
 const liveManagers = new Set<RegisteredPaneManager>()
@@ -14,17 +16,28 @@ export function unregisterLivePaneManager(manager: RegisteredPaneManager): void 
   liveManagers.delete(manager)
 }
 
+function managersEligibleForAtlasRecovery(): RegisteredPaneManager[] {
+  // Why (#66 / upstream #12061): a global fanout over dozens of hidden worktree
+  // managers multiplies CPU/heap on ordinary fullscreen/visibility returns.
+  // Managers that opt in with isVisibleForAtlasRecovery === false are skipped;
+  // missing the hook keeps legacy "reset everyone" behavior.
+  return Array.from(liveManagers).filter(
+    (manager) => manager.isVisibleForAtlasRecovery?.() !== false
+  )
+}
+
 /**
- * Resets the WebGL glyph atlases of every live pane manager, not just one.
+ * Resets the WebGL glyph atlases of live pane managers eligible for recovery.
  *
  * Why: @xterm/addon-webgl keeps a module-global atlas cache, so terminals with
  * identical font configs share one glyph texture atlas. Clearing it through a
  * single manager invalidates the cached glyph coordinates of every other
  * sharing terminal without rebuilding their render models, which paints them
- * as garbled glyphs. Recovery resets must therefore rebuild all terminals.
+ * as garbled glyphs. Recovery resets must therefore rebuild all *visible*
+ * terminals — hidden surfaces take the heavy path on reveal instead.
  */
 export function resetAllTerminalWebglAtlases(): void {
-  for (const manager of liveManagers) {
+  for (const manager of managersEligibleForAtlasRecovery()) {
     try {
       manager.resetWebglTextureAtlases()
     } catch {
@@ -35,8 +48,9 @@ export function resetAllTerminalWebglAtlases(): void {
 }
 
 export function resetAndRefreshAllTerminalWebglAtlases(): void {
+  const recoveryManagers = managersEligibleForAtlasRecovery()
   const resetManagers: RegisteredPaneManager[] = []
-  for (const manager of liveManagers) {
+  for (const manager of recoveryManagers) {
     try {
       manager.resetWebglTextureAtlases()
       resetManagers.push(manager)
