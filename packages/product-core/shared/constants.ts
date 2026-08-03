@@ -391,7 +391,9 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
       customAgentCommand: ''
     },
     sourceControlAi: getDefaultSourceControlAiSettings(),
-    voice: getDefaultVoiceSettings()
+    voice: getDefaultVoiceSettings(),
+    // Why: default-on kill switch for browser guest LRU retention across hidden worktrees.
+    browserGuestWorktreeRetentionBudget: true
   }
 }
 

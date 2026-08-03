@@ -63,11 +63,36 @@ export function setBrowserPageZoomLevel(
       return null
     }
     const next = normalizeBrowserPageZoomLevel(level)
+    // Why compare first: Chromium's HostZoomMap is keyed by host per partition,
+    // so a no-op write still overwrites the host-wide zoom a sibling tab on the
+    // same hostname set. Only write when this pane actually needs to move.
+    if (normalizeBrowserPageZoomLevel(webview.getZoomLevel()) === next) {
+      return next
+    }
     webview.setZoomLevel(next)
     return next
   } catch {
     return null
   }
+}
+
+// Why module-level: the guest webview outlives its React pane (a worktree
+// switch parks the viewport), so a pane-local ref re-seeds from the shared
+// Settings default on every remount and would hijack a tab the user already
+// zoomed (#68 / upstream #12191 · #10800).
+const explicitPaneZoomLevels = new Map<string, number>()
+
+/** Level this tab holds because the USER zoomed it, or null on the new-tab seed. */
+export function getExplicitBrowserPageZoomLevel(browserPageId: string): number | null {
+  return explicitPaneZoomLevels.get(browserPageId) ?? null
+}
+
+export function rememberExplicitBrowserPageZoomLevel(browserPageId: string, level: number): void {
+  explicitPaneZoomLevels.set(browserPageId, normalizeBrowserPageZoomLevel(level))
+}
+
+export function forgetExplicitBrowserPageZoomLevel(browserPageId: string): void {
+  explicitPaneZoomLevels.delete(browserPageId)
 }
 
 export function getBrowserPageZoomIndicatorState({

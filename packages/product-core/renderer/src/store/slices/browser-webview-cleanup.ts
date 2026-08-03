@@ -1,5 +1,9 @@
 import type { BrowserPage, BrowserWorkspace } from '../../../../shared/types'
 import {
+  getExplicitBrowserPageZoomLevel,
+  rememberExplicitBrowserPageZoomLevel
+} from '../../components/browser-pane/browser-page-zoom'
+import {
   destroyPersistentWebview,
   moveFocusToRendererBeforeFocusedWebviewHidden
 } from '../../components/browser-pane/webview-registry'
@@ -29,6 +33,28 @@ export function collectBrowserWebviewIds(
     }
   }
   return ids
+}
+
+// Why: guest-budget eviction destroys every guest a hidden worktree retains
+// while its tabs/pages stay in the store, so a revisit rebuilds from state.
+// Eviction is not a user close — re-remember zoom past the destroy-path forget
+// (#68 / upstream #12194).
+export function destroyWorktreeBrowserGuests(
+  browserTabsByWorktree: Record<string, BrowserWorkspace[]>,
+  browserPagesByWorkspace: Record<string, BrowserPage[]>,
+  worktreeId: string
+): void {
+  for (const tab of browserTabsByWorktree[worktreeId] ?? []) {
+    const pages = browserPagesByWorkspace[tab.id] ?? []
+    const guestIds = pages.length === 0 ? [tab.id] : pages.map((page) => page.id)
+    for (const guestId of guestIds) {
+      const explicitZoomLevel = getExplicitBrowserPageZoomLevel(guestId)
+      destroyRemovedBrowserWebview(guestId)
+      if (explicitZoomLevel !== null) {
+        rememberExplicitBrowserPageZoomLevel(guestId, explicitZoomLevel)
+      }
+    }
+  }
 }
 
 export function destroyWorkspaceWebviews(

@@ -139,7 +139,9 @@ import {
   browserPageZoomLevelToPercent,
   DEFAULT_BROWSER_PAGE_ZOOM_LEVEL,
   getBrowserPageZoomIndicatorState,
+  getExplicitBrowserPageZoomLevel,
   normalizeBrowserPageZoomLevel,
+  rememberExplicitBrowserPageZoomLevel,
   setBrowserPageZoomLevel,
   type BrowserPageZoomDirection
 } from './browser-page-zoom'
@@ -2771,8 +2773,12 @@ function BrowserPagePane({
   const setBrowserDefaultZoomLevel = useAppStore((state) => state.setBrowserDefaultZoomLevel)
   const normalizedBrowserDefaultZoomLevel = normalizeBrowserPageZoomLevel(browserDefaultZoomLevel)
   const browserDefaultZoomPercent = browserPageZoomLevelToPercent(normalizedBrowserDefaultZoomLevel)
-  const browserDefaultZoomLevelRef = useRef(normalizedBrowserDefaultZoomLevel)
-  browserDefaultZoomLevelRef.current = normalizedBrowserDefaultZoomLevel
+  // Why (#68 / upstream #10800): the level THIS pane should hold. Seeded once from
+  // explicit user zoom or the configured default, and moved only by zooming
+  // this pane — so a reload can't adopt another tab's zoom via the shared setting.
+  const paneZoomLevelRef = useRef(
+    getExplicitBrowserPageZoomLevel(browserTab.id) ?? normalizedBrowserDefaultZoomLevel
+  )
   const grabElementShortcut = useShortcutLabel('browser.grabElement')
   const faviconUrlRef = useRef<string | null>(browserTab.faviconUrl)
   const initialBrowserUrlRef = useRef(browserTab.url)
@@ -3554,8 +3560,11 @@ function BrowserPagePane({
       if (!isActiveRef.current) {
         return
       }
+      // Why: reset targets 100% like Chromium; the configured default is a new-tab seed.
       const nextLevel = applyBrowserPageZoom(webviewRef.current, direction)
       if (nextLevel !== null) {
+        paneZoomLevelRef.current = nextLevel
+        rememberExplicitBrowserPageZoomLevel(browserTabIdRef.current, nextLevel)
         setBrowserDefaultZoomLevel(nextLevel)
         showBrowserZoomFeedback(nextLevel)
       }
@@ -3665,7 +3674,6 @@ function BrowserPagePane({
     container = ensuredWebview.container
     const webview = ensuredWebview.webview
     const needsInitialNavigation = ensuredWebview.created
-    let needsInitialDefaultZoom = ensuredWebview.created
 
     if (!ensuredWebview.created) {
       // pointerEvents is already applied inside ensureBrowserPageWebview for the
@@ -3725,12 +3733,13 @@ function BrowserPagePane({
       if (!queuedAnnotationViewportBridgeSync) {
         syncBrowserAnnotationViewportBridge()
       }
-      if (needsInitialDefaultZoom) {
-        const appliedLevel = setBrowserPageZoomLevel(webview, browserDefaultZoomLevelRef.current)
-        if (appliedLevel !== null) {
-          setBrowserZoomPercent(browserPageZoomLevelToPercent(appliedLevel))
-        }
-        needsInitialDefaultZoom = false
+      // Why (#68 / upstream #10800): Chromium restores per-origin zoom on reload, so
+      // reassert THIS pane's level after every guest load. Uses the pane-local
+      // level (not the shared setting) so reloading one tab never adopts a zoom
+      // the user applied to a different tab.
+      const appliedLevel = setBrowserPageZoomLevel(webview, paneZoomLevelRef.current)
+      if (appliedLevel !== null) {
+        setBrowserZoomPercent(browserPageZoomLevelToPercent(appliedLevel))
       }
       // Why: CDP Emulation.setDeviceMetricsOverride and related overrides are
       // scoped to the guest's debugger session and do not survive all
