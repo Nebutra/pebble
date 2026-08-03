@@ -93,14 +93,13 @@ describe('Tauri release workflow signing gate', () => {
     })
   })
 
-  it('keeps Linux out of the updater manifest until a self-contained package exists', () => {
+  it('keeps Linux and Windows out of the required updater matrix until packages exist', () => {
     const verifyStep = releaseWorkflow().jobs['verify-updater-manifest'].steps.find(
       ({ name }) => name === 'Verify published signed platform matrix'
     )
 
-    expect(verifyStep.env.TAURI_REQUIRED_UPDATER_PLATFORMS).toBe(
-      'darwin-aarch64,darwin-x86_64,windows-x86_64'
-    )
+    // Soft-launch: Windows waits on Authenticode certs; Linux debs are direct-download only.
+    expect(verifyStep.env.TAURI_REQUIRED_UPDATER_PLATFORMS).toBe('darwin-aarch64,darwin-x86_64')
   })
 
   it('preflights credentials before build and inspects artifacts before evidence upload', () => {
@@ -266,7 +265,7 @@ describe('Tauri release workflow signing gate', () => {
     expect(buildStep.env.APPLE_API_KEY_P8).toBeUndefined()
   })
 
-  it('keeps the complete Apple ID notarization fallback mapped to Tauri', () => {
+  it('maps App Store Connect API key notarization into the Tauri build env', () => {
     const buildStep = releaseWorkflow().jobs.build.steps.find(
       (step) => step.name === 'Build Tauri desktop bundle'
     )
@@ -279,12 +278,16 @@ describe('Tauri release workflow signing gate', () => {
         APPLE_CERTIFICATE: "${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}",
         APPLE_CERTIFICATE_PASSWORD:
           "${{ matrix.platform == 'macos' && secrets.MAC_CERTS_PASSWORD || '' }}",
-        APPLE_ID: "${{ matrix.platform == 'macos' && secrets.APPLE_ID || '' }}",
-        APPLE_PASSWORD:
-          "${{ matrix.platform == 'macos' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}",
+        APPLE_API_KEY: "${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY || '' }}",
+        APPLE_API_ISSUER: "${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}",
+        APPLE_API_KEY_PATH: "${{ matrix.platform == 'macos' && env.APPLE_API_KEY_PATH || '' }}",
         APPLE_TEAM_ID: "${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}"
       })
     )
+    // Prefer ASC API key path; do not pass empty APPLE_ID which still trips notarytool.
+    expect(buildStep.env.APPLE_ID).toBeUndefined()
+    expect(buildStep.env.APPLE_PASSWORD).toBeUndefined()
+    expect(buildStep.env.PEBBLE_SKIP_NOTARIZATION).toBeUndefined()
   })
 
   it('uses one Sentry release distribution across renderer and native artifacts', () => {
