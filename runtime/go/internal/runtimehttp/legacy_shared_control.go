@@ -1692,7 +1692,7 @@ func (s *Server) stopLegacySharedControlTerminals(method string, raw json.RawMes
 	}
 	sort.Strings(stoppedIDs)
 
-	// Why (#64 / Orca #11960): re-list with a fresh budget. A failed stop RPC is
+	// Why (#64 / upstream #11960): re-list with a fresh budget. A failed stop RPC is
 	// not proof of liveness; Session inventory decides exited vs live vs unverifiable.
 	remainingIDs := make([]string, 0)
 	listOK := true

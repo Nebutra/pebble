@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Why (#64 / Orca #11960): destructive worktree removal must prove PTYs are
+// Why (#64 / upstream #11960): destructive worktree removal must prove PTYs are
 // dead before (or while) filesystem work proceeds. A stop RPC that fails is not
 // evidence the process is still live — Session not found means already gone.
 // Verification gets its own budget so a spent sweep deadline cannot forever
@@ -153,7 +153,7 @@ func (m *Manager) verifyUnstoppedSessions(
 	if verifyBudget < WorktreePtyVerifyGrace {
 		verifyBudget = WorktreePtyVerifyGrace
 	}
-	// Why: do not share the spent sweep deadline — that was the Orca #11960 wedge.
+	// Why: do not share the spent sweep deadline — that was the upstream #11960 wedge.
 	deadline := time.Now().Add(verifyBudget)
 	type listResult struct {
 		sessions []Session

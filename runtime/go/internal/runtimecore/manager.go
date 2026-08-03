@@ -1127,7 +1127,7 @@ func (m *Manager) DeleteWorktree(ctx context.Context, id string, req DeleteWorkt
 	if worktreePathMatchesProject(worktree, project) {
 		return DeleteWorktreeResponse{}, errors.New("main worktree cannot be deleted; remove the project instead")
 	}
-	// Why (#64 / Orca #11960): stop PTYs before filesystem removal so a hung or
+	// Why (#64 / upstream #11960): stop PTYs before filesystem removal so a hung or
 	// stale session cannot leave the workspace permanently unremovable. Force
 	// (user Force Delete / CLI --force) waives unproven stop inventory.
 	if err := m.StopSessionsForWorktree(ctx, id, req.Force); err != nil {
