@@ -1,3 +1,4 @@
+// oxlint-disable max-lines -- Why: pre-existing oversized verify script; split is follow-up. Keeps PR lint green.
 import { readdir, readFile } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -4003,7 +4004,9 @@ const checks = [
     name: 'Tauri release workflow compiles diagnostics against the platform API host',
     file: '.github/workflows/tauri-desktop-release.yml',
     expect: (text) =>
-      text.includes('PEBBLE_DIAGNOSTICS_TOKEN_URL: https://api.nebutra.com/pebble/diagnostics/token')
+      text.includes(
+        'PEBBLE_DIAGNOSTICS_TOKEN_URL: https://api.nebutra.com/pebble/diagnostics/token'
+      )
   },
   {
     name: 'Tauri updater and process plugins are registered in the native shell',
