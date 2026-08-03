@@ -1841,7 +1841,10 @@ function buildWorktreePurgeState(s: AppState, worktreeIds: string[]): Partial<Ap
   for (const id of worktreeIdSet) {
     for (const tab of s.tabsByWorktree[id] ?? []) {
       doomedTabIds.add(tab.id)
-      for (const ptyId of s.ptyIdsByTabId[tab.id] ?? []) {
+      // Why: isolated worktree-slice tests (and any partial store hydrate) may
+      // omit the terminal slice entirely; production always seeds {}. Optional-
+      // chain so bulk purge never throws when only tabsByWorktree is present.
+      for (const ptyId of s.ptyIdsByTabId?.[tab.id] ?? []) {
         doomedPtyIds.add(ptyId)
       }
       // Why: a removed worktree's panes are gone for good, so drop their
@@ -1923,7 +1926,12 @@ function buildWorktreePurgeState(s: AppState, worktreeIds: string[]): Partial<Ap
     }
     return changed ? out : omitted
   }
-  const omitByTabId = <T>(obj: Record<string, T>): Record<string, T> => {
+  const omitByTabId = <T>(obj: Record<string, T> | undefined): Record<string, T> | undefined => {
+    // Null-tolerant: worktree-isolation fixtures omit terminal slices entirely;
+    // production store always initializes these maps to {}.
+    if (!obj) {
+      return obj
+    }
     let changed = false
     const out = { ...obj }
     for (const tabId of doomedTabIds) {
@@ -1934,7 +1942,10 @@ function buildWorktreePurgeState(s: AppState, worktreeIds: string[]): Partial<Ap
     }
     return changed ? out : obj
   }
-  const omitByPtyId = <T>(obj: Record<string, T>): Record<string, T> => {
+  const omitByPtyId = <T>(obj: Record<string, T> | undefined): Record<string, T> | undefined => {
+    if (!obj) {
+      return obj
+    }
     let changed = false
     const out = { ...obj }
     for (const ptyId of doomedPtyIds) {
