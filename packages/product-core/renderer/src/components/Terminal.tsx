@@ -248,7 +248,7 @@ function Terminal(): React.JSX.Element | null {
   const activeView = useAppStore((s) => s.activeView)
   // Why: when switching worktrees, keep the previous surface painted until the
   // newly activated terminal has a settled first paint (or the 1s fallback).
-  // Upstream Orca #10871; without cold-parked tracking, treat every mounted
+  // Upstream #10871; without cold-parked tracking, treat every mounted
   // worktree as needing settle so hidden→shown switches cannot flash empty.
   const desiredPresentedWorktree = useMemo(
     () =>

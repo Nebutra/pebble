@@ -23,21 +23,27 @@ describe('legacy brand identifier scan', () => {
     (value) => expect(containsLegacyBrandIdentifier(value)).toBe(false)
   )
 
-  it('scans historical, verifier-owned, and path identity residue without exceptions', async () => {
+  it('skips trellis archives and the scanner itself, but still flags path residue', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'pebble-brand-scan-'))
     const historicalFile = '.trellis/tasks/migration/prd.md'
     const scannerFile = 'config/scripts/legacy-brand-identifier-scan.mjs'
     const retiredPath = `docs/${retiredName}-migration.md`
+    const productFile = 'packages/product-core/shared/example.ts'
 
     try {
-      for (const file of [historicalFile, scannerFile]) {
+      for (const file of [historicalFile, scannerFile, productFile]) {
         await mkdir(join(repoRoot, dirname(file)), { recursive: true })
         await writeFile(join(repoRoot, file), `retired product: ${retiredName}\n`)
       }
 
       await expect(
-        scanLegacyBrandIdentifiers(repoRoot, [historicalFile, scannerFile, retiredPath])
-      ).resolves.toEqual([historicalFile, scannerFile, `${retiredPath} (path)`])
+        scanLegacyBrandIdentifiers(repoRoot, [
+          historicalFile,
+          scannerFile,
+          retiredPath,
+          productFile
+        ])
+      ).resolves.toEqual([`${retiredPath} (path)`, productFile])
     } finally {
       await rm(repoRoot, { force: true, recursive: true })
     }

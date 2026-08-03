@@ -36,7 +36,7 @@ type SparsePresetsMaps = Pick<
 
 // Why: the four per-repo sparse-preset maps are populated lazily but were never
 // pruned on repo removal, so orphaned UUID repoIds accumulated for the whole
-// session (Orca #7564).
+// session (upstream #7564).
 export function omitSparsePresetsForRepos(
   state: SparsePresetsMaps,
   removedRepoIds: readonly string[]

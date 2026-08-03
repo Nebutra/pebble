@@ -193,7 +193,7 @@ func classifyGitLabIssueListError(err error) *ProviderClassifiedError {
 	lower := strings.ToLower(message)
 	switch {
 	// Why: primary rate-limit errors also carry "HTTP 403" — check rate limit
-	// first so they don't misclassify as a token-scope problem (Orca #7595).
+	// first so they don't misclassify as a token-scope problem (upstream #7595).
 	case strings.Contains(lower, "rate limit"), strings.Contains(lower, "http 429"):
 		return &ProviderClassifiedError{Type: "rate_limited", Message: "GitLab rate limit hit. Try again in a few minutes."}
 	case errors.Is(err, ErrCLIUnauthenticated), strings.Contains(lower, "http 403"), strings.Contains(lower, "forbidden"), strings.Contains(lower, "insufficient_scope"):

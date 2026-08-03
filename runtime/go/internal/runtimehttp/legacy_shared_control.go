@@ -1095,7 +1095,7 @@ func legacySharedControlMobileMethodAllowed(method string) bool {
 		"emulator.exec",
 		"orchestration.dispatchShow",
 		// Why: mobile full-tree browsing uses lazy per-directory reads (#7289 /
-		// upstream Orca). Keep broader files.list / mutate methods denied.
+		// upstream). Keep broader files.list / mutate methods denied.
 		"files.readDir",
 		"session.tabs.createTerminal", "session.tabs.updatePaneLayout", "session.tabs.setTabProps", "session.tabs.move":
 		return true
