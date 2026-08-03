@@ -13,7 +13,7 @@ const MAX_NO_EFFECTIVE_UPSTREAM_CACHE_ENTRIES = 512
 // or git config changes. Ahead/behind is a pure function of the two rev-list
 // endpoints, so a recently-resolved name can be revalidated with one rev-list
 // spawn per poll tick; a failed rev-list (deleted ref) falls back to a full
-// re-resolve. Upstream Orca #7595 / #7576: this path dominated idle spawn churn.
+// re-resolve. Upstream #7595 / #7576: this path dominated idle spawn churn.
 const RESOLVED_UPSTREAM_NAME_CACHE_TTL_MS = 60_000
 
 type NoEffectiveUpstreamCacheIdentity = {
