@@ -1127,6 +1127,12 @@ func (m *Manager) DeleteWorktree(ctx context.Context, id string, req DeleteWorkt
 	if worktreePathMatchesProject(worktree, project) {
 		return DeleteWorktreeResponse{}, errors.New("main worktree cannot be deleted; remove the project instead")
 	}
+	// Why (#64 / upstream #11960): stop PTYs before filesystem removal so a hung or
+	// stale session cannot leave the workspace permanently unremovable. Force
+	// (user Force Delete / CLI --force) waives unproven stop inventory.
+	if err := m.StopSessionsForWorktree(ctx, id, req.Force); err != nil {
+		return DeleteWorktreeResponse{}, err
+	}
 	var preserved *PreservedWorktreeBranch
 	if req.ExecuteGit {
 		result, err := removeLocalGitWorktree(ctx, project, worktree, req)
