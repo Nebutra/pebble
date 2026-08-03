@@ -291,7 +291,7 @@ pub fn browser_child_webview_create(
         .ok_or_else(|| "primary window is not available".to_string())?;
     let mut builder = tauri::webview::WebviewBuilder::new(label.clone(), WebviewUrl::External(url))
         .devtools(true)
-        // Why (#67 / Orca #11910 · #12040): embedded guests must never destroy
+        // Why (#67 / upstream #11910 · #12040): embedded guests must never destroy
         // themselves via window.close(). A successful close leaves a dead
         // child WebView while the tab shell still holds a label, and the next
         // click crashes or no-ops against a missing guest. Uniform guard for
@@ -501,7 +501,7 @@ pub async fn browser_child_webview_resolve_dialog(
 /// Why: guest pages (and `target=_blank` openers that land as tabs) sometimes
 /// call `window.close()`. On a child WebView that tears down the native surface
 /// while the renderer still routes by label — subsequent ops fail or panic.
-/// Match Orca's guard: replace close with a no-op early, no bypass key.
+/// Match upstream's guard: replace close with a no-op early, no bypass key.
 fn browser_window_close_guard_script() -> &'static str {
     r#"
 (() => {
@@ -1737,7 +1737,7 @@ mod tests {
 
     #[test]
     fn browser_window_close_guard_neutralizes_guest_close() {
-        // Why (#67 / Orca #11910 · #12040): pin the no-op close guard; no bypass
+        // Why (#67 / upstream #11910 · #12040): pin the no-op close guard; no bypass
         // key (removed upstream as unsafe).
         let script = browser_window_close_guard_script();
         assert!(script.contains("Object.defineProperty(window, 'close'"));

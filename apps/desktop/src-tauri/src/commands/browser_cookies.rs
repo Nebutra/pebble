@@ -165,7 +165,7 @@ pub async fn browser_guest_cookie_set(
     if !path.starts_with('/') || path.len() > 2048 {
         return Err("invalid browser cookie path".to_string());
     }
-    // Why (#67 / Orca #12166): `__Host-` cookies are rejected when they carry a
+    // Why (#67 / upstream #12166): `__Host-` cookies are rejected when they carry a
     // Domain attribute or a non-`/` path. WebView2/WK host-only form is the host
     // without a leading period (empty domain is invalid on Windows CreateCookie).
     let is_host_prefixed = is_host_prefix_cookie_name(name);
@@ -404,7 +404,7 @@ fn build_import_cookie(entry: RawCookieEntry) -> Option<(Cookie<'static>, String
     if path.is_empty() || !path.starts_with('/') || path.len() > 2048 {
         return None;
     }
-    // Why (#67 / Orca #12166): Chromium/WebView2 reject `__Host-` cookies that
+    // Why (#67 / upstream #12166): Chromium/WebView2 reject `__Host-` cookies that
     // carry a Domain attribute (domain cookie) or path other than `/`. Host-only
     // form on WebView2/WK is the host without a leading period + path=/ + Secure.
     let is_host_prefixed = is_host_prefix_cookie_name(name);
@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn imports_host_prefix_cookies_host_only_with_root_path() {
-        // Why (#67 / Orca #12166): `__Host-` + Domain / non-`/` path is rejected by Chromium.
+        // Why (#67 / upstream #12166): `__Host-` + Domain / non-`/` path is rejected by Chromium.
         let entry = RawCookieEntry {
             domain: ".github.com".to_string(),
             name: "__Host-user_session_same_site".to_string(),
