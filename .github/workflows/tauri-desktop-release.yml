@@ -282,8 +282,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS || '' }}
           APPLE_CERTIFICATE_PASSWORD: ${{ matrix.platform == 'macos' && secrets.MAC_CERTS_PASSWORD || '' }}
-          # Only materialize ASC notary credentials on macOS after prepare-apple-api-key
-          # wrote APPLE_API_KEY_PATH. Empty strings on other platforms still trip Tauri.
+          # macOS: ASC key is consumed by scripts/tauri-release-build.mjs after nested
+          # codesign (serve-sim-bin). Empty strings on other platforms still trip Tauri.
           APPLE_API_KEY: ${{ matrix.platform == 'macos' && secrets.APPLE_API_KEY || '' }}
           APPLE_API_ISSUER: ${{ matrix.platform == 'macos' && secrets.APPLE_API_ISSUER || '' }}
           APPLE_API_KEY_PATH: ${{ matrix.platform == 'macos' && env.APPLE_API_KEY_PATH || '' }}
@@ -294,7 +294,9 @@ jobs:
           PEBBLE_MAC_RELEASE: ${{ matrix.platform == 'macos' && '1' || '' }}
         with:
           projectPath: apps/desktop
-          tauriScript: pnpm exec tauri
+          # macOS: wrap tauri so nested binaries are Developer-ID signed before notary.
+          # Other platforms keep the stock CLI.
+          tauriScript: ${{ matrix.platform == 'macos' && 'node scripts/tauri-release-build.mjs' || 'pnpm exec tauri' }}
           args: ${{ matrix.args }}
           includeDebug: false
           uploadUpdaterJson: true
