@@ -30,6 +30,7 @@ class FakeWebSocket {
 type HeartbeatInternals = {
   ws: FakeWebSocket | null
   state: string
+  hasEverConnected: boolean
   sharedKey: Uint8Array | null
   lastInboundFrameAt: number
   lastHeartbeatTickAt: number
@@ -63,6 +64,7 @@ function makeConnectedClient(): {
   internals.ws = socket
   internals.sharedKey = new Uint8Array(32)
   internals.state = 'connected'
+  internals.hasEverConnected = true
   internals.lastInboundFrameAt = nowMs
   internals.lastHeartbeatTickAt = nowMs
   internals.heartbeatProbeSentAt = null
@@ -128,7 +130,7 @@ describe('WebRuntimeClient liveness heartbeat', () => {
   })
 
   it('closes the socket only after a SENT probe goes unanswered (not raw silence)', () => {
-    const { internals, socket, setNow } = makeConnectedClient()
+    const { client, internals, socket, setNow } = makeConnectedClient()
     // Tick 1: 30s silence on normal cadence → probe sent.
     internals.lastInboundFrameAt = 1_000
     setNow(31_000)
@@ -137,12 +139,14 @@ describe('WebRuntimeClient liveness heartbeat', () => {
     expect(socket.send).toHaveBeenCalledTimes(1)
     expect(socket.close).not.toHaveBeenCalled()
     // Tick 2 (normal cadence later): probe still unanswered past the grace
-    // window (20s) → close + reconnect.
+    // window (20s) → degrade, close + reconnect (never silent freeze).
     setNow(31_000 + 21_000)
     internals.lastHeartbeatTickAt = 31_000 + 21_000 - 10_000
     internals.runHeartbeatTick()
     expect(socket.close).toHaveBeenCalledTimes(1)
     expect(internals.ws).toBeNull()
+    // hasEverConnected was true (we seeded connected); recovery is reconnecting.
+    expect(client.getConnectionState()).toBe('reconnecting')
   })
 
   it('does NOT close on resume after a long hidden gap — re-probes instead (regression)', () => {

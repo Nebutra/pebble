@@ -16,12 +16,27 @@ import {
   publicKeyToBase64
 } from './web-e2ee'
 
-type WebRuntimeConnectionState =
+/**
+ * Truthful control-plane lifecycle for the paired remote runtime WebSocket.
+ * Why (#65 / upstream #12076): callers must observe reconnect/degrade separately
+ * from first connect, and must never treat a half-open or pre-auth socket as
+ * "connected".
+ */
+export type WebRuntimeConnectionState =
   | 'disconnected'
   | 'connecting'
   | 'handshaking'
   | 'connected'
+  /** Previously authenticated; probing/closing a half-open socket. */
+  | 'degraded'
+  /** Scheduling or performing a reconnect after a prior successful session. */
+  | 'reconnecting'
   | 'auth-failed'
+
+export type WebRuntimeConnectionStateListener = (
+  state: WebRuntimeConnectionState,
+  previous: WebRuntimeConnectionState
+) => void
 
 type PendingRequest = {
   method: string
@@ -63,6 +78,9 @@ const CONNECT_TIMEOUT_MS = 12_000
 const HANDSHAKE_TIMEOUT_MS = 10_000
 const FILE_WATCH_READY_CLEANUP_TIMEOUT_MS = 5_000
 const RECONNECT_DELAYS_MS = [500, 1000, 2000, 4000, 8000, 15_000]
+// Why (#65 / upstream #12086): after a verified session, reconnect should prefer a
+// short "fast lane" before falling back to full backoff — not a cold-start feel.
+const RECONNECT_FAST_LANE_DELAYS_MS = [200, 400, 800, 1500]
 const SHARED_CONNECTION_SUBSCRIPTION_METHODS = new Set(['files.watch'])
 // Why: the browser WebSocket API hides protocol pings/pongs, so a half-open
 // connection (mobile NAT idle timeout, server crash, wifi→cellular handoff)
@@ -83,6 +101,8 @@ export class WebRuntimeClient {
   private state: WebRuntimeConnectionState = 'disconnected'
   private requestCounter = 0
   private reconnectAttempt = 0
+  /** True once e2ee_authenticated has succeeded at least once this client lifetime. */
+  private hasEverConnected = false
   private intentionallyClosed = false
   private connectTimer: number | null = null
   private handshakeTimer: number | null = null
@@ -101,11 +121,28 @@ export class WebRuntimeClient {
   private readonly subscriptions = new Map<string, RuntimeSubscription>()
   private readonly childClients = new Set<WebRuntimeClient>()
   private readonly waiters: { resolve: () => void; reject: (error: Error) => void }[] = []
+  private readonly stateListeners = new Set<WebRuntimeConnectionStateListener>()
   private readonly serverPublicKey: Uint8Array
 
   constructor(private readonly pairing: WebPairingOffer) {
     this.serverPublicKey = publicKeyFromBase64(pairing.publicKeyB64)
     this.openConnection()
+  }
+
+  /** Current control lifecycle state (never "connected" before E2EE auth). */
+  getConnectionState(): WebRuntimeConnectionState {
+    return this.state
+  }
+
+  /**
+   * Subscribe to lifecycle transitions. Returns an unsubscribe function.
+   * Listener is not called for the current state; only subsequent changes.
+   */
+  onConnectionStateChange(listener: WebRuntimeConnectionStateListener): () => void {
+    this.stateListeners.add(listener)
+    return () => {
+      this.stateListeners.delete(listener)
+    }
   }
 
   async call(
@@ -361,7 +398,9 @@ export class WebRuntimeClient {
     ws.binaryType = 'arraybuffer'
     this.ws = ws
     this.sharedKey = null
-    this.setState('connecting')
+    // Why (#65): first dial is "connecting"; subsequent dials after a proven
+    // session are "reconnecting" so hosts never look cold-started while recovering.
+    this.setState(this.hasEverConnected ? 'reconnecting' : 'connecting')
 
     this.connectTimer = window.setTimeout(() => {
       if (this.ws === ws && ws.readyState === WebSocket.CONNECTING) {
@@ -589,18 +628,32 @@ export class WebRuntimeClient {
     if (this.ws !== closedWs) {
       return
     }
+    // Why (#65 / upstream #12076): a socket that closed during handshaking must not
+    // be promoted to a live control. Drop identity and route into recovery.
+    const closedDuringHandshake =
+      this.state === 'handshaking' || this.state === 'connecting' || this.state === 'degraded'
     this.ws = null
     this.sharedKey = null
     this.clearConnectTimer()
     this.clearHandshakeTimer()
     this.clearHeartbeatTimer()
-    this.rejectAllPending('Remote Pebble runtime connection interrupted.')
+    this.rejectAllPending(
+      this.hasEverConnected
+        ? 'Remote Pebble runtime connection interrupted; reconnecting.'
+        : 'Remote Pebble runtime connection interrupted.'
+    )
     this.notifySubscriptionsClosed()
     if (this.intentionallyClosed || this.state === 'auth-failed') {
       this.setState(this.state === 'auth-failed' ? 'auth-failed' : 'disconnected')
       return
     }
-    this.setState('disconnected')
+    // Never leave a dead pre-auth control looking "online".
+    if (closedDuringHandshake && !this.hasEverConnected) {
+      this.setState('disconnected')
+      this.scheduleReconnect()
+      return
+    }
+    this.setState(this.hasEverConnected ? 'reconnecting' : 'disconnected')
     this.scheduleReconnect()
   }
 
@@ -608,18 +661,43 @@ export class WebRuntimeClient {
     if (this.reconnectTimer || this.intentionallyClosed) {
       return
     }
-    const delay =
-      RECONNECT_DELAYS_MS[Math.min(this.reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)]
+    if (this.hasEverConnected && this.state !== 'reconnecting') {
+      this.setState('reconnecting')
+    }
+    const delays = this.hasEverConnected ? RECONNECT_FAST_LANE_DELAYS_MS : RECONNECT_DELAYS_MS
+    const delay = delays[Math.min(this.reconnectAttempt, delays.length - 1)]
+    // After exhausting the fast lane, continue with the long backoff table.
+    const longDelay =
+      this.hasEverConnected && this.reconnectAttempt >= RECONNECT_FAST_LANE_DELAYS_MS.length
+        ? RECONNECT_DELAYS_MS[
+            Math.min(
+              this.reconnectAttempt - RECONNECT_FAST_LANE_DELAYS_MS.length,
+              RECONNECT_DELAYS_MS.length - 1
+            )
+          ]
+        : delay
     this.reconnectAttempt += 1
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null
       this.openConnection()
-    }, delay)
+    }, longDelay)
   }
 
   private setState(next: WebRuntimeConnectionState): void {
+    if (this.state === next) {
+      return
+    }
+    const previous = this.state
     this.state = next
+    for (const listener of this.stateListeners) {
+      try {
+        listener(next, previous)
+      } catch {
+        // Lifecycle listeners must not break the transport.
+      }
+    }
     if (next === 'connected') {
+      this.hasEverConnected = true
       this.startHeartbeat()
       for (const waiter of this.waiters.splice(0)) {
         waiter.resolve()
@@ -743,6 +821,9 @@ export class WebRuntimeClient {
       this.heartbeatProbeSentAt !== null &&
       now - this.heartbeatProbeSentAt >= HEARTBEAT_PROBE_GRACE_MS
     ) {
+      // Why (#65): mark degraded before close so UI can show a truthful
+      // "connection lost / recovering" state instead of silent freeze.
+      this.setState('degraded')
       ws.close()
       this.handleSocketClosed(ws)
       return
