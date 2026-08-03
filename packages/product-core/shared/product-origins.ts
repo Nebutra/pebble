@@ -15,6 +15,14 @@
  * never gets its own subdomain.
  */
 
+// Why redeclared here: tsgo under `types: ['node']` does not always pick up
+// ambient injects from packages/product-core/types/build-constants.d.ts for this
+// module; keep the same compile-time contract the Vite defines substitute.
+declare const PEBBLE_PRODUCT_ORIGIN: string | null
+declare const PEBBLE_DOCS_ORIGIN: string | null
+declare const PEBBLE_API_ORIGIN: string | null
+declare const PEBBLE_STATUS_ORIGIN: string | null
+
 const DEFAULT_PRODUCT_ORIGIN = 'https://pebble.nebutra.com'
 const DEFAULT_DOCS_ORIGIN = 'https://docs.nebutra.com'
 const DEFAULT_API_ORIGIN = 'https://api.nebutra.com'
