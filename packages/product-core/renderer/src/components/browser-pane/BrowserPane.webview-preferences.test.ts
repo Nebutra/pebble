@@ -248,7 +248,11 @@ describe('BrowserPane webview preferences', () => {
       resolveContainer
     })
 
-    expect(registryMocks.destroyPersistentWebview).toHaveBeenCalledWith('browser-page-1')
+    // Why (#68): partition remount is same-tab rebuild — keep user zoom via
+    // preserveViewport so Chromium does not reset the viewport level.
+    expect(registryMocks.destroyPersistentWebview).toHaveBeenCalledWith('browser-page-1', {
+      preserveViewport: true
+    })
     expect(resolveContainer).toHaveBeenCalledTimes(1)
     expect(ensuredWebview).not.toBeNull()
     expect(ensuredWebview?.created).toBe(true)
