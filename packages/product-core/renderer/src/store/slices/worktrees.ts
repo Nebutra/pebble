@@ -291,7 +291,11 @@ const FORCE_RETRYABLE_WORKTREE_REMOVAL_MESSAGES = [
   'Worktree has uncommitted or untracked changes',
   'contains modified or untracked files',
   'Worktree is no longer registered with Git but its directory remains',
-  'Worktree is no longer registered with Git and its directory is already gone'
+  'Worktree is no longer registered with Git and its directory is already gone',
+  // Why (#64 / Orca #11960): Force Delete must appear when the PTY gate refused
+  // removal; ordinary force (dirty skip) is a different path that still sets force
+  // only after the user confirms the dedicated Force Delete control.
+  'Failed to physically stop every PTY for worktree:'
 ] as const
 
 // Why: local preflight formatting can surface raw git porcelain instead of the

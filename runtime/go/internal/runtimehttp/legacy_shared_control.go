@@ -1678,23 +1678,46 @@ func (s *Server) stopLegacySharedControlTerminals(method string, raw json.RawMes
 		}
 	}
 	stoppedIDs := make([]string, 0, len(targets))
-	stopErrors := make([]string, 0)
+	failedIDs := make([]string, 0)
 	for _, session := range targets {
 		if _, err := s.manager.StopSession(session.ID); err == nil {
 			stoppedIDs = append(stoppedIDs, session.ID)
-		} else {
-			stopErrors = append(stopErrors, session.ID+": "+err.Error())
+			continue
+		} else if errors.Is(err, runtimecore.ErrSessionNotFound) {
+			// Already gone is success for teardown; do not treat as still-live.
+			stoppedIDs = append(stoppedIDs, session.ID)
+			continue
 		}
+		failedIDs = append(failedIDs, session.ID)
 	}
 	sort.Strings(stoppedIDs)
+
+	// Why (#64 / Orca #11960): re-list with a fresh budget. A failed stop RPC is
+	// not proof of liveness; Session inventory decides exited vs live vs unverifiable.
 	remainingIDs := make([]string, 0)
+	listOK := true
 	for _, session := range s.manager.ListSessions() {
 		if legacySharedControlSessionLive(session) && (worktreeID == "" || session.WorktreeID == worktreeID) {
 			remainingIDs = append(remainingIDs, session.ID)
 		}
 	}
 	sort.Strings(remainingIDs)
-	postStopVerified := len(stopErrors) == 0
+
+	// Promote failed stop attempts that no longer list as live into stopped.
+	if listOK && len(failedIDs) > 0 {
+		stillFailed := make([]string, 0)
+		for _, id := range failedIDs {
+			if containsLegacySharedControlString(remainingIDs, id) {
+				stillFailed = append(stillFailed, id)
+			} else {
+				stoppedIDs = append(stoppedIDs, id)
+			}
+		}
+		failedIDs = stillFailed
+		sort.Strings(stoppedIDs)
+	}
+
+	postStopVerified := len(failedIDs) == 0
 	if method == "terminal.stopExact" && params.TargetOnly {
 		for _, target := range targets {
 			postStopVerified = postStopVerified && !containsLegacySharedControlString(remainingIDs, target.ID)
@@ -1712,8 +1735,10 @@ func (s *Server) stopLegacySharedControlTerminals(method string, raw json.RawMes
 		result["remainingLivePtyIds"] = remainingIDs
 	}
 	if !postStopVerified {
-		if len(stopErrors) > 0 {
-			result["postStopFailure"] = "terminal_stop_failed: " + strings.Join(stopErrors, "; ")
+		if len(failedIDs) > 0 && len(remainingIDs) > 0 {
+			result["postStopFailure"] = "terminal_stop_still_live: " + strings.Join(failedIDs, ", ")
+		} else if len(failedIDs) > 0 {
+			result["postStopFailure"] = "terminal_stop_unverified: " + strings.Join(failedIDs, ", ")
 		} else {
 			result["postStopFailure"] = "terminal_exact_stop_still_live"
 		}

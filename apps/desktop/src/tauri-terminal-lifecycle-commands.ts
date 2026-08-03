@@ -154,21 +154,31 @@ export async function stopTerminals(params: unknown) {
   const targets = worktreeId
     ? sessions.filter((session) => session.worktreeId === worktreeId)
     : sessions
+  const liveBefore = targets.filter(isLiveSession)
+  const livePtyIds = liveBefore.map((session) => session.id).sort()
   const stoppedPtyIds: string[] = []
-  for (const session of targets) {
-    if (!isLiveSession(session)) {
-      continue
-    }
+  for (const session of liveBefore) {
+    // Why (#64): DELETE may 404 when the session already exited; treat that as
+    // stopped and re-list to prove liveness rather than trusting the RPC alone.
     await requestRuntimeJson<RuntimeSession>(`/v1/sessions/${encodeURIComponent(session.id)}`, {
       method: 'DELETE'
     }).catch(() => undefined)
     stoppedPtyIds.push(session.id)
   }
+  const remainingLive = (await listSessions()).filter(
+    (session) => isLiveSession(session) && (!worktreeId || session.worktreeId === worktreeId)
+  )
   return {
     stopped: stoppedPtyIds.length,
-    stoppedPtyIds,
-    livePtyIds: targets.filter(isLiveSession).map((session) => session.id),
-    postStopVerified: true
+    stoppedPtyIds: stoppedPtyIds.sort(),
+    livePtyIds,
+    postStopVerified: remainingLive.length === 0,
+    ...(remainingLive.length > 0
+      ? {
+          remainingLivePtyIds: remainingLive.map((session) => session.id).sort(),
+          postStopFailure: 'terminal_stop_still_live'
+        }
+      : {})
   }
 }
 
