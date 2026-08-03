@@ -291,6 +291,12 @@ pub fn browser_child_webview_create(
         .ok_or_else(|| "primary window is not available".to_string())?;
     let mut builder = tauri::webview::WebviewBuilder::new(label.clone(), WebviewUrl::External(url))
         .devtools(true)
+        // Why (#67 / Orca #11910 · #12040): embedded guests must never destroy
+        // themselves via window.close(). A successful close leaves a dead
+        // child WebView while the tab shell still holds a label, and the next
+        // click crashes or no-ops against a missing guest. Uniform guard for
+        // every embedded tab — no CLI/allowlist bypass.
+        .initialization_script(browser_window_close_guard_script())
         .initialization_script(browser_context_menu_script(&input.grab_shortcuts)?)
         .initialization_script(browser_automation_capture_script())
         .initialization_script(browser_screencast_dirty::script())
@@ -488,6 +494,32 @@ pub async fn browser_child_webview_resolve_dialog(
     receiver
         .await
         .map_err(|_| "browser dialog resolver was dropped".to_string())?
+}
+
+/// Neutralize `window.close()` in every embedded browser guest.
+///
+/// Why: guest pages (and `target=_blank` openers that land as tabs) sometimes
+/// call `window.close()`. On a child WebView that tears down the native surface
+/// while the renderer still routes by label — subsequent ops fail or panic.
+/// Match Orca's guard: replace close with a no-op early, no bypass key.
+fn browser_window_close_guard_script() -> &'static str {
+    r#"
+(() => {
+  const ignoreWindowClose = () => {};
+  try {
+    Object.defineProperty(window, 'close', {
+      configurable: false,
+      enumerable: false,
+      writable: false,
+      value: ignoreWindowClose
+    });
+  } catch {
+    try {
+      window.close = ignoreWindowClose;
+    } catch {}
+  }
+})();
+"#
 }
 
 fn browser_context_menu_script(grab_shortcuts: &[String]) -> Result<String, String> {
@@ -1701,6 +1733,19 @@ mod tests {
         ));
         let invalid = Url::parse("pebble-context://event?kind=grabActionShortcut&key=x").unwrap();
         assert!(parse_context_menu_navigation(&invalid, "tab-1").is_none());
+    }
+
+    #[test]
+    fn browser_window_close_guard_neutralizes_guest_close() {
+        // Why (#67 / Orca #11910 · #12040): pin the no-op close guard; no bypass
+        // key (removed upstream as unsafe).
+        let script = browser_window_close_guard_script();
+        assert!(script.contains("Object.defineProperty(window, 'close'"));
+        assert!(script.contains("ignoreWindowClose"));
+        assert!(script.contains("window.close = ignoreWindowClose"));
+        assert!(!script.contains("allowWindowClose"));
+        assert!(!script.contains("__orca_window_close_allowed__"));
+        assert!(!script.contains("__pebble_window_close_allowed__"));
     }
 
     #[test]

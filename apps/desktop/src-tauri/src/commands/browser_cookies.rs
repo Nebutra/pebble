@@ -157,21 +157,34 @@ pub async fn browser_guest_cookie_set(
 ) -> Result<bool, String> {
     let webview = resolve_browser_webview(&app, &input.label)?;
     let domain = input.domain.as_deref().map(str::trim).unwrap_or_default();
-    if !is_valid_cookie_name(input.name.trim()) || !is_valid_cookie_domain(domain) {
+    let name = input.name.trim();
+    if !is_valid_cookie_name(name) || !is_valid_cookie_domain(domain) {
         return Err("invalid browser cookie name or domain".to_string());
     }
     let path = input.path.as_deref().unwrap_or("/").trim();
     if !path.starts_with('/') || path.len() > 2048 {
         return Err("invalid browser cookie path".to_string());
     }
-    let mut builder = Cookie::build((
-        input.name.trim().to_string(),
-        strip_non_printable_ascii(&input.value),
-    ))
-    .domain(domain.to_string())
-    .path(path.to_string())
-    .secure(input.secure.unwrap_or(false))
-    .http_only(input.http_only.unwrap_or(false));
+    // Why (#67 / Orca #12166): `__Host-` cookies are rejected when they carry a
+    // Domain attribute or a non-`/` path. WebView2/WK host-only form is the host
+    // without a leading period (empty domain is invalid on Windows CreateCookie).
+    let is_host_prefixed = is_host_prefix_cookie_name(name);
+    let cookie_domain = if is_host_prefixed {
+        domain.trim_start_matches('.').to_string()
+    } else {
+        domain.to_string()
+    };
+    let cookie_path = if is_host_prefixed { "/" } else { path };
+    let secure = if is_host_prefixed {
+        true
+    } else {
+        input.secure.unwrap_or(false)
+    };
+    let mut builder = Cookie::build((name.to_string(), strip_non_printable_ascii(&input.value)))
+        .domain(cookie_domain)
+        .path(cookie_path.to_string())
+        .secure(secure)
+        .http_only(input.http_only.unwrap_or(false));
     if let Some(same_site) = parse_same_site(input.same_site.as_deref())? {
         builder = builder.same_site(same_site);
     }
@@ -376,6 +389,10 @@ fn parse_cookie_entries(bytes: &[u8]) -> Result<Vec<RawCookieEntry>, String> {
     Ok(entries)
 }
 
+fn is_host_prefix_cookie_name(name: &str) -> bool {
+    name.starts_with("__Host-")
+}
+
 fn build_import_cookie(entry: RawCookieEntry) -> Option<(Cookie<'static>, String)> {
     let domain = entry.domain.trim();
     let name = entry.name.trim();
@@ -387,10 +404,24 @@ fn build_import_cookie(entry: RawCookieEntry) -> Option<(Cookie<'static>, String
     if path.is_empty() || !path.starts_with('/') || path.len() > 2048 {
         return None;
     }
-    let secure = bool_like(entry.secure.as_ref());
+    // Why (#67 / Orca #12166): Chromium/WebView2 reject `__Host-` cookies that
+    // carry a Domain attribute (domain cookie) or path other than `/`. Host-only
+    // form on WebView2/WK is the host without a leading period + path=/ + Secure.
+    let is_host_prefixed = is_host_prefix_cookie_name(name);
+    let cookie_domain = if is_host_prefixed {
+        domain.trim_start_matches('.').to_string()
+    } else {
+        domain.to_string()
+    };
+    let cookie_path = if is_host_prefixed { "/" } else { path };
+    let secure = if is_host_prefixed {
+        true
+    } else {
+        bool_like(entry.secure.as_ref())
+    };
     let mut builder = Cookie::build((name.to_string(), value))
-        .domain(domain.to_string())
-        .path(path.to_string())
+        .domain(cookie_domain)
+        .path(cookie_path.to_string())
         .secure(secure)
         .http_only(bool_like(entry.http_only.as_ref()));
     if let Some(same_site) = normalize_same_site(entry.same_site.as_ref()) {
@@ -534,9 +565,47 @@ mod tests {
     }
 
     #[test]
+    fn imports_host_prefix_cookies_host_only_with_root_path() {
+        // Why (#67 / Orca #12166): `__Host-` + Domain / non-`/` path is rejected by Chromium.
+        let entry = RawCookieEntry {
+            domain: ".github.com".to_string(),
+            name: "__Host-user_session_same_site".to_string(),
+            value: "sess".to_string(),
+            path: Some("/account".to_string()),
+            secure: Some(BoolLike::Bool(false)),
+            http_only: Some(BoolLike::Bool(true)),
+            same_site: Some(serde_json::Value::String("lax".to_string())),
+            expiration_date: None,
+        };
+        let (cookie, summary_domain) = build_import_cookie(entry).expect("host cookie");
+        // Host-only form: no leading-dot domain cookie (WebView2/WK host-only host).
+        assert_eq!(cookie.domain(), Some("github.com"));
+        assert_eq!(cookie.path(), Some("/"));
+        assert_eq!(cookie.secure(), Some(true));
+        assert_eq!(cookie.http_only(), Some(true));
+        assert_eq!(summary_domain, "github.com");
+
+        let normal = RawCookieEntry {
+            domain: ".github.com".to_string(),
+            name: "_gh_sess".to_string(),
+            value: "abc".to_string(),
+            path: Some("/settings".to_string()),
+            secure: Some(BoolLike::Bool(true)),
+            http_only: None,
+            same_site: None,
+            expiration_date: None,
+        };
+        let (normal_cookie, _) = build_import_cookie(normal).expect("normal cookie");
+        assert_eq!(normal_cookie.domain(), Some("github.com"));
+        assert_eq!(normal_cookie.path(), Some("/settings"));
+    }
+
+    #[test]
     fn rejects_path_traversal_and_invalid_cookie_names() {
         assert!(!is_valid_cookie_name("bad=name"));
         assert!(!is_valid_cookie_domain("example..com"));
+        assert!(is_host_prefix_cookie_name("__Host-user_session_same_site"));
+        assert!(!is_host_prefix_cookie_name("__Secure-session"));
     }
 
     #[test]
