@@ -2937,6 +2937,12 @@ export type GlobalSettings = {
    *  effectively present at runtime — the renderer should still fall back to
    *  defaults when reading optional sub-fields. */
   voice?: VoiceSettings
+  /**
+   * Kill switch for the browser-guest worktree retention budget: destroys the
+   * least-recently-activated hidden worktrees' webview guests beyond an LRU count.
+   * Absent or true keeps the budget on (default).
+   */
+  browserGuestWorktreeRetentionBudget?: boolean
 }
 
 export type PebbleWorkspaceLayout = {
@@ -3300,14 +3306,7 @@ export type PersistedUIState = {
   browserDefaultUrl?: string | null
   browserDefaultSearchEngine?: 'google' | 'duckduckgo' | 'bing' | 'kagi' | null
   /** Electron browser zoom level applied when a new local browser tab is created. */
-  browserDefaultZoomLevel?: number
-  /**
-   * Kill switch for the browser-guest worktree retention budget: destroys the
-   * least-recently-activated hidden worktrees' webview guests beyond an LRU count.
-   * Absent or true keeps the budget on (default).
-   */
-  browserGuestWorktreeRetentionBudget?: boolean
-  /** Optional Kagi private-session link used only when Kagi is the search engine. */
+  browserDefaultZoomLevel?: number /** Optional Kagi private-session link used only when Kagi is the search engine. */
   browserKagiSessionLink?: string | null
   /** Saved window bounds so the app restores to the user's last position/size
    *  instead of maximizing on every launch. */

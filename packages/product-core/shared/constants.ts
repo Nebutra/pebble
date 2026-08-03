@@ -391,7 +391,9 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
       customAgentCommand: ''
     },
     sourceControlAi: getDefaultSourceControlAiSettings(),
-    voice: getDefaultVoiceSettings()
+    voice: getDefaultVoiceSettings(),
+    // Why: default-on kill switch for browser guest LRU retention across hidden worktrees.
+    browserGuestWorktreeRetentionBudget: true
   }
 }
 
@@ -506,8 +508,7 @@ export function getDefaultUIState(): PersistedUIState {
     featureTipsSeenIds: [],
     featureInteractions: {},
     contextualToursSeenIds: [],
-    browserDefaultZoomLevel: DEFAULT_BROWSER_PAGE_ZOOM_LEVEL,
-    browserGuestWorktreeRetentionBudget: true
+    browserDefaultZoomLevel: DEFAULT_BROWSER_PAGE_ZOOM_LEVEL
   }
 }
 
