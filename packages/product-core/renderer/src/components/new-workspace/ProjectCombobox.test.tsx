@@ -34,11 +34,11 @@ let root: Root
 const projects: NewWorkspaceProjectOption[] = [
   {
     kind: 'project',
-    id: 'github:stablyai/orca',
-    projectId: 'github:stablyai/orca',
-    displayName: 'orca',
+    id: 'github:stablyai/pebble-demo',
+    projectId: 'github:stablyai/pebble-demo',
+    displayName: 'pebble-demo',
     badgeColor: '#111111',
-    detail: 'stablyai/orca'
+    detail: 'stablyai/pebble-demo'
   },
   {
     kind: 'project',
@@ -112,12 +112,16 @@ describe('ProjectCombobox', () => {
   it('renders a logical project label without host-specific SSH chrome', () => {
     act(() => {
       root.render(
-        <ProjectCombobox options={projects} value="github:stablyai/orca" onValueChange={vi.fn()} />
+        <ProjectCombobox
+          options={projects}
+          value="github:stablyai/pebble-demo"
+          onValueChange={vi.fn()}
+        />
       )
     })
 
     const shell = container.querySelector('[data-project-combobox-root="true"]')
-    expect(shell?.textContent).toContain('orca')
+    expect(shell?.textContent).toContain('pebble-demo')
     expect(shell?.textContent).not.toContain('SSH')
   })
 
@@ -143,7 +147,7 @@ describe('ProjectCombobox', () => {
       root.render(
         <ProjectCombobox
           options={projects}
-          value="github:stablyai/orca"
+          value="github:stablyai/pebble-demo"
           onValueChange={onValueChange}
         />
       )
@@ -286,7 +290,7 @@ describe('ProjectCombobox', () => {
 
     type('noq')
     expect(container.textContent).toContain('stablyai/noqa')
-    expect(container.textContent).not.toContain('stablyai/orca')
+    expect(container.textContent).not.toContain('stablyai/pebble-demo')
   })
 
   it('commits the armed row on Enter', () => {
@@ -340,7 +344,11 @@ describe('ProjectCombobox', () => {
   it('restores the committed project on Escape instead of stranding a stale query', () => {
     act(() => {
       root.render(
-        <ProjectCombobox options={projects} value="github:stablyai/orca" onValueChange={vi.fn()} />
+        <ProjectCombobox
+          options={projects}
+          value="github:stablyai/pebble-demo"
+          onValueChange={vi.fn()}
+        />
       )
     })
     openList()
@@ -361,13 +369,17 @@ describe('ProjectCombobox', () => {
 
     expect(field().value).toBe('')
     const shell = container.querySelector('[data-project-combobox-root="true"]')
-    expect(shell?.textContent).toContain('orca')
+    expect(shell?.textContent).toContain('pebble-demo')
   })
 
   it('drops an uncommitted query when the list closes, so junk text never persists', () => {
     act(() => {
       root.render(
-        <ProjectCombobox options={projects} value="github:stablyai/orca" onValueChange={vi.fn()} />
+        <ProjectCombobox
+          options={projects}
+          value="github:stablyai/pebble-demo"
+          onValueChange={vi.fn()}
+        />
       )
     })
     openList()
@@ -383,7 +395,7 @@ describe('ProjectCombobox', () => {
 
     expect(field().value).toBe('')
     const shell = container.querySelector('[data-project-combobox-root="true"]')
-    expect(shell?.textContent).toContain('orca')
+    expect(shell?.textContent).toContain('pebble-demo')
   })
 
   it('marks the field invalid so a failed create press can turn it red', () => {
