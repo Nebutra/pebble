@@ -682,7 +682,7 @@ describe('useTerminalPaneGlobalEffects', () => {
       getActivePane: vi.fn(() => null)
     }
 
-    // Why (#66 / Orca #12061): plain focus keeps the warm shared glyph atlas.
+    // Why (#66 / upstream #12061): plain focus keeps the warm shared glyph atlas.
     registerManagerForReset(manager)
     beginHookRender()
     useTerminalPaneGlobalEffects({
@@ -832,7 +832,7 @@ describe('useTerminalPaneGlobalEffects', () => {
     visibilityState = 'visible'
     listener(new Event('visibilitychange'))
 
-    // Why (#66 / Orca #12061): fullscreen visibility returns preserve atlases.
+    // Why (#66 / upstream #12061): fullscreen visibility returns preserve atlases.
     expect(manager.resetWebglTextureAtlases).not.toHaveBeenCalled()
     expect(siblingManager.resetWebglTextureAtlases).not.toHaveBeenCalled()
     expect(manager.scheduleRevealRepaint).toHaveBeenCalledTimes(1)

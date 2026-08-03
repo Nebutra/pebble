@@ -20,7 +20,7 @@ export function shouldRepairActiveTerminalTab(args: {
 /**
  * Resolve which terminal tab to open after a project/agent is selected, or null
  * if no repair is needed. Prefers the remembered per-worktree tab so a transient
- * repair does not reset selection to Terminal 1 (#66 / Orca #11950).
+ * repair does not reset selection to Terminal 1 (#66 / upstream #11950).
  */
 export function resolveRepairedActiveTerminalTabId(args: {
   activeTabType: WorkspaceVisibleTabType

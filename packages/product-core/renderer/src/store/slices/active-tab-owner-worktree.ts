@@ -17,7 +17,7 @@ export function _resetDuplicateTabOwnerBreadcrumbsForTests(): void {
  * Why the preference: a stale map can leave one tab id under two worktrees, and
  * attributing it to an arbitrary first match leaves `activeTabId` permanently
  * unconvergeable — which strands Terminal's active-terminal repair effect in a
- * self-retriggering loop (React #185 / Orca #11950 / Pebble #66).
+ * self-retriggering loop (React #185 / upstream #11950 / Pebble #66).
  */
 export function resolveActiveTabOwnerWorktreeId(
   tabsByWorktree: Record<string, TerminalTab[]>,

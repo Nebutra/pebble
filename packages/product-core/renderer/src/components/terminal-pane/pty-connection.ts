@@ -4377,7 +4377,7 @@ export function connectPanePty(
         ? shouldForceForegroundRenderRefresh(data)
         : { refresh: false, inPlaceRewrite: false, recoverWebglAtlasAfterParse: false }
       if (!foregroundOutput) {
-        // Why (#66 / Orca #12061): advance hidden rewrite state only; reveal owns
+        // Why (#66 / upstream #12061): advance hidden rewrite state only; reveal owns
         // atlas recovery so hidden TUI/synchronized storms do not fan out global
         // resets across dozens of mounted managers.
         void hiddenOutputNeedsAtlasRecoveryAfterParse(data)

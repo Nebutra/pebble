@@ -17,7 +17,7 @@ export function unregisterLivePaneManager(manager: RegisteredPaneManager): void 
 }
 
 function managersEligibleForAtlasRecovery(): RegisteredPaneManager[] {
-  // Why (#66 / Orca #12061): a global fanout over dozens of hidden worktree
+  // Why (#66 / upstream #12061): a global fanout over dozens of hidden worktree
   // managers multiplies CPU/heap on ordinary fullscreen/visibility returns.
   // Managers that opt in with isVisibleForAtlasRecovery === false are skipped;
   // missing the hook keeps legacy "reset everyone" behavior.

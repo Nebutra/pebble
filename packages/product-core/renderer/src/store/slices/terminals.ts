@@ -1312,7 +1312,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
       // silently swallow the signal. Mirrors the guard in activateTab and
       // focusGroup.
       //
-      // Why prefer active worktree on duplicate ids (#66 / Orca #11950): a
+      // Why prefer active worktree on duplicate ids (#66 / upstream #11950): a
       // first-match scan can pin ownership to a background worktree, leave
       // global activeTabId unchanged, and strand the active-terminal repair
       // effect in a React #185 update loop.

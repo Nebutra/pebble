@@ -70,7 +70,7 @@ export class PaneManager {
   private styleOptions: PaneStyleOptions = {}
   private destroyed = false
   private renderingSuspended: boolean
-  /** Visible surfaces participate in heavy shared-atlas recovery (#66 / Orca #12061). */
+  /** Visible surfaces participate in heavy shared-atlas recovery (#66 / upstream #12061). */
   private atlasRecoveryVisible: boolean
   private identities = new PaneIdentityRegistry()
   private pendingPaneReparentFrameIds = new Set<number>()

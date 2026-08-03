@@ -43,7 +43,7 @@ type RecoverVisibleTerminalWindowWakeArgs = {
   /**
    * When true, wipe and rebuild the shared WebGL glyph atlas (genuine OS resume).
    * Ordinary focus / fullscreen visibility returns leave the warm atlas intact
-   * so paired traffic cannot multiply global recovery (#66 / Orca #12061).
+   * so paired traffic cannot multiply global recovery (#66 / upstream #12061).
    */
   clearGlyphAtlases?: boolean
 }

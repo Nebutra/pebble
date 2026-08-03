@@ -65,7 +65,7 @@ export function useTerminalWindowWakeRecovery({
         })
       })
     }
-    // Why (#66 / Orca #12061): plain refocus and fullscreen visibility returns
+    // Why (#66 / upstream #12061): plain refocus and fullscreen visibility returns
     // keep the warm shared glyph atlas. Wiping it on every Space swipe fans out
     // global resets across dozens of managers and freezes the renderer.
     const onFocus = (): void => recoverVisibleWake(false)

@@ -13,7 +13,7 @@ type ActiveTerminalRepairInput = {
 
 /**
  * Pure repair step used by the effect and by unit tests that pin the
- * non-convergence contract without mounting React (#66 / Orca #11950).
+ * non-convergence contract without mounting React (#66 / upstream #11950).
  */
 export function repairActiveTerminalTab({
   activeTabType,

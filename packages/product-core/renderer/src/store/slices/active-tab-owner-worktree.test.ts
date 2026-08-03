@@ -45,7 +45,7 @@ describe('resolveActiveTabOwnerWorktreeId', () => {
   })
 
   it('prefers the active worktree over an earlier-scanned duplicate', () => {
-    // Why regression (#66 / Orca #11950): first-match ownership skipped activeTabId
+    // Why regression (#66 / upstream #11950): first-match ownership skipped activeTabId
     // while reallocating activeTabIdByWorktree, retriggering repair indefinitely.
     const owner = resolveActiveTabOwnerWorktreeId(
       { 'wt-other': [tab('t1', 'wt-other')], 'wt-active': [tab('t1', 'wt-active')] },
