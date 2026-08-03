@@ -325,6 +325,24 @@ jobs:
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: node config/scripts/upload-sentry-native-debug-files.mjs
 
+      # tauri-action may miss the post-notary DMG rebuilt by tauri-release-build.mjs.
+      - name: Upload notarized macOS DMG to GitHub Release
+        if: >-
+          matrix.platform == 'macos' &&
+          (github.event_name == 'push' || inputs.upload_to_github_release) &&
+          inputs.release_tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DMG=$(find apps/desktop/src-tauri/target -name 'pebble-macos-universal.dmg' -o -name 'Pebble.dmg' | head -1)
+          if [ -z "${DMG}" ]; then
+            echo "No macOS DMG found after notarized build" >&2
+            exit 1
+          fi
+          gh release upload "${{ inputs.release_tag }}" "${DMG}#pebble-macos-universal.dmg" --clobber
+          echo "Uploaded ${DMG} as pebble-macos-universal.dmg"
+
       - name: Inspect signed release artifacts and sidecars
         env:
           APPLE_TEAM_ID: ${{ matrix.platform == 'macos' && secrets.APPLE_TEAM_ID || '' }}
