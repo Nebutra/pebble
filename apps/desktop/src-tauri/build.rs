@@ -17,6 +17,15 @@ fn configure_local_speech_runtime_paths() {
     if cfg!(target_os = "macos") {
         println!("cargo:rustc-link-arg=-Wl,-rpath,@loader_path");
         println!("cargo:rustc-link-arg=-Wl,-rpath,@loader_path/../Frameworks");
+        // Why: same class of failure as Linux — restored target/ keeps -L into a
+        // missing ~/Library/Caches/sherpa-rs path, then ld fails with
+        // "library 'onnxruntime.1.17.1' not found". Stage via
+        // ensure-macos-speech-link-libs.mjs (or SHERPA_LIB_PATH).
+        if let Some(lib_dir) = macos_speech_lib_search_dir() {
+            println!("cargo:rerun-if-env-changed=SHERPA_LIB_PATH");
+            println!("cargo:rerun-if-env-changed=PEBBLE_MACOS_SPEECH_LIB_DIR");
+            println!("cargo:rustc-link-search=native={}", lib_dir.display());
+        }
     } else if cfg!(target_os = "linux") {
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/../lib");
@@ -30,6 +39,43 @@ fn configure_local_speech_runtime_paths() {
             println!("cargo:rustc-link-search=native={}", lib_dir.display());
         }
     }
+}
+
+fn macos_speech_lib_search_dir() -> Option<PathBuf> {
+    const ONNX: &str = "libonnxruntime.1.17.1.dylib";
+    if let Ok(dir) = env::var("PEBBLE_MACOS_SPEECH_LIB_DIR") {
+        let path = PathBuf::from(dir);
+        if path.join(ONNX).is_file() {
+            return Some(path);
+        }
+    }
+    if let Ok(root) = env::var("SHERPA_LIB_PATH") {
+        let lib = PathBuf::from(root).join("lib");
+        if lib.join(ONNX).is_file() {
+            return Some(lib);
+        }
+    }
+    let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR")?);
+    let target = env::var("TARGET").ok()?;
+    let staged = manifest_dir.join("speech-libs").join(&target).join("lib");
+    if staged.join(ONNX).is_file() {
+        return Some(staged);
+    }
+    // Universal builds may only have one arch staged; accept the sibling.
+    for alt in ["aarch64-apple-darwin", "x86_64-apple-darwin"] {
+        if alt == target {
+            continue;
+        }
+        let alt_staged = manifest_dir.join("speech-libs").join(alt).join("lib");
+        if alt_staged.join(ONNX).is_file() {
+            return Some(alt_staged);
+        }
+    }
+    let frameworks = manifest_dir.join("staged-macos-libraries");
+    if frameworks.join(ONNX).is_file() {
+        return Some(frameworks);
+    }
+    None
 }
 
 fn linux_speech_lib_search_dir() -> Option<PathBuf> {

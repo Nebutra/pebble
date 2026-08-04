@@ -274,6 +274,22 @@ jobs:
           # Force sherpa-rs-sys to re-emit -L against the staged path.
           cargo clean -p sherpa-rs-sys -p sherpa-rs --manifest-path apps/desktop/src-tauri/Cargo.toml || true
 
+      # Why: same failure mode on macOS — restored target/ points -L at a missing
+      # ~/Library/Caches/sherpa-rs path; ld then reports
+      # "library 'onnxruntime.1.17.1' not found" during universal builds.
+      - name: Ensure macOS speech link libraries
+        if: runner.os == 'macOS'
+        env:
+          TAURI_RELEASE_TARGET_TRIPLE: ${{ matrix.target_triple }}
+        run: |
+          set -euo pipefail
+          node apps/desktop/scripts/ensure-macos-speech-link-libs.mjs
+          # Force sherpa-rs-sys to re-emit -L against the staged path for both
+          # universal slices (aarch64 + x86_64).
+          cargo clean -p sherpa-rs-sys -p sherpa-rs --manifest-path apps/desktop/src-tauri/Cargo.toml || true
+          cargo clean -p sherpa-rs-sys -p sherpa-rs --manifest-path apps/desktop/src-tauri/Cargo.toml --target aarch64-apple-darwin || true
+          cargo clean -p sherpa-rs-sys -p sherpa-rs --manifest-path apps/desktop/src-tauri/Cargo.toml --target x86_64-apple-darwin || true
+
       - name: Build Tauri desktop bundle
         id: tauri-build
         uses: tauri-apps/tauri-action@v1
@@ -306,8 +322,8 @@ jobs:
           PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY: ${{ env.PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY }}
           CSC_NAME: ${{ env.CSC_NAME }}
           PEBBLE_MAC_RELEASE: ${{ matrix.platform == 'macos' && '1' || '' }}
-          # SHERPA_LIB_PATH / PEBBLE_LINUX_SPEECH_LIB_DIR come from GITHUB_ENV
-          # written by Ensure Linux speech link libraries (Linux only).
+          # SHERPA_LIB_PATH / PEBBLE_*_SPEECH_LIB_DIR come from GITHUB_ENV written
+          # by Ensure Linux / Ensure macOS speech link libraries.
         with:
           projectPath: apps/desktop
           # macOS: wrap tauri so nested binaries are Developer-ID signed before notary.
