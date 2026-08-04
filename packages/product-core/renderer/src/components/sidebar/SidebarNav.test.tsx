@@ -2,9 +2,11 @@
 
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { GlobalSettings, Repo } from '../../../../shared/types'
+import { i18n } from '../../i18n/i18n'
 
 const mocks = vi.hoisted(() => ({
   state: {} as Record<string, unknown>,
@@ -141,7 +143,11 @@ async function renderSidebarNav(): Promise<HTMLDivElement> {
   const root = createRoot(container)
   mountedRoots.push(root)
   await act(async () => {
-    root.render(<SidebarNav />)
+    root.render(
+      <I18nextProvider i18n={i18n}>
+        <SidebarNav />
+      </I18nextProvider>
+    )
   })
   return container
 }
@@ -187,11 +193,17 @@ describe('SidebarNav', () => {
       }
     })
     document.body.innerHTML = ''
+    await act(async () => {
+      await i18n.changeLanguage('en')
+    })
   })
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
     setSidebarState()
+    await act(async () => {
+      await i18n.changeLanguage('en')
+    })
   })
 
   it('shows the Agents entry while settings are loading', () => {
@@ -266,6 +278,26 @@ describe('SidebarNav', () => {
     await clickButton(getHideButton(automationsMenu as HTMLElement))
 
     expect(mocks.updateSettings).toHaveBeenCalledWith({ showAutomationsButton: false })
+  })
+
+  it('retranslates memoized nav labels when the UI language changes without a tab click', async () => {
+    // Why: SidebarNav is React.memo with no props. Without useTranslation it only
+    // re-renders when store selectors change (e.g. clicking a tab). Language
+    // switches must still refresh Automations / Agents / Search labels.
+    const container = await renderSidebarNav()
+    expect(queryButtonByText(container, 'Automations')).not.toBeNull()
+    expect(queryButtonByText(container, 'Agents')).not.toBeNull()
+    // Search shares the button with shortcut chips; match by label prefix.
+    expect(container.textContent).toContain('Search')
+
+    await act(async () => {
+      await i18n.changeLanguage('zh')
+    })
+
+    expect(queryButtonByText(container, '自动化')).not.toBeNull()
+    expect(queryButtonByText(container, '智能体')).not.toBeNull()
+    expect(container.textContent).toContain('搜索')
+    expect(queryButtonByText(container, 'Automations')).toBeNull()
   })
 
   it('hides Mobile from its sidebar context menu', async () => {

@@ -1,5 +1,6 @@
 import React from 'react'
 import { Kanban } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { ScrollToCurrentWorkspaceToolbarButton } from './ScrollToCurrentWorkspaceToolbarButton'
@@ -22,6 +23,8 @@ const SidebarToolbar = React.memo(function SidebarToolbar({
   workspaceBoardDragPreviewOpen = false,
   onWorkspaceBoardToggle
 }: SidebarToolbarProps) {
+  // Why: memoized toolbar would keep stale translate() strings across language switches.
+  useTranslation()
   const [workspaceBoardMovedHintOpen, setWorkspaceBoardMovedHintOpen] = React.useState(false)
   const movedHintEligibleRef = React.useRef<boolean | null>(null)
   const persistedUIReady = useAppStore((state) => state.persistedUIReady)
