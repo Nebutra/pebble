@@ -1,5 +1,6 @@
 import React from 'react'
 import { Bell, CalendarClock, Search, Smartphone } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
 import type { GlobalSettings } from '../../../../shared/types'
@@ -36,6 +37,11 @@ export function shouldShowAutomationsButton(
 }
 
 const SidebarNav = React.memo(function SidebarNav() {
+  // Why: this nav is React.memo with no props, so parent re-renders (including
+  // the root useTranslation subscription) do not refresh it. Without a local
+  // language subscription, Automations/Agents/Search stay in the old language
+  // until activeView or another store selector changes (e.g. clicking a tab).
+  useTranslation()
   const worktreePaletteShortcutCombos = useShortcutKeyComboDetails('worktree.palette')
   const openAutomationsPage = useAppStore((s) => s.openAutomationsPage)
   const openActivityPage = useAppStore((s) => s.openActivityPage)
