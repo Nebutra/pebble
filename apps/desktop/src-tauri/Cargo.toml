@@ -62,7 +62,7 @@ sherpa-rs = { version = "0.6.8", optional = true, default-features = false, feat
   "download-binaries",
   "sys"
 ] }
-tauri = { version = "2", features = ["tray-icon", "unstable"] }
+tauri = { version = "2", features = ["tray-icon", "unstable", "image-png"] }
 tauri-plugin-deep-link = "2"
 tauri-plugin-notification = "2.3.3"
 tauri-plugin-process = "2"

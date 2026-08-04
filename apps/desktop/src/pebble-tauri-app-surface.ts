@@ -34,6 +34,8 @@ export function createPebbleAppApi(base: PreloadApi['app']): PreloadApi['app'] {
       getCurrentWindow().setBadgeCount(
         Number.isFinite(count) && count > 0 ? Math.min(99, count) : undefined
       ),
+    // Why: Appearance → App Icon must reach Dock / taskbar, not just settings.
+    setAppIcon: (iconId) => invoke('app_set_icon', { iconId }),
     // Why: terminal startup must not depend on the renderer path plugin being
     // ready; Rust resolves and validates the cwd before the PTY is mounted.
     getFloatingTerminalCwd: (args) =>

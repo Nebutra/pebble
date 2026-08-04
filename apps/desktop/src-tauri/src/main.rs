@@ -162,6 +162,7 @@ pub fn run() {
             commands::app_native::app_list_fonts,
             commands::app_native::app_platform_info,
             commands::app_native::app_linux_install_kind,
+            commands::app_native::app_set_icon,
             commands::star_nag::star_nag_check,
             commands::star_nag::star_nag_star,
             commands::browser_upload_files::browser_read_upload_files,
