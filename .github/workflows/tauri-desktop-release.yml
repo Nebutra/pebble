@@ -260,6 +260,20 @@ jobs:
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: node config/scripts/verify-observability-release-config.mjs
 
+      # Why: Rust target/ cache can restore sherpa-rs-sys link metadata that
+      # points at ~/.cache/sherpa-rs without restoring those .so files. rust-lld
+      # then fails the final binary link with -lonnxruntime not found. Stage
+      # the prebuilt shared libs into the workspace and export SHERPA_LIB_PATH.
+      - name: Ensure Linux speech link libraries
+        if: runner.os == 'Linux'
+        env:
+          TAURI_RELEASE_TARGET_TRIPLE: ${{ matrix.target_triple }}
+        run: |
+          set -euo pipefail
+          node apps/desktop/scripts/ensure-linux-speech-link-libs.mjs
+          # Force sherpa-rs-sys to re-emit -L against the staged path.
+          cargo clean -p sherpa-rs-sys -p sherpa-rs --manifest-path apps/desktop/src-tauri/Cargo.toml || true
+
       - name: Build Tauri desktop bundle
         id: tauri-build
         uses: tauri-apps/tauri-action@v1
@@ -292,6 +306,8 @@ jobs:
           PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY: ${{ env.PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY }}
           CSC_NAME: ${{ env.CSC_NAME }}
           PEBBLE_MAC_RELEASE: ${{ matrix.platform == 'macos' && '1' || '' }}
+          # SHERPA_LIB_PATH / PEBBLE_LINUX_SPEECH_LIB_DIR come from GITHUB_ENV
+          # written by Ensure Linux speech link libraries (Linux only).
         with:
           projectPath: apps/desktop
           # macOS: wrap tauri so nested binaries are Developer-ID signed before notary.
@@ -359,11 +375,15 @@ jobs:
           --output artifacts/tauri-release/${{ matrix.label }}.json
 
       - name: Upload release inspection evidence
+        # Soft-launch: inspect is continue-on-error above; missing JSON must not
+        # red the job after installers already uploaded.
+        if: ${{ always() }}
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: tauri-release-inspection-${{ matrix.label }}
           path: artifacts/tauri-release/${{ matrix.label }}.json
-          if-no-files-found: error
+          if-no-files-found: warn
 
   verify-updater-manifest:
     name: Verify merged updater manifest

@@ -20,7 +20,38 @@ fn configure_local_speech_runtime_paths() {
     } else if cfg!(target_os = "linux") {
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/../lib");
+        // Why: Actions may restore target/ (with sherpa-rs-sys -L metadata pointing
+        // at ~/.cache/sherpa-rs) without that cache. Stage path from
+        // ensure-linux-speech-link-libs.mjs (or SHERPA_LIB_PATH) so -lonnxruntime
+        // still resolves under rust-lld.
+        if let Some(lib_dir) = linux_speech_lib_search_dir() {
+            println!("cargo:rerun-if-env-changed=SHERPA_LIB_PATH");
+            println!("cargo:rerun-if-env-changed=PEBBLE_LINUX_SPEECH_LIB_DIR");
+            println!("cargo:rustc-link-search=native={}", lib_dir.display());
+        }
     }
+}
+
+fn linux_speech_lib_search_dir() -> Option<PathBuf> {
+    if let Ok(dir) = env::var("PEBBLE_LINUX_SPEECH_LIB_DIR") {
+        let path = PathBuf::from(dir);
+        if path.join("libonnxruntime.so").is_file() {
+            return Some(path);
+        }
+    }
+    if let Ok(root) = env::var("SHERPA_LIB_PATH") {
+        let lib = PathBuf::from(root).join("lib");
+        if lib.join("libonnxruntime.so").is_file() {
+            return Some(lib);
+        }
+    }
+    let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR")?);
+    let target = env::var("TARGET").ok()?;
+    let staged = manifest_dir.join("speech-libs").join(target).join("lib");
+    if staged.join("libonnxruntime.so").is_file() {
+        return Some(staged);
+    }
+    None
 }
 
 fn build_zig_system() {
