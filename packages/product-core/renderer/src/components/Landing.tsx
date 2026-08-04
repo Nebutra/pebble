@@ -27,7 +27,9 @@ type ShortcutItem = {
   action: string
 }
 
-const PEBBLE_STARGAZERS_URL = 'https://github.com/nebutra/pebble/stargazers'
+// Why: /stargazers returns GitHub 404 for this public repo. Open the repo root
+// so browser-based starring still works when the gh CLI path is unavailable.
+const PEBBLE_REPO_URL = 'https://github.com/nebutra/pebble'
 const LANDING_STAR_MENU_COLLISION_PADDING = { top: 8, right: 8, bottom: 72, left: 8 } as const
 
 type StarState = 'loading' | 'starred' | 'not-starred' | 'web-fallback' | 'hidden'
@@ -60,7 +62,7 @@ function GitHubStarButton({ hasRepos }: { hasRepos: boolean }): React.JSX.Elemen
       return
     }
     if (state === 'web-fallback') {
-      await window.api.shell.openUrl(PEBBLE_STARGAZERS_URL)
+      await window.api.shell.openUrl(PEBBLE_REPO_URL)
       return
     }
     if (state !== 'not-starred') {

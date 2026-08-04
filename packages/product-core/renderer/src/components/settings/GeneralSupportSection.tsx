@@ -9,7 +9,9 @@ import { SearchableSetting } from './SearchableSetting'
 import { SettingsSubsectionHeader } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 
-const PEBBLE_STARGAZERS_URL = 'https://github.com/nebutra/pebble/stargazers'
+// Why: /stargazers returns GitHub 404 for this public repo (list disabled /
+// unauthenticated). Open the repo root so the browser star control still works.
+const PEBBLE_REPO_URL = 'https://github.com/nebutra/pebble'
 
 type SupportState =
   | 'loading'
@@ -58,7 +60,7 @@ export function GeneralSupportSection({
   const handleStarClick = async (): Promise<void> => {
     if (starState === 'web-fallback') {
       setStarState('opening-github')
-      await window.api.shell.openUrl(PEBBLE_STARGAZERS_URL)
+      await window.api.shell.openUrl(PEBBLE_REPO_URL)
       if (mountedRef.current) {
         setStarState('web-fallback')
       }
