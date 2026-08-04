@@ -41,7 +41,10 @@
       "binaries/relay-workers": "binaries/relay-workers",
       "../../../native/computer-use-linux/runtime.py": "computer-use-linux/runtime.py",
       "../../../native/computer-use-windows/runtime.ps1": "computer-use-windows/runtime.ps1",
-      "../../../node_modules/serve-sim/bin/serve-sim-bin": "serve-sim/serve-sim-bin"
+      "../../../node_modules/serve-sim/bin/serve-sim-bin": "serve-sim/serve-sim-bin",
+      "../../../resources/icon.png": "app-icons/classic.png",
+      "../../../resources/app-icons/pebble-watercolor.png": "app-icons/watercolor.png",
+      "../../../resources/app-icons/pebble-blue.png": "app-icons/blue.png"
     },
     "macOS": {
       "entitlements": "../../../resources/build/entitlements.mac.plist",
@@ -60,15 +63,11 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": [
-          "pebble"
-        ]
+        "schemes": ["pebble"]
       }
     },
     "updater": {
-      "endpoints": [
-        "https://github.com/nebutra/pebble/releases/latest/download/latest.json"
-      ],
+      "endpoints": ["https://github.com/nebutra/pebble/releases/latest/download/latest.json"],
       "pubkey": "UlNJRzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
     }
   }

@@ -236,6 +236,108 @@ pub fn app_keyboard_input_source_id() -> Option<String> {
     None
 }
 
+/// Apply a selectable app icon to the Dock (macOS) and window/taskbar chrome.
+///
+/// Why: Appearance → App Icon only wrote `settings.appIcon` after the Tauri
+/// migration — there was no native apply path. This command maps the stored id
+/// onto bundled PNG resources and pushes them into the running process so Dock
+/// / window switcher / taskbar match the settings preview.
+#[tauri::command]
+pub fn app_set_icon(app: AppHandle, icon_id: String) -> Result<(), String> {
+    let icon_id = normalize_app_icon_id(&icon_id);
+    let path = resolve_app_icon_path(&app, icon_id)?;
+    let bytes = fs::read(&path).map_err(|error| {
+        format!(
+            "Failed to read app icon {}: {error}",
+            path.to_string_lossy()
+        )
+    })?;
+    let icon = tauri::image::Image::from_bytes(&bytes).map_err(|error| error.to_string())?;
+
+    for (_label, window) in app.webview_windows() {
+        let _ = window.set_icon(icon.clone());
+    }
+
+    if let Some(tray) = app.tray_by_id("pebble-main-tray") {
+        let _ = tray.set_icon(Some(icon));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let bytes_for_dock = bytes;
+        app.run_on_main_thread(move || {
+            if let Err(error) = set_macos_application_icon(&bytes_for_dock) {
+                eprintln!("[app_set_icon] Dock icon apply failed: {error}");
+            }
+        })
+        .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
+}
+
+fn normalize_app_icon_id(value: &str) -> &'static str {
+    match value.trim() {
+        "watercolor" => "watercolor",
+        "blue" => "blue",
+        _ => "classic",
+    }
+}
+
+fn resolve_app_icon_path(app: &AppHandle, icon_id: &str) -> Result<PathBuf, String> {
+    let resource_name = match icon_id {
+        "watercolor" => "app-icons/watercolor.png",
+        "blue" => "app-icons/blue.png",
+        _ => "app-icons/classic.png",
+    };
+    let dev_relative = match icon_id {
+        "watercolor" => PathBuf::from("../../../resources/app-icons/pebble-watercolor.png"),
+        "blue" => PathBuf::from("../../../resources/app-icons/pebble-blue.png"),
+        _ => PathBuf::from("../../../resources/icon.png"),
+    };
+
+    if let Ok(path) = app
+        .path()
+        .resolve(resource_name, tauri::path::BaseDirectory::Resource)
+    {
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+
+    let dev_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(dev_relative);
+    if dev_path.is_file() {
+        return Ok(dev_path);
+    }
+
+    Err(format!(
+        "App icon resource not found for id '{icon_id}' (looked for {resource_name})"
+    ))
+}
+
+#[cfg(target_os = "macos")]
+fn set_macos_application_icon(png_bytes: &[u8]) -> Result<(), String> {
+    use objc2::{AllocAnyThread, MainThreadMarker};
+    use objc2_app_kit::{NSApplication, NSImage};
+    use objc2_foundation::NSData;
+
+    // Why: Dock icon is owned by NSApplication, not individual windows.
+    // Window.set_icon alone does not update the Dock on macOS.
+    // Prefer a real main-thread marker; fall back only when already scheduled
+    // via AppHandle::run_on_main_thread (which guarantees the main thread).
+    let mtm = MainThreadMarker::new().unwrap_or_else(|| unsafe {
+        MainThreadMarker::new_unchecked()
+    });
+    let app = NSApplication::sharedApplication(mtm);
+    let data = NSData::with_bytes(png_bytes);
+    let image = NSImage::initWithData(NSImage::alloc(), &data)
+        .ok_or_else(|| "Failed to decode app icon PNG for Dock.".to_string())?;
+    unsafe {
+        app.setApplicationIconImage(Some(&image));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn app_list_fonts() -> Vec<String> {
     // Font discovery launches platform tools; keep it off the native event loop.

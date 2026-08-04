@@ -22,7 +22,21 @@ import {
 import { bumpProviderRuntimeSessionGeneration } from '@/lib/provider-runtime-context'
 import { normalizeUiLanguage } from '../../../../shared/ui-language'
 import { normalizeDesktopTerminalScrollbackRows } from '../../../../shared/terminal-scrollback-policy'
+import { normalizeAppIconId } from '../../../../shared/app-icon'
 import { translate } from '@/i18n/i18n'
+
+/** Best-effort Dock / taskbar icon apply. Never throws into settings IO. */
+async function applyAppIconBestEffort(iconId: unknown): Promise<void> {
+  const setAppIcon = window.api?.app?.setAppIcon
+  if (typeof setAppIcon !== 'function') {
+    return
+  }
+  try {
+    await setAppIcon(normalizeAppIconId(iconId))
+  } catch (error) {
+    console.warn('Failed to apply app icon:', error)
+  }
+}
 
 export type SettingsSlice = SettingsSearchState & {
   settings: GlobalSettings | null
@@ -70,6 +84,8 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
     try {
       const settings = await window.api.settings.get()
       set({ settings })
+      // Why: restore the user-chosen Dock/taskbar icon after settings hydrate.
+      void applyAppIconBestEffort(settings.appIcon)
       // Why: best-effort boot probe so sidebar host pickers show live runtime
       // health before the settings pane is ever opened. Fire-and-forget to keep
       // startup off the network round-trips.
@@ -135,8 +151,16 @@ export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> 
           updates.terminalScrollbackRows
         )
       }
+      if ('appIcon' in updates) {
+        sanitizedUpdates.appIcon = normalizeAppIconId(updates.appIcon)
+      }
       const nextSettings = await window.api.settings.set(sanitizedUpdates)
       set((s) => ({ settings: (nextSettings as GlobalSettings | undefined) ?? s.settings }))
+      // Why: apply after persistence so a failed native set does not roll back
+      // the saved preference the user just chose in Appearance.
+      if ('appIcon' in sanitizedUpdates) {
+        void applyAppIconBestEffort(sanitizedUpdates.appIcon)
+      }
     } catch (err) {
       console.error('Failed to update settings:', err)
     }

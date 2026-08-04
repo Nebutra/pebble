@@ -548,6 +548,10 @@ export type AppApi = {
   getKeyboardInputSourceId: () => Promise<string | null>
   /** Updates the macOS Dock unread badge. No-op on Windows/Linux. */
   setUnreadDockBadgeCount: (count: number) => Promise<void>
+  /** Applies a selectable app icon to Dock / window switcher / taskbar.
+   *  No-op on web. Best-effort on desktop — settings still persist even if
+   *  the native apply fails. */
+  setAppIcon: (iconId: string) => Promise<void>
   /** Resolves the launch directory for global Floating Terminal tabs. */
   getFloatingTerminalCwd: (args?: FloatingTerminalCwdRequest) => Promise<string>
   /** Resolves Pebble's app-owned directory for auto-created Floating Workspace
