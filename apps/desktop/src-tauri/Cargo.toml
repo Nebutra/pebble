@@ -31,9 +31,14 @@ quick-xml = "0.39.4"
 regex = "1"
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
+  # Why: GUI apps do not inherit shell HTTP(S)_PROXY; system-proxy (and the
+  # macOS system-configuration backend) lets updater/changelog traffic follow
+  # the OS proxy / Clash system proxy the same way the browser does.
+  "macos-system-configuration",
   "multipart",
   "rustls-tls",
-  "stream"
+  "stream",
+  "system-proxy"
 ] }
 rfd = "0.15"
 rusqlite = { version = "0.32", features = ["bundled"] }

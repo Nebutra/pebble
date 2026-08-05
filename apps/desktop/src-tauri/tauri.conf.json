@@ -63,14 +63,13 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": [
-          "pebble"
-        ]
+        "schemes": ["pebble"]
       }
     },
     "updater": {
       "endpoints": [
-        "https://github.com/nebutra/pebble/releases/latest/download/latest.json"
+        "https://github.com/nebutra/pebble/releases/latest/download/latest.json",
+        "https://pebble.nebutra.com/updater/latest.json"
       ],
       "pubkey": "UlNJRzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
     }
