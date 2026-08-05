@@ -1,3 +1,6 @@
+/* oxlint-disable max-lines -- Why: this module owns the desktop updater
+ * surface (status bus, silent checks, nudges, download/relaunch). Splitting
+ * would scatter the tightly coupled state machine; keep one authoritative file. */
 import { invoke } from '@tauri-apps/api/core'
 import { relaunch } from '@tauri-apps/plugin-process'
 import type { Update } from '@tauri-apps/plugin-updater'
@@ -6,20 +9,14 @@ import {
   PEBBLE_UPDATER_QUIT_AND_INSTALL_ABORTED_EVENT,
   PEBBLE_UPDATER_QUIT_AND_INSTALL_STARTED_EVENT
 } from '../../../packages/product-core/shared/updater-renderer-events'
-import type {
-  UpdateCheckOptions,
-  UpdateStatus
-} from '../../../packages/product-core/shared/types'
+import type { UpdateCheckOptions, UpdateStatus } from '../../../packages/product-core/shared/types'
 import { createTauriUpdateDownloadProgressHandler } from './tauri-updater-download-progress'
 import {
   fetchTauriChangelog,
   readCurrentAppVersion,
   resetTauriUpdaterAppVersionForTests
 } from './tauri-updater-app-version'
-import {
-  describeTauriUpdaterUnavailable,
-  releaseUrlForVersion
-} from './tauri-updater-release-url'
+import { describeTauriUpdaterUnavailable, releaseUrlForVersion } from './tauri-updater-release-url'
 import { TauriUpdaterNudgeState } from './tauri-updater-nudge-state'
 import { TauriUpdaterOperationState } from './tauri-updater-operation-state'
 import {
@@ -29,6 +26,7 @@ import {
   requiresTaggedReleaseCheck,
   resolvePebbleRelease
 } from './tauri-updater-release-check'
+import { TauriSilentUpdateCheck } from './tauri-updater-silent-check'
 
 const updaterStatusListeners = new Set<(status: UpdateStatus) => void>()
 const updaterClearDismissalListeners = new Set<() => void>()
@@ -47,12 +45,22 @@ const updaterNudges = new TauriUpdaterNudgeState({
   writeUi: (patch) => window.api.ui.set(patch),
   readStatus: () => currentUpdaterStatus,
   startCheck: (operation) => updaterOperations.startCheck(operation),
-  performCheck: (activeNudgeId) => performTauriOrReleaseUpdateCheck({}, activeNudgeId),
+  performCheck: (activeNudgeId) =>
+    performTauriOrReleaseUpdateCheck({}, { activeNudgeId, userInitiated: false }),
   clearDismissal: () => {
     for (const listener of updaterClearDismissalListeners) {
       listener()
     }
   }
+})
+
+const silentUpdateChecks = new TauriSilentUpdateCheck({
+  development: import.meta.env.DEV,
+  isBusy: () =>
+    currentUpdaterStatus.state === 'checking' ||
+    currentUpdaterStatus.state === 'downloading' ||
+    currentUpdaterStatus.state === 'downloaded',
+  runSilentCheck: () => startSilentTauriUpdateCheck()
 })
 
 export function installTauriUpdaterApi(): void {
@@ -79,24 +87,38 @@ export function installTauriUpdaterApi(): void {
       return () => updaterClearDismissalListeners.delete(callback)
     }
   } satisfies PreloadApi['updater']
+  // Campaign nudges stay optional; silent release checks cover normal upgrades.
   updaterNudges.installPolling()
+  silentUpdateChecks.install()
 }
 
 async function startManualTauriUpdateCheck(options?: UpdateCheckOptions): Promise<void> {
   const operation = updaterOperations.startCheck(async () => {
     emitUpdaterStatus({ state: 'checking', userInitiated: true })
-    await performTauriOrReleaseUpdateCheck(options, undefined)
+    await performTauriOrReleaseUpdateCheck(options, { userInitiated: true })
+  })
+  return operation.promise
+}
+
+async function startSilentTauriUpdateCheck(): Promise<void> {
+  const operation = updaterOperations.startCheck(async () => {
+    // Why: silent runs must not mount the "Checking..." / "You're up to date"
+    // cards (App only shows those when userInitiated is true).
+    emitUpdaterStatus({ state: 'checking', userInitiated: false })
+    await performTauriOrReleaseUpdateCheck({}, { userInitiated: false })
   })
   return operation.promise
 }
 
 async function performTauriOrReleaseUpdateCheck(
   options?: UpdateCheckOptions,
-  activeNudgeId?: string
+  context: { activeNudgeId?: string; userInitiated?: boolean } = {}
 ): Promise<void> {
+  const activeNudgeId = context.activeNudgeId
+  const userInitiated = context.userInitiated ?? !activeNudgeId
   const currentVersion = await readCurrentAppVersion()
   if (requiresTaggedReleaseCheck(currentVersion, options)) {
-    await checkPebbleReleaseFeed(options, undefined, activeNudgeId)
+    await checkPebbleReleaseFeed(options, undefined, { activeNudgeId, userInitiated })
     return
   }
   try {
@@ -112,19 +134,21 @@ async function performTauriOrReleaseUpdateCheck(
       {
         pluginError: error instanceof Error ? error.message : String(error)
       },
-      activeNudgeId
+      { activeNudgeId, userInitiated }
     )
     return
   }
 
-  await checkPebbleReleaseFeed(options, undefined, activeNudgeId)
+  await checkPebbleReleaseFeed(options, undefined, { activeNudgeId, userInitiated })
 }
 
 async function checkPebbleReleaseFeed(
   options?: UpdateCheckOptions,
   nativeFailure?: { pluginError: string },
-  activeNudgeId?: string
+  context: { activeNudgeId?: string; userInitiated?: boolean } = {}
 ): Promise<void> {
+  const activeNudgeId = context.activeNudgeId
+  const userInitiated = context.userInitiated ?? !activeNudgeId
   try {
     const currentVersion = await readCurrentAppVersion()
     const result = await resolvePebbleRelease(currentVersion, options)
@@ -142,7 +166,7 @@ async function checkPebbleReleaseFeed(
     }
     if (result.state === 'not-available') {
       await settleNudgeCheck(activeNudgeId)
-      emitUpdaterStatus({ state: 'not-available', userInitiated: !activeNudgeId })
+      emitUpdaterStatus({ state: 'not-available', userInitiated })
       return
     }
     await settleNudgeCheck(activeNudgeId)
@@ -151,7 +175,7 @@ async function checkPebbleReleaseFeed(
       message: nativeFailure
         ? describeTauriUpdaterUnavailable(nativeFailure.pluginError, result.message)
         : (result.message ?? 'Could not check Pebble releases.'),
-      userInitiated: !activeNudgeId,
+      userInitiated,
       ...(activeNudgeId ? { activeNudgeId } : {})
     })
   } catch (error) {
@@ -166,7 +190,7 @@ async function checkPebbleReleaseFeed(
         : error instanceof Error
           ? error.message
           : String(error),
-      userInitiated: !activeNudgeId,
+      userInitiated,
       ...(activeNudgeId ? { activeNudgeId } : {})
     })
   }
@@ -312,5 +336,6 @@ export async function resetTauriUpdaterStateForTests(): Promise<void> {
   pendingReleaseTag = null
   resetTauriUpdaterAppVersionForTests()
   updaterNudges.resetForTests()
+  silentUpdateChecks.resetForTests()
   resetTauriUpdaterReleaseCheckForTests()
 }

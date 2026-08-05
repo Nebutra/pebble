@@ -101,6 +101,16 @@ pub async fn updater_check_latest_release(
     } else {
         None
     };
+
+    // Why: stable clients only need one small signed latest.json, not the full
+    // GitHub Atom history. Prefer O(1) latest.json; fall back to the feed only
+    // for prerelease channels or when latest is still publishing.
+    if !include_prerelease && release_filter.is_none() {
+        if let Some(result) = check_default_latest_manifest(&current_version).await? {
+            return Ok(result);
+        }
+    }
+
     let tags = fetch_release_feed_tags().await?;
     let candidates = filter_release_candidates(tags, include_prerelease, release_filter);
     let Some(newest_newer_index) = candidates
@@ -153,6 +163,55 @@ pub async fn updater_check_latest_release(
         message: Some("Latest release assets are still publishing.".to_string()),
         last_good_tag: None,
     })
+}
+
+/// Fast path for the stable channel: one GET of `/releases/latest/download/latest.json`.
+/// Returns `None` when the caller should fall back to the Atom feed (network error,
+/// unusable manifest, or assets still publishing for a newer tag).
+async fn check_default_latest_manifest(
+    current_version: &str,
+) -> Result<Option<UpdaterCheckLatestResult>, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(FETCH_TIMEOUT_SECONDS))
+        .build()
+        .map_err(|error| format!("Could not create Pebble release client: {error}"))?;
+    let response = match client.get(DEFAULT_UPDATER_ENDPOINT).send().await {
+        Ok(response) => response,
+        Err(_) => return Ok(None),
+    };
+    if !response.status().is_success() {
+        return Ok(None);
+    }
+    let manifest = match response.json::<serde_json::Value>().await {
+        Ok(manifest) => manifest,
+        Err(_) => return Ok(None),
+    };
+    let Some(version) = manifest
+        .get("version")
+        .and_then(serde_json::Value::as_str)
+        .map(normalize_tag_to_version)
+    else {
+        return Ok(None);
+    };
+    if parse_version(&version).is_none() {
+        return Ok(None);
+    }
+    let tag = format!("v{version}");
+    if compare_versions(&version, current_version) <= 0 {
+        return Ok(Some(UpdaterCheckLatestResult {
+            state: "not-available".to_string(),
+            version: None,
+            tag: None,
+            release_url: None,
+            message: None,
+            last_good_tag: None,
+        }));
+    }
+    if !tauri_manifest_has_current_platform(&manifest, &tag) {
+        // Newer latest.json without this platform yet — probe the feed for a ready build.
+        return Ok(None);
+    }
+    Ok(Some(available_result(&ReleaseFeedTag { tag, version })))
 }
 
 #[tauri::command]
