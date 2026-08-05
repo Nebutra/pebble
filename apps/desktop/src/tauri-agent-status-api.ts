@@ -211,6 +211,13 @@ async function listRuntimeSessions(): Promise<TauriRuntimeAgentSession[]> {
 }
 
 function rememberBinding(binding: RuntimeAgentBinding): void {
+  // Why: a reused pane takes a new session without a drop. Leaving the previous
+  // occupant mapped by session id lets its later stop emit a done row onto the
+  // pane the new agent now owns.
+  const replaced = bindingsByPaneKey.get(binding.paneKey)
+  if (replaced && replaced.sessionId !== binding.sessionId) {
+    bindingsBySessionId.delete(replaced.sessionId)
+  }
   bindingsBySessionId.set(binding.sessionId, binding)
   bindingsByPaneKey.set(binding.paneKey, binding)
 }
