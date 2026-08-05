@@ -674,9 +674,11 @@ const checks = [
     file: 'packages/product-core/renderer/src/components/onboarding/OnboardingInlineCommandTerminal.tsx',
     expect: (text) =>
       text.includes('INSERT_ACCEPT_RETRY_MS') &&
+      text.includes('BRACKETED_PASTE_FALLBACK_MS') &&
       text.includes('insertCommand((pasted) =>') &&
       text.includes('autoInsertedRef.current = command') &&
-      text.includes('requireShellPasteReady: true') &&
+      // Prefer bracketed paste, then relax after a stable prompt (#95).
+      text.includes('requireShellPasteReady') &&
       text.includes('onSettled')
   },
   {

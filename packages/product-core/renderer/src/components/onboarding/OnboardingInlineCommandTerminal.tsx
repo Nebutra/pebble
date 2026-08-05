@@ -27,6 +27,11 @@ const AUTO_INSERT_DELAY_MS = 250
 const READY_RETRY_MS = 100
 const PTY_TEXT_FALLBACK_MS = 750
 const INSERT_ACCEPT_RETRY_MS = 100
+// Why: some macOS shells never advertise bracketed paste to xterm (or advertise
+// late). Prefer waiting for it so zsh line-editor repaints keep the draft, but
+// after a visible prompt + this grace period insert raw text so the user is not
+// left with an empty skill-setup terminal (#95).
+const BRACKETED_PASTE_FALLBACK_MS = 2_000
 
 type OnboardingInlineCommandTerminalProps = {
   command: string
@@ -199,7 +204,7 @@ export function OnboardingInlineCommandTerminal({
   }, [autoScrollIntoView, entered, prefersReducedMotion])
 
   const insertCommand = useCallback(
-    (onSettled: (pasted: boolean) => void) => {
+    (onSettled: (pasted: boolean) => void, requireShellPasteReady: boolean) => {
       if (!tabId) {
         return
       }
@@ -212,6 +217,7 @@ export function OnboardingInlineCommandTerminal({
       dispatchTerminalTextWithAcknowledgement({
         tabId,
         text: command.trim(),
+        requireShellPasteReady,
         onSettled: (pasted) => {
           // Why: failed cold-start retries must not repeatedly steal focus from
           // a user who is already interacting with this or another control.
@@ -233,6 +239,8 @@ export function OnboardingInlineCommandTerminal({
     let insertionTimer: number | null = null
     let retryTimer: number | null = null
     let ptyFirstSeenAt: number | null = null
+    let firstFailedInsertAt: number | null = null
+    let requireShellPasteReady = true
 
     const scheduleInsert = (): void => {
       if (insertionTimer !== null) {
@@ -251,10 +259,21 @@ export function OnboardingInlineCommandTerminal({
             autoInsertedRef.current = command
             return
           }
+          firstFailedInsertAt ??= Date.now()
+          // Why: issue #95 — macOS shells can show a stable prompt while never
+          // enabling xterm bracketed paste. Prefer waiting, then drop the gate
+          // once a prompt is visible so the install command still appears.
+          if (
+            requireShellPasteReady &&
+            Date.now() - firstFailedInsertAt >= BRACKETED_PASTE_FALLBACK_MS &&
+            terminalReadyForCommand(findTerminalTabElement(tabId))
+          ) {
+            requireShellPasteReady = false
+          }
           if (insertionTimer === null) {
             insertionTimer = window.setTimeout(attemptInsert, INSERT_ACCEPT_RETRY_MS)
           }
-        })
+        }, requireShellPasteReady)
       }
       insertionTimer = window.setTimeout(attemptInsert, AUTO_INSERT_DELAY_MS)
     }

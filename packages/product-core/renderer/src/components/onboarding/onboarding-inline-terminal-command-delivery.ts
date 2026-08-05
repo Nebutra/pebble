@@ -15,13 +15,17 @@ export function dispatchTerminalTextWithAcknowledgement({
   text,
   onSettled,
   acknowledgementTimeoutMs = INSERT_ACK_TIMEOUT_MS,
-  nativeAcknowledgementTimeoutMs = INSERT_NATIVE_ACK_TIMEOUT_MS
+  nativeAcknowledgementTimeoutMs = INSERT_NATIVE_ACK_TIMEOUT_MS,
+  // Why: default true so cold zsh repaints cannot erase drafts; callers that
+  // already saw a stable prompt may pass false after retries stall.
+  requireShellPasteReady = true
 }: {
   tabId: string
   text: string
   onSettled: (pasted: boolean) => void
   acknowledgementTimeoutMs?: number
   nativeAcknowledgementTimeoutMs?: number
+  requireShellPasteReady?: boolean
 }): () => void {
   let settled = false
   let timeout: number | null = null
@@ -44,7 +48,7 @@ export function dispatchTerminalTextWithAcknowledgement({
         tabId,
         text,
         directPtyDraft: true,
-        requireShellPasteReady: true,
+        requireShellPasteReady,
         onReceived: () => {
           // Why: Tauri can deliver the event before a cold native PTY answers.
           // Separate listener delivery from the slower native write ACK.
