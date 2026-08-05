@@ -4051,6 +4051,7 @@ const checks = [
     expect: (text) =>
       text.includes('"updater"') &&
       text.includes('https://github.com/nebutra/pebble/releases/latest/download/latest.json') &&
+      text.includes('https://pebble.nebutra.com/updater/latest.json') &&
       text.includes('"pubkey"') &&
       !text.includes('"updater": null')
   },

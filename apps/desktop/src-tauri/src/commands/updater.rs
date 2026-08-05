@@ -10,12 +10,23 @@ const CHANGELOG_JSON_URL: &str = "https://pebble.nebutra.com/whats-new/changelog
 const NUDGE_JSON_URL: &str = "https://pebble.nebutra.com/whats-new/nudge.json";
 const RELEASES_DOWNLOAD_BASE: &str = "https://github.com/nebutra/pebble/releases/download";
 const RELEASES_TAG_BASE: &str = "https://github.com/nebutra/pebble/releases/tag";
+/// Canonical GitHub latest.json (primary). Keep first so stable builds prefer origin.
 const DEFAULT_UPDATER_ENDPOINT: &str =
     "https://github.com/nebutra/pebble/releases/latest/download/latest.json";
+/// Cloudflare-fronted mirror for regions where github.com is slow or blocked.
+const MIRROR_UPDATER_ENDPOINT: &str = "https://pebble.nebutra.com/updater/latest.json";
+/// Ordered trusted endpoints for the Tauri plugin and the Rust stable fast path.
+const TRUSTED_UPDATER_ENDPOINTS: &[&str] =
+    &[DEFAULT_UPDATER_ENDPOINT, MIRROR_UPDATER_ENDPOINT];
 const PLACEHOLDER_UPDATER_PUBLIC_KEY: &str =
     "UlNJRzAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=";
-const FETCH_TIMEOUT_SECONDS: u64 = 5;
+/// Full request budget (align with the renderer check timeout of 15s).
+const FETCH_TIMEOUT_SECONDS: u64 = 15;
+/// Fail fast on dead routes so multi-endpoint fallback can try the mirror.
+const CONNECT_TIMEOUT_SECONDS: u64 = 8;
+const TRANSIENT_RETRY_DELAY_MS: u64 = 400;
 const MAX_MANIFEST_PROBE_CANDIDATES: usize = 4;
+const UPDATER_USER_AGENT: &str = "Pebble-Desktop-Updater/1.0 (+https://pebble.nebutra.com)";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -165,53 +176,54 @@ pub async fn updater_check_latest_release(
     })
 }
 
-/// Fast path for the stable channel: one GET of `/releases/latest/download/latest.json`.
+/// Fast path for the stable channel: GET trusted latest.json endpoints in order.
 /// Returns `None` when the caller should fall back to the Atom feed (network error,
 /// unusable manifest, or assets still publishing for a newer tag).
 async fn check_default_latest_manifest(
     current_version: &str,
 ) -> Result<Option<UpdaterCheckLatestResult>, String> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(FETCH_TIMEOUT_SECONDS))
-        .build()
-        .map_err(|error| format!("Could not create Pebble release client: {error}"))?;
-    let response = match client.get(DEFAULT_UPDATER_ENDPOINT).send().await {
-        Ok(response) => response,
-        Err(_) => return Ok(None),
-    };
-    if !response.status().is_success() {
-        return Ok(None);
+    let client = release_http_client("release")?;
+    for endpoint in TRUSTED_UPDATER_ENDPOINTS {
+        let Some(manifest) = fetch_json_value(&client, endpoint).await else {
+            continue;
+        };
+        if let Some(result) = interpret_latest_manifest(&manifest, current_version) {
+            return Ok(Some(result));
+        }
+        // Manifest parsed but not usable yet (e.g. missing platform) — try next host,
+        // then let the Atom feed probe for a ready tag.
     }
-    let manifest = match response.json::<serde_json::Value>().await {
-        Ok(manifest) => manifest,
-        Err(_) => return Ok(None),
-    };
-    let Some(version) = manifest
+    Ok(None)
+}
+
+/// Parse a Tauri latest.json payload into a check result, or `None` to try another source.
+fn interpret_latest_manifest(
+    manifest: &serde_json::Value,
+    current_version: &str,
+) -> Option<UpdaterCheckLatestResult> {
+    let version = manifest
         .get("version")
         .and_then(serde_json::Value::as_str)
-        .map(normalize_tag_to_version)
-    else {
-        return Ok(None);
-    };
+        .map(normalize_tag_to_version)?;
     if parse_version(&version).is_none() {
-        return Ok(None);
+        return None;
     }
     let tag = format!("v{version}");
     if compare_versions(&version, current_version) <= 0 {
-        return Ok(Some(UpdaterCheckLatestResult {
+        return Some(UpdaterCheckLatestResult {
             state: "not-available".to_string(),
             version: None,
             tag: None,
             release_url: None,
             message: None,
             last_good_tag: None,
-        }));
+        });
     }
-    if !tauri_manifest_has_current_platform(&manifest, &tag) {
+    if !tauri_manifest_has_current_platform(manifest, &tag) {
         // Newer latest.json without this platform yet — probe the feed for a ready build.
-        return Ok(None);
+        return None;
     }
-    Ok(Some(available_result(&ReleaseFeedTag { tag, version })))
+    Some(available_result(&ReleaseFeedTag { tag, version }))
 }
 
 #[tauri::command]
@@ -235,6 +247,13 @@ pub async fn updater_check_release_tag<R: Runtime>(
         .endpoints(vec![endpoint])
         .map_err(|error| error.to_string())?
         .timeout(Duration::from_secs(FETCH_TIMEOUT_SECONDS))
+        // Why: match the shared release client — plugin reqwest feature-unifies
+        // with system-proxy so OS/Clash proxies apply to tagged manifest checks.
+        .configure_client(|builder| {
+            builder
+                .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECONDS))
+                .user_agent(UPDATER_USER_AGENT)
+        })
         .build()
         .map_err(|error| error.to_string())?;
     let Some(update) = updater.check().await.map_err(|error| error.to_string())? else {
@@ -265,25 +284,7 @@ pub async fn updater_check_release_tag<R: Runtime>(
 
 #[tauri::command]
 pub async fn updater_fetch_changelog_entries() -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(FETCH_TIMEOUT_SECONDS))
-        .build()
-        .map_err(|error| format!("Could not create Pebble changelog client: {error}"))?;
-    let response = client
-        .get(CHANGELOG_JSON_URL)
-        .send()
-        .await
-        .map_err(|error| format!("Could not fetch Pebble changelog: {error}"))?;
-    if !response.status().is_success() {
-        return Err(format!(
-            "Could not fetch Pebble changelog: status {}",
-            response.status().as_u16()
-        ));
-    }
-    response
-        .json::<serde_json::Value>()
-        .await
-        .map_err(|error| format!("Could not parse Pebble changelog: {error}"))
+    fetch_bounded_json(CHANGELOG_JSON_URL, "changelog").await
 }
 
 #[tauri::command]
@@ -291,14 +292,37 @@ pub async fn updater_fetch_nudge() -> Result<serde_json::Value, String> {
     fetch_bounded_json(NUDGE_JSON_URL, "nudge").await
 }
 
-async fn fetch_bounded_json(url: &str, label: &str) -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::builder()
+fn release_http_client(label: &str) -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
         .timeout(Duration::from_secs(FETCH_TIMEOUT_SECONDS))
+        .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECONDS))
+        .user_agent(UPDATER_USER_AGENT)
+        .redirect(reqwest::redirect::Policy::limited(10))
         .build()
-        .map_err(|error| format!("Could not create Pebble {label} client: {error}"))?;
-    let response = client
-        .get(url)
-        .send()
+        .map_err(|error| format!("Could not create Pebble {label} client: {error}"))
+}
+
+fn is_transient_reqwest_error(error: &reqwest::Error) -> bool {
+    error.is_timeout() || error.is_connect() || error.is_request()
+}
+
+async fn send_get_with_retry(
+    client: &reqwest::Client,
+    url: &str,
+) -> Result<reqwest::Response, reqwest::Error> {
+    match client.get(url).send().await {
+        Ok(response) => Ok(response),
+        Err(error) if is_transient_reqwest_error(&error) => {
+            tokio::time::sleep(Duration::from_millis(TRANSIENT_RETRY_DELAY_MS)).await;
+            client.get(url).send().await
+        }
+        Err(error) => Err(error),
+    }
+}
+
+async fn fetch_bounded_json(url: &str, label: &str) -> Result<serde_json::Value, String> {
+    let client = release_http_client(label)?;
+    let response = send_get_with_retry(&client, url)
         .await
         .map_err(|error| format!("Could not fetch Pebble {label}: {error}"))?;
     if !response.status().is_success() {
@@ -313,14 +337,18 @@ async fn fetch_bounded_json(url: &str, label: &str) -> Result<serde_json::Value,
         .map_err(|error| format!("Could not parse Pebble {label}: {error}"))
 }
 
+/// Best-effort JSON GET used by multi-endpoint stable checks (soft-fail per host).
+async fn fetch_json_value(client: &reqwest::Client, url: &str) -> Option<serde_json::Value> {
+    let response = send_get_with_retry(client, url).await.ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    response.json::<serde_json::Value>().await.ok()
+}
+
 async fn fetch_release_feed_tags() -> Result<Vec<ReleaseFeedTag>, String> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(FETCH_TIMEOUT_SECONDS))
-        .build()
-        .map_err(|error| format!("Could not create Pebble release client: {error}"))?;
-    let response = client
-        .get(ATOM_FEED_URL)
-        .send()
+    let client = release_http_client("release")?;
+    let response = send_get_with_retry(&client, ATOM_FEED_URL)
         .await
         .map_err(|error| format!("Could not fetch Pebble release feed: {error}"))?;
     if !response.status().is_success() {
@@ -348,24 +376,13 @@ async fn fetch_release_feed_tags() -> Result<Vec<ReleaseFeedTag>, String> {
 }
 
 async fn has_ready_tauri_manifest(tag: &str) -> bool {
-    let client = match reqwest::Client::builder()
-        .timeout(Duration::from_secs(FETCH_TIMEOUT_SECONDS))
-        .build()
-    {
-        Ok(client) => client,
-        Err(_) => return false,
-    };
-    let response = match client.get(tauri_release_manifest_url(tag)).send().await {
-        Ok(response) => response,
-        Err(_) => return false,
-    };
-    if !response.status().is_success() {
+    let Ok(client) = release_http_client("release") else {
         return false;
-    }
-    match response.json::<serde_json::Value>().await {
-        Ok(manifest) => tauri_manifest_has_current_platform(&manifest, tag),
-        Err(_) => false,
-    }
+    };
+    let Some(manifest) = fetch_json_value(&client, &tauri_release_manifest_url(tag)).await else {
+        return false;
+    };
+    tauri_manifest_has_current_platform(&manifest, tag)
 }
 
 fn filter_release_candidates(
@@ -407,18 +424,38 @@ fn tauri_manifest_has_current_platform(manifest: &serde_json::Value, tag: &str) 
         return false;
     };
     let prefix = current_updater_platform_prefix();
-    let expected_download_prefix = format!("{}/", release_download_url(tag));
     platforms.iter().any(|(platform, entry)| {
         (platform == &prefix || platform.starts_with(&format!("{prefix}-")))
             && entry
                 .get("url")
                 .and_then(serde_json::Value::as_str)
-                .is_some_and(|value| value.starts_with(&expected_download_prefix))
+                .is_some_and(|value| is_trusted_platform_download_url(value, tag))
             && entry
                 .get("signature")
                 .and_then(serde_json::Value::as_str)
                 .is_some_and(|value| !value.trim().is_empty())
     })
+}
+
+/// Accept browser download URLs and GitHub Releases API asset URLs from tauri-action.
+fn is_trusted_platform_download_url(url: &str, tag: &str) -> bool {
+    let trimmed = url.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let download_prefix = format!("{}/", release_download_url(tag));
+    if trimmed.starts_with(&download_prefix) {
+        return true;
+    }
+    // Why: production latest.json from tauri-action uses
+    // `https://api.github.com/repos/{Owner}/pebble/releases/assets/{id}` (Owner casing
+    // varies). Browser `/releases/download/...` URLs remain trusted for mirrors.
+    let lower = trimmed.to_ascii_lowercase();
+    const API_ASSET_PREFIX: &str = "https://api.github.com/repos/nebutra/pebble/releases/assets/";
+    if let Some(rest) = lower.strip_prefix(API_ASSET_PREFIX) {
+        return !rest.is_empty() && rest.chars().all(|character| character.is_ascii_digit());
+    }
+    false
 }
 
 fn current_updater_platform_prefix() -> String {
@@ -465,11 +502,14 @@ fn validate_compiled_updater_config(source: &str) -> Result<(), String> {
         .get("endpoints")
         .and_then(serde_json::Value::as_array)
         .ok_or_else(|| "Pebble updater endpoints are not configured in this build.".to_string())?;
-    if endpoints.len() != 1
-        || endpoints.first().and_then(serde_json::Value::as_str) != Some(DEFAULT_UPDATER_ENDPOINT)
-    {
+    let configured: Vec<&str> = endpoints
+        .iter()
+        .filter_map(serde_json::Value::as_str)
+        .collect();
+    // Why: require the full ordered trusted chain so builds always ship GitHub + mirror.
+    if configured.as_slice() != TRUSTED_UPDATER_ENDPOINTS {
         return Err(
-            "Pebble updater endpoint is not the trusted nebutra/pebble release endpoint."
+            "Pebble updater endpoints are not the trusted nebutra/pebble release chain."
                 .to_string(),
         );
     }
@@ -646,9 +686,33 @@ mod tests {
     }
 
     #[test]
+    fn validates_github_api_asset_platform_urls_from_tauri_action() {
+        let platform = current_updater_platform_prefix();
+        let manifest = serde_json::json!({
+            "version": "1.4.130",
+            "platforms": {
+                (platform): {
+                    "url": "https://api.github.com/repos/Nebutra/pebble/releases/assets/502281744",
+                    "signature": "signed"
+                }
+            }
+        });
+        assert!(tauri_manifest_has_current_platform(&manifest, "v1.4.130"));
+        assert!(is_trusted_platform_download_url(
+            "https://api.github.com/repos/nebutra/pebble/releases/assets/1",
+            "v1.4.130"
+        ));
+        assert!(!is_trusted_platform_download_url(
+            "https://api.github.com/repos/evil/pebble/releases/assets/1",
+            "v1.4.130"
+        ));
+    }
+
+    #[test]
     fn rejects_foreign_or_unsigned_tauri_platform_entries() {
         let platform = current_updater_platform_prefix();
         let foreign = serde_json::json!({
+            "version": "1.4.128",
             "platforms": {
                 (platform): { "url": "https://example.test/Pebble.tar.gz", "signature": "signed" }
             }
@@ -676,7 +740,7 @@ mod tests {
         let config = serde_json::json!({
             "plugins": {
                 "updater": {
-                    "endpoints": [DEFAULT_UPDATER_ENDPOINT],
+                    "endpoints": TRUSTED_UPDATER_ENDPOINTS,
                     "pubkey": PLACEHOLDER_UPDATER_PUBLIC_KEY
                 }
             }
@@ -687,11 +751,11 @@ mod tests {
     }
 
     #[test]
-    fn accepts_trusted_endpoint_with_release_public_key() {
+    fn accepts_trusted_endpoint_chain_with_release_public_key() {
         let config = serde_json::json!({
             "plugins": {
                 "updater": {
-                    "endpoints": [DEFAULT_UPDATER_ENDPOINT],
+                    "endpoints": TRUSTED_UPDATER_ENDPOINTS,
                     "pubkey": "UlNJRzAxUFJPRFVDVElPTktFWQ=="
                 }
             }
@@ -712,5 +776,36 @@ mod tests {
         assert!(validate_compiled_updater_config(&config.to_string())
             .unwrap_err()
             .contains("trusted nebutra/pebble"));
+    }
+
+    #[test]
+    fn rejects_partial_trusted_endpoint_chain() {
+        let config = serde_json::json!({
+            "plugins": {
+                "updater": {
+                    "endpoints": [DEFAULT_UPDATER_ENDPOINT],
+                    "pubkey": "UlNJRzAxUFJPRFVDVElPTktFWQ=="
+                }
+            }
+        });
+        assert!(validate_compiled_updater_config(&config.to_string())
+            .unwrap_err()
+            .contains("trusted nebutra/pebble"));
+    }
+
+    #[test]
+    fn interpret_latest_manifest_marks_current_as_not_available() {
+        let platform = current_updater_platform_prefix();
+        let manifest = serde_json::json!({
+            "version": "1.4.130",
+            "platforms": {
+                (platform): {
+                    "url": "https://api.github.com/repos/Nebutra/pebble/releases/assets/1",
+                    "signature": "signed"
+                }
+            }
+        });
+        let result = interpret_latest_manifest(&manifest, "1.4.130").expect("result");
+        assert_eq!(result.state, "not-available");
     }
 }
