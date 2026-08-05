@@ -195,6 +195,33 @@ describe('terminal programmatic text paste', () => {
     expect(onSettled).toHaveBeenCalledWith(false)
   })
 
+  it('writes a raw setup draft when shell paste readiness is intentionally relaxed (#95)', async () => {
+    const pane = makePane()
+    pane.terminal.modes.bracketedPasteMode = false
+    const transport = makeTransport()
+    const onSettled = vi.fn()
+
+    handleTerminalProgrammaticTextPaste({
+      detail: {
+        tabId: 'tab-1',
+        text: 'npx skills update orchestration --global',
+        directPtyDraft: true,
+        requireShellPasteReady: false,
+        onSettled
+      },
+      getManager: () => makeManager(pane) as never,
+      getPaneTransports: () => new Map([[pane.id, transport]]) as never,
+      tabId: 'tab-1',
+      worktreeId: 'wt-1'
+    })
+    await flushPasteTasks()
+
+    expect(transport.sendInputAccepted).toHaveBeenCalledWith(
+      'npx skills update orchestration --global'
+    )
+    expect(onSettled).toHaveBeenCalledWith(true)
+  })
+
   it('keeps setup command insertion retryable when the native PTY rejects the write', async () => {
     const pane = makePane()
     const transport = makeTransport({ accepted: false })

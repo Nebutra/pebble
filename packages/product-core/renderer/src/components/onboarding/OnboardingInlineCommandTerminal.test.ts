@@ -77,6 +77,31 @@ describe('dispatchTerminalTextWithAcknowledgement', () => {
     expect(onSettled).toHaveBeenCalledWith(true)
   })
 
+  it('can relax shell paste readiness for stalled skill-setup drafts (#95)', () => {
+    vi.useFakeTimers()
+    const onSettled = vi.fn()
+    const listener = (event: Event): void => {
+      const detail = (event as CustomEvent<PasteTerminalTextDetail>).detail
+      expect(detail.requireShellPasteReady).toBe(false)
+      detail.onReceived?.()
+      detail.onSettled?.(true)
+    }
+    window.addEventListener(PASTE_TERMINAL_TEXT_EVENT, listener)
+
+    dispatchTerminalTextWithAcknowledgement({
+      tabId: 'tab-1',
+      text: 'npx skills update orchestration --global',
+      onSettled,
+      requireShellPasteReady: false,
+      acknowledgementTimeoutMs: 25
+    })
+    vi.advanceTimersByTime(25)
+    window.removeEventListener(PASTE_TERMINAL_TEXT_EVENT, listener)
+
+    expect(onSettled).toHaveBeenCalledOnce()
+    expect(onSettled).toHaveBeenCalledWith(true)
+  })
+
   it('keeps waiting for a cold native PTY after the terminal listener receives the draft', () => {
     vi.useFakeTimers()
     const onSettled = vi.fn()
