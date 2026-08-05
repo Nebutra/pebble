@@ -170,6 +170,21 @@ describe('launchPromptAsMessage', () => {
     ).toBeNull()
   })
 
+  it('mirrors a multi-line launch draft into the composer verbatim', () => {
+    // Why: whitespace normalization exists only to match a reflowed transcript
+    // copy. The rendered block must keep the draft's own line structure.
+    const draft = ['Refactor the parser:', '', '- keep the fast path', '- drop the shim'].join('\n')
+    const message = launchPromptAsMessage({
+      tabId: 'tab-1',
+      agent: 'codex',
+      text: draft,
+      createdAt: 42
+    })
+
+    expect(message?.blocks).toEqual([{ type: 'text', text: draft }])
+    expect(message?.blocks[0]).toMatchObject({ text: expect.stringContaining('\n') })
+  })
+
   it('uses pending-send normalization for large multiline generated prompts', () => {
     const prompt = [
       '[Image #1] Resolve the failing checks:',
