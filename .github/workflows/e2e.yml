@@ -108,6 +108,21 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y at-spi2-core dbus-x11 gir1.2-atspi-2.0 libwebkit2gtk-4.1-dev libappindicator3-dev python3-gi librsvg2-dev patchelf xvfb
       - run: pnpm install --frozen-lockfile
+
+      # Why: this job builds the shell with --features local-speech, and
+      # sherpa-rs-sys links against onnxruntime. Only tauri-desktop-release.yml
+      # staged those libraries, so build.rs failed in every other workflow that
+      # runs the same build. The scripts fall back to the host triple when
+      # TAURI_RELEASE_TARGET_TRIPLE is unset, which is what these jobs want.
+      - name: Ensure speech link libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            node apps/desktop/scripts/ensure-linux-speech-link-libs.mjs
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            node apps/desktop/scripts/ensure-macos-speech-link-libs.mjs
+          fi
       - name: Run Tauri functional evidence on Linux
         if: runner.os == 'Linux'
         run: xvfb-run --auto-servernum dbus-run-session -- pnpm verify:tauri-real-runtime

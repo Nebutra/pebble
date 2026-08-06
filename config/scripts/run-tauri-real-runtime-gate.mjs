@@ -15,6 +15,13 @@ import { evaluateWindowLifecycleEvidence } from './window-lifecycle-evidence.mjs
 import { isMissingTccBundleRegistration } from './macos-tcc-reset-result.mjs'
 import { validateTauriRuntimeScreenshots } from './tauri-real-runtime-screenshot-evidence.mjs'
 
+// Why: `command()` is called from top-level statements far above its own
+// definition, so this list has to be initialized before that code runs. Keeping
+// it next to the function put it in the temporal dead zone and threw
+// "Cannot access 'WINDOWS_SHIM_COMMANDS' before initialization" — on Windows
+// only, because every other platform returns from `command()` before reading it.
+const WINDOWS_SHIM_COMMANDS = new Set(['npm', 'npx', 'pnpm', 'yarn'])
+
 const root = resolve(import.meta.dirname, '../..')
 const desktop = resolve(root, 'apps/desktop')
 const temporary = mkdtempSync(join(tmpdir(), 'pebble-real-runtime-gate-'))
@@ -412,8 +419,8 @@ function resetFunctionalGateAccessibility() {
 // extension, but git and node are real `.exe`s. Appending `.cmd` to those made
 // spawn fail to start the process at all, surfacing as a null exit status and
 // the misleading message "git exited with no status".
-const WINDOWS_SHIM_COMMANDS = new Set(['npm', 'npx', 'pnpm', 'yarn'])
-
+// WINDOWS_SHIM_COMMANDS is declared at the top of this module; see the note
+// there for why it cannot live beside this function.
 function command(name) {
   if (process.platform !== 'win32' || name.includes('\\') || name.includes('/')) {
     return name
