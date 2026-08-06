@@ -114,6 +114,19 @@ jobs:
       # staged those libraries, so build.rs failed in every other workflow that
       # runs the same build. The scripts fall back to the host triple when
       # TAURI_RELEASE_TARGET_TRIPLE is unset, which is what these jobs want.
+      # Why: Cargo evaluates Tauri's resource paths in build.rs, and
+      # tauri.macos.conf.json lists the computer-use helper app. Without it the
+      # build fails at "resource path ../../../native/computer-use-macos/.build/
+      # release/Pebble Computer Use.app doesn't exist". tauri-desktop-release.yml
+      # already stages it; ad-hoc signing is fine because nothing here ships.
+      - name: Prepare ad-hoc macOS computer-use helper
+        if: runner.os == 'macOS'
+        env:
+          PEBBLE_COMPUTER_MACOS_SIGN_IDENTITY: '-'
+        run: |
+          node apps/desktop/scripts/prepare-macos-native-test-resources.mjs
+          node config/scripts/build-computer-macos.mjs
+
       - name: Ensure speech link libraries
         shell: bash
         run: |
