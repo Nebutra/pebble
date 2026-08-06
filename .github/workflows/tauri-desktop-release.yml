@@ -336,9 +336,16 @@ jobs:
           releaseAssetNamePattern: ${{ matrix.asset_pattern }}
           tagName: ${{ inputs.upload_to_github_release && inputs.release_tag || '' }}
           releaseName: Pebble ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
-          # Existing published release may already hold Linux assets; stay non-draft
-          # when re-uploading so mac/win can attach to the same tag.
-          releaseDraft: ${{ contains(github.event_name == 'push' && github.ref_name || inputs.release_tag, '-rc.') }}
+          # Why: this used to be `contains(tag, '-rc.')`, which left stable tags
+          # non-draft — so tauri-action published the release the moment it
+          # finished uploading, inside the build job, before verify-updater-
+          # manifest and verify-release-evidence ever ran. publish-release has
+          # been skipped on all ten cuts to date and every stable release since
+          # the fork shipped unverified. Staying draft is what makes those
+          # checks a gate instead of a report; publish-release flips it after
+          # they pass. Re-uploading to an already published tag still works,
+          # because the release is looked up by tag either way.
+          releaseDraft: true
           prerelease: ${{ contains(github.event_name == 'push' && github.ref_name || inputs.release_tag, '-rc.') }}
           retryAttempts: 2
 
