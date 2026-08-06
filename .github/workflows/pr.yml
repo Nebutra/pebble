@@ -86,6 +86,13 @@ jobs:
       - name: Check feature wall asset budget
         run: pnpm check:feature-wall-assets
 
+      # Why: the manifest embeds package.json's version and nothing regenerated
+      # it on a bump, so it stayed at the fork baseline through every release
+      # until 1.4.131. This gate lived only inside the `pnpm lint` aggregate,
+      # which no job runs, so the drift shipped unnoticed.
+      - name: Verify bundled skill guides
+        run: pnpm verify:bundled-skills
+
       - name: Verify Tauri desktop mainline contract
         run: pnpm verify:tauri-mainline
 

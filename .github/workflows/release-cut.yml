@@ -456,12 +456,21 @@ jobs:
           npm version "$VERSION" --no-git-tag-version --allow-same-version
           node config/scripts/sync-tauri-release-version.mjs "$VERSION"
           node config/scripts/verify-tauri-version-sync.mjs
+
+          # Why: the bundled skill manifest embeds package.json's version, so a
+          # bump leaves it stale unless it is regenerated in the same commit.
+          # It sat at the fork baseline through every release until 1.4.131.
+          node config/scripts/generate-bundled-skill-guides.mjs --write
+          node config/scripts/generate-bundled-skill-guides.mjs
           git add \
             package.json \
             apps/desktop/package.json \
             apps/desktop/src-tauri/tauri.conf.json \
             apps/desktop/src-tauri/Cargo.toml \
-            apps/desktop/src-tauri/Cargo.lock
+            apps/desktop/src-tauri/Cargo.lock \
+            resources/skills/current-manifest.json \
+            resources/skills/release-mapping.json \
+            runtime/go/cmd/pebble-control/bundled_skill_guides_generated.go
           commit_message="release: v$VERSION"
           if [[ "$EVENT_NAME" == "schedule" ]]; then
             commit_message="$commit_message [rc-slot:$SLOT]"
