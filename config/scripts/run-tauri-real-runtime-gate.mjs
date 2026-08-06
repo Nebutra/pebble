@@ -30,9 +30,19 @@ const dataDir = join(temporary, 'runtime-data')
 const evidence = join(temporary, 'evidence.json')
 const providerBin = join(temporary, 'provider-bin')
 const nativeChatRoot = join(temporary, 'native-chat')
-const screenshotDir = process.env.PEBBLE_REAL_RUNTIME_SCREENSHOT_DIR
-  ? resolve(process.env.PEBBLE_REAL_RUNTIME_SCREENSHOT_DIR)
-  : null
+// Why: captureFunctionalWindow is macOS-only by construction — CoreGraphics
+// window lookup through `xcrun swift`, and it throws outright anywhere else.
+// The app blocks in `functional_gate_capture_ready` after announcing
+// `<surface>-capture-ready` whenever it is handed a screenshot directory, so
+// handing one to a host that cannot capture parks the run until the 240s
+// deadline. That is exactly why golden mode timed out on Linux while the plain
+// gate, which never sets the directory, finished the same build in 8.5s.
+// Both uses read this constant so the pair cannot drift apart again.
+const canCaptureFunctionalWindow = process.platform === 'darwin'
+const screenshotDir =
+  process.env.PEBBLE_REAL_RUNTIME_SCREENSHOT_DIR && canCaptureFunctionalWindow
+    ? resolve(process.env.PEBBLE_REAL_RUNTIME_SCREENSHOT_DIR)
+    : null
 const reportPath = process.env.PEBBLE_REAL_RUNTIME_REPORT_PATH
   ? resolve(process.env.PEBBLE_REAL_RUNTIME_REPORT_PATH)
   : null
@@ -481,7 +491,7 @@ async function waitForEvidence(path, child, captureDirectory) {
       const surface = captureDirectory
         ? lastStage.match(/^(terminal|browser|source-control|checks)-capture-ready$/)?.[1]
         : null
-      if (process.platform === 'darwin' && surface && !capturedSurfaces.has(surface)) {
+      if (canCaptureFunctionalWindow && surface && !capturedSurfaces.has(surface)) {
         captureFunctionalWindow(surface, captureDirectory)
         capturedSurfaces.add(surface)
       }
