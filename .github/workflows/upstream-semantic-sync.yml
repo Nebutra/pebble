@@ -13,10 +13,16 @@ jobs:
   report:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version-file: package.json
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+      # Why: the verify step below runs vitest from the workspace, which needs a
+      # real install. Without it every scheduled run dies before publishing.
+      - run: pnpm install --frozen-lockfile
       - name: Generate semantic report
         run: node config/scripts/upstream-semantic-sync.mjs --fetch
       - name: Verify sync tooling
@@ -25,7 +31,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node config/scripts/publish-upstream-semantic-issue.mjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: upstream-semantic-sync
           path: artifacts/upstream-semantic-sync
