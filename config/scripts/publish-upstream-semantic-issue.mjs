@@ -15,6 +15,17 @@ export function findMarkedIssue(issues, marker) {
   )
 }
 
+const SCOPED_PACKAGE = /(?<![`\w])@([a-z0-9][\w.-]*\/[\w.-]+)/gi
+const BARE_HANDLE = /(?<![`\w./-])@([A-Za-z0-9][A-Za-z0-9-]{0,38})(?![\w-])/g
+
+// Why: this report is posted verbatim and carries upstream commit subjects, so
+// any `@token` in it becomes a GitHub notification for whoever owns that handle
+// — people who never opted into this fork. Handles lose the `@`; scoped package
+// names keep it inside a code span so `@scope/pkg` stays a correct package name.
+export function neutralizeMentions(markdown) {
+  return markdown.replace(SCOPED_PACKAGE, '`@$1`').replace(BARE_HANDLE, '$1')
+}
+
 async function request(url, token, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -46,7 +57,7 @@ async function main() {
     return
   }
   const marker = issueMarker(report)
-  const body = `${marker}\n\n${markdown}`
+  const body = `${marker}\n\n${neutralizeMentions(markdown)}`
   const apiBase = `https://api.github.com/repos/${repository}`
   const upstreamLabel = `upstream-${'or'}${'ca'}`
   // Why: one batched list request avoids a search call for every upstream commit.

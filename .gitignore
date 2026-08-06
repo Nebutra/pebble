@@ -93,6 +93,7 @@ docs/reference/react-performance-audit.md
 .validate-ui-screenshots/
 validation-screenshots/
 artifacts/tauri-pixel-performance/
+artifacts/upstream-semantic-sync/
 .pebble-browser
 
 # Playwright

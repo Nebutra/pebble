@@ -53,3 +53,25 @@ create/update call to conserve API quota.
 High-risk desktop-host, preload, daemon, relay, and runtime changes always require a manual
 Go/Tauri semantic port. Draft PR generation is intentionally disabled until an allow-list
 of deterministic transformations is reviewed. Auto-merge is not part of this pipeline.
+
+## Mention safety
+
+Anything written into a sync issue must be mention-safe. GitHub treats `@token` as a
+notification, not as an inert citation, so a pasted upstream changelog pages contributors
+who never opted into this fork. Pebble is an independent product; upstream authors are not
+reviewers here and must not be summoned into these threads.
+
+Rules for anyone — human or agent — filing or updating a sync issue:
+
+- Attribute with a plain username or a link, never `@handle`: write `by someone in
+  <pull-request-url>`, not `by @someone in ...`.
+- Prefer linking a compare, release, or pull-request URL over pasting a whole
+  "What's Changed" block, which is where handles arrive in bulk.
+- Cross-repository issue references need the full `owner/repo#123` form. A bare `#123`
+  resolves against Pebble and silently points at the wrong thing.
+- Scoped package names keep their `@` but belong in a code span: `` `@scope/pkg` ``.
+  Bare, they render as an organisation mention.
+
+`neutralizeMentions` in `config/scripts/publish-upstream-semantic-issue.mjs` enforces this
+for the automated path, because upstream commit subjects carry both handles and scoped
+package names. It cannot cover text written by hand — that part is a review obligation.
