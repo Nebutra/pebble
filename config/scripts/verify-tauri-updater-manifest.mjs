@@ -1,10 +1,69 @@
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 
 import { verifyUpdaterSignatureWithRust } from './verify-tauri-release-artifacts.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '../..')
+
+// Why: tauri-action emits API asset URLs (`api.github.com/repos/o/r/releases/
+// assets/<id>`), not browser download URLs, so that private repositories work.
+// tauri-plugin-updater sends `Accept: application/octet-stream` when fetching
+// the payload, which is what makes those URLs resolve to bytes instead of JSON.
+// Both forms are legitimate; this gate previously accepted only the browser one
+// and so failed every release, which is how publishing came to bypass it.
+export function classifyUpdaterUrl(rawUrl) {
+  let url
+  try {
+    url = new URL(rawUrl)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+    return null
+  }
+  const segments = decodeSegments(url)
+  if (!segments) {
+    return null
+  }
+  if (url.host === 'github.com') {
+    const [owner, repo, releases, download, tag, assetName, ...extra] = segments
+    if (releases !== 'releases' || download !== 'download' || !assetName || extra.length > 0) {
+      return null
+    }
+    return { kind: 'browser', repository: `${owner}/${repo}`, tag, assetName }
+  }
+  if (url.host === 'api.github.com') {
+    const [repos, owner, repo, releases, assets, assetId, ...extra] = segments
+    if (
+      repos !== 'repos' ||
+      releases !== 'releases' ||
+      assets !== 'assets' ||
+      !/^\d+$/.test(assetId ?? '') ||
+      extra.length > 0
+    ) {
+      return null
+    }
+    return { kind: 'api', repository: `${owner}/${repo}`, assetId: Number(assetId) }
+  }
+  return null
+}
+
+function decodeSegments(url) {
+  try {
+    return url.pathname
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => decodeURIComponent(segment))
+  } catch {
+    return null
+  }
+}
+
+function sameRepository(a, b) {
+  // GitHub owner and repository names are case-insensitive.
+  return a.toLowerCase() === b.toLowerCase()
+}
 
 export function validateUpdaterManifest(manifest, options = {}) {
   if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
@@ -30,7 +89,7 @@ export function validateUpdaterManifest(manifest, options = {}) {
     }
     const url = typeof value.url === 'string' ? value.url : ''
     const signature = typeof value.signature === 'string' ? value.signature.trim() : ''
-    if (!url.startsWith('https://github.com/nebutra/pebble/releases/download/')) {
+    if (!classifyUpdaterUrl(url)) {
       throw new Error(`Tauri updater platform ${platform} has an unexpected download URL.`)
     }
     if (!signature) {
@@ -68,78 +127,64 @@ export function validatePublishedUpdaterManifest(manifest, options = {}) {
     expectedVersion: tag,
     requiredPlatforms: options.requiredPlatforms
   })
-  const assetsByName = new Map(
-    options.releaseAssets
-      .filter((asset) => asset && typeof asset.name === 'string')
-      .map((asset) => [asset.name, asset])
-  )
   // Why: signatures authenticate downloaded bytes, but cannot prove that a
   // manifest routes clients to an artifact uploaded for this exact release.
   for (const [platform, entry] of Object.entries(manifest.platforms)) {
-    const assetName = updaterAssetName(entry.url, { platform, repository, tag })
-    const asset = assetsByName.get(assetName)
-    if (!asset) {
-      throw new Error(
-        `Tauri updater platform ${platform} references missing release asset ${assetName}.`
-      )
-    }
+    const asset = resolveUpdaterAsset(entry.url, {
+      platform,
+      repository,
+      tag,
+      releaseAssets: options.releaseAssets
+    })
+    const label = asset.name ?? asset.id
     if (asset.state !== 'uploaded') {
       throw new Error(
-        `Tauri updater platform ${platform} references release asset ${assetName} in state ${
+        `Tauri updater platform ${platform} references release asset ${label} in state ${
           asset.state ?? 'unknown'
         }.`
       )
     }
     if (!Number.isFinite(asset.size) || asset.size <= 0) {
-      throw new Error(
-        `Tauri updater platform ${platform} references empty release asset ${assetName}.`
-      )
+      throw new Error(`Tauri updater platform ${platform} references empty release asset ${label}.`)
     }
   }
   return manifest
 }
 
-function updaterAssetName(rawUrl, { platform, repository, tag }) {
-  let url
-  try {
-    url = new URL(rawUrl)
-  } catch {
-    throw new Error(`Tauri updater platform ${platform} has an invalid download URL.`)
-  }
-  if (
-    url.protocol !== 'https:' ||
-    url.host !== 'github.com' ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash
-  ) {
+// Why: resolve against the release's own asset list rather than trusting the
+// URL text. A browser URL names the asset; an API URL only carries its numeric
+// id, and the id is the stronger claim — it cannot point at another release.
+export function resolveUpdaterAsset(rawUrl, { platform, repository, tag, releaseAssets }) {
+  const target = classifyUpdaterUrl(rawUrl)
+  if (!target) {
     throw new Error(`Tauri updater platform ${platform} has an ambiguous download URL.`)
   }
-
-  let segments
-  try {
-    segments = url.pathname
-      .split('/')
-      .filter(Boolean)
-      .map((segment) => decodeURIComponent(segment))
-  } catch {
-    throw new Error(`Tauri updater platform ${platform} has an invalid download URL.`)
-  }
-  const [owner, repo, releases, download, urlTag, assetName, ...extra] = segments
-  if (
-    `${owner}/${repo}` !== repository ||
-    releases !== 'releases' ||
-    download !== 'download' ||
-    urlTag !== tag ||
-    !assetName ||
-    extra.length > 0
-  ) {
+  if (!sameRepository(target.repository, repository)) {
     throw new Error(
       `Tauri updater platform ${platform} does not target ${repository} release ${tag}.`
     )
   }
-  return assetName
+  if (target.kind === 'browser') {
+    if (target.tag !== tag) {
+      throw new Error(
+        `Tauri updater platform ${platform} does not target ${repository} release ${tag}.`
+      )
+    }
+    const asset = releaseAssets.find((candidate) => candidate?.name === target.assetName)
+    if (!asset) {
+      throw new Error(
+        `Tauri updater platform ${platform} references missing release asset ${target.assetName}.`
+      )
+    }
+    return asset
+  }
+  const asset = releaseAssets.find((candidate) => candidate?.id === target.assetId)
+  if (!asset) {
+    throw new Error(
+      `Tauri updater platform ${platform} references release asset ${target.assetId}, which is not part of ${tag}.`
+    )
+  }
+  return asset
 }
 
 export async function fetchReleaseUpdaterData({ repository, tag, token, fetchImpl = fetch }) {
@@ -193,13 +238,18 @@ export async function verifyPublishedUpdaterPayloadSignatures({
   if (typeof publicKey !== 'string' || publicKey.trim() === '') {
     throw new Error('TAURI_UPDATER_PUBLIC_KEY is required to verify published updater payloads.')
   }
-  const assetsByName = new Map(releaseAssets.map((asset) => [asset.name, asset]))
   const temporaryDirectory = await mkdtemp(join(tmpdir(), 'pebble-updater-verification-'))
   const verified = []
   try {
     for (const [platform, entry] of Object.entries(manifest.platforms)) {
-      const assetName = decodeURIComponent(basename(new URL(entry.url).pathname))
-      const asset = assetsByName.get(assetName)
+      // Why: an API URL's last path segment is the asset id, not its filename,
+      // so matching on basename silently found nothing for tauri-action output.
+      const target = classifyUpdaterUrl(entry.url)
+      const asset = releaseAssets.find((candidate) =>
+        target?.kind === 'api'
+          ? candidate?.id === target.assetId
+          : candidate?.name === target?.assetName
+      )
       if (!asset?.url) {
         throw new Error(`Tauri updater platform ${platform} has no downloadable release asset.`)
       }
@@ -281,9 +331,7 @@ if (process.argv[1] === import.meta.filename) {
       `Verified published Tauri updater manifest and ${verifiedPlatforms.length} payload signature(s) for ${releaseTag}.`
     )
   } else {
-    const directory = resolve(
-      process.argv[2] || `${repoRoot}/apps/desktop/src-tauri/target`
-    )
+    const directory = resolve(process.argv[2] || `${repoRoot}/apps/desktop/src-tauri/target`)
     const paths = await verifyGeneratedUpdaterManifests(directory)
     console.log(`Verified ${paths.length} Tauri updater manifest(s).`)
   }

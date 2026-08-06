@@ -35,6 +35,83 @@ function publishedManifest(overrides = {}) {
   }
 }
 
+test('accepts the API asset URLs tauri-action actually emits', () => {
+  // Shape taken from the published v1.4.131 latest.json.
+  const manifest = {
+    version: '1.4.131',
+    platforms: {
+      'linux-aarch64': {
+        url: 'https://api.github.com/repos/Nebutra/pebble/releases/assets/502403757',
+        signature: 'signed-value'
+      }
+    }
+  }
+  assert.equal(validateUpdaterManifest(manifest), manifest)
+})
+
+test('resolves an API asset URL by id rather than by path basename', () => {
+  const manifest = {
+    version: '1.2.3',
+    platforms: {
+      'darwin-aarch64': {
+        url: `https://api.github.com/repos/${repository}/releases/assets/502403757`,
+        signature: 'signed-value'
+      }
+    }
+  }
+  assert.equal(
+    validatePublishedUpdaterManifest(
+      manifest,
+      publishedManifestOptions({
+        releaseAssets: [{ id: 502403757, name: assetName, state: 'uploaded', size: 123 }]
+      })
+    ),
+    manifest
+  )
+})
+
+test('rejects an API asset id that belongs to another release', () => {
+  const manifest = {
+    version: '1.2.3',
+    platforms: {
+      'darwin-aarch64': {
+        url: `https://api.github.com/repos/${repository}/releases/assets/999`,
+        signature: 'signed-value'
+      }
+    }
+  }
+  assert.throws(
+    () =>
+      validatePublishedUpdaterManifest(
+        manifest,
+        publishedManifestOptions({
+          releaseAssets: [{ id: 502403757, name: assetName, state: 'uploaded', size: 123 }]
+        })
+      ),
+    /is not part of v1\.2\.3/
+  )
+})
+
+test('treats the owner and repository as case-insensitive', () => {
+  const manifest = publishedManifest({
+    url: `https://github.com/Nebutra/Pebble/releases/download/${tag}/${assetName}`
+  })
+  assert.equal(validatePublishedUpdaterManifest(manifest, publishedManifestOptions()), manifest)
+})
+
+test('still rejects a host that is neither github.com nor its API', () => {
+  const manifest = {
+    version: '1.2.3',
+    platforms: {
+      'darwin-aarch64': {
+        url: 'https://api.github.com.evil.test/repos/nebutra/pebble/releases/assets/1',
+        signature: 'signed-value'
+      }
+    }
+  }
+  assert.throws(() => validateUpdaterManifest(manifest), /unexpected download URL/)
+})
+
 test('accepts signed Nebutra Pebble updater platforms', () => {
   const manifest = {
     version: '1.2.3',
@@ -106,7 +183,10 @@ test('rejects updater URLs for another release tag or an ambiguous URL', () => {
         }),
         publishedManifestOptions()
       ),
-    /ambiguous download URL/
+    // A query string is now rejected by the shared URL classifier, one stage
+    // earlier than before, so the message is "unexpected" rather than
+    // "ambiguous". Still rejected.
+    /unexpected download URL/
   )
 })
 
@@ -210,7 +290,10 @@ test('downloads and cryptographically verifies every published updater payload',
   assert.equal(fetchCalls[0].options.headers.Accept, 'application/octet-stream')
   assert.equal(signatureVerifierCalls[0].publicKey, 'production-public-key')
   assert.match(signatureVerifierCalls[0].payloadPath, /pebble-updater-verification-/)
-  assert.equal(signatureVerifierCalls[0].signaturePath, `${signatureVerifierCalls[0].payloadPath}.sig`)
+  assert.equal(
+    signatureVerifierCalls[0].signaturePath,
+    `${signatureVerifierCalls[0].payloadPath}.sig`
+  )
 })
 
 test('fails closed when a published updater payload signature is invalid', async () => {
