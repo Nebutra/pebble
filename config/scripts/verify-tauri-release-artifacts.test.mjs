@@ -326,6 +326,9 @@ describe('Tauri release artifact inspection', () => {
     for (const name of ['pebble-runtime', 'pebble-control', 'pebble-relay-worker']) {
       writeBinary(join(appPath, name), bytes)
     }
+    // Ships in Contents/MacOS beside the sidecars; the shipped v1.4.131 bundle
+    // has it, and leaving it out is what made the main-executable count read 2.
+    writeBinary(join(appPath, 'pebble-updater-signature-verifier'), bytes)
     for (const name of ['libonnxruntime.1.17.1.dylib', 'libsherpa-onnx-c-api.dylib']) {
       writeBinary(join(appPath, '../Frameworks', name), bytes)
     }
@@ -392,7 +395,8 @@ describe('Tauri release artifact inspection', () => {
       join(appPath, 'pebble-desktop-tauri'),
       '3'
     ])
-    expect(result.artifacts).toHaveLength(28)
+    expect(result.artifacts).toHaveLength(29)
+    expect(result.artifacts.map((artifact) => artifact.role)).toContain('bundled-secondary-binary')
     expect(
       result.artifacts.filter((artifact) => artifact.role === 'bundled-relay-worker')
     ).toHaveLength(6)
