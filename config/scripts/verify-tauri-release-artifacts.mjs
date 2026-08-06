@@ -27,6 +27,9 @@ const computerUseMacosEntitlementsPath = resolve(
   'resources/build/entitlements.computer-use.mac.plist'
 )
 const sidecarNames = ['pebble-control', 'pebble-relay-worker', 'pebble-runtime']
+// Why: a cargo bin, not a Tauri sidecar — it ships in Contents/MacOS only on
+// macOS, staged by prepare-macos-universal-package-bins.mjs.
+const macosSecondaryBinaryName = 'pebble-updater-signature-verifier'
 const macosSpeechLibraryNames = ['libonnxruntime.1.17.1.dylib', 'libsherpa-onnx-c-api.dylib']
 const computerUseScripts = [
   ['computer-use-linux', 'runtime.py'],
@@ -63,7 +66,11 @@ function walk(root, includeDirectories = false) {
 
 function requireSingle(paths, label) {
   if (paths.length !== 1) {
-    throw new Error(`Expected exactly one ${label}; found ${paths.length}.`)
+    // Why: naming the candidates is the whole diagnosis. "found 2" alone is why
+    // the macOS dual-executable failure sat behind continue-on-error instead of
+    // being fixed — nothing in the log said which second file had appeared.
+    const found = paths.length === 0 ? ' none' : `\n  ${paths.join('\n  ')}`
+    throw new Error(`Expected exactly one ${label}; found ${paths.length}:${found}`)
   }
   return paths[0]
 }
@@ -420,6 +427,13 @@ function verifyMacosArtifacts(root, targetTriple, commandRunner, expectedAppleTe
   const sidecars = sidecarNames.map((name) =>
     requireFile(resolve(appPath, 'Contents/MacOS', name), `bundled ${name} sidecar`)
   )
+  // Why: prepare-macos-universal-package-bins.mjs lipo's this cargo bin into
+  // Contents/MacOS alongside the sidecars. It was in neither list, so the main
+  // executable lookup counted it and failed with "found 2" on every release.
+  const updaterSignatureVerifier = requireFile(
+    resolve(appPath, 'Contents/MacOS', macosSecondaryBinaryName),
+    `bundled ${macosSecondaryBinaryName}`
+  )
   const speechLibraries = macosSpeechLibraryNames.map((name) =>
     requireFile(resolve(appPath, 'Contents/Frameworks', name), `bundled ${name}`)
   )
@@ -500,9 +514,10 @@ function verifyMacosArtifacts(root, targetTriple, commandRunner, expectedAppleTe
     commandRunner('xcrun', ['stapler', 'validate', diskImage])
   }
 
+  const bundledExecutableNames = [...sidecarNames, macosSecondaryBinaryName]
   const mainExecutable = requireSingle(
     walk(resolve(appPath, 'Contents/MacOS')).filter(
-      (path) => !sidecarNames.includes(basename(path))
+      (path) => !bundledExecutableNames.includes(basename(path))
     ),
     'macOS main executable'
   )
@@ -535,6 +550,15 @@ function verifyMacosArtifacts(root, targetTriple, commandRunner, expectedAppleTe
         'hardened-runtime'
       ])
     ),
+    // Why: it ships inside the notarized bundle, so it earns the same checks a
+    // sidecar gets. Excluding it from the main-executable lookup without
+    // verifying it would trade one blind spot for another.
+    evidenceRecord('bundled-secondary-binary', updaterSignatureVerifier, [
+      'architecture',
+      'codesign-developer-id',
+      'codesign-strict',
+      'hardened-runtime'
+    ]),
     ...speechLibraries.map((path) =>
       evidenceRecord('bundled-native-library', path, [
         'architecture',

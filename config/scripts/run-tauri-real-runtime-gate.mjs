@@ -375,6 +375,11 @@ function run(name, args, cwd, extraEnv = {}) {
     stdio: 'inherit',
     env: { ...process.env, ...extraEnv }
   })
+  // Why: a spawn that never started reports a null status, so reporting only
+  // the status hides the actual cause behind "exited with no status".
+  if (result.error) {
+    throw new Error(`${name} could not start: ${result.error.message}`)
+  }
   if (result.status !== 0) {
     throw new Error(`${name} exited with ${result.status ?? 'no status'}`)
   }
@@ -403,10 +408,17 @@ function resetFunctionalGateAccessibility() {
   return true
 }
 
+// Why: on Windows, npm is a `.cmd` shim that Node will not resolve without the
+// extension, but git and node are real `.exe`s. Appending `.cmd` to those made
+// spawn fail to start the process at all, surfacing as a null exit status and
+// the misleading message "git exited with no status".
+const WINDOWS_SHIM_COMMANDS = new Set(['npm', 'npx', 'pnpm', 'yarn'])
+
 function command(name) {
-  return process.platform === 'win32' && !name.includes('\\') && !name.includes('/')
-    ? `${name}.cmd`
-    : name
+  if (process.platform !== 'win32' || name.includes('\\') || name.includes('/')) {
+    return name
+  }
+  return WINDOWS_SHIM_COMMANDS.has(name) ? `${name}.cmd` : name
 }
 
 function findAvailablePort() {
