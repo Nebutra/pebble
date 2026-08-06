@@ -417,6 +417,19 @@ jobs:
         with:
           node-version-file: package.json
 
+      # Why: the manifest check verifies each payload signature by running
+      # `cargo run --bin pebble-updater-signature-verifier`, which compiles the
+      # desktop crate and therefore gdk-sys and native/zig-system. The job only
+      # installed Node, so it failed at "failed to run custom build command for
+      # gdk-sys" after the manifest itself had already validated.
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+      - name: Install Linux Tauri dependencies
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
       - name: Verify published signed platform matrix
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
