@@ -69,6 +69,11 @@ jobs:
     name: Tauri functional ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
+    # Why: the renderer bundle exhausts the default heap on the macOS runner and
+    # dies with "Ineffective mark-compacts near heap limit". Same ceiling the
+    # release terminal-rendering jobs already use.
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
     strategy:
       fail-fast: false
       matrix:
@@ -93,6 +98,12 @@ jobs:
         with:
           go-version-file: runtime/go/go.mod
       - uses: dtolnay/rust-toolchain@stable
+      # Why: tauri build.rs compiles native/zig-system; without zig on PATH the
+      # shell build fails with "failed to build Zig system library" (os error 2).
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
       - name: Install Linux Tauri dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y at-spi2-core dbus-x11 gir1.2-atspi-2.0 libwebkit2gtk-4.1-dev libappindicator3-dev python3-gi librsvg2-dev patchelf xvfb

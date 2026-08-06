@@ -48,6 +48,12 @@ jobs:
         with:
           run_install: false
       - uses: dtolnay/rust-toolchain@stable
+      # Why: tauri build.rs compiles native/zig-system; without zig on PATH the
+      # shell build fails with "failed to build Zig system library" (os error 2).
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y python3 python3-gi gir1.2-atspi-2.0 at-spi2-core gedit xvfb xclip xdotool
       # Why: pnpm's bundled node-gyp can ship gyp_main.py without execute
