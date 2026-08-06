@@ -47,6 +47,9 @@ jobs:
       - uses: pnpm/action-setup@v6
         with:
           run_install: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: runtime/go/go.mod
       - uses: dtolnay/rust-toolchain@stable
       # Why: tauri build.rs compiles native/zig-system; without zig on PATH the
       # shell build fails with "failed to build Zig system library" (os error 2).
@@ -54,8 +57,11 @@ jobs:
         uses: mlugg/setup-zig@v2
         with:
           version: 0.16.0
+      # Why: the webkit/gtk -dev packages are what `cargo test` needs to link
+      # gdk-sys. Every other Tauri-building workflow installs them; this job
+      # carried only the accessibility tooling and failed at `gdk-3.0 not found`.
       - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y python3 python3-gi gir1.2-atspi-2.0 at-spi2-core gedit xvfb xclip xdotool
+        run: sudo apt-get update && sudo apt-get install -y python3 python3-gi gir1.2-atspi-2.0 at-spi2-core gedit xvfb xclip xdotool libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       # Why: pnpm's bundled node-gyp can ship gyp_main.py without execute
       # permission on Linux runners; node-pty's install fallback then fails
       # before this smoke job can exercise the native package.
@@ -81,6 +87,12 @@ jobs:
           packages/product-core/cli/index.test.ts
           packages/product-core/cli/runtime/envelope-schema.test.ts
           packages/product-core/shared/remote-runtime-client.test.ts
+      # Why: Tauri's build script resolves externalBin resources even for cargo
+      # test, so the sidecars must exist first. Without this the Windows leg
+      # fails with "resource path binaries\pebble-runtime-...exe doesn't exist".
+      - name: Prepare host Go sidecars for native tests
+        run: node apps/desktop/scripts/prepare-go-sidecars.mjs --host-only
+
       - name: Test Tauri computer-use ownership
         run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --no-default-features computer_use
       - run: pnpm verify:computer-native
