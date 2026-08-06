@@ -187,6 +187,38 @@ export function resolveUpdaterAsset(rawUrl, { platform, repository, tag, release
   return asset
 }
 
+// Why: `GET /releases/tags/{tag}` cannot see a draft — a draft carries no tag
+// association until it is published. Now that the release stays a draft until
+// these checks pass, that endpoint 404s on the very release being verified, so
+// fall back to the list endpoint, which does include drafts.
+export async function findReleaseByTag({ repository, tag, headers, fetchImpl }) {
+  const byTag = await fetchImpl(
+    `https://api.github.com/repos/${repository}/releases/tags/${encodeURIComponent(tag)}`,
+    { headers }
+  )
+  if (byTag.ok) {
+    return byTag.json()
+  }
+  if (byTag.status !== 404) {
+    throw new Error(`Could not read GitHub release ${tag}: status ${byTag.status}.`)
+  }
+  const listed = await fetchImpl(
+    `https://api.github.com/repos/${repository}/releases?per_page=100`,
+    { headers }
+  )
+  if (!listed.ok) {
+    throw new Error(`Could not list GitHub releases for ${tag}: status ${listed.status}.`)
+  }
+  const releases = await listed.json()
+  const match = Array.isArray(releases)
+    ? releases.find((candidate) => candidate?.tag_name === tag)
+    : null
+  if (!match) {
+    throw new Error(`Could not read GitHub release ${tag}: status 404.`)
+  }
+  return match
+}
+
 export async function fetchReleaseUpdaterData({ repository, tag, token, fetchImpl = fetch }) {
   if (!/^[^/]+\/[^/]+$/.test(repository)) {
     throw new Error('GITHUB_REPOSITORY must use owner/repository format.')
@@ -202,12 +234,7 @@ export async function fetchReleaseUpdaterData({ repository, tag, token, fetchImp
     Authorization: `Bearer ${token}`,
     'X-GitHub-Api-Version': '2022-11-28'
   }
-  const releaseUrl = `https://api.github.com/repos/${repository}/releases/tags/${encodeURIComponent(tag)}`
-  const releaseResponse = await fetchImpl(releaseUrl, { headers })
-  if (!releaseResponse.ok) {
-    throw new Error(`Could not read GitHub release ${tag}: status ${releaseResponse.status}.`)
-  }
-  const release = await releaseResponse.json()
+  const release = await findReleaseByTag({ repository, tag, headers, fetchImpl })
   const asset = Array.isArray(release.assets)
     ? release.assets.find((candidate) => candidate?.name === 'latest.json')
     : null

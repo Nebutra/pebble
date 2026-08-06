@@ -35,6 +35,35 @@ function publishedManifest(overrides = {}) {
   }
 }
 
+test('finds the release while it is still a draft awaiting verification', async () => {
+  // Why: publish-release only publishes after this check passes, so the release
+  // under verification is always a draft — and `GET /releases/tags/{tag}` does
+  // not return drafts. Looking it up by tag alone made the check 404 on the
+  // exact release it exists to verify.
+  const manifest = { version: '1.2.3', platforms: {} }
+  const draft = { tag_name: tag, draft: true, assets: [{ name: 'latest.json', url: 'asset-url' }] }
+  const requested = []
+  const fetchImpl = async (url) => {
+    requested.push(String(url))
+    if (String(url).includes('/releases/tags/')) {
+      return new Response('{"message":"Not Found"}', { status: 404 })
+    }
+    if (String(url).includes('/releases?')) {
+      return new Response(JSON.stringify([{ tag_name: 'v9.9.9', draft: false }, draft]))
+    }
+    return new Response(JSON.stringify(manifest))
+  }
+
+  assert.deepEqual(
+    await fetchReleaseUpdaterManifest({ repository, tag, token: 'test-token', fetchImpl }),
+    manifest
+  )
+  assert.ok(
+    requested.some((url) => url.includes('/releases?')),
+    'must fall back to the list endpoint when the tag lookup 404s'
+  )
+})
+
 test('accepts the API asset URLs tauri-action actually emits', () => {
   // Shape taken from the published v1.4.131 latest.json.
   const manifest = {
