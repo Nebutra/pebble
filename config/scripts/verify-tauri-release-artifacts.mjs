@@ -63,7 +63,11 @@ function walk(root, includeDirectories = false) {
 
 function requireSingle(paths, label) {
   if (paths.length !== 1) {
-    throw new Error(`Expected exactly one ${label}; found ${paths.length}.`)
+    // Why: naming the candidates is the whole diagnosis. "found 2" alone is why
+    // the macOS dual-executable failure sat behind continue-on-error instead of
+    // being fixed — nothing in the log said which second file had appeared.
+    const found = paths.length === 0 ? ' none' : `\n  ${paths.join('\n  ')}`
+    throw new Error(`Expected exactly one ${label}; found ${paths.length}:${found}`)
   }
   return paths[0]
 }
