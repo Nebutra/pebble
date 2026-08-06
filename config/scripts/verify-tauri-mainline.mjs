@@ -982,9 +982,13 @@ const checks = [
   {
     name: 'Updater publication verifies exact uploaded release assets',
     file: 'config/scripts/verify-tauri-updater-manifest.mjs',
+    // Why: assets are resolved against the release's own list — by name for a
+    // browser URL, by numeric id for an API URL — rather than by parsing the
+    // URL text, so the pinned symbol is the resolver, not a lookup table.
     expect: (text) =>
       text.includes('const tag = options.tag?.trim()') &&
-      text.includes('assetsByName') &&
+      text.includes('resolveUpdaterAsset') &&
+      text.includes('candidate?.id === target.assetId') &&
       text.includes("asset.state !== 'uploaded'") &&
       text.includes('asset.size <= 0')
   },
@@ -5784,8 +5788,13 @@ const checks = [
   {
     name: 'Tauri updater release output is signature and repository verified',
     file: 'config/scripts/verify-tauri-updater-manifest.mjs',
+    // Why: tauri-action emits api.github.com asset URLs, so pinning the browser
+    // download prefix rejected every real release. Pin the classifier and its
+    // host allowlist instead — that is what keeps a foreign host out.
     expect: (text) =>
-      text.includes('github.com/nebutra/pebble/releases/download/') &&
+      text.includes('classifyUpdaterUrl') &&
+      text.includes("url.host === 'github.com'") &&
+      text.includes("url.host === 'api.github.com'") &&
       text.includes('has no signature') &&
       text.includes('fetchReleaseUpdaterManifest') &&
       text.includes('missing required platform') &&
