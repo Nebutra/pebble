@@ -51,6 +51,7 @@ type Manager struct {
 	automationDispatchTokens map[string]automationDispatchTokenRecord
 	externalWorkItems        map[string]ExternalWorkItem
 	sourceControlProjections map[string]SourceControlProjection
+	gitStatusReads           gitStatusReadLeaseOwner
 	releases                 map[string]ReleasePlan
 	remoteFileTrees          map[string]RemoteFileTreeSnapshot
 	remoteFileContents       map[string]RemoteFileContentSnapshot
@@ -2879,6 +2880,9 @@ func (m *Manager) MutateGit(ctx context.Context, req GitMutationRequest) (GitCom
 	if err != nil {
 		return GitCommitResult{}, err
 	}
+	// Why: a status read started before this mutation reflects pre-mutation state,
+	// so callers arriving afterwards must not be able to join it.
+	m.gitStatusReads.invalidate()
 	switch strings.TrimSpace(req.Operation) {
 	case "stage":
 		return GitCommitResult{Success: true}, runGitPathCommand(ctx, base, []string{"add", "--"}, []string{req.FilePath})

@@ -135,7 +135,7 @@ func TestSourceProjectionFromGitStatusReadsRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	projection := sourceProjectionFromGitStatus("github", "repo", "workspace", repo, "fallback", "change")
+	projection := sourceProjectionFromGitStatus(context.Background(), readGitShortStatus, "github", "repo", "workspace", repo, "fallback", "change")
 	if projection.Branch == "" || projection.Branch == "fallback" {
 		t.Fatalf("expected branch from git status, got %q", projection.Branch)
 	}
@@ -147,7 +147,7 @@ func TestSourceProjectionFromGitStatusReadsRepository(t *testing.T) {
 }
 
 func TestSourceProjectionFromGitStatusUnknownWhenUnreadable(t *testing.T) {
-	projection := sourceProjectionFromGitStatus("gitlab", "repo", "workspace", "", "feature", "merge-request")
+	projection := sourceProjectionFromGitStatus(context.Background(), readGitShortStatus, "gitlab", "repo", "workspace", "", "feature", "merge-request")
 	if projection.SyncStatus != "unknown" {
 		t.Fatalf("expected unknown sync status, got %q", projection.SyncStatus)
 	}
@@ -185,7 +185,7 @@ func TestUpdateSourceControlProjectionOverridesRemoteUnknown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before := manager.ListSourceControlProjections(SourceControlProjectionFilter{ProjectID: project.ID})
+	before := manager.ListSourceControlProjections(context.Background(), SourceControlProjectionFilter{ProjectID: project.ID})
 	if len(before) != 1 || before[0].SyncStatus != "unknown" {
 		t.Fatalf("expected initial remote projection to be unknown, got %#v", before)
 	}
@@ -213,7 +213,7 @@ func TestUpdateSourceControlProjectionOverridesRemoteUnknown(t *testing.T) {
 		t.Fatalf("unexpected updated projection: %#v", updated)
 	}
 
-	after := manager.ListSourceControlProjections(SourceControlProjectionFilter{ProjectID: project.ID})
+	after := manager.ListSourceControlProjections(context.Background(), SourceControlProjectionFilter{ProjectID: project.ID})
 	if len(after) != 1 || after[0].SyncStatus != "dirty" || len(after[0].Changes) != 1 {
 		t.Fatalf("expected cached remote projection, got %#v", after)
 	}
