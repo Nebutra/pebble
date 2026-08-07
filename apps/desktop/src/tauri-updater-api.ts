@@ -16,6 +16,10 @@ import {
   readCurrentAppVersion,
   resetTauriUpdaterAppVersionForTests
 } from './tauri-updater-app-version'
+import {
+  describeLinuxUpdateRefusal,
+  type LinuxUpdateRecovery
+} from './tauri-updater-linux-recovery'
 import { describeTauriUpdaterUnavailable, releaseUrlForVersion } from './tauri-updater-release-url'
 import { TauriUpdaterNudgeState } from './tauri-updater-nudge-state'
 import { TauriUpdaterOperationState } from './tauri-updater-operation-state'
@@ -207,6 +211,16 @@ async function checkPebbleReleaseFeed(
   }
 }
 
+// Why: an older runtime does not expose this command. A refusal must still be
+// delivered, so a missing payload degrades to the generic guidance.
+async function readLinuxUpdateRecovery(): Promise<LinuxUpdateRecovery | null> {
+  try {
+    return await invoke<LinuxUpdateRecovery>('app_linux_update_recovery')
+  } catch {
+    return null
+  }
+}
+
 async function downloadTauriUpdate(): Promise<void> {
   return updaterOperations.startDownload(performTauriUpdateDownload).promise
 }
@@ -230,9 +244,7 @@ async function performTauriUpdateDownload(): Promise<void> {
     if (navigator.userAgent.toLowerCase().includes('linux')) {
       const installKind = await invoke<string>('app_linux_install_kind')
       if (installKind !== 'appimage') {
-        throw new Error(
-          `Automatic updates are available for AppImage installs. Update this system package through your package manager or download it from ${releaseUrl}.`
-        )
+        throw new Error(describeLinuxUpdateRefusal(await readLinuxUpdateRecovery(), releaseUrl))
       }
     }
     emitUpdaterStatus(withActiveNudge({ state: 'downloading', percent: 0, version }))

@@ -72,6 +72,7 @@ pub mod hermes_automation_history;
 pub mod hooks;
 pub mod jira;
 pub mod linear;
+pub mod linux_package_update_recovery;
 #[cfg(target_os = "macos")]
 pub mod macos_system_crash_import;
 pub mod managed_claude_accounts;

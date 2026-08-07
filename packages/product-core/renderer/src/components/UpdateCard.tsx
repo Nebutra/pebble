@@ -973,7 +973,9 @@ function ErrorCardContent({
         <p className="mb-1 text-[11px] font-medium uppercase text-muted-foreground">
           {translate('auto.components.UpdateCard.3553a8672f', 'Last error')}
         </p>
-        <p className="scrollbar-sleek max-h-20 overflow-auto break-words font-mono text-xs leading-relaxed text-muted-foreground">
+        {/* Why: a manual-recovery message puts the shell command on its own
+            line; collapsing whitespace would bury it mid-sentence. */}
+        <p className="scrollbar-sleek max-h-20 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-muted-foreground">
           {message}
         </p>
       </div>

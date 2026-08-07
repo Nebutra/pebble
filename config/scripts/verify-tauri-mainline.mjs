@@ -7384,6 +7384,28 @@ const checks = [
     file: 'apps/desktop/src-tauri/src/commands/computer_use_helper_socket.rs',
     expect: (text) =>
       text.includes('.arg("--peer-pid")') && text.includes('std::process::id().to_string()')
+  },
+  {
+    name: 'Native Linux update recovery names a command from trusted directories and never runs it',
+    file: 'apps/desktop/src-tauri/src/commands/linux_package_update_recovery.rs',
+    expect: (text) =>
+      text.includes('TRUSTED_EXECUTABLE_DIRECTORIES') &&
+      text.includes('pub fn app_linux_update_recovery() -> LinuxUpdateRecovery') &&
+      text.includes('quote_for_posix_shell') &&
+      text.includes('"no-escalator"') &&
+      text.includes('"no-package-manager"') &&
+      !text.includes('Command::new') &&
+      !text.includes('"-y"') &&
+      !text.includes('--noconfirm')
+  },
+  {
+    name: 'Linux updater refusal stays actionable instead of promising an AppImage build',
+    file: 'apps/desktop/src/tauri-updater-linux-recovery.ts',
+    expect: (text) =>
+      text.includes('export function describeLinuxUpdateRefusal(') &&
+      text.includes('Pebble is installed as a system package, so it cannot replace itself') &&
+      text.includes('keeping the quotes') &&
+      !text.includes('AppImage')
   }
 ]
 
