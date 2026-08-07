@@ -31,10 +31,7 @@ export type RuntimeAgentBinding = {
   interrupted?: boolean
 }
 
-type ExistingBindingLookup = (
-  sessionId: string,
-  paneKey: string
-) => RuntimeAgentBinding | undefined
+type ExistingBindingLookup = (sessionId: string, paneKey: string) => RuntimeAgentBinding | undefined
 
 export function createBindingFromRuntimeSession(
   session: TauriRuntimeAgentSession,
@@ -87,7 +84,13 @@ export function createBindingFromSession(
     ...(metadata.launchToken ? { launchToken: metadata.launchToken } : {}),
     prompt: metadata.prompt,
     receivedAt: now,
-    stateStartedAt: existing?.state === state ? existing.stateStartedAt : now,
+    // Why: only the same session may carry its clock forward. On a reused pane
+    // `existing` is the previous occupant, and inheriting its stateStartedAt
+    // would date the new agent's turn to when the old one began.
+    stateStartedAt:
+      existing && existing.sessionId === session.id && existing.state === state
+        ? existing.stateStartedAt
+        : now,
     state,
     interrupted: session.status === 'stopped' ? true : undefined
   }

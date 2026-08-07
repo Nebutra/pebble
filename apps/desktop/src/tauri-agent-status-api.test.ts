@@ -17,8 +17,25 @@ import {
   emitRuntimeAgentSessionStatus,
   getCurrentRuntimeAgentAwakeStatuses,
   installTauriAgentStatusApi,
+  markRuntimeAgentSessionStopped,
+  recordRuntimeAgentSessionSpawn,
   type TauriRuntimeAgentSession
 } from './tauri-agent-status-api'
+
+type SpawnOptions = Parameters<typeof recordRuntimeAgentSessionSpawn>[0]['spawnOptions']
+
+const REUSED_LEAF_ID = '44444444-4444-4444-8444-444444444444'
+
+function spawnInReusedPane(sessionId: string, updatedAt: string): void {
+  recordRuntimeAgentSessionSpawn({
+    session: session({ id: sessionId, tabId: 'tab-reuse', leafId: REUSED_LEAF_ID, updatedAt }),
+    spawnOptions: {
+      tabId: 'tab-reuse',
+      leafId: REUSED_LEAF_ID,
+      launchAgent: 'codex'
+    } as SpawnOptions
+  })
+}
 
 function session(overrides: Partial<TauriRuntimeAgentSession> = {}): TauriRuntimeAgentSession {
   return {
@@ -156,5 +173,37 @@ describe('installTauriAgentStatusApi', () => {
         contents: '[]'
       })
     })
+  })
+
+  it('drops a stopped session once its pane has been reused by another agent', () => {
+    installApi()
+    spawnInReusedPane('session-first', '2026-07-08T10:00:00.000Z')
+    spawnInReusedPane('session-second', '2026-07-08T11:00:00.000Z')
+
+    const events: unknown[] = []
+    window.api.agentStatus.onSet((event) => {
+      events.push(event)
+    })
+    markRuntimeAgentSessionStopped('session-first')
+
+    expect(events).toEqual([])
+    window.api.agentStatus.drop(`tab-reuse:${REUSED_LEAF_ID}`)
+  })
+
+  it('starts a reusing agent on its own clock instead of the previous occupant', () => {
+    installApi()
+    const events: { stateStartedAt: number }[] = []
+    window.api.agentStatus.onSet((event) => {
+      events.push(event as { stateStartedAt: number })
+    })
+
+    spawnInReusedPane('session-first', '2026-07-08T10:00:00.000Z')
+    spawnInReusedPane('session-second', '2026-07-08T11:00:00.000Z')
+
+    expect(events.map((event) => event.stateStartedAt)).toEqual([
+      Date.parse('2026-07-08T10:00:00.000Z'),
+      Date.parse('2026-07-08T11:00:00.000Z')
+    ])
+    window.api.agentStatus.drop(`tab-reuse:${REUSED_LEAF_ID}`)
   })
 })
