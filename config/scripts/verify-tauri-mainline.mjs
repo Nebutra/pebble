@@ -7341,6 +7341,25 @@ const checks = [
       text.includes("case 'emulator.exec':") &&
       text.includes('streamUrl: `scrcpy://${nativeId}`') &&
       text.includes("{ method: 'DELETE' }")
+  },
+  {
+    name: 'Go agent hooks keep a pane working while Claude still owns background work',
+    file: 'runtime/go/internal/runtimecore/claude_background_work.go',
+    expect: (text) =>
+      text.includes('func claudeOwnsRunningBackgroundWork(payload string) bool') &&
+      text.includes('claudeTerminalBackgroundTaskStatuses') &&
+      text.includes('`json:"background_tasks"`') &&
+      text.includes('`json:"session_crons"`') &&
+      text.includes('!= "teammate"')
+  },
+  {
+    name: 'Go Stop hooks consult Claude background work before reporting idle',
+    file: 'runtime/go/internal/runtimecore/agent_hook_ingest.go',
+    expect: (text) =>
+      text.includes('case "Stop", "StopFailure":') &&
+      text.includes('if claudeOwnsRunningBackgroundWork(payload) {') &&
+      text.includes('return SessionHookWorking, true') &&
+      !text.includes('case "Stop", "StopFailure", "SubagentStop":')
   }
 ]
 
