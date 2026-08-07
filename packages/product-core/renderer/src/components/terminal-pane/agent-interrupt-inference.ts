@@ -7,6 +7,7 @@ import {
   type AgentInterruptInferenceRequest,
   type AgentInterruptInputIntent
 } from '../../../../shared/agent-interrupt-intent'
+import { isAskUserQuestionTool } from '../../../../shared/ask-user-question-tool'
 import { isExplicitAgentStatusFresh } from '@/lib/agent-status'
 
 export type AgentInterruptInference = {
@@ -54,6 +55,20 @@ function shouldIgnoreInterruptIntent(
   intent: AgentInterruptInputIntent
 ): boolean {
   return agentType === 'droid' && intent === 'ctrl-c'
+}
+
+/** Escape while Claude waits on AskUserQuestion dismisses the question rather
+ *  than interrupting a turn, and Claude sends no hook for it — so the wait is
+ *  a second valid starting state for inference. Every other wait (a real
+ *  permission prompt, any other agent) stays sticky. */
+function canInferInterrupt(entry: AgentStatusEntry, intent: AgentInterruptInputIntent): boolean {
+  return (
+    entry.state === 'working' ||
+    (intent === 'plain-escape' &&
+      entry.state === 'waiting' &&
+      entry.agentType === 'claude' &&
+      isAskUserQuestionTool(entry.toolName))
+  )
 }
 
 function isSameTurnBaseline(
@@ -133,7 +148,7 @@ export function createAgentInterruptInference({
   ): CapturedInterruptBaseline | null => {
     const agentType = entry.agentType
     if (
-      entry.state !== 'working' ||
+      !canInferInterrupt(entry, intent) ||
       !isExplicitAgentStatusFresh(entry, now(), AGENT_STATUS_STALE_AFTER_MS)
     ) {
       return null
@@ -158,7 +173,7 @@ export function createAgentInterruptInference({
     const entry = getStatusEntry()
     if (
       entry &&
-      (entry.state !== 'working' ||
+      (!canInferInterrupt(entry, baseline.intent) ||
         entry.agentType !== baseline.agentType ||
         entry.prompt !== baseline.prompt ||
         entry.updatedAt !== baseline.updatedAt ||

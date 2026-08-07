@@ -36,6 +36,7 @@ import {
 } from './agent-session-resume'
 import { parsePaneKey } from './stable-pane-id'
 import { isHarnessInjectedUserTurnText } from './harness-injected-user-turns'
+import { isAskUserQuestionTool } from './ask-user-question-tool'
 
 /** Maximum request body size accepted by the listener (1 MB). */
 export const HOOK_REQUEST_MAX_BYTES = 1_000_000
@@ -623,14 +624,6 @@ function toolUpdate(
     hasToolUpdate: true,
     hasToolInputField: options?.hasToolInputField === true
   }
-}
-
-/** True for the AskUserQuestion tool across the casing variants different
- *  agents emit (`AskUserQuestion` / `ask_user_question` / `askUserQuestion`).
- *  Why: this is the structured "pick an option" prompt whose full input the
- *  clients render as a live card. */
-function isAskUserQuestionTool(toolName: string | undefined): boolean {
-  return toolName?.replaceAll(/[^a-z0-9]/gi, '').toLowerCase() === 'askuserquestion'
 }
 
 /** Capture the full AskUserQuestion tool input as a JSON string when the tool
