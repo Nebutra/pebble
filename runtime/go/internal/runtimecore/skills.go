@@ -231,18 +231,46 @@ func parseSkillFrontmatter(frontmatter string) map[string]string {
 	return result
 }
 
+// Why: these are written by the OS or the VCS, not by whoever authored the
+// skill. Counting them reports a file count the user cannot reconcile with
+// what they see, and they crowd real files out of maxSkillPackageFiles.
+var skipSkillDirectories = map[string]bool{".git": true, "__MACOSX": true}
+
+var skipSkillFiles = map[string]bool{
+	".DS_Store":   true,
+	"Icon\r":      true,
+	"Thumbs.db":   true,
+	"ehthumbs.db": true,
+	"desktop.ini": true,
+}
+
+func isSkillSidecarFile(name string) bool {
+	// AppleDouble sidecars carry the companion file's name, so match the prefix.
+	return skipSkillFiles[name] || strings.HasPrefix(name, "._")
+}
+
 func countSkillFiles(root string) int {
 	count := 0
 	_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err == nil && !entry.IsDir() && count < maxSkillPackageFiles {
-			if entry.Type()&os.ModeSymlink == 0 {
-				count++
-			} else if info, statErr := os.Stat(path); statErr == nil && !info.IsDir() {
-				count++
-			}
+		if err != nil {
+			return nil
 		}
-		if count >= maxSkillPackageFiles && entry.IsDir() {
-			return filepath.SkipDir
+		if entry.IsDir() {
+			if path != root && skipSkillDirectories[entry.Name()] {
+				return filepath.SkipDir
+			}
+			if count >= maxSkillPackageFiles {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if count >= maxSkillPackageFiles || isSkillSidecarFile(entry.Name()) {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink == 0 {
+			count++
+		} else if info, statErr := os.Stat(path); statErr == nil && !info.IsDir() {
+			count++
 		}
 		return nil
 	})
