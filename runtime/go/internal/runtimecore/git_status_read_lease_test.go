@@ -28,6 +28,21 @@ func waitForGitStatusLeases(t *testing.T, owner *gitStatusReadLeaseOwner, key st
 	}
 }
 
+func waitForGitStatusReads(t *testing.T, loads *atomic.Int32, want int32) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		seen := loads.Load()
+		if seen == want {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %d reads, saw %d", want, seen)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func TestGitStatusReadLeaseCoalescesConcurrentCallersOntoOneRead(t *testing.T) {
 	owner := &gitStatusReadLeaseOwner{}
 	var loads atomic.Int32
@@ -83,9 +98,9 @@ func TestGitStatusReadLeaseDoesNotHandOutASettledRead(t *testing.T) {
 
 func TestGitStatusReadLeaseRejectsAPreAbortedCallerWithoutReading(t *testing.T) {
 	owner := &gitStatusReadLeaseOwner{}
-	var loads atomic.Int32
+	started := make(chan struct{}, 1)
 	load := func(context.Context) ([]string, error) {
-		loads.Add(1)
+		started <- struct{}{}
 		return nil, nil
 	}
 
@@ -95,8 +110,13 @@ func TestGitStatusReadLeaseRejectsAPreAbortedCallerWithoutReading(t *testing.T) 
 	if !errors.Is(err, context.Canceled) || lines != nil {
 		t.Fatalf("expected a cancelled result, got %#v / %v", lines, err)
 	}
-	if got := loads.Load(); got != 0 {
-		t.Fatalf("expected no read for an already-cancelled caller, got %d", got)
+	// Why: the caller is already gone, so spawning git for it is pure waste. A
+	// bounded wait is enough — the read would otherwise start on its own
+	// goroutine straight away.
+	select {
+	case <-started:
+		t.Fatal("an already-cancelled caller still started a read")
+	case <-time.After(100 * time.Millisecond):
 	}
 }
 
@@ -224,7 +244,7 @@ func TestGitStatusReadLeaseInvalidationStopsLaterCallersJoiningAnInFlightRead(t 
 		_, err := owner.lease(context.Background(), "worktree", load)
 		first <- err
 	}()
-	waitForGitStatusLeases(t, owner, "worktree", 1)
+	waitForGitStatusReads(t, &loads, 1)
 
 	owner.invalidate()
 	second := make(chan error, 1)
@@ -232,7 +252,10 @@ func TestGitStatusReadLeaseInvalidationStopsLaterCallersJoiningAnInFlightRead(t 
 		_, err := owner.lease(context.Background(), "worktree", load)
 		second <- err
 	}()
-	waitForGitStatusLeases(t, owner, "worktree", 1)
+	// Why: waiting on the second read rather than on lease counts is what pins
+	// invalidation — the first read is still blocked here, so a caller that could
+	// still join it would never start one.
+	waitForGitStatusReads(t, &loads, 2)
 
 	close(release)
 	if err := <-first; err != nil {
@@ -240,9 +263,6 @@ func TestGitStatusReadLeaseInvalidationStopsLaterCallersJoiningAnInFlightRead(t 
 	}
 	if err := <-second; err != nil {
 		t.Fatalf("the post-invalidation caller failed: %v", err)
-	}
-	if got := loads.Load(); got != 2 {
-		t.Fatalf("expected the post-invalidation caller to read afresh, got %d reads", got)
 	}
 }
 
