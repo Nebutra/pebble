@@ -11,7 +11,10 @@ import type { AiVaultScope, AiVaultSession } from '../../../../shared/ai-vault-t
 import type { AiVaultResumeStartup } from '@/lib/ai-vault-resume-command'
 import { translate } from '@/i18n/i18n'
 import { SessionInlineDetails } from './AiVaultSessionDetails'
-import { latestSessionConversationTurn } from './ai-vault-session-display'
+import {
+  latestSessionConversationTurn,
+  sessionFirstPromptBeyondTitle
+} from './ai-vault-session-display'
 import { SessionActionMenuItems } from './AiVaultSessionActionMenuItems'
 import { SessionRowTrailingActions } from './SessionRowTrailingActions'
 import type { AiVaultSessionResumeActions } from './ai-vault-session-resume'
@@ -74,6 +77,7 @@ export function VaultSessionRow({
   const updatedAt = session.updatedAt ?? session.modifiedAt
   const detailsId = getSessionDetailsId(session.id)
   const latestTurn = latestSessionConversationTurn(session)
+  const firstPromptLine = sessionFirstPromptBeyondTitle(session)
   const detailsTooltip = detailsExpanded
     ? translate('auto.components.right.sidebar.AiVaultSessionRow.hideDetails', 'Hide Details')
     : translate('auto.components.right.sidebar.AiVaultSessionRow.showDetails', 'Show Details')
@@ -161,6 +165,17 @@ export function VaultSessionRow({
           ) : null}
           {!detailsExpanded ? (
             <>
+              {firstPromptLine ? (
+                <div className="mt-0.5 min-w-0 line-clamp-1 text-[12px] leading-4 text-muted-foreground">
+                  <span className="font-medium text-foreground/80">
+                    {translate(
+                      'auto.components.right.sidebar.AiVaultSessionRow.firstAsk',
+                      'First ask'
+                    )}
+                  </span>
+                  <span>: {firstPromptLine}</span>
+                </div>
+              ) : null}
               <div className="mt-0.5 min-w-0 line-clamp-2 text-[12px] leading-4 text-muted-foreground">
                 {latestTurn ? (
                   <>

@@ -4,6 +4,8 @@ import {
   latestSessionConversationTurn,
   recentSessionConversationTurns,
   sessionDetailConversationTurns,
+  sessionFirstPrompt,
+  sessionFirstPromptBeyondTitle,
   sessionPreviewSearchText
 } from './ai-vault-session-display'
 
@@ -89,5 +91,68 @@ describe('ai vault session display', () => {
       'I updated the fixture ordering',
       'Added a regression test'
     ])
+  })
+
+  it('prefers the scanned first prompt over a preview window that already slid past it', () => {
+    expect(
+      sessionFirstPrompt({
+        ...baseSession,
+        firstUserPrompt: 'Port the updater readiness probe',
+        previewMessages: [
+          { role: 'user', text: 'And now rename the pane', timestamp: null },
+          { role: 'assistant', text: 'Renamed', timestamp: null }
+        ]
+      })
+    ).toBe('Port the updater readiness probe')
+  })
+
+  it('falls back to the earliest user preview turn for a host that sent no first prompt', () => {
+    expect(sessionFirstPrompt(baseSession)).toBe('Please fix the flaky golden tests')
+  })
+
+  it('reports no first prompt when nothing the user wrote survives', () => {
+    expect(sessionFirstPrompt({ ...baseSession, previewMessages: [] })).toBeNull()
+    expect(
+      sessionFirstPrompt({
+        ...baseSession,
+        firstUserPrompt: '   ',
+        previewMessages: [{ role: 'assistant', text: 'Only agent text', timestamp: null }]
+      })
+    ).toBeNull()
+  })
+
+  it('carries a single-line ask through unchanged and keeps a long one whole', () => {
+    const longAsk = `Rewrite ${'the pane reuse path '.repeat(10)}without dropping status`
+    expect(sessionFirstPrompt({ ...baseSession, firstUserPrompt: 'Rename the pane' })).toBe(
+      'Rename the pane'
+    )
+    expect(sessionFirstPrompt({ ...baseSession, firstUserPrompt: longAsk })).toBe(longAsk)
+  })
+
+  it('hides the row line when the title already says what the first ask says', () => {
+    expect(
+      sessionFirstPromptBeyondTitle({
+        ...baseSession,
+        title: 'Fix the flaky golden tests',
+        firstUserPrompt: 'Fix the flaky golden tests'
+      })
+    ).toBeNull()
+    expect(
+      sessionFirstPromptBeyondTitle({
+        ...baseSession,
+        title: 'Fix the flaky golden tests in the renderer suite',
+        firstUserPrompt: 'Fix the flaky golden tests in the renderer suite before release'
+      })
+    ).toBeNull()
+  })
+
+  it('shows the row line when the title came from the transcript instead of the ask', () => {
+    expect(
+      sessionFirstPromptBeyondTitle({
+        ...baseSession,
+        title: 'Golden test triage',
+        firstUserPrompt: 'Fix the flaky golden tests'
+      })
+    ).toBe('Fix the flaky golden tests')
   })
 })

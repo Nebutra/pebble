@@ -1,11 +1,11 @@
 import type React from 'react'
-import { FileJson, FolderGit2, MessageSquare, Play } from 'lucide-react'
+import { FileJson, FolderGit2, MessageSquare, MessageSquareQuote, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { AiVaultScope, AiVaultSession } from '../../../../shared/ai-vault-types'
 import { translate } from '@/i18n/i18n'
-import { sessionDetailConversationTurns } from './ai-vault-session-display'
+import { sessionDetailConversationTurns, sessionFirstPrompt } from './ai-vault-session-display'
 import {
   aiVaultWorktreeCompactPath,
   aiVaultWorktreeStatusLabel,
@@ -39,6 +39,7 @@ export function SessionInlineDetails({
   const showResumeInWorktree = Boolean(resumeActions.worktree.worktreeId)
   const showResumeInNewTab = !showResumeInWorktree || Boolean(resumeActions.newTab.worktreeId)
   const detailTurns = sessionDetailConversationTurns(session, 3)
+  const firstPrompt = sessionFirstPrompt(session)
   const worktreeDisplay = worktreeInfo
 
   return (
@@ -54,6 +55,25 @@ export function SessionInlineDetails({
       }}
     >
       <div className="space-y-3 p-3">
+        <SessionReceiptSection
+          icon={<MessageSquareQuote className="size-3" />}
+          label={translate(
+            'auto.components.right.sidebar.AiVaultSessionDetails.firstAsk',
+            'First ask'
+          )}
+        >
+          {firstPrompt ? (
+            <p className="text-[12px] leading-4 [overflow-wrap:anywhere]">{firstPrompt}</p>
+          ) : (
+            <SessionDetailEmptyState
+              message={translate(
+                'auto.components.right.sidebar.AiVaultSessionDetails.noFirstPromptRecorded',
+                'No user prompt recorded'
+              )}
+            />
+          )}
+        </SessionReceiptSection>
+
         <SessionReceiptSection
           icon={<MessageSquare className="size-3" />}
           label={translate(

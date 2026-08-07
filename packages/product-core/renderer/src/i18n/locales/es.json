@@ -9769,7 +9769,9 @@
             "sessionRole": "Sesión",
             "jumpToOriginalPane": "Saltar al panel original",
             "worktree": "Worktree",
-            "jumpToWorktree": "Saltar al worktree"
+            "jumpToWorktree": "Saltar al worktree",
+            "firstAsk": "Primera petición",
+            "noFirstPromptRecorded": "No se registró ningún mensaje del usuario"
           },
           "AiVaultSessionRow": {
             "resumeAgentSession": "Reanudar sesión de {{value0}}",
@@ -9795,7 +9797,8 @@
             "systemRole": "Sistema",
             "sessionRole": "Sesión",
             "jumpToOriginalPane": "Saltar al panel original",
-            "jumpToWorktree": "Saltar al worktree"
+            "jumpToWorktree": "Saltar al worktree",
+            "firstAsk": "Primera petición"
           },
           "FileExplorerNameFilter": {
             "26fb73c6e3": "Buscar archivos",

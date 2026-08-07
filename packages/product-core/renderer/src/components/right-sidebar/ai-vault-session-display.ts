@@ -28,6 +28,36 @@ export function recentSessionConversationTurns(
   return displayableSessionPreviewMessages(session).slice(-limit).map(toDisplayTurn)
 }
 
+/**
+ * The session's opening ask, or null when nothing the user wrote survives.
+ *
+ * Why the fallback: an SSH host on an older runtime sends no `firstUserPrompt`,
+ * and short sessions still have their opening turn inside the preview window.
+ */
+export function sessionFirstPrompt(session: AiVaultSession): string | null {
+  const stored = session.firstUserPrompt?.trim()
+  if (stored) {
+    return stored
+  }
+  const earliestUserTurn = session.previewMessages.find((message) => message.role === 'user')
+  return earliestUserTurn?.text.trim() || null
+}
+
+/**
+ * The opening ask, but only when it says something the row title does not.
+ *
+ * Why: most agents derive the title from the first user turn, so rendering both
+ * would print the same sentence twice. The line earns its place on sessions
+ * whose title came from the transcript itself (Codex, OpenCode, Rovo).
+ */
+export function sessionFirstPromptBeyondTitle(session: AiVaultSession): string | null {
+  const prompt = sessionFirstPrompt(session)
+  if (!prompt || turnTextMatchesSessionTitle(session.title, prompt)) {
+    return null
+  }
+  return prompt
+}
+
 export function sessionDetailConversationTurns(
   session: AiVaultSession,
   limit: number
