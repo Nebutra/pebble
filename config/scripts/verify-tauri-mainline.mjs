@@ -7420,6 +7420,30 @@ const checks = [
     expect: (text) =>
       text.includes("runtime === 'host'") &&
       text.includes('`wsl:${distro ? distro : DEFAULT_WSL_DISTRO_KEY}`')
+  },
+  {
+    name: 'Go coalesces concurrent git status reads and abandons them on the last lease',
+    file: 'runtime/go/internal/runtimecore/git_status_read_lease.go',
+    expect: (text) =>
+      text.includes('context.WithCancelCause(context.WithoutCancel(ctx))') &&
+      text.includes('abandoned := cause != nil && entry.leases == 0 && !entry.settled') &&
+      text.includes('func (o *gitStatusReadLeaseOwner) invalidate()')
+  },
+  {
+    name: 'Go reads git status through the request context and the coalescing lease',
+    file: 'runtime/go/internal/runtimecore/source_control_projection.go',
+    expect: (text) =>
+      text.includes('func (m *Manager) leasedGitShortStatus(ctx context.Context, path string)') &&
+      text.includes('m.gitStatusReads.lease(ctx, path,') &&
+      text.includes('func readGitShortStatus(ctx context.Context, path string)')
+  },
+  {
+    name: 'GitLab diff counting tracks hunk state instead of header prefixes',
+    file: 'runtime/go/internal/providercli/gitlab_work_item_details.go',
+    expect: (text) =>
+      text.includes('inHunk := false') &&
+      text.includes('if strings.HasPrefix(line, "@@") {') &&
+      text.includes('if !inHunk {')
   }
 ]
 

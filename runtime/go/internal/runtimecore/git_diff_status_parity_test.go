@@ -141,7 +141,7 @@ func TestSourceProjectionReportsMergeConflicts(t *testing.T) {
 	command.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1")
 	_ = command.Run()
 
-	projection := sourceProjectionFromGitStatus("github", "repo", "repo", repo, "", "none")
+	projection := sourceProjectionFromGitStatus(context.Background(), readGitShortStatus, "github", "repo", "repo", repo, "", "none")
 	if projection.ConflictOperation != "merge" {
 		t.Fatalf("expected merge conflict operation, got %q", projection.ConflictOperation)
 	}

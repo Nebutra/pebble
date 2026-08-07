@@ -1142,7 +1142,7 @@ func (s *Server) handleSourceControl(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	projections := s.manager.ListSourceControlProjections(runtimecore.SourceControlProjectionFilter{
+	projections := s.manager.ListSourceControlProjections(r.Context(), runtimecore.SourceControlProjectionFilter{
 		ProjectID:   r.URL.Query().Get("projectId"),
 		WorkspaceID: r.URL.Query().Get("workspaceId"),
 	})

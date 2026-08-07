@@ -375,10 +375,21 @@ func fetchGitLabMRFiles(ctx context.Context, workdir string, project GitLabProje
 	return files
 }
 
+// countGitLabDiffLines feeds the +N/-N shown per file in the MR dialog. It needs
+// hunk headers, so it must not be reused for the header-less agent-tool diffs
+// that diffFromText in native-chat-diff.ts handles.
 func countGitLabDiffLines(diff string) (int, int) {
 	additions, deletions := 0, 0
+	// Why: `---`/`+++` are file headers only before the first hunk. A removed line
+	// whose own text began with `--` (SQL/Lua `-- comment`) becomes the diff line
+	// `--- old comment`, which a plain prefix check drops as a header.
+	inHunk := false
 	for _, line := range strings.Split(diff, "\n") {
-		if strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---") {
+		if strings.HasPrefix(line, "@@") {
+			inHunk = true
+			continue
+		}
+		if !inHunk {
 			continue
 		}
 		if strings.HasPrefix(line, "+") {

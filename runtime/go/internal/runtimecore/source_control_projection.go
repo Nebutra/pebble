@@ -75,10 +75,12 @@ type UpdateSourceControlProjectionRequest struct {
 }
 
 func (m *Manager) mobileSourceControlProjections() []SourceControlProjection {
-	return m.ListSourceControlProjections(SourceControlProjectionFilter{})
+	// Why: a mobile snapshot is assembled without a client request to cancel
+	// against, so it only takes part in coalescing, never in abandonment.
+	return m.ListSourceControlProjections(context.Background(), SourceControlProjectionFilter{})
 }
 
-func (m *Manager) ListSourceControlProjections(filter SourceControlProjectionFilter) []SourceControlProjection {
+func (m *Manager) ListSourceControlProjections(ctx context.Context, filter SourceControlProjectionFilter) []SourceControlProjection {
 	projects := m.ListProjects()
 	worktrees := m.ListWorktrees("")
 	worktreesByProject := make(map[string][]Worktree)
@@ -103,6 +105,8 @@ func (m *Manager) ListSourceControlProjections(filter SourceControlProjectionFil
 				continue
 			}
 			projections = append(projections, sourceProjectionFromGitStatus(
+				ctx,
+				m.leasedGitShortStatus,
 				project.Provider,
 				project.ID,
 				project.ID,
@@ -121,6 +125,8 @@ func (m *Manager) ListSourceControlProjections(filter SourceControlProjectionFil
 				continue
 			}
 			gitProjection := sourceProjectionFromGitStatus(
+				ctx,
+				m.leasedGitShortStatus,
 				project.Provider,
 				project.ID,
 				worktree.ID,
@@ -218,7 +224,9 @@ func gitReadablePath(path string, canReadGit bool) string {
 	return path
 }
 
-func sourceProjectionFromGitStatus(provider string, repositoryID string, workspaceID string, path string, fallbackBranch string, fallbackReviewKind string) SourceControlProjection {
+type gitShortStatusReader func(context.Context, string) ([]string, error)
+
+func sourceProjectionFromGitStatus(ctx context.Context, read gitShortStatusReader, provider string, repositoryID string, workspaceID string, path string, fallbackBranch string, fallbackReviewKind string) SourceControlProjection {
 	branch := strings.TrimSpace(fallbackBranch)
 	if branch == "" {
 		branch = "unknown"
@@ -237,7 +245,7 @@ func sourceProjectionFromGitStatus(provider string, repositoryID string, workspa
 	if strings.TrimSpace(path) == "" {
 		return projection
 	}
-	lines, err := readGitShortStatus(path)
+	lines, err := read(ctx, path)
 	if err != nil {
 		return projection
 	}
@@ -248,8 +256,16 @@ func sourceProjectionFromGitStatus(provider string, repositoryID string, workspa
 	return projection
 }
 
-func readGitShortStatus(path string) ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 750*time.Millisecond)
+// leasedGitShortStatus keys the coalescing on the worktree path, which is the
+// read's only input, so joined callers can never receive another path's status.
+func (m *Manager) leasedGitShortStatus(ctx context.Context, path string) ([]string, error) {
+	return m.gitStatusReads.lease(ctx, path, func(readCtx context.Context) ([]string, error) {
+		return readGitShortStatus(readCtx, path)
+	})
+}
+
+func readGitShortStatus(ctx context.Context, path string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
 	defer cancel()
 	output, err := exec.CommandContext(ctx, "git", "-C", path, "status", "--short", "--branch").CombinedOutput()
 	if err != nil {
