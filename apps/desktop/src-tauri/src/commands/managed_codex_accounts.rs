@@ -6,6 +6,8 @@ use tauri::Manager;
 
 use super::agent_accounts::{read_codex_auth_status_at, CodexAuthStatus};
 use super::windows_verbatim_path::strip_verbatim_prefix;
+#[cfg(target_os = "windows")]
+use super::wsl_command::wsl_command;
 
 const MARKER_FILE: &str = ".pebble-managed-home";
 
@@ -129,8 +131,7 @@ fn prepare_wsl_home(account_id: &str, distro: Option<&str>) -> Result<ManagedCod
         "-lc".to_string(),
         script,
     ]);
-    let output = std::process::Command::new("wsl.exe")
-        .args(args)
+    let output = wsl_command(args)
         .output()
         .map_err(|err| format!("Could not start WSL for Codex account: {err}"))?;
     if !output.status.success() {
@@ -184,11 +185,10 @@ fn validate_wsl_home(
         "set -euo pipefail; home='{}'; test -f \"$home/{MARKER_FILE}\"; test \"$(cat \"$home/{MARKER_FILE}\")\" = '{account_id}'",
         linux_home.replace('\'', "'\\''")
     );
-    let status = std::process::Command::new("wsl.exe")
-        .args(["-d", distro, "--", "bash", "-lc", &script])
-        .status()
+    let output = wsl_command(["-d", distro, "--", "bash", "-lc", &script])
+        .output()
         .map_err(|err| format!("Could not validate managed Codex WSL home: {err}"))?;
-    if status.success() {
+    if output.status.success() {
         Ok(())
     } else {
         Err("Managed Codex WSL home failed ownership validation.".to_string())
@@ -218,11 +218,10 @@ fn remove_wsl_home(
             "set -euo pipefail; home='{}'; rm -rf -- \"$home\"; rmdir -- \"$(dirname \"$home\")\" 2>/dev/null || true",
             linux_home.replace('\'', "'\\''")
         );
-        let status = std::process::Command::new("wsl.exe")
-            .args(["-d", distro, "--", "bash", "-lc", &script])
-            .status()
+        let output = wsl_command(["-d", distro, "--", "bash", "-lc", &script])
+            .output()
             .map_err(|err| format!("Could not remove managed Codex WSL home: {err}"))?;
-        if status.success() {
+        if output.status.success() {
             return Ok(());
         }
         return Err("Could not remove managed Codex WSL home.".to_string());

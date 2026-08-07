@@ -9,6 +9,7 @@ use tauri::Manager;
 
 use super::agent_accounts::read_keychain_password;
 use super::windows_verbatim_path::strip_verbatim_prefix;
+use super::wsl_command::wsl_command;
 
 const MARKER_FILE: &str = ".pebble-managed-claude-auth";
 const MANAGED_SERVICE: &str = "Pebble Claude Code Managed Credentials";
@@ -313,8 +314,7 @@ pub(crate) fn validate_wsl_owned_path(
 }
 
 fn run_wsl(args: &[&str]) -> Result<String, String> {
-    let output = Command::new("wsl.exe")
-        .args(args)
+    let output = wsl_command(args)
         .output()
         .map_err(|err| format!("Could not run WSL: {err}"))?;
     if !output.status.success() {

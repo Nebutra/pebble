@@ -113,3 +113,4 @@ pub mod updater;
 pub mod warp_theme_import;
 pub mod webview_reload;
 pub mod windows_verbatim_path;
+pub mod wsl_command;
