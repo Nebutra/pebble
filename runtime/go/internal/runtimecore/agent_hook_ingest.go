@@ -104,7 +104,15 @@ func classifyAgentHookPayload(payload string) (SessionHookState, bool) {
 		event = parsed.HookEventNameCamel
 	}
 	switch event {
-	case "Stop", "StopFailure", "SubagentStop":
+	case "Stop", "StopFailure":
+		// Why: Claude fires Stop when the lead turn ends, but provider-owned
+		// background shells and session crons keep running past it, so the pane
+		// is only idle once that work is gone too.
+		if claudeOwnsRunningBackgroundWork(payload) {
+			return SessionHookWorking, true
+		}
+		return SessionHookIdle, true
+	case "SubagentStop":
 		return SessionHookIdle, true
 	case "PermissionRequest", "Notification":
 		// Notification is Claude's "waiting for user input" signal; both mean
