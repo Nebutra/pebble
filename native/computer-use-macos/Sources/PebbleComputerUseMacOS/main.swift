@@ -2533,16 +2533,22 @@ private enum KeyMap {
 private final class AgentRuntime: NSObject, NSApplicationDelegate {
     private let socketPath: String
     private let token: String?
+    private let expectedPeerProcessId: Int32
     private var listener: SocketListener?
 
-    init(socketPath: String, token: String?) {
+    init(socketPath: String, token: String?, expectedPeerProcessId: Int32) {
         self.socketPath = socketPath
         self.token = token
+        self.expectedPeerProcessId = expectedPeerProcessId
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         do {
-            let listener = try SocketListener(socketPath: socketPath, token: token)
+            let listener = try SocketListener(
+                socketPath: socketPath,
+                token: token,
+                expectedPeerProcessId: expectedPeerProcessId
+            )
             self.listener = listener
             listener.start()
         } catch {
@@ -3461,10 +3467,15 @@ private final class SocketListener: @unchecked Sendable {
     private let providerLock = NSLock()
     private var socketFd: Int32 = -1
     private var isStopped = false
+    private let expectedPeerProcessId: Int32
+    private let ownershipLock = NSLock()
+    private var ownership = AgentSessionOwnership()
+    private var nextConnectionId: UInt64 = 1
 
-    init(socketPath: String, token: String?) throws {
+    init(socketPath: String, token: String?, expectedPeerProcessId: Int32) throws {
         self.socketPath = socketPath
         self.token = token
+        self.expectedPeerProcessId = expectedPeerProcessId
         try bindSocket()
     }
 
@@ -3547,7 +3558,12 @@ private final class SocketListener: @unchecked Sendable {
 
     private func handleConnection(_ fd: Int32) {
         defer { close(fd) }
-        let authorizedPeer = peerProcessId(fd).map(isAuthorizedAgentPeer) == true
+        let authorizedPeer = isAuthorizedAgentPeer(
+            peerProcessId: peerProcessId(fd),
+            expectedProcessId: expectedPeerProcessId
+        )
+        let connection = claimConnection(authorized: authorizedPeer)
+        defer { releaseConnection(connection) }
         let decoder = JSONDecoder()
         while let line = readLine(from: fd) {
             guard let data = line.data(using: .utf8),
@@ -3565,7 +3581,42 @@ private final class SocketListener: @unchecked Sendable {
             writeJSON(response, to: fd)
         }
     }
+
+    private func claimConnection(authorized: Bool) -> AgentSessionConnectionID {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
+        let connection = AgentSessionConnectionID(rawValue: nextConnectionId)
+        nextConnectionId += 1
+        _ = ownership.registerConnection(connection, authorized: authorized)
+        return connection
+    }
+
+    private func releaseConnection(_ connection: AgentSessionConnectionID) {
+        ownershipLock.lock()
+        let sessionEnded = ownership.disconnect(connection)
+        ownershipLock.unlock()
+        guard sessionEnded else { return }
+        // Why: the read loop above only ends when the owner's socket hits EOF,
+        // which is exactly what a killed or crashed Pebble produces. Exiting
+        // here is what keeps a helper holding accessibility and screen-recording
+        // grants from outliving the process that was driving it.
+        reapAfterOwnerLoss()
+    }
 }
+
+/// Terminates the helper once its supervising process is gone. Runs on the
+/// connection thread, so it hands the shutdown to the main run loop and falls
+/// back to `exit` if that never lands.
+private func reapAfterOwnerLoss() {
+    DispatchQueue.main.async {
+        NSApp.terminate(nil)
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + ownerLossReapGrace) {
+        exit(0)
+    }
+}
+
+private let ownerLossReapGrace: DispatchTimeInterval = .seconds(5)
 
 private func existingPathMode(_ path: String) -> mode_t? {
     var statInfo = stat()
@@ -3584,56 +3635,14 @@ private func peerProcessId(_ fd: Int32) -> pid_t? {
     return result == 0 && pid > 0 ? pid : nil
 }
 
-private func isAuthorizedAgentPeer(_ pid: pid_t) -> Bool {
-    let parentBundleIdentifier = parentProcessId(pid).flatMap(processBundleIdentifier)
-    return isAuthorizedPebbleAgentPeer(
-        peerBundleIdentifier: processBundleIdentifier(pid),
-        parentBundleIdentifier: parentBundleIdentifier,
-        command: processCommand(pid)
-    )
-}
-
-private func processBundleIdentifier(_ pid: pid_t) -> String? {
-    NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
-}
-
-private func parentProcessId(_ pid: pid_t) -> pid_t? {
-    guard let output = processField(pid: pid, field: "ppid=") else {
-        return nil
-    }
-    let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard let parentPid = pid_t(trimmed), parentPid > 1 else {
-        return nil
-    }
-    return parentPid
-}
-
-private func processCommand(_ pid: pid_t) -> String? {
-    return processField(pid: pid, field: "command=")
-}
-
-private func processField(pid: pid_t, field: String) -> String? {
-    let process = Process()
-    let pipe = Pipe()
-    process.executableURL = URL(fileURLWithPath: "/bin/ps")
-    process.arguments = ["-p", "\(pid)", "-o", field]
-    process.standardOutput = pipe
-    process.standardError = Pipe()
-    do {
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)
-    } catch {
-        return nil
-    }
-}
-
 @MainActor
-private func runAgent(socketPath: String, token: String?) {
+private func runAgent(socketPath: String, token: String?, expectedPeerProcessId: Int32) {
     let app = NSApplication.shared
-    let delegate = AgentRuntime(socketPath: socketPath, token: token)
+    let delegate = AgentRuntime(
+        socketPath: socketPath,
+        token: token,
+        expectedPeerProcessId: expectedPeerProcessId
+    )
     app.delegate = delegate
     // Why: SCK is reliable once this code runs as a signed app with a real TCC identity.
     setenv("PEBBLE_COMPUTER_USE_SCK_SCREENSHOTS", "1", 1)
@@ -3767,23 +3776,24 @@ private func writeAll(_ data: Data, to fd: Int32) -> Bool {
 
 let arguments = Array(CommandLine.arguments.dropFirst())
 if arguments.first == "--agent" {
-    guard arguments.count >= 2 else {
-        fputs("usage: pebble-computer-use-macos --agent <socket-path> --token-file <token-path>\n", stderr)
+    guard let launch = AgentLaunchArguments.parse(arguments) else {
+        fputs(
+            "usage: pebble-computer-use-macos --agent <socket-path> --token-file <token-path> --peer-pid <pid>\n",
+            stderr
+        )
         exit(2)
     }
-    let tokenFileIndex = arguments.firstIndex(of: "--token-file")
-    let token = tokenFileIndex.flatMap { index -> String? in
-        let valueIndex = index + 1
-        guard valueIndex < arguments.count else { return nil }
-        let tokenPath = arguments[valueIndex]
-        return try? String(contentsOfFile: tokenPath, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
+    let token = try? String(contentsOfFile: launch.tokenFilePath, encoding: .utf8)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
     guard let token, !token.isEmpty else {
         fputs("pebble-computer-use-macos --agent requires a non-empty --token-file\n", stderr)
         exit(2)
     }
-    runAgent(socketPath: arguments[1], token: token)
+    runAgent(
+        socketPath: launch.socketPath,
+        token: token,
+        expectedPeerProcessId: launch.expectedPeerProcessId
+    )
 } else if arguments.first == "--permissions" {
     runPermissionCheck()
 } else if arguments.first == "--permission" {

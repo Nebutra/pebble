@@ -7360,6 +7360,30 @@ const checks = [
       text.includes('if claudeOwnsRunningBackgroundWork(payload) {') &&
       text.includes('return SessionHookWorking, true') &&
       !text.includes('case "Stop", "StopFailure", "SubagentStop":')
+  },
+  {
+    name: 'macOS computer-use helper binds to one supervised peer pid, not a bundle family',
+    file: 'native/computer-use-macos/Sources/PebbleComputerUseMacOSCore/AgentPeerAuthorization.swift',
+    expect: (text) =>
+      text.includes('public let expectedPeerProcessId: Int32') &&
+      text.includes('arguments[4] == "--peer-pid"') &&
+      text.includes('peerProcessId == expectedProcessId') &&
+      !text.includes('BundleIdentifier') &&
+      !text.includes('computer-sidecar.js')
+  },
+  {
+    name: 'macOS computer-use helper reaps itself when its owner disconnects',
+    file: 'native/computer-use-macos/Sources/PebbleComputerUseMacOSCore/AgentSessionOwnership.swift',
+    expect: (text) =>
+      text.includes('public struct AgentSessionOwnership') &&
+      text.includes('guard authorized, !sessionClosed else { return .rejected }') &&
+      text.includes('guard wasClaimed, authorizedConnections.isEmpty else { return false }')
+  },
+  {
+    name: 'Native computer-use launcher names the supervising pid the helper must bind to',
+    file: 'apps/desktop/src-tauri/src/commands/computer_use_helper_socket.rs',
+    expect: (text) =>
+      text.includes('.arg("--peer-pid")') && text.includes('std::process::id().to_string()')
   }
 ]
 
