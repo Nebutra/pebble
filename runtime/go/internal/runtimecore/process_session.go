@@ -14,6 +14,11 @@ import (
 
 const maxSessionChunks = 2048
 
+// Why: the output ring retires chunks by advancing a head index, and only
+// compacts once the retired prefix is worth a single memmove. Compacting on
+// every read instead made each PTY read shift the whole ring.
+const maxRetiredSessionChunks = maxSessionChunks / 4
+
 type processSession struct {
 	mu             sync.RWMutex
 	id             string
@@ -39,6 +44,7 @@ type processSession struct {
 	resizePty      func(cols int, rows int) error
 	cleanupProcess func()
 	output         []OutputChunk
+	outputHead     int
 	transcript     terminalTranscript
 	emit           func(topic string, payload interface{})
 	// outputEvents coalesces session.output emissions so /v1/events stays
@@ -185,18 +191,30 @@ func (s *processSession) signal(signal string) error {
 func (s *processSession) tail(limit int) []OutputChunk {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if limit <= 0 || limit > len(s.output) {
-		limit = len(s.output)
+	return s.tailChunksLocked(limit)
+}
+
+// liveChunksLocked is the ring's live window; anything before outputHead has
+// been retired and is only waiting to be compacted away.
+func (s *processSession) liveChunksLocked() []OutputChunk {
+	return s.output[s.outputHead:]
+}
+
+func (s *processSession) tailChunksLocked(limit int) []OutputChunk {
+	live := s.liveChunksLocked()
+	if limit <= 0 || limit > len(live) {
+		limit = len(live)
 	}
-	start := len(s.output) - limit
 	chunks := make([]OutputChunk, limit)
-	copy(chunks, s.output[start:])
+	copy(chunks, live[len(live)-limit:])
 	return chunks
 }
 
 func (s *processSession) clearBuffer() Session {
 	s.mu.Lock()
+	clear(s.output)
 	s.output = s.output[:0]
+	s.outputHead = 0
 	s.transcript.clear()
 	s.updatedAt = time.Now().UTC()
 	snapshot := s.snapshotLocked()
@@ -275,9 +293,14 @@ func (s *processSession) appendOutput(stream string, content string) {
 	s.mu.Lock()
 	s.output = append(s.output, chunk)
 	s.transcript.append(content)
-	if len(s.output) > maxSessionChunks {
-		copy(s.output, s.output[len(s.output)-maxSessionChunks:])
-		s.output = s.output[:maxSessionChunks]
+	if len(s.output)-s.outputHead > maxSessionChunks {
+		s.outputHead++
+	}
+	if s.outputHead >= maxRetiredSessionChunks {
+		kept := copy(s.output, s.liveChunksLocked())
+		clear(s.output[kept:])
+		s.output = s.output[:kept]
+		s.outputHead = 0
 	}
 	s.updatedAt = chunk.At
 	snapshot := s.snapshotLocked()
@@ -288,12 +311,7 @@ func (s *processSession) appendOutput(stream string, content string) {
 func (s *processSession) tailResponse(limit int) TailSessionResponse {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if limit <= 0 || limit > len(s.output) {
-		limit = len(s.output)
-	}
-	start := len(s.output) - limit
-	chunks := make([]OutputChunk, limit)
-	copy(chunks, s.output[start:])
+	chunks := s.tailChunksLocked(limit)
 	return TailSessionResponse{
 		SessionID:  s.id,
 		Chunks:     chunks,
@@ -401,7 +419,7 @@ func (s *processSession) buildSnapshotLocked() Session {
 		ExitCode:         cloneExitCode(s.exitCode),
 		StartedAt:        s.startedAt,
 		UpdatedAt:        s.updatedAt,
-		OutputChunks:     len(s.output),
+		OutputChunks:     len(s.output) - s.outputHead,
 		PID:              s.pid,
 		Cols:             s.cols,
 		Rows:             s.rows,

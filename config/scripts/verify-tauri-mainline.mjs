@@ -7444,6 +7444,40 @@ const checks = [
       text.includes('inHunk := false') &&
       text.includes('if strings.HasPrefix(line, "@@") {') &&
       text.includes('if !inHunk {')
+  },
+  {
+    name: 'Go accumulates terminal transcript lines as bytes rather than per-rune string concatenation',
+    file: 'runtime/go/internal/runtimecore/terminal_transcript.go',
+    expect: (text) =>
+      text.includes('partialLine        []byte') &&
+      text.includes('t.partialLine = utf8.AppendRune(t.partialLine, char)') &&
+      text.includes('func isPlainTranscriptByte(b byte) bool') &&
+      !text.includes('t.partialLine +=')
+  },
+  {
+    name: 'Go carries the transcript char budget instead of re-summing retained lines per read',
+    file: 'runtime/go/internal/runtimecore/terminal_transcript.go',
+    expect: (text) =>
+      text.includes('totalChars := t.completedChars + len(t.partialLine)') &&
+      text.includes('func (t *terminalTranscript) dropOldestCompletedLines(count int)') &&
+      text.includes('t.completedChars -= len(line)')
+  },
+  {
+    name: 'Go retires session output chunks by head index and compacts in batches',
+    file: 'runtime/go/internal/runtimecore/process_session.go',
+    expect: (text) =>
+      text.includes('const maxRetiredSessionChunks = maxSessionChunks / 4') &&
+      text.includes('if len(s.output)-s.outputHead > maxSessionChunks {') &&
+      text.includes('if s.outputHead >= maxRetiredSessionChunks {') &&
+      text.includes('OutputChunks:     len(s.output) - s.outputHead,')
+  },
+  {
+    name: 'Go trims the coalesced output window at flush time, not on every PTY read',
+    file: 'runtime/go/internal/runtimecore/session_output_events.go',
+    expect: (text) =>
+      text.includes('func (e *sessionOutputEmitter) trimToBudgetLocked()') &&
+      text.includes('if len(e.buffer) > 2*e.maxBytes {') &&
+      text.includes('e.buffer = e.buffer[:copy(e.buffer, e.buffer[start:])]')
   }
 ]
 

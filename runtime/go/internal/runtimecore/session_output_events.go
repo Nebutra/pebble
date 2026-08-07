@@ -56,15 +56,12 @@ func (e *sessionOutputEmitter) append(chunk OutputChunk, snapshot Session) {
 	e.snapshot = snapshot
 	e.chunkCount++
 	e.buffer = append(e.buffer, chunk.Content...)
-	if len(e.buffer) > e.maxBytes {
-		start := len(e.buffer) - e.maxBytes
-		// Why: PTY reads may split a rune, and trimming at the raw byte budget
-		// must not turn the retained newest tail into malformed JSON text.
-		for start < len(e.buffer) && !utf8.RuneStart(e.buffer[start]) {
-			start++
-		}
-		e.droppedBytes += start
-		e.buffer = append(e.buffer[:0:0], e.buffer[start:]...)
+	// Why: the payload only has to be bounded when it is taken, so trimming is
+	// deferred to the flush. Trimming per read copied the whole retained budget
+	// on every read once a command was dumping output; this caps in-window
+	// memory instead and pays one trim per emitted event.
+	if len(e.buffer) > 2*e.maxBytes {
+		e.trimToBudgetLocked()
 	}
 	if e.timer == nil {
 		e.timer = time.AfterFunc(e.emitDelay, e.flushTimerFired)
@@ -100,10 +97,26 @@ func (e *sessionOutputEmitter) flushNow() {
 	}
 }
 
+// trimToBudgetLocked drops the oldest bytes past the payload budget, in place.
+func (e *sessionOutputEmitter) trimToBudgetLocked() {
+	if len(e.buffer) <= e.maxBytes {
+		return
+	}
+	start := len(e.buffer) - e.maxBytes
+	// Why: PTY reads may split a rune, and trimming at the raw byte budget must
+	// not turn the retained newest tail into malformed JSON text.
+	for start < len(e.buffer) && !utf8.RuneStart(e.buffer[start]) {
+		start++
+	}
+	e.droppedBytes += start
+	e.buffer = e.buffer[:copy(e.buffer, e.buffer[start:])]
+}
+
 func (e *sessionOutputEmitter) takeLocked() (string, map[string]interface{}, bool) {
 	if e.chunkCount == 0 {
 		return "", nil, false
 	}
+	e.trimToBudgetLocked()
 	// Payload keeps the pre-coalescing {session, chunk} shape so the SSE push
 	// bridge and mobile terminal projection consume it unchanged.
 	payload := map[string]interface{}{
@@ -114,7 +127,10 @@ func (e *sessionOutputEmitter) takeLocked() (string, map[string]interface{}, boo
 	if e.droppedBytes > 0 {
 		payload["droppedBytes"] = e.droppedBytes
 	}
-	e.buffer = nil
+	// Why: the payload took its own copy above, so the window's buffer can be
+	// reused instead of regrown from nil on every emit. The in-window cap in
+	// append is what keeps that retained capacity bounded.
+	e.buffer = e.buffer[:0]
 	e.chunkCount = 0
 	e.droppedBytes = 0
 	e.stream = ""
