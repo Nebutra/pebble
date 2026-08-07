@@ -334,6 +334,9 @@ function computeVisibility(input: VisibilityInput): VisibilityResult {
   if (status.state === 'not-available' && !isUserInitiated) {
     return 'hidden'
   }
+  if (status.state === 'publishing' && !isUserInitiated) {
+    return 'hidden'
+  }
   if (status.state === 'idle') {
     return 'hidden'
   }
@@ -400,6 +403,28 @@ describe('UpdateCard visibility gates', () => {
     expect(
       computeVisibility({
         status: { state: 'not-available', userInitiated: true },
+        dismissedVersion: null,
+        cachedVersion: null,
+        hasStartedDownload: false
+      })
+    ).toBe('visible')
+  })
+
+  it('hides background publishing so a mid-upload check stays silent', () => {
+    expect(
+      computeVisibility({
+        status: { state: 'publishing' },
+        dismissedVersion: null,
+        cachedVersion: null,
+        hasStartedDownload: false
+      })
+    ).toBe('hidden')
+  })
+
+  it('shows user-initiated publishing', () => {
+    expect(
+      computeVisibility({
+        status: { state: 'publishing', userInitiated: true },
         dismissedVersion: null,
         cachedVersion: null,
         hasStartedDownload: false

@@ -182,6 +182,47 @@ describe('installTauriUpdaterApi', () => {
     )
   })
 
+  it('reports a release whose assets are still uploading as a wait, not an error', async () => {
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'updater_assert_install_ready') {
+        return undefined
+      }
+      if (command === 'updater_check_latest_release') {
+        return { state: 'not-ready', message: 'Latest release assets are still publishing.' }
+      }
+      throw new Error(`unexpected invoke ${command}`)
+    })
+    installTauriUpdaterApi()
+
+    await window.api.updater.check({})
+
+    expect(await window.api.updater.getStatus()).toEqual(
+      expect.objectContaining({ state: 'publishing', userInitiated: true })
+    )
+  })
+
+  it('reports an unreachable release host as an error the user can retry', async () => {
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'updater_assert_install_ready') {
+        return undefined
+      }
+      if (command === 'updater_check_latest_release') {
+        return { state: 'unavailable', message: 'Could not reach Pebble release downloads.' }
+      }
+      throw new Error(`unexpected invoke ${command}`)
+    })
+    installTauriUpdaterApi()
+
+    await window.api.updater.check({})
+
+    expect(await window.api.updater.getStatus()).toEqual(
+      expect.objectContaining({
+        state: 'error',
+        message: expect.stringContaining('Could not reach Pebble release downloads.')
+      })
+    )
+  })
+
   it('reports a missing production updater key before starting a native download check', async () => {
     invokeMock.mockImplementation(async (command: string) => {
       if (command === 'updater_assert_install_ready') {
