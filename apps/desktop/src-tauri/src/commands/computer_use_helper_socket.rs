@@ -261,6 +261,11 @@ fn start_helper_connection(helper_executable: &Path) -> Result<HelperConnection,
         .arg(&socket_path)
         .arg("--token-file")
         .arg(&token_path)
+        // Why: the helper accepts only this pid on the socket, so a stolen
+        // socket path cannot be driven by another process, and the helper reaps
+        // itself when this process dies without running shutdown().
+        .arg("--peer-pid")
+        .arg(std::process::id().to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
