@@ -662,6 +662,7 @@ export function AccountsPane({
         (action.startsWith('remove:') && previousActiveAccountId !== nextActiveAccountId)
       if (shouldPromptRestart) {
         void markLiveCodexSessionsForRestart({
+          route: accountRuntime,
           previousAccountLabel: getCodexAccountLabel(codexAccounts, previousActiveAccountId),
           nextAccountLabel: getCodexAccountLabel(next, nextActiveAccountId)
         })

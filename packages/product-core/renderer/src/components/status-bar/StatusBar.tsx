@@ -1268,6 +1268,7 @@ function CodexSwitcherMenu({
       const nextActiveAccountId = getCodexStatusActiveId(next, target)
       if (previousActiveAccountId !== nextActiveAccountId) {
         await markLiveCodexSessionsForRestart({
+          route: target,
           previousAccountLabel: getCodexAccountLabel(accountState, previousActiveAccountId),
           nextAccountLabel: getCodexAccountLabel(next, nextActiveAccountId)
         })
