@@ -143,10 +143,13 @@ pub async fn updater_check_latest_release(
         .skip(newest_newer_index)
         .take(MAX_MANIFEST_PROBE_CANDIDATES);
     let mut saw_missing_newer_manifest = false;
+    let mut saw_unreachable_manifest = false;
     for entry in probe_candidates {
-        if !has_ready_tauri_manifest(&entry.tag).await {
+        let readiness = probe_tauri_manifest(&entry.tag).await;
+        if readiness != ReleaseReadiness::Ready {
             if compare_versions(&entry.version, &current_version) > 0 {
                 saw_missing_newer_manifest = true;
+                saw_unreachable_manifest |= readiness == ReleaseReadiness::Unavailable;
             }
             continue;
         }
@@ -154,26 +157,41 @@ pub async fn updater_check_latest_release(
             continue;
         }
         if saw_missing_newer_manifest {
-            return Ok(UpdaterCheckLatestResult {
-                state: "not-ready".to_string(),
-                version: None,
-                tag: None,
-                release_url: None,
-                message: Some("Latest release assets are still publishing.".to_string()),
-                last_good_tag: Some(entry.tag.clone()),
-            });
+            return Ok(publishing_result(Some(entry.tag.clone())));
         }
         return Ok(available_result(entry));
     }
 
-    Ok(UpdaterCheckLatestResult {
+    // Why: only claim the release is publishing when every newer tag answered
+    // for itself. If any probe could not reach the host, report the outage so
+    // the user retries rather than waiting out a window that already closed.
+    Ok(if saw_unreachable_manifest {
+        unreachable_result()
+    } else {
+        publishing_result(None)
+    })
+}
+
+fn publishing_result(last_good_tag: Option<String>) -> UpdaterCheckLatestResult {
+    UpdaterCheckLatestResult {
         state: "not-ready".to_string(),
         version: None,
         tag: None,
         release_url: None,
         message: Some("Latest release assets are still publishing.".to_string()),
+        last_good_tag,
+    }
+}
+
+fn unreachable_result() -> UpdaterCheckLatestResult {
+    UpdaterCheckLatestResult {
+        state: "unavailable".to_string(),
+        version: None,
+        tag: None,
+        release_url: None,
+        message: Some("Could not reach Pebble release downloads.".to_string()),
         last_good_tag: None,
-    })
+    }
 }
 
 /// Fast path for the stable channel: GET trusted latest.json endpoints in order.
@@ -375,14 +393,50 @@ async fn fetch_release_feed_tags() -> Result<Vec<ReleaseFeedTag>, String> {
     Ok(tags)
 }
 
-async fn has_ready_tauri_manifest(tag: &str) -> bool {
+/// Whether a release tag's signed manifest can be installed yet.
+///
+/// Why three states rather than a bool: a release whose assets are still
+/// uploading answers 404, while an unreachable host answers a transport error
+/// or 5xx. Collapsing both into "not ready" makes a network outage tell the
+/// user their release is still publishing, which never resolves on its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReleaseReadiness {
+    Ready,
+    NotReady,
+    Unavailable,
+}
+
+/// Classify the manifest GET before its body is read. A 404 is the publishing
+/// window; anything else non-success is the host failing us, not the release.
+fn classify_manifest_status(status: u16) -> ReleaseReadiness {
+    match status {
+        404 => ReleaseReadiness::NotReady,
+        200..=299 => ReleaseReadiness::Ready,
+        _ => ReleaseReadiness::Unavailable,
+    }
+}
+
+async fn probe_tauri_manifest(tag: &str) -> ReleaseReadiness {
     let Ok(client) = release_http_client("release") else {
-        return false;
+        return ReleaseReadiness::Unavailable;
     };
-    let Some(manifest) = fetch_json_value(&client, &tauri_release_manifest_url(tag)).await else {
-        return false;
+    let Ok(response) = send_get_with_retry(&client, &tauri_release_manifest_url(tag)).await else {
+        return ReleaseReadiness::Unavailable;
     };
-    tauri_manifest_has_current_platform(&manifest, tag)
+    match classify_manifest_status(response.status().as_u16()) {
+        ReleaseReadiness::Ready => {}
+        other => return other,
+    }
+    let Ok(manifest) = response.json::<serde_json::Value>().await else {
+        return ReleaseReadiness::Unavailable;
+    };
+    // Why: a manifest can land before every platform's asset finishes uploading,
+    // so a present-but-incomplete manifest is still the publishing window.
+    if tauri_manifest_has_current_platform(&manifest, tag) {
+        ReleaseReadiness::Ready
+    } else {
+        ReleaseReadiness::NotReady
+    }
 }
 
 fn filter_release_candidates(
@@ -660,6 +714,41 @@ mod tests {
     fn filters_perf_tags_only_when_explicit() {
         assert!(is_perf_prerelease_tag("v1.4.121-rc.6.perf"));
         assert!(!is_perf_prerelease_tag("v1.4.121-rc.6.performance"));
+    }
+
+    // Why: an outage that reports "still publishing" tells the user to wait out
+    // a window that already closed, so 404 and 5xx must not share a verdict.
+    #[test]
+    fn separates_a_publishing_release_from_an_unreachable_host() {
+        assert_eq!(classify_manifest_status(404), ReleaseReadiness::NotReady);
+        assert_eq!(classify_manifest_status(200), ReleaseReadiness::Ready);
+        assert_eq!(classify_manifest_status(503), ReleaseReadiness::Unavailable);
+        assert_eq!(classify_manifest_status(500), ReleaseReadiness::Unavailable);
+        assert_eq!(classify_manifest_status(403), ReleaseReadiness::Unavailable);
+    }
+
+    #[test]
+    fn reports_a_missing_platform_manifest_as_still_publishing() {
+        let manifest = serde_json::json!({
+            "version": "1.4.131",
+            "platforms": {
+                "unrelated-platform": { "url": "https://example.test/x", "signature": "signed" }
+            }
+        });
+        assert!(!tauri_manifest_has_current_platform(&manifest, "v1.4.131"));
+    }
+
+    #[test]
+    fn keeps_the_publishing_and_unreachable_payloads_distinct() {
+        let publishing = publishing_result(Some("v1.4.130".to_string()));
+        assert_eq!(publishing.state, "not-ready");
+        assert_eq!(publishing.last_good_tag.as_deref(), Some("v1.4.130"));
+        assert!(publishing.message.unwrap().contains("publishing"));
+
+        let unreachable = unreachable_result();
+        assert_eq!(unreachable.state, "unavailable");
+        assert!(unreachable.last_good_tag.is_none());
+        assert!(unreachable.message.unwrap().contains("reach"));
     }
 
     #[test]

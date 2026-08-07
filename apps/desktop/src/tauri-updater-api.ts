@@ -169,6 +169,17 @@ async function checkPebbleReleaseFeed(
       emitUpdaterStatus({ state: 'not-available', userInitiated })
       return
     }
+    // Why: the native check separates a release still uploading its assets from
+    // a host it could not reach. Only the latter is an error the user can act on.
+    if (result.state === 'not-ready') {
+      await settleNudgeCheck(activeNudgeId)
+      emitUpdaterStatus({
+        state: 'publishing',
+        userInitiated,
+        ...(activeNudgeId ? { activeNudgeId } : {})
+      })
+      return
+    }
     await settleNudgeCheck(activeNudgeId)
     emitUpdaterStatus({
       state: 'error',

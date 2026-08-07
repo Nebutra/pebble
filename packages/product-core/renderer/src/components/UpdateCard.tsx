@@ -142,7 +142,8 @@ export function UpdateCard() {
   } else if (
     status.state === 'checking' ||
     status.state === 'idle' ||
-    status.state === 'not-available'
+    status.state === 'not-available' ||
+    status.state === 'publishing'
   ) {
     // Why: a new check cycle has started or completed without an available update.
     // Clear the cached version so a later check failure cannot dismiss or link to
@@ -247,6 +248,11 @@ export function UpdateCard() {
     return null
   }
   if (status.state === 'not-available' && autoDismissed) {
+    return null
+  }
+  // Why: a background check that lands mid-publish must stay silent — the next
+  // check picks the release up once its assets finish uploading.
+  if (status.state === 'publishing' && !isUserInitiated) {
     return null
   }
 
@@ -448,15 +454,17 @@ export function UpdateCard() {
       ? 'Checking for updates'
       : status.state === 'not-available'
         ? "You're on the latest version"
-        : status.state === 'available'
-          ? 'Update available'
-          : status.state === 'downloading'
-            ? 'Downloading update'
-            : status.state === 'downloaded'
-              ? 'Update ready to install'
-              : status.state === 'error'
-                ? 'Update error'
-                : 'Update status'
+        : status.state === 'publishing'
+          ? 'A new release is still uploading'
+          : status.state === 'available'
+            ? 'Update available'
+            : status.state === 'downloading'
+              ? 'Downloading update'
+              : status.state === 'downloaded'
+                ? 'Update ready to install'
+                : status.state === 'error'
+                  ? 'Update error'
+                  : 'Update status'
 
   // ── Card wrapper ──────────────────────────────────────────────────
 
@@ -483,6 +491,18 @@ export function UpdateCard() {
         <CompactCardContent
           icon="check"
           text={translate('auto.components.UpdateCard.ea2a41adbe', "You're on the latest version.")}
+        />
+      )
+    }
+
+    if (status.state === 'publishing') {
+      return (
+        <CompactCardContent
+          icon="spinner"
+          text={translate(
+            'auto.components.UpdateCard.publishing',
+            'A new release is still uploading. Check again shortly.'
+          )}
         />
       )
     }
