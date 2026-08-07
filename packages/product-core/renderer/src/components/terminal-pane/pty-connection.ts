@@ -101,6 +101,7 @@ import {
   isCtrlCKeyEvent,
   isPlainEscapeKeyEvent
 } from './agent-interrupt-inference'
+import { resolveDismissedQuestionStatus } from './agent-question-dismissal'
 import {
   AGENT_INTERRUPT_SETTLE_MS,
   type AgentInterruptInputIntent
@@ -1664,6 +1665,18 @@ export function connectPanePty(
     paneKey: cacheKey,
     getStatusEntry: () => useAppStore.getState().agentStatusByPaneKey[cacheKey],
     inferInterrupt: (request) => {
+      // Why: a dismissed Claude question resolves against the hook row in the
+      // store, which the runtime-session bridge behind agentStatus.inferInterrupt
+      // cannot see — it never reports `waiting` or a tool name.
+      const dismissed = resolveDismissedQuestionStatus({
+        entry: useAppStore.getState().agentStatusByPaneKey[cacheKey],
+        request,
+        now: Date.now()
+      })
+      if (dismissed) {
+        useAppStore.getState().setAgentStatus(cacheKey, dismissed)
+        return true
+      }
       // Why: the explicit hook row is the authority for an in-flight agent turn.
       // Codex can reset its terminal title while handling Ctrl+C/Escape, so title
       // state must not veto clearing the row's working state.
