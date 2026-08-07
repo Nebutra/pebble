@@ -170,7 +170,9 @@ fn sync_system_resources() -> Result<(), String> {
             let _ = fs::remove_file(&marker);
             continue;
         }
-        copy_recursively(&source, &target)?;
+        // Why: claim ownership before writing. A crash between the copy and the
+        // marker would otherwise strand a half-copied tree that the check above
+        // reads as user content, so the entry could never repair itself.
         fs::create_dir_all(&markers).map_err(|error| error.to_string())?;
         fs::write(
             &marker,
@@ -180,6 +182,7 @@ fn sync_system_resources() -> Result<(), String> {
             ),
         )
         .map_err(|error| error.to_string())?;
+        copy_recursively(&source, &target)?;
     }
     Ok(())
 }

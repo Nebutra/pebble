@@ -8,6 +8,7 @@ use sha2::{Digest, Sha256};
 use tauri::Manager;
 
 use super::agent_accounts::read_keychain_password;
+use super::windows_verbatim_path::strip_verbatim_prefix;
 
 const MARKER_FILE: &str = ".pebble-managed-claude-auth";
 const MANAGED_SERVICE: &str = "Pebble Claude Code Managed Credentials";
@@ -675,7 +676,7 @@ fn cleanup_temporary_login(path: &Path) {
 
 fn canonical_string(path: &Path) -> Result<String, String> {
     fs::canonicalize(path)
-        .map(|path| path.to_string_lossy().to_string())
+        .map(|path| strip_verbatim_prefix(&path.to_string_lossy()))
         .map_err(|err| err.to_string())
 }
 
@@ -717,5 +718,22 @@ mod tests {
         assert!(validate_account_id("account-1").is_ok());
         assert!(validate_account_id("../account-1").is_err());
         assert!(validate_account_id("account/1").is_err());
+    }
+
+    // Why: this string reaches the renderer as `temporary_config_path`, which
+    // becomes CLAUDE_CONFIG_DIR and the captive-login PTY cwd — neither survives
+    // a verbatim `\\?\C:` volume.
+    #[test]
+    fn the_managed_auth_path_is_never_verbatim() {
+        let temp = tempfile::tempdir().unwrap();
+        let auth = temp.path().join("claude-accounts").join("a").join("auth");
+        fs::create_dir_all(&auth).unwrap();
+
+        let resolved = canonical_string(&auth).unwrap();
+
+        assert!(
+            !resolved.starts_with(r"\\?\"),
+            "got verbatim path {resolved}"
+        );
     }
 }
