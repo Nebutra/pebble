@@ -49,6 +49,7 @@ type AiVaultSession struct {
 	MessageCount          int                     `json:"messageCount"`
 	TotalTokens           int                     `json:"totalTokens"`
 	PreviewMessages       []AiVaultPreviewMessage `json:"previewMessages"`
+	FirstUserPrompt       *string                 `json:"firstUserPrompt"`
 	ResumeCommand         string                  `json:"resumeCommand"`
 }
 
@@ -719,7 +720,7 @@ func parseAiVaultJSONL(candidate aiVaultCandidate, codexHome string) (*AiVaultSe
 	}
 	defer file.Close()
 	sessionID := strings.TrimSuffix(filepath.Base(candidate.path), filepath.Ext(candidate.path))
-	var title, cwd, model, created, updated string
+	var title, cwd, model, created, updated, firstUserPrompt string
 	messageCount, totalTokens := 0, 0
 	preview := make([]AiVaultPreviewMessage, 0, 6)
 	scanner := bufio.NewScanner(file)
@@ -766,6 +767,10 @@ func parseAiVaultJSONL(candidate aiVaultCandidate, codexHome string) (*AiVaultSe
 			if title == "" && role == "user" {
 				title = compactAiVaultText(text, 96)
 			}
+			// Why: read the opening ask before the six-message window slides past it.
+			if firstUserPrompt == "" && normalizeAiVaultRole(role) == "user" {
+				firstUserPrompt = aiVaultFirstUserPromptText(text)
+			}
 			preview = append(preview, AiVaultPreviewMessage{Role: normalizeAiVaultRole(role), Text: compactAiVaultText(text, 220), Timestamp: optionalString(updated)})
 			if len(preview) > 6 {
 				preview = preview[len(preview)-6:]
@@ -797,7 +802,7 @@ func parseAiVaultJSONL(candidate aiVaultCandidate, codexHome string) (*AiVaultSe
 	if cwd != "" {
 		resume = "cd " + quoteAiVaultShellArg(cwd) + " && " + resume
 	}
-	return &AiVaultSession{ID: "local:" + candidate.agent + ":" + sessionID + ":" + candidate.path, ExecutionHostID: "local", Agent: candidate.agent, SessionID: sessionID, Title: title, Cwd: optionalString(cwd), Branch: nil, Model: optionalString(model), FilePath: candidate.path, CodexHome: optionalCodexHome(candidate.agent, codexHome), CreatedAt: optionalString(created), UpdatedAt: optionalString(updated), ModifiedAt: modified, MessageCount: messageCount, TotalTokens: totalTokens, PreviewMessages: preview, ResumeCommand: resume}, nil
+	return &AiVaultSession{ID: "local:" + candidate.agent + ":" + sessionID + ":" + candidate.path, ExecutionHostID: "local", Agent: candidate.agent, SessionID: sessionID, Title: title, Cwd: optionalString(cwd), Branch: nil, Model: optionalString(model), FilePath: candidate.path, CodexHome: optionalCodexHome(candidate.agent, codexHome), CreatedAt: optionalString(created), UpdatedAt: optionalString(updated), ModifiedAt: modified, MessageCount: messageCount, TotalTokens: totalTokens, PreviewMessages: preview, FirstUserPrompt: optionalString(firstUserPrompt), ResumeCommand: resume}, nil
 }
 
 func parseAiVaultJSON(candidate aiVaultCandidate) (*AiVaultSession, error) {
@@ -1028,6 +1033,7 @@ func parseOpenCodeSQLiteSession(dbPath, sessionID string, info os.FileInfo) (*Ai
 			session.Model = optionalString(firstString(model, "id", "modelID"))
 		}
 	}
+	readOpenCodeSQLiteFirstUserPrompt(db, session)
 	if err := consumeOpenCodeSQLitePreview(db, session); err != nil {
 		return nil, err
 	}
@@ -1079,10 +1085,15 @@ func consumeOpenCodeSQLitePreview(db *sql.DB, session *AiVaultSession) error {
 			session.Title = firstString(summary, "title", "body")
 		}
 	}
+	// Why: this query reads the newest parts only, so the oldest user turn in it
+	// is mid-session. readOpenCodeSQLiteFirstUserPrompt already answered for this
+	// source; keep its result rather than letting the window overwrite it.
+	firstUserPrompt := session.FirstUserPrompt
 	for index := len(previews) - 1; index >= 0; index-- {
 		item := previews[index]
 		appendAiVaultPreview(session, item.role, item.text, item.timestamp)
 	}
+	session.FirstUserPrompt = firstUserPrompt
 	if count, err := countOpenCodeMessages(db, session.SessionID); err == nil {
 		session.MessageCount = count
 	} else if session.MessageCount == 0 {
@@ -1573,6 +1584,9 @@ func consumeSimpleRoleMessage(session *AiVaultSession, message map[string]any) {
 }
 
 func appendAiVaultPreview(session *AiVaultSession, role, text, timestamp string) {
+	// Why: capture from the raw text before the preview cap and the sliding
+	// window can drop the opening ask.
+	captureAiVaultFirstUserPrompt(session, role, text)
 	text = compactAiVaultText(text, 220)
 	if text == "" {
 		return

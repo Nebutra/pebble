@@ -9768,7 +9768,9 @@
             "sessionRole": "Session",
             "jumpToOriginalPane": "Jump to Original Pane",
             "worktree": "Worktree",
-            "jumpToWorktree": "Jump to Worktree"
+            "jumpToWorktree": "Jump to Worktree",
+            "firstAsk": "First ask",
+            "noFirstPromptRecorded": "No user prompt recorded"
           },
           "AiVaultSessionRow": {
             "noPreviewAvailable": "No conversation preview available",
@@ -9794,7 +9796,8 @@
             "systemRole": "System",
             "sessionRole": "Session",
             "jumpToOriginalPane": "Jump to Original Pane",
-            "jumpToWorktree": "Jump to Worktree"
+            "jumpToWorktree": "Jump to Worktree",
+            "firstAsk": "First ask"
           },
           "FileExplorerNameFilter": {
             "26fb73c6e3": "Find files",

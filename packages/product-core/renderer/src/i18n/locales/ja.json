@@ -9768,7 +9768,9 @@
             "sessionRole": "セッション",
             "jumpToOriginalPane": "元のペインにジャンプ",
             "worktree": "ワークツリー",
-            "jumpToWorktree": "ワークツリーにジャンプ"
+            "jumpToWorktree": "ワークツリーにジャンプ",
+            "firstAsk": "最初の依頼",
+            "noFirstPromptRecorded": "ユーザープロンプトは記録されていません"
           },
           "AiVaultSessionRow": {
             "resumeAgentSession": "{{value0}} セッションを再開",
@@ -9794,7 +9796,8 @@
             "systemRole": "システム",
             "sessionRole": "セッション",
             "jumpToOriginalPane": "元のペインにジャンプ",
-            "jumpToWorktree": "ワークツリーにジャンプ"
+            "jumpToWorktree": "ワークツリーにジャンプ",
+            "firstAsk": "最初の依頼"
           },
           "FileExplorerNameFilter": {
             "26fb73c6e3": "ファイルを検索",

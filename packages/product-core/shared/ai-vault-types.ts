@@ -70,6 +70,10 @@ export type AiVaultSession = {
   messageCount: number
   totalTokens: number
   previewMessages: AiVaultSessionPreviewMessage[]
+  /** The session's opening user turn, captured before the six-message preview
+   *  window slides past it. Optional because an SSH host running an older
+   *  runtime sends no such field; use `sessionFirstPrompt` to read it. */
+  firstUserPrompt?: string | null
   resumeCommand: string
 }
 

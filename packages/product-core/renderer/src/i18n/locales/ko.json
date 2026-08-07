@@ -9768,7 +9768,9 @@
             "sessionRole": "세션",
             "jumpToOriginalPane": "원래 창으로 이동",
             "worktree": "작업 트리",
-            "jumpToWorktree": "작업 트리로 이동"
+            "jumpToWorktree": "작업 트리로 이동",
+            "firstAsk": "첫 요청",
+            "noFirstPromptRecorded": "사용자 프롬프트가 기록되지 않음"
           },
           "AiVaultSessionRow": {
             "resumeAgentSession": "{{value0}} 세션 재개",
@@ -9794,7 +9796,8 @@
             "systemRole": "시스템",
             "sessionRole": "세션",
             "jumpToOriginalPane": "원래 창으로 이동",
-            "jumpToWorktree": "작업 트리로 이동"
+            "jumpToWorktree": "작업 트리로 이동",
+            "firstAsk": "첫 요청"
           },
           "FileExplorerNameFilter": {
             "26fb73c6e3": "파일 찾기",
