@@ -6,6 +6,30 @@ import {
   type RuntimeEnvironmentCallRequest
 } from '@/runtime/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '@/runtime/runtime-rpc-client'
+import type { ProjectExecutionRuntimeResolution } from '../../../shared/project-execution-runtime'
+import type * as LocalPreflightContext from './local-preflight-context'
+
+let projectRuntimeByWorktreeId: Record<string, ProjectExecutionRuntimeResolution> = {}
+
+vi.mock('@/lib/local-preflight-context', async (importOriginal) => ({
+  ...(await importOriginal<typeof LocalPreflightContext>()),
+  getLocalProjectExecutionRuntimeContext: (_state: unknown, worktreeId?: string | null) =>
+    worktreeId ? projectRuntimeByWorktreeId[worktreeId] : undefined
+}))
+
+function wslRuntime(distro: string): ProjectExecutionRuntimeResolution {
+  return {
+    status: 'resolved',
+    runtime: {
+      kind: 'wsl',
+      hostPlatform: 'wsl',
+      projectId: 'project-1',
+      distro,
+      reason: 'project-override',
+      cacheKey: `wsl:${distro}`
+    }
+  }
+}
 
 const ACCOUNT_A = 'account-a@example.com'
 const ACCOUNT_B = 'account-b@example.com'
@@ -18,6 +42,7 @@ describe('markLiveCodexSessionsForRestart', () => {
 
   beforeEach(() => {
     clearRuntimeCompatibilityCacheForTests()
+    projectRuntimeByWorktreeId = {}
     runtimeEnvironmentCall.mockReset()
     runtimeEnvironmentTransportCall.mockReset()
     runtimeEnvironmentTransportCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
@@ -75,6 +100,7 @@ describe('markLiveCodexSessionsForRestart', () => {
     vi.mocked(window.api.pty.getForegroundProcess).mockResolvedValue('codex')
 
     await markLiveCodexSessionsForRestart({
+      route: { runtime: 'host' },
       previousAccountLabel: ACCOUNT_A,
       nextAccountLabel: ACCOUNT_B
     })
@@ -128,6 +154,7 @@ describe('markLiveCodexSessionsForRestart', () => {
     })
 
     await markLiveCodexSessionsForRestart({
+      route: { runtime: 'host' },
       previousAccountLabel: ACCOUNT_A,
       nextAccountLabel: ACCOUNT_B
     })
@@ -148,6 +175,7 @@ describe('markLiveCodexSessionsForRestart', () => {
     vi.mocked(window.api.pty.getForegroundProcess).mockResolvedValue('zsh')
 
     await markLiveCodexSessionsForRestart({
+      route: { runtime: 'host' },
       previousAccountLabel: ACCOUNT_A,
       nextAccountLabel: ACCOUNT_B
     })
@@ -159,6 +187,7 @@ describe('markLiveCodexSessionsForRestart', () => {
     vi.mocked(window.api.pty.getForegroundProcess).mockResolvedValue('codex.exe')
 
     await markLiveCodexSessionsForRestart({
+      route: { runtime: 'host' },
       previousAccountLabel: ACCOUNT_A,
       nextAccountLabel: ACCOUNT_B
     })
@@ -173,6 +202,7 @@ describe('markLiveCodexSessionsForRestart', () => {
     vi.mocked(window.api.pty.getForegroundProcess).mockResolvedValue('codex-aarch64-ap')
 
     await markLiveCodexSessionsForRestart({
+      route: { runtime: 'host' },
       previousAccountLabel: ACCOUNT_A,
       nextAccountLabel: ACCOUNT_B
     })
@@ -187,12 +217,14 @@ describe('markLiveCodexSessionsForRestart', () => {
     vi.mocked(window.api.pty.getForegroundProcess).mockResolvedValue('codex')
 
     await markLiveCodexSessionsForRestart({
+      route: { runtime: 'host' },
       previousAccountLabel: ACCOUNT_A,
       nextAccountLabel: ACCOUNT_B
     })
     useAppStore.getState().queueCodexPaneRestarts(['pty-1'])
 
     await markLiveCodexSessionsForRestart({
+      route: { runtime: 'host' },
       previousAccountLabel: ACCOUNT_B,
       nextAccountLabel: ACCOUNT_A
     })
@@ -205,11 +237,13 @@ describe('markLiveCodexSessionsForRestart', () => {
     vi.mocked(window.api.pty.getForegroundProcess).mockResolvedValue('codex')
 
     await markLiveCodexSessionsForRestart({
+      route: { runtime: 'host' },
       previousAccountLabel: ACCOUNT_A,
       nextAccountLabel: ACCOUNT_B
     })
 
     await markLiveCodexSessionsForRestart({
+      route: { runtime: 'host' },
       previousAccountLabel: ACCOUNT_B,
       nextAccountLabel: ACCOUNT_C
     })
@@ -251,6 +285,7 @@ describe('markLiveCodexSessionsForRestart', () => {
     })
 
     await markLiveCodexSessionsForRestart({
+      route: { runtime: 'host' },
       previousAccountLabel: ACCOUNT_A,
       nextAccountLabel: ACCOUNT_B
     })
@@ -265,6 +300,93 @@ describe('markLiveCodexSessionsForRestart', () => {
     expect(useAppStore.getState().codexRestartNoticeByPtyId['remote:term-1']).toEqual({
       previousAccountLabel: ACCOUNT_A,
       nextAccountLabel: ACCOUNT_B
+    })
+  })
+
+  describe('CODEX_HOME route scoping', () => {
+    beforeEach(() => {
+      projectRuntimeByWorktreeId = { wt2: wslRuntime('Ubuntu') }
+      useAppStore.setState({
+        tabsByWorktree: {
+          wt1: [
+            {
+              id: 'tab-1',
+              ptyId: 'pty-1',
+              worktreeId: 'wt1',
+              title: 'pebble-host',
+              customTitle: null,
+              color: null,
+              sortOrder: 0,
+              createdAt: 1
+            }
+          ],
+          wt2: [
+            {
+              id: 'tab-2',
+              ptyId: 'pty-2',
+              worktreeId: 'wt2',
+              title: 'pebble-wsl',
+              customTitle: null,
+              color: null,
+              sortOrder: 0,
+              createdAt: 2
+            }
+          ]
+        },
+        ptyIdsByTabId: { 'tab-1': ['pty-1'], 'tab-2': ['pty-2'] }
+      })
+      vi.mocked(window.api.pty.getForegroundProcess).mockResolvedValue('codex')
+    })
+
+    it('marks only the panes launched against the switched route', async () => {
+      await markLiveCodexSessionsForRestart({
+        route: { runtime: 'wsl', wslDistro: 'Ubuntu' },
+        previousAccountLabel: ACCOUNT_A,
+        nextAccountLabel: ACCOUNT_B
+      })
+
+      const notices = useAppStore.getState().codexRestartNoticeByPtyId
+      expect(notices['pty-2']).toEqual({
+        previousAccountLabel: ACCOUNT_A,
+        nextAccountLabel: ACCOUNT_B
+      })
+      expect(notices['pty-1']).toBeUndefined()
+    })
+
+    it('keeps a pending restart when another route switches to the same account label', async () => {
+      await markLiveCodexSessionsForRestart({
+        route: { runtime: 'host' },
+        previousAccountLabel: ACCOUNT_A,
+        nextAccountLabel: ACCOUNT_B
+      })
+      useAppStore.setState({ pendingCodexPaneRestartIds: { 'pty-1': true } })
+
+      // Why: host and WSL panes can share an account label while pointing at
+      // different managed homes. A WSL switch back to that label must not read
+      // as "the host pane is home again" and cancel its real pending restart.
+      await markLiveCodexSessionsForRestart({
+        route: { runtime: 'wsl', wslDistro: 'Ubuntu' },
+        previousAccountLabel: ACCOUNT_C,
+        nextAccountLabel: ACCOUNT_A
+      })
+
+      expect(useAppStore.getState().codexRestartNoticeByPtyId['pty-1']).toEqual({
+        previousAccountLabel: ACCOUNT_A,
+        nextAccountLabel: ACCOUNT_B
+      })
+      expect(useAppStore.getState().pendingCodexPaneRestartIds['pty-1']).toBe(true)
+    })
+
+    it('separates WSL distros that each select their own account', async () => {
+      projectRuntimeByWorktreeId = { wt2: wslRuntime('Debian') }
+
+      await markLiveCodexSessionsForRestart({
+        route: { runtime: 'wsl', wslDistro: 'Ubuntu' },
+        previousAccountLabel: ACCOUNT_A,
+        nextAccountLabel: ACCOUNT_B
+      })
+
+      expect(useAppStore.getState().codexRestartNoticeByPtyId['pty-2']).toBeUndefined()
     })
   })
 })

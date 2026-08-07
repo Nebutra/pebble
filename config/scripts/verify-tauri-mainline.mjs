@@ -7406,6 +7406,20 @@ const checks = [
       text.includes('Pebble is installed as a system package, so it cannot replace itself') &&
       text.includes('keeping the quotes') &&
       !text.includes('AppImage')
+  },
+  {
+    name: 'Codex restart prompts are scoped to the pane CODEX_HOME route',
+    file: 'packages/product-core/renderer/src/lib/codex-session-restart.ts',
+    expect: (text) =>
+      text.includes('getCodexPaneAccountRouteKeyForWorktree(state, worktreeId) !== routeKey') &&
+      text.includes('route: CodexPaneAccountRoute')
+  },
+  {
+    name: 'Host and per-distro WSL Codex homes stay distinct restart routes',
+    file: 'packages/product-core/renderer/src/lib/codex-pane-account-route.ts',
+    expect: (text) =>
+      text.includes("runtime === 'host'") &&
+      text.includes('`wsl:${distro ? distro : DEFAULT_WSL_DISTRO_KEY}`')
   }
 ]
 

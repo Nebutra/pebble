@@ -52,6 +52,7 @@ import { SearchableSetting } from './SearchableSetting'
 import { SettingsRow, SettingsSegmentedControl } from './SettingsFormControls'
 import { matchesSettingsSearch } from './settings-search'
 import { markLiveCodexSessionsForRestart } from '@/lib/codex-session-restart'
+import { resolveSwitchedCodexRoute } from '@/lib/codex-pane-account-route'
 import {
   Dialog,
   DialogContent,
@@ -662,6 +663,11 @@ export function AccountsPane({
         (action.startsWith('remove:') && previousActiveAccountId !== nextActiveAccountId)
       if (shouldPromptRestart) {
         void markLiveCodexSessionsForRestart({
+          route: resolveSwitchedCodexRoute(
+            accountRuntime,
+            next.accounts.find((account) => account.id === nextActiveAccountId) ??
+              codexAccounts.accounts.find((account) => account.id === previousActiveAccountId)
+          ),
           previousAccountLabel: getCodexAccountLabel(codexAccounts, previousActiveAccountId),
           nextAccountLabel: getCodexAccountLabel(next, nextActiveAccountId)
         })

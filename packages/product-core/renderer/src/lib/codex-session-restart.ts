@@ -1,6 +1,11 @@
 import type { AppState } from '@/store'
 import { useAppStore } from '@/store'
 import { inspectRuntimeTerminalProcess } from '@/runtime/runtime-terminal-inspection'
+import {
+  getCodexPaneAccountRouteKey,
+  getCodexPaneAccountRouteKeyForWorktree,
+  type CodexPaneAccountRoute
+} from '@/lib/codex-pane-account-route'
 
 function normalizeProcessName(processName: string | null): string | null {
   if (!processName) {
@@ -21,12 +26,22 @@ function isCodexForegroundProcess(processName: string | null): boolean {
   return normalized === 'codex' || normalized.startsWith('codex-')
 }
 
-async function getLiveCodexSessionPtyIds(state: AppState): Promise<string[]> {
-  const tabs = Object.values(state.tabsByWorktree).flat()
+async function getLiveCodexSessionPtyIds(state: AppState, routeKey: string): Promise<string[]> {
+  const tabs = Object.entries(state.tabsByWorktree).flatMap(([worktreeId, worktreeTabs]) =>
+    worktreeTabs.map((tab) => ({ tab, worktreeId }))
+  )
   const checks = await Promise.all(
-    tabs.map(async (tab) => {
+    tabs.map(async ({ tab, worktreeId }) => {
       const ptyIds = state.ptyIdsByTabId[tab.id] ?? []
       if (ptyIds.length === 0) {
+        return [] as string[]
+      }
+
+      // Why: host and each WSL distro select accounts independently into
+      // separate CODEX_HOMEs. Panes on an untouched route are still logged in,
+      // and marking them would also cancel their own pending restarts whenever
+      // the two routes happen to land on the same account label.
+      if (getCodexPaneAccountRouteKeyForWorktree(state, worktreeId) !== routeKey) {
         return [] as string[]
       }
 
@@ -49,11 +64,15 @@ async function getLiveCodexSessionPtyIds(state: AppState): Promise<string[]> {
 }
 
 export async function markLiveCodexSessionsForRestart(args: {
+  route: CodexPaneAccountRoute
   previousAccountLabel: string
   nextAccountLabel: string
 }): Promise<void> {
   const state = useAppStore.getState()
-  const liveCodexSessionPtyIds = await getLiveCodexSessionPtyIds(state)
+  const liveCodexSessionPtyIds = await getLiveCodexSessionPtyIds(
+    state,
+    getCodexPaneAccountRouteKey(args.route)
+  )
   if (liveCodexSessionPtyIds.length === 0) {
     return
   }

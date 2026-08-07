@@ -57,6 +57,7 @@ import { ClaudeIcon, GeminiIcon, MiniMaxIcon, OpenAIIcon, OpenCodeGoIcon } from 
 import { AgentIcon } from '@/lib/agent-catalog'
 import { formatWindowLabel } from '@/lib/window-label-formatter'
 import { markLiveCodexSessionsForRestart } from '@/lib/codex-session-restart'
+import { resolveSwitchedCodexRoute } from '@/lib/codex-pane-account-route'
 import { UpdateStatusSegment } from './UpdateStatusSegment'
 import { isStatusBarItemAvailable } from './status-bar-agent-gating'
 import { getVisibleUsageProvider, isUsageEmptyState } from './status-bar-provider-visibility'
@@ -1268,6 +1269,11 @@ function CodexSwitcherMenu({
       const nextActiveAccountId = getCodexStatusActiveId(next, target)
       if (previousActiveAccountId !== nextActiveAccountId) {
         await markLiveCodexSessionsForRestart({
+          route: resolveSwitchedCodexRoute(
+            target,
+            next.accounts.find((account) => account.id === nextActiveAccountId) ??
+              accountState.accounts.find((account) => account.id === previousActiveAccountId)
+          ),
           previousAccountLabel: getCodexAccountLabel(accountState, previousActiveAccountId),
           nextAccountLabel: getCodexAccountLabel(next, nextActiveAccountId)
         })
