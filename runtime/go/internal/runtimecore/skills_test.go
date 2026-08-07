@@ -34,6 +34,45 @@ func TestSkillScannerFindsMetadataAndAvoidsSymlinkLoops(t *testing.T) {
 	}
 }
 
+// Why: agent homes like ~/.claude/skills are commonly symlinked into a dotfiles
+// repo. The renderer decides which agent covers a skill by matching path
+// segments on RootPath, so discovery must report the root it was asked to scan
+// rather than the symlink target — otherwise a symlinked home reads as an
+// uncovered agent.
+func TestSkillScannerReportsTheUnresolvedRootForASymlinkedHome(t *testing.T) {
+	base := t.TempDir()
+	target := filepath.Join(base, "dotfiles", "skills")
+	skillDir := filepath.Join(target, "orchestration")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	markdown := "---\nname: Orchestration\ndescription: Coordinate agents.\n---\n"
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(markdown), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	home := filepath.Join(base, ".claude", "skills")
+	if err := os.MkdirAll(filepath.Dir(home), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, home); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	files := findSkillFiles(home, 4)
+	if len(files) != 1 {
+		t.Fatalf("expected one skill file through the symlinked home, got %#v", files)
+	}
+	skill := describeSkill(SkillDiscoverySource{
+		ID: "home-claude", Label: "Claude home", Path: home, SourceKind: "home", Providers: []string{"claude"},
+	}, files[0])
+	if skill.RootPath != home {
+		t.Fatalf("expected the unresolved root %q, got %q", home, skill.RootPath)
+	}
+	if skill.Name != "Orchestration" || !skill.Installed {
+		t.Fatalf("unexpected skill projection: %#v", skill)
+	}
+}
+
 func TestSkillMarkdownFallsBackToHeadingAndParagraph(t *testing.T) {
 	name, description := summarizeSkillMarkdown("# Browser Tools\n\nAutomate the browser\nsafely.\n")
 	if name != "Browser Tools" || description == nil || *description != "Automate the browser safely." {

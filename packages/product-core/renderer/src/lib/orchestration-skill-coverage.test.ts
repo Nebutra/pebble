@@ -97,6 +97,23 @@ describe('orchestration skill agent coverage', () => {
     ).toBe(true)
   })
 
+  // Why: agent homes are commonly symlinked into a dotfiles repo, so the skill's
+  // own directory sits outside the agent home. Discovery reports the root it was
+  // asked to scan, which is what keeps the agent covered.
+  it('matches a skill discovered through a symlinked agent home', () => {
+    expect(
+      agentHasOrchestrationSkill('claude', [
+        skill({
+          providers: ['claude'],
+          sourceKind: 'home',
+          rootPath: '/Users/test/.claude/skills',
+          directoryPath: '/Users/test/dotfiles/skills/orchestration',
+          skillFilePath: '/Users/test/dotfiles/skills/orchestration/SKILL.md'
+        })
+      ])
+    ).toBe(true)
+  })
+
   it('matches Windows skill paths', () => {
     expect(
       agentHasOrchestrationSkill('codex', [
