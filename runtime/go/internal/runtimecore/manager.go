@@ -1607,6 +1607,9 @@ func (m *Manager) StartAgentRun(ctx context.Context, req StartAgentRunRequest) (
 	if !ok {
 		return AgentRun{}, ErrNotFound
 	}
+	if err := requireAgentProfileCommand(profile, m.agentRunExecutesLocally(req.ProjectID), exec.LookPath); err != nil {
+		return AgentRun{}, err
+	}
 	command, stdinPrompt := buildAgentCommand(profile, req.Prompt)
 	session, err := m.StartSession(ctx, StartSessionRequest{
 		ProjectID:  req.ProjectID,
