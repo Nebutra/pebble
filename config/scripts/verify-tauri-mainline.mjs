@@ -5552,7 +5552,11 @@ const checks = [
       text.includes('pub async fn updater_check_latest_release') &&
       text.includes('pub async fn updater_check_release_tag') &&
       text.includes('pub async fn updater_fetch_changelog_entries') &&
-      text.includes('has_ready_tauri_manifest') &&
+      // Why: the probe must stay three-state — folding "assets still uploading"
+      // back into one bool with "host unreachable" is the #76 regression.
+      text.includes('enum ReleaseReadiness') &&
+      text.includes('async fn probe_tauri_manifest') &&
+      text.includes('ReleaseReadiness::Unavailable') &&
       text.includes('tauri_manifest_has_current_platform') &&
       text.includes('current_updater_platform_prefix') &&
       text.includes('format!("{}/latest.json"') &&
