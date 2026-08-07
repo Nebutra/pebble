@@ -18,6 +18,22 @@ export function getCodexPaneAccountRouteKey(route: CodexPaneAccountRoute): strin
   return `wsl:${distro ? distro : DEFAULT_WSL_DISTRO_KEY}`
 }
 
+/** Why: a WSL selection is stored under a concrete distro key — the backend
+ *  falls back to the account's own distro when the picker has none — so the
+ *  route must resolve the same way or it would name no live pane. */
+export function resolveSwitchedCodexRoute(
+  selected: CodexPaneAccountRoute,
+  switchedAccount: { wslDistro?: string | null } | undefined
+): CodexPaneAccountRoute {
+  if (selected.runtime !== 'wsl') {
+    return { runtime: 'host' }
+  }
+  return {
+    runtime: 'wsl',
+    wslDistro: selected.wslDistro?.trim() || switchedAccount?.wslDistro?.trim() || null
+  }
+}
+
 /** Why: a pane bakes CODEX_HOME into its environment at spawn and never sees a
  *  later change, so its route is fixed by the worktree it was opened from. */
 export function getCodexPaneAccountRouteKeyForWorktree(

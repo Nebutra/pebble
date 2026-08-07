@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getCodexPaneAccountRouteKey } from './codex-pane-account-route'
+import { getCodexPaneAccountRouteKey, resolveSwitchedCodexRoute } from './codex-pane-account-route'
 
 describe('getCodexPaneAccountRouteKey', () => {
   it('keeps the host route separate from every WSL route', () => {
@@ -23,5 +23,34 @@ describe('getCodexPaneAccountRouteKey', () => {
     expect(getCodexPaneAccountRouteKey({ runtime: 'wsl', wslDistro: ' Ubuntu ' })).toBe(
       getCodexPaneAccountRouteKey({ runtime: 'wsl', wslDistro: 'Ubuntu' })
     )
+  })
+})
+
+describe('resolveSwitchedCodexRoute', () => {
+  it('falls back to the account distro when the picker names none', () => {
+    // Why: selectCodexAccount stores the selection under the account's own
+    // distro in this case, so the route has to land on the same concrete key.
+    expect(
+      resolveSwitchedCodexRoute({ runtime: 'wsl', wslDistro: null }, { wslDistro: 'Ubuntu' })
+    ).toEqual({ runtime: 'wsl', wslDistro: 'Ubuntu' })
+  })
+
+  it('prefers the explicitly picked distro over the account distro', () => {
+    expect(
+      resolveSwitchedCodexRoute({ runtime: 'wsl', wslDistro: 'Debian' }, { wslDistro: 'Ubuntu' })
+    ).toEqual({ runtime: 'wsl', wslDistro: 'Debian' })
+  })
+
+  it('drops the distro entirely for a host selection', () => {
+    expect(
+      resolveSwitchedCodexRoute({ runtime: 'host', wslDistro: 'Ubuntu' }, { wslDistro: 'Ubuntu' })
+    ).toEqual({ runtime: 'host' })
+  })
+
+  it('stays on the shared WSL default when neither side names a distro', () => {
+    expect(resolveSwitchedCodexRoute({ runtime: 'wsl', wslDistro: null }, undefined)).toEqual({
+      runtime: 'wsl',
+      wslDistro: null
+    })
   })
 })
