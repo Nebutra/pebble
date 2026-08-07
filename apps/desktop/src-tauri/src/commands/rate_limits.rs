@@ -1564,4 +1564,66 @@ mod tests {
         assert!(map_consume_outcome(Some("mystery")).is_err());
         assert!(map_consume_outcome(None).is_err());
     }
+
+    // Fake token shaped like a real Codex access token so a substring match is
+    // meaningful; no credential may reach argv, an error string, or a log line.
+    const FAKE_ACCESS_TOKEN: &str = "sk-codex-LEAKCANARY0123456789abcdef";
+
+    #[test]
+    fn codex_auth_parse_errors_never_echo_the_credential_payload() {
+        // Why: stdout here is the whole auth file. Interpolating it into the
+        // error would put the access token in front of every error surface.
+        let malformed = format!("{{\"tokens\": {{\"access_token\": \"{FAKE_ACCESS_TOKEN}\"");
+        let error = parse_codex_auth_json(&malformed).unwrap_err();
+        assert!(
+            !error.contains(FAKE_ACCESS_TOKEN),
+            "malformed-JSON error leaked the token: {error}"
+        );
+
+        let wrong_shape =
+            serde_json::json!({ "stale": { "access_token": FAKE_ACCESS_TOKEN } }).to_string();
+        let error = parse_codex_auth_json(&wrong_shape).unwrap_err();
+        assert!(
+            !error.contains(FAKE_ACCESS_TOKEN),
+            "missing-tokens error leaked the token: {error}"
+        );
+
+        let blank_token = serde_json::json!({ "tokens": { "access_token": "  " } }).to_string();
+        assert!(parse_codex_auth_json(&blank_token).is_err());
+    }
+
+    #[test]
+    fn codex_auth_succeeds_without_placing_the_token_in_argv() {
+        let signed_in = serde_json::json!({
+            "tokens": { "access_token": FAKE_ACCESS_TOKEN, "account_id": "acct_1" }
+        })
+        .to_string();
+        let (token, account_id) = parse_codex_auth_json(&signed_in).unwrap();
+        assert_eq!(token, FAKE_ACCESS_TOKEN);
+        assert_eq!(account_id.as_deref(), Some("acct_1"));
+
+        // The WSL hop passes only a CODEX_HOME path; the token comes back over
+        // stdout because argv is world-readable via `ps`.
+        let args = wsl_codex_auth_args(Some("Ubuntu"), Some("/home/u/.codex"));
+        assert!(
+            args.iter().all(|arg| !arg.contains(FAKE_ACCESS_TOKEN)),
+            "credential reached argv: {args:?}"
+        );
+        assert!(args.contains(&"CODEX_HOME=/home/u/.codex".to_string()));
+    }
+
+    #[test]
+    fn codex_failure_results_carry_no_credential_material() {
+        let failure = codex_failed(
+            "error",
+            "Codex CLI not found".to_string(),
+            "cli_missing",
+        );
+        let serialized = serde_json::to_string(&failure).unwrap();
+        assert!(
+            !serialized.contains(FAKE_ACCESS_TOKEN),
+            "failure result leaked the token: {serialized}"
+        );
+        assert_eq!(failure.provider, "codex");
+    }
 }
