@@ -92,6 +92,11 @@ func readClaudeUsageTurns(reader io.Reader, fallbackSessionID string) ([]claudeU
 		if turn.DedupeKey != "" {
 			dedupe[turn.DedupeKey] = len(turns) - 1
 		}
+		// One transcript must not be able to spend the whole scan's budget; the
+		// dedupe index grows with the retained turns, so both stop here.
+		if len(turns) >= usageScanMaxFileTurns {
+			break
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err

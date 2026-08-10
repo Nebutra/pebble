@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -66,16 +65,16 @@ func (m *Manager) discoverCodexUsageFiles() []codexUsageScanFile {
 }
 
 func walkCodexUsageFiles(roots []string) []string {
-	files := make([]string, 0)
+	discovery := newUsageScanDiscovery()
 	for _, root := range roots {
 		_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 			if err == nil && entry.Type().IsRegular() && strings.EqualFold(filepath.Ext(entry.Name()), ".jsonl") {
-				files = append(files, path)
+				discovery.add(path, entry)
 			}
 			return nil
 		})
 	}
-	sort.Strings(files)
+	files, _ := discovery.paths()
 	return files
 }
 

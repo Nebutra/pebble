@@ -95,7 +95,10 @@ func (m *Manager) RefreshClaudeUsage(ctx context.Context, force bool) (ClaudeUsa
 	if err := m.writeClaudeUsageStore(store); err != nil {
 		return ClaudeUsageNativeSnapshot{}, err
 	}
-	files, scanErr := scanClaudeUsageIncremental(ctx, discoverClaudeUsageFiles(), store.Files)
+	// Discovery is already capped to the newest transcripts, which is what keeps
+	// the persisted store from growing with the machine's whole history.
+	discovered, _ := discoverClaudeUsageFiles()
+	files, scanErr := scanClaudeUsageIncremental(ctx, discovered, store.Files)
 	if scanErr != nil {
 		message := scanErr.Error()
 		store.LastScanError = &message

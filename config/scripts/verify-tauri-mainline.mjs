@@ -7752,6 +7752,26 @@ const checks = [
       text.includes('if err != nil || !created {') &&
       text.includes('CreateWorktreeWithSetupHook(r.Context(), req)') &&
       text.includes('createdWorktreeResponse{Worktree: worktree, Warning: warning}')
+  },
+  {
+    name: 'Usage scans stay inside a fixed memory budget on a long-lived machine',
+    // Why: the caps only bound the scan if discovery, the per-file read, and the
+    // retained result all honour them, so the constants and their three call
+    // sites are pinned together.
+    files: [
+      'runtime/go/internal/runtimecore/usage_scan_bounds.go',
+      'runtime/go/internal/runtimecore/usage_claude_scan.go',
+      'runtime/go/internal/runtimecore/usage_claude_parser.go',
+      'runtime/go/internal/runtimecore/usage_codex_discovery.go'
+    ],
+    expect: (text) =>
+      text.includes('usageScanMaxFiles = 4000') &&
+      text.includes('usageScanMaxFileTurns = 20000') &&
+      text.includes('usageScanMaxTurns = 150000') &&
+      text.includes('if len(turns) >= usageScanMaxFileTurns {') &&
+      text.includes('results := make(chan fileResult, usageScanResultBuffer)') &&
+      text.includes('boundUsageScanTurns(len(result.Turns), len(file.turns))') &&
+      (text.match(/discovery\.add\(path, entry\)/g) ?? []).length === 2
   }
 ]
 
