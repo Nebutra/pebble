@@ -7537,6 +7537,25 @@ const checks = [
       text.includes('return `echo setup> setup-ran.txt`') &&
       text.includes('"scripts:\\n  setup: "+runtimeRPCSetupMarkerCommand()+"\\n"') &&
       !text.includes('scripts:\\n  setup: printf setup > setup-ran.txt')
+  },
+  {
+    name: 'The SSH askpass helper classifies the prompt before releasing a credential',
+    file: 'runtime/go/cmd/pebble-runtime/main.go',
+    expect: (text) =>
+      text.includes(
+        'if runtimecore.ClassifySshAskpassPrompt(prompt) != runtimecore.SshAskpassPromptSecret {'
+      ) &&
+      text.includes('os.Exit(1)') &&
+      text.includes('prompt = os.Args[1]')
+  },
+  {
+    name: 'The askpass classifier withholds cached credentials from security-key prompts',
+    file: 'runtime/go/internal/runtimecore/ssh_askpass_prompt.go',
+    expect: (text) =>
+      text.includes('func ClassifySshAskpassPrompt(prompt string) SshAskpassPromptKind') &&
+      text.includes('"enter pin for",') &&
+      text.includes('"confirm user presence",') &&
+      text.includes('return SshAskpassPromptOther')
   }
 ]
 
