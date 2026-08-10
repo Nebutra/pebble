@@ -19,6 +19,16 @@ func main() {
 	if os.Getenv("PEBBLE_SSH_ASKPASS_MODE") == "1" {
 		// Why: the runtime executable is a cross-platform SSH_ASKPASS helper;
 		// the credential stays in the child environment and never enters argv.
+		// SSH_ASKPASS_REQUIRE=force routes every prompt here, so release the
+		// secret only for the prompts it can answer and exit non-zero otherwise —
+		// exiting 0 with no output would offer OpenSSH an empty password instead.
+		prompt := ""
+		if len(os.Args) > 1 {
+			prompt = os.Args[1]
+		}
+		if runtimecore.ClassifySshAskpassPrompt(prompt) != runtimecore.SshAskpassPromptSecret {
+			os.Exit(1)
+		}
 		fmt.Fprintln(os.Stdout, os.Getenv("PEBBLE_SSH_ASKPASS_SECRET"))
 		return
 	}
