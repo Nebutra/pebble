@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -14,6 +15,12 @@ const RUNTIME_EVENTS_PATH: &str = "/v1/events";
 /// Backoff bounds for reconnecting to the runtime SSE stream.
 const RECONNECT_MIN: Duration = Duration::from_millis(500);
 const RECONNECT_MAX: Duration = Duration::from_secs(10);
+/// Mirrors `eventStreamHeartbeatInterval` in runtime/go/internal/runtimehttp/timeout.go.
+const RUNTIME_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);
+/// Why: an SSH tunnel or NAT proxy usually dies without closing the socket, so the read
+/// never errors and the renderer stays in "connected" — polling disarmed, app dark until
+/// the OS TCP keepalive fires hours later. Missing three heartbeats means the stream is gone.
+const STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(45);
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -226,7 +233,12 @@ async fn drain_stream(
     let mut parser = SseParser::default();
     let mut emitted = false;
     loop {
-        match response.chunk().await {
+        // Abandoning the response is what makes the cancelled read safe: the stalled
+        // `chunk()` future is dropped and never polled again, not resumed later.
+        let Some(chunk) = read_before_deadline(response.chunk(), STREAM_IDLE_TIMEOUT).await else {
+            return stalled_outcome(emitted);
+        };
+        match chunk {
             Ok(Some(bytes)) => {
                 for event in parser.push(&bytes) {
                     // Why: terminal output is latency-sensitive and high-frequency. Tauri
@@ -240,19 +252,28 @@ async fn drain_stream(
                 }
             }
             Ok(None) => break,
-            Err(_) => {
-                return if emitted {
-                    StreamOutcome::Emitted
-                } else {
-                    StreamOutcome::Failed
-                };
-            }
+            Err(_) => return stalled_outcome(emitted),
         }
     }
     if emitted {
         StreamOutcome::Emitted
     } else {
         StreamOutcome::Idle
+    }
+}
+
+/// Applies the idle deadline to one chunk read; `None` means the stream went silent.
+async fn read_before_deadline<T>(read: impl Future<Output = T>, idle: Duration) -> Option<T> {
+    tokio::time::timeout(idle, read).await.ok()
+}
+
+fn stalled_outcome(emitted: bool) -> StreamOutcome {
+    // A stream that already delivered was healthy, so reconnect fast; one that never
+    // did leaves the caller's backoff growing against a runtime that is still down.
+    if emitted {
+        StreamOutcome::Emitted
+    } else {
+        StreamOutcome::Failed
     }
 }
 
@@ -416,5 +437,30 @@ mod tests {
         assert_eq!(events[0].data, "1");
         assert_eq!(events[1].topic.as_deref(), Some("b"));
         assert_eq!(events[1].data, "2");
+    }
+
+    #[test]
+    fn the_idle_deadline_survives_two_missed_heartbeats() {
+        // Pins the client deadline to the server's heartbeat rather than to a bare
+        // number, so shortening one side without the other fails here.
+        assert!(STREAM_IDLE_TIMEOUT >= RUNTIME_HEARTBEAT_INTERVAL * 3);
+    }
+
+    #[tokio::test]
+    async fn a_silent_stream_is_abandoned_once_the_idle_deadline_passes() {
+        let read = read_before_deadline(std::future::pending::<u8>(), Duration::from_millis(10));
+        assert!(read.await.is_none());
+    }
+
+    #[tokio::test]
+    async fn a_stream_that_answers_within_the_deadline_is_kept() {
+        let read = read_before_deadline(std::future::ready(7u8), Duration::from_secs(30));
+        assert_eq!(read.await, Some(7));
+    }
+
+    #[test]
+    fn a_stalled_stream_reconnects_fast_only_after_it_delivered_something() {
+        assert!(matches!(stalled_outcome(true), StreamOutcome::Emitted));
+        assert!(matches!(stalled_outcome(false), StreamOutcome::Failed));
     }
 }
