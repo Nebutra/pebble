@@ -87,6 +87,7 @@ type Manager struct {
 	stats                   StatsSummary
 	accountsSnapshot        json.RawMessage
 	legacySharedControl     LegacySharedControlState
+	notifications           notificationJournal
 	liveAgentStats          map[string]time.Time
 	subscribers             map[uint64]chan RuntimeEvent
 	nextSubscriber          uint64
