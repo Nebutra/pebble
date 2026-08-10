@@ -244,7 +244,10 @@ pub mod win32 {
         SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
     };
     use winreg::enums::{RegType, HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
-    use winreg::{RegKey, RegValue, ToRegValue};
+    // Why: winreg only re-exports the key and value types at its root; the
+    // conversion trait stays in `types`.
+    use winreg::types::ToRegValue;
+    use winreg::{RegKey, RegValue};
 
     pub struct Win32UserPathRegistry;
 

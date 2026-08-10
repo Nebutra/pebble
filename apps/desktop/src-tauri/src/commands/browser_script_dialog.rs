@@ -240,8 +240,8 @@ mod platform {
 
 #[cfg(target_os = "windows")]
 mod platform {
+    use std::cell::RefCell;
     use std::collections::HashMap;
-    use std::sync::{Mutex, OnceLock};
 
     use webview2_com::Microsoft::Web::WebView2::Win32::{
         ICoreWebView2Deferral, ICoreWebView2ScriptDialogOpeningEventArgs,
@@ -254,9 +254,12 @@ mod platform {
         deferral: ICoreWebView2Deferral,
     }
 
-    fn pending_dialogs() -> &'static Mutex<HashMap<usize, PendingDialog>> {
-        static PENDING: OnceLock<Mutex<HashMap<usize, PendingDialog>>> = OnceLock::new();
-        PENDING.get_or_init(|| Mutex::new(HashMap::new()))
+    // Why: WebView2 interfaces are !Send and a deferral must be completed on the
+    // thread that created it. Both hooks below run under `with_webview` on the
+    // UI thread, so the registry is thread-local like the GTK sibling above.
+    thread_local! {
+        static PENDING_DIALOGS: RefCell<HashMap<usize, PendingDialog>> =
+            RefCell::new(HashMap::new());
     }
 
     pub fn attach(platform_webview: tauri::webview::PlatformWebview) -> Result<(), String> {
@@ -268,11 +271,12 @@ mod platform {
                 return Ok(());
             };
             let deferral = unsafe { args.GetDeferral()? };
-            if let Some(previous) = pending_dialogs()
-                .lock()
-                .expect("browser dialog registry poisoned")
-                .insert(key, PendingDialog { args, deferral })
-            {
+            let previous = PENDING_DIALOGS.with(|dialogs| {
+                dialogs
+                    .borrow_mut()
+                    .insert(key, PendingDialog { args, deferral })
+            });
+            if let Some(previous) = previous {
                 unsafe { previous.deferral.Complete()? };
             }
             Ok(())
@@ -291,10 +295,7 @@ mod platform {
         let controller = platform_webview.controller();
         let webview = unsafe { controller.CoreWebView2() }.map_err(|error| error.to_string())?;
         let key = Interface::as_raw(&webview) as usize;
-        let pending = pending_dialogs()
-            .lock()
-            .map_err(|_| "browser dialog registry poisoned".to_string())?
-            .remove(&key);
+        let pending = PENDING_DIALOGS.with(|dialogs| dialogs.borrow_mut().remove(&key));
         let Some(pending) = pending else {
             return Ok(false);
         };

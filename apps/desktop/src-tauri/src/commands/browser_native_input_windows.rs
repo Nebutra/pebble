@@ -165,10 +165,14 @@ fn call_cdp(
     let method = HSTRING::from(method);
     let parameters = HSTRING::from(parameters.to_string());
     let (sender, receiver) = mpsc::channel();
-    let handler = CallDevToolsProtocolMethodCompletedHandler::create(Box::new(move |completed| {
-        let _ = sender.send(completed.map(|_| ()).map_err(|error| error.to_string()));
-        Ok(())
-    }));
+    // Why: the completed handler is called with the HRESULT and the method's
+    // return object; only the HRESULT decides whether the dispatch succeeded.
+    let handler = CallDevToolsProtocolMethodCompletedHandler::create(Box::new(
+        move |completed, _return_object| {
+            let _ = sender.send(completed.map_err(|error| error.to_string()));
+            Ok(())
+        },
+    ));
     unsafe {
         webview.CallDevToolsProtocolMethod(
             PCWSTR(method.as_ptr()),

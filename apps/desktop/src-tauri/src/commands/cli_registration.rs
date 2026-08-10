@@ -58,6 +58,7 @@ fn unsupported(reason: &str, detail: &str) -> CliInstallStatus {
 const OTHER_UNSUPPORTED_DETAIL: &str = "CLI registration is not available on this platform.";
 
 #[cfg(target_os = "windows")]
+#[path = "cli_registration_windows.rs"]
 mod cli_registration_windows;
 #[path = "cli_registration_wsl.rs"]
 mod cli_registration_wsl;

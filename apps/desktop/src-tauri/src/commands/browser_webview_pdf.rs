@@ -73,20 +73,21 @@ pub(super) fn capture_platform_pdf(
         let wide_path = HSTRING::from(path.to_string_lossy().as_ref());
         let callback_path = path.clone();
         let (completion_sender, completion_receiver) = mpsc::channel();
-        let handler = PrintToPdfCompletedHandler::create(Box::new(move |completed| {
-            let result = completed
-                .map_err(|error| error.to_string())
-                .and_then(|success| {
-                    if !success.as_bool() {
+        // Why: the completed handler is called with the HRESULT and a separate
+        // success flag; a succeeding call can still report no PDF was written.
+        let handler =
+            PrintToPdfCompletedHandler::create(Box::new(move |completed, is_successful| {
+                let captured = completed.map_err(|error| error.to_string()).and_then(|()| {
+                    if !is_successful {
                         return Err("WebView2 PDF capture was not completed".to_string());
                     }
                     let bytes = std::fs::read(&callback_path).map_err(|error| error.to_string());
                     let _ = std::fs::remove_file(&callback_path);
                     bytes
                 });
-            let _ = completion_sender.send(result);
-            Ok(())
-        }));
+                let _ = completion_sender.send(captured);
+                Ok(())
+            }));
         // Why: WebView2 writes atomically to the requested path; a unique file
         // avoids exposing an application-controlled overwrite destination.
         unsafe { webview7.PrintToPdf(PCWSTR(wide_path.as_ptr()), None, &handler) }

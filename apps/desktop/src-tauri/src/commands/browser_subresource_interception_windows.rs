@@ -23,8 +23,9 @@ pub(super) fn attach(
         COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT,
     };
     use webview2_com::WebResourceRequestedEventHandler;
-    use windows::core::{HSTRING, PWSTR};
+    use windows::core::HSTRING;
 
+    let resume_webview = webview.clone();
     webview
         .with_webview(move |platform_webview| {
             let controller = platform_webview.controller();
@@ -65,23 +66,27 @@ pub(super) fn attach(
                         return Ok(());
                     };
                     let deferral = unsafe { args.GetDeferral()? };
-                    let args = args.clone();
-                    let environment = environment.clone();
+                    park_paused_subresource(
+                        record.request_id.clone(),
+                        PausedSubresource {
+                            args: args.clone(),
+                            deferral,
+                        },
+                    );
+                    let request_id = record.request_id;
                     let timeout_state = request_control.clone();
+                    let resume_webview = resume_webview.clone();
                     std::thread::spawn(move || {
-                        let decision = receiver.recv_timeout(REQUEST_DECISION_TIMEOUT);
-                        match decision {
-                            Ok(BrowserRequestDecision::Continue) => {}
-                            Ok(decision) => {
-                                if let Ok(response) =
-                                    create_request_control_response(&environment, decision)
-                                {
-                                    let _ = unsafe { args.SetResponse(&response) };
-                                }
-                            }
-                            Err(_) => timeout_state.finish_timeout(&record.request_id),
+                        let decision = receiver.recv_timeout(REQUEST_DECISION_TIMEOUT).ok();
+                        if decision.is_none() {
+                            timeout_state.finish_timeout(&request_id);
                         }
-                        let _ = unsafe { deferral.Complete() };
+                        // Why: the parked args and the deferral are !Send and
+                        // WebView2 only accepts them from the UI thread, so the
+                        // answer is applied back inside `with_webview`.
+                        let _ = resume_webview.with_webview(move |platform_webview| {
+                            resume_paused_subresource(&platform_webview, &request_id, decision);
+                        });
                     });
                     return Ok(());
                 }
@@ -99,6 +104,56 @@ pub(super) fn attach(
             let _ = unsafe { core.add_WebResourceRequested(&handler, &mut token) };
         })
         .map_err(|error| error.to_string())
+}
+
+// Why: a paused request has to survive until its decision arrives, but both
+// WebView2 handles are !Send and the deferral may only be completed on the
+// thread that created it, so the pair parks on the UI thread rather than
+// travelling to the waiting thread.
+#[cfg(target_os = "windows")]
+struct PausedSubresource {
+    args: webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2WebResourceRequestedEventArgs,
+    deferral: webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Deferral,
+}
+
+#[cfg(target_os = "windows")]
+thread_local! {
+    static PAUSED_SUBRESOURCES: std::cell::RefCell<
+        std::collections::HashMap<String, PausedSubresource>,
+    > = std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+#[cfg(target_os = "windows")]
+fn park_paused_subresource(request_id: String, paused: PausedSubresource) {
+    PAUSED_SUBRESOURCES.with(|paused_requests| {
+        paused_requests.borrow_mut().insert(request_id, paused);
+    });
+}
+
+#[cfg(target_os = "windows")]
+fn resume_paused_subresource(
+    platform_webview: &tauri::webview::PlatformWebview,
+    request_id: &str,
+    decision: Option<BrowserRequestDecision>,
+) {
+    let Some(paused) =
+        PAUSED_SUBRESOURCES.with(|paused_requests| paused_requests.borrow_mut().remove(request_id))
+    else {
+        return;
+    };
+    // A timed-out or continued request is released untouched; only an explicit
+    // fulfil or fail replaces the response.
+    match decision {
+        None | Some(BrowserRequestDecision::Continue) => {}
+        Some(decision) => {
+            if let Ok(response) =
+                create_request_control_response(&platform_webview.environment(), decision)
+            {
+                let _ = unsafe { paused.args.SetResponse(&response) };
+            }
+        }
+    }
+    let _ = unsafe { paused.deferral.Complete() };
 }
 
 #[cfg(target_os = "windows")]
@@ -183,7 +238,9 @@ fn create_intercept_response(
     use windows::Win32::System::Com::{IStream, STREAM_SEEK_SET};
 
     let (stream, status, reason, headers) = match decision {
-        NativeBrowserInterceptDecision::Abort => (
+        // Why: a paused request is answered on the deferral path above, so one
+        // arriving here was never held — fail closed rather than let it through.
+        NativeBrowserInterceptDecision::Pause | NativeBrowserInterceptDecision::Abort => (
             None,
             403,
             "Blocked by Pebble".to_string(),
@@ -230,8 +287,10 @@ fn create_intercept_response(
 
 #[cfg(target_os = "windows")]
 fn read_request_string(
-    read: impl FnOnce(*mut PWSTR) -> windows::core::Result<()>,
+    read: impl FnOnce(*mut windows::core::PWSTR) -> windows::core::Result<()>,
 ) -> windows::core::Result<String> {
+    use windows::core::PWSTR;
+
     let mut value = PWSTR::null();
     read(&mut value)?;
     Ok(webview2_com::take_pwstr(value))
