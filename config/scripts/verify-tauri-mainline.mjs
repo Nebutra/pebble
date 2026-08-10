@@ -7478,6 +7478,16 @@ const checks = [
       text.includes('func (e *sessionOutputEmitter) trimToBudgetLocked()') &&
       text.includes('if len(e.buffer) > 2*e.maxBytes {') &&
       text.includes('e.buffer = e.buffer[:copy(e.buffer, e.buffer[start:])]')
+  },
+  {
+    name: 'AI Vault scan tests run against an isolated home, not real agent transcripts',
+    file: 'runtime/go/internal/runtimehttp/legacy_shared_control_ai_vault_test.go',
+    expect: (text) =>
+      text.includes('func isolateAiVaultScanHome(t *testing.T) string') &&
+      text.includes('t.Setenv("HOME", home)') &&
+      text.includes('t.Setenv("USERPROFILE", home)') &&
+      text.includes('"OPENCLAW_STATE_DIR",') &&
+      text.includes('home := isolateAiVaultScanHome(t)')
   }
 ]
 
