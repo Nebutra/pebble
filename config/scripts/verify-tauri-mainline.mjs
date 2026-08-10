@@ -7625,6 +7625,19 @@ const checks = [
       text.includes('"enter pin for",') &&
       text.includes('"confirm user presence",') &&
       text.includes('return SshAskpassPromptOther')
+  },
+  {
+    name: 'The runtime event stream drops a silent SSE connection instead of trusting it',
+    // Why: the client deadline is only meaningful against the server heartbeat that
+    // feeds it, so both halves of the contract are pinned in one rule.
+    files: [
+      'apps/desktop/src-tauri/src/commands/runtime_event_stream.rs',
+      'runtime/go/internal/runtimehttp/timeout.go'
+    ],
+    expect: (text) =>
+      text.includes('eventStreamHeartbeatInterval = 15 * time.Second') &&
+      text.includes('const RUNTIME_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15)') &&
+      text.includes('read_before_deadline(response.chunk(), STREAM_IDLE_TIMEOUT)')
   }
 ]
 
