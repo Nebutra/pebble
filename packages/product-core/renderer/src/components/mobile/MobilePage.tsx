@@ -4,10 +4,12 @@ import { useMountedRef } from '@/hooks/useMountedRef'
 import { useAppStore } from '@/store'
 import type { PairedDevice, Platform, StepIndex } from './MobileHero'
 import { getInstallCopy, type IosChannel } from './mobile-platform-copy'
+import type { MobileNetworkInterface } from '../settings/mobile-network-interface-selection'
 import {
-  selectRefreshedNetworkAddress,
-  type MobileNetworkInterface
-} from '../settings/mobile-network-interface-selection'
+  choosePairingAddress,
+  persistedManualAddress,
+  refreshPairingAddressSelection
+} from '../settings/mobile-pairing-address-selection'
 import { useMobilePairingDevicePolling } from '../settings/mobile-pairing-device-polling'
 import {
   shouldShowPairedAfterDeviceRefresh,
@@ -40,6 +42,11 @@ export default function MobilePage(): React.JSX.Element {
   const [devices, setDevices] = useState<PairedDevice[]>([])
   const [revokingDeviceIds, setRevokingDeviceIds] = useState<string[]>([])
   const [deviceCountAtPairStart, setDeviceCountAtPairStart] = useState<number | null>(null)
+  const storedPairingAddress = useAppStore((s) => s.settings?.mobilePairingAddress ?? null)
+  // Why: read by the refresh path, which must not gain a dependency that makes
+  // the mount effect re-enumerate whenever the stored address changes.
+  const storedPairingAddressRef = useRef<string | null>(storedPairingAddress)
+  storedPairingAddressRef.current = storedPairingAddress
   const hasGeneratedRef = useRef(false)
   const mountedRef = useMountedRef()
   const stageRef = useRef<FlowStage | null>(null)
@@ -218,26 +225,21 @@ export default function MobilePage(): React.JSX.Element {
       }
       // Resolve the new address before committing it so we can detect a real
       // change and remint the QR — otherwise the QR keeps encoding the stale
-      // endpoint after a network refresh swaps the active interface.
-      const newAddress = selectRefreshedNetworkAddress(
-        selectedAddress,
-        result.interfaces,
-        addressIsManual
+      // endpoint after a network refresh swaps the active interface. Before the
+      // first selection exists, the remembered manual address seeds it.
+      const next = refreshPairingAddressSelection(
+        selectedAddress === undefined
+          ? null
+          : { address: selectedAddress, isManual: addressIsManual },
+        storedPairingAddressRef.current,
+        result.interfaces
       )
       if (mountedRef.current) {
-        // Why: selectRefreshedNetworkAddress can rewrite selectedAddress
-        // (e.g. when a refresh surfaces a tailnet interface and the user
-        // had been on LAN). Re-derive `addressIsManual` from the new
-        // value so the next refresh doesn't snap the user back to LAN
-        // just because they once picked a non-tailnet interface.
-        setSelectedAddress(newAddress)
-        const nextIsManual =
-          newAddress !== undefined &&
-          !result.interfaces.some((iface) => iface.address === newAddress)
-        setAddressIsManual(nextIsManual)
+        setSelectedAddress(next.address)
+        setAddressIsManual(next.isManual)
       }
-      if (newAddress !== selectedAddress && hasGeneratedRef.current && mountedRef.current) {
-        void generatePairing(true, newAddress)
+      if (next.address !== selectedAddress && hasGeneratedRef.current && mountedRef.current) {
+        void generatePairing(true, next.address)
       }
     } catch {
       // Network list is non-critical; the QR will still mint with default routing.
@@ -257,16 +259,21 @@ export default function MobilePage(): React.JSX.Element {
 
   const handleAddressChange = useCallback(
     (address: string) => {
-      setSelectedAddress(address)
       // Why: if the picked address is not in the OS-enumerated list, it is
       // a user-typed manual entry — remember that so the next refresh does
-      // not snap it back to a tailnet/LAN fallback.
-      const isManual = !networkInterfaces.some((iface) => iface.address === address)
-      setAddressIsManual(isManual)
+      // not snap it back to a tailnet/LAN fallback, and persist it so a
+      // restart does not lose the only address that reaches the phone.
+      const next = choosePairingAddress(address, networkInterfaces)
+      setSelectedAddress(next.address)
+      setAddressIsManual(next.isManual)
+      const manualAddress = persistedManualAddress(next)
+      if (manualAddress !== storedPairingAddressRef.current) {
+        void updateSettings({ mobilePairingAddress: manualAddress })
+      }
       // Switching network must remint so the QR encodes the new endpoint.
       void generatePairing(true, address)
     },
-    [generatePairing, networkInterfaces]
+    [generatePairing, networkInterfaces, storedPairingAddressRef, updateSettings]
   )
 
   const copyPairingCode = useCallback(async () => {

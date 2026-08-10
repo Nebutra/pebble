@@ -2,6 +2,11 @@ import type { PreloadApi } from '../../../packages/product-core/shared/preload-a
 import type { RuntimeAccessGrant } from '../../../packages/product-core/shared/runtime-access-grants'
 import { invoke } from '@tauri-apps/api/core'
 import QRCodeBrowser from 'qrcode/lib/browser'
+import {
+  resolvePairingEndpoint,
+  SHARED_CONTROL_PATH,
+  SHARED_CONTROL_PORT
+} from '../../../packages/product-core/shared/network/pairing-endpoint'
 import { requestRuntimeJson } from './pebble-tauri-runtime-transport'
 
 type RuntimeSharedControlPairing = {
@@ -48,7 +53,7 @@ export function createPebbleMobileApi(base: PreloadApi['mobile']): PreloadApi['m
     revokeRuntimeAccess: ({ deviceId }) => revokeRuntimeSharedControlPairing(deviceId),
     isWebSocketReady: async () => ({
       ready: true,
-      endpoint: 'ws://127.0.0.1:17777/v1/shared-control'
+      endpoint: `ws://127.0.0.1:${SHARED_CONTROL_PORT}${SHARED_CONTROL_PATH}`
     })
   }
 }
@@ -88,6 +93,15 @@ async function createPairingMaterial(
   if (!address) {
     return null
   }
+  // Why: the desktop runtime is started with --lan-shared-control so this
+  // advertise host is the address actually served for shared-control, while
+  // the desktop-owned control HTTP client still uses the loopback listen URL.
+  // Resolve before minting material so an address the phone could never dial
+  // does not rotate the device token on its way to failing.
+  const endpoint = resolvePairingEndpoint(address)
+  if (!endpoint) {
+    return null
+  }
   const material = await requestRuntimeJson<RuntimeSharedControlPairingMaterial>(
     '/v1/shared-control/pairing',
     {
@@ -100,10 +114,6 @@ async function createPairingMaterial(
       }
     }
   )
-  // Why: the desktop runtime is started with --lan-shared-control so this
-  // advertise host is the address actually served for shared-control, while
-  // the desktop-owned control HTTP client still uses the loopback listen URL.
-  const endpoint = `ws://${formatPairingHost(address)}:17777/v1/shared-control`
   const pairingUrl = encodePairingOffer({
     v: 2,
     endpoint,
@@ -149,10 +159,6 @@ function mapRuntimePairingToGrant(pairing: RuntimeSharedControlPairing): Runtime
     createdAt: pairing.pairedAt,
     lastSeenAt: pairing.lastSeenAt > 0 ? pairing.lastSeenAt : null
   }
-}
-
-function formatPairingHost(address: string): string {
-  return address.includes(':') && !address.startsWith('[') ? `[${address}]` : address
 }
 
 function encodePairingOffer(offer: object): string {

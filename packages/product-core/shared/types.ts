@@ -2852,6 +2852,13 @@ export type GlobalSettings = {
    *  on read into [5_000ms, 60min] to defend against bad config.
    *  See docs/mobile-fit-hold.md. */
   mobileAutoRestoreFitMs: number | null
+  /** Address advertised in the mobile pairing QR when the user typed one the
+   *  OS does not enumerate — a Tailscale MagicDNS name, a DDNS domain, or a
+   *  static IP, optionally with `:port`. `null` (default) means "use whatever
+   *  interface discovery surfaces". Only a manual address is stored: an
+   *  enumerated one reappears on the next refresh, and persisting it would pin
+   *  a LAN address DHCP has since moved. */
+  mobilePairingAddress: string | null
   /** Experimental: floating animated pet (claude.webp) in the bottom-right
    *  corner. Opt-in because it's a cosmetic joke feature; users who leave it
    *  off never mount the overlay. Toggling takes effect immediately in the

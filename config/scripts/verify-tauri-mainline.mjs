@@ -6441,6 +6441,42 @@ const checks = [
       text.includes('await getCurrentWindow().hide()')
   },
   {
+    name: 'One resolver builds every mobile pairing endpoint',
+    files: [
+      'packages/product-core/shared/network/pairing-endpoint.ts',
+      'apps/desktop/src/tauri-mobile-runtime-api.ts'
+    ],
+    // Why: the picker accepts `host:port` and a full ws/wss URL, so appending
+    // the shared-control port to the raw address minted an endpoint with two
+    // ports that the phone silently failed to dial. Resolving before the POST
+    // also keeps an unusable address from rotating the device token.
+    expect: (text) =>
+      text.includes('export function resolvePairingEndpoint(') &&
+      text.includes('function parseAbsolutePairingUrl(') &&
+      text.includes('isBareIPv6Literal(') &&
+      text.includes('const endpoint = resolvePairingEndpoint(address)') &&
+      !text.includes('function formatPairingHost(')
+  },
+  {
+    name: 'Mobile pairing advertises only addresses a phone can dial and remembers a manual one',
+    files: [
+      'apps/desktop/src-tauri/src/commands/network_interfaces.rs',
+      'packages/product-core/renderer/src/components/settings/mobile-pairing-address-selection.ts',
+      'packages/product-core/renderer/src/components/settings/MobilePane.tsx'
+    ],
+    // Why: a local proxy's fake-ip TUN owns the default route, so advertising
+    // it produced a QR that scanned and never connected; Tailscale's CGNAT
+    // range has to survive the same filter. A refresh must also not discard a
+    // manual address, which is the only way to pair across networks.
+    expect: (text) =>
+      text.includes('fn is_pairable_address(') &&
+      text.includes('a == 198 && (b == 18 || b == 19)') &&
+      text.includes('export function refreshPairingAddressSelection(') &&
+      text.includes('export function persistedManualAddress(') &&
+      text.includes('refreshPairingAddressSelection(') &&
+      text.includes('updateSettings({ mobilePairingAddress: manualAddress })')
+  },
+  {
     name: 'Tauri feedback uses a bounded native host submission instead of the web fallback',
     file: 'apps/desktop/src-tauri/src/commands/feedback.rs',
     expect: (text) =>
