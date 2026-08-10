@@ -86,9 +86,19 @@ func createCleanupGitFixture(t *testing.T) (string, string) {
 	return repo, worktree
 }
 
+// Why: the classifier reads git's own activity signal now, so a fixture standing
+// in for an abandoned worktree has to look abandoned to git too — otherwise
+// `git worktree add` stamps its reflog seconds before the scan runs.
+const cleanupFixtureGitDate = "2020-01-02T03:04:05+00:00"
+
 func runCleanupGit(t *testing.T, args ...string) {
 	t.Helper()
-	if output, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+	command := exec.Command("git", args...)
+	command.Env = append(os.Environ(),
+		"GIT_AUTHOR_DATE="+cleanupFixtureGitDate,
+		"GIT_COMMITTER_DATE="+cleanupFixtureGitDate,
+	)
+	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %v failed: %v\n%s", args, err, output)
 	}
 }
