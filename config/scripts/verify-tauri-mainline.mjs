@@ -7840,6 +7840,28 @@ const checks = [
       text.includes(
         'NativeBrowserInterceptDecision::Pause | NativeBrowserInterceptDecision::Abort =>'
       )
+  },
+  {
+    name: 'Shared control answers the multiplex, settings, and client-event calls a web client makes on startup',
+    // Why: the capability was advertised but terminal.multiplex, settings.get,
+    // and runtime.clientEvents.subscribe fell through to method_not_found, so a
+    // paired web client came up with blank terminals and a toast per pane.
+    files: [
+      'runtime/go/internal/runtimehttp/legacy_shared_control_terminal_multiplex.go',
+      'runtime/go/internal/runtimehttp/legacy_shared_control_settings.go',
+      'runtime/go/internal/runtimehttp/legacy_shared_control_client_events.go'
+    ],
+    expect: (text) =>
+      text.includes('func (s *Server) startLegacySharedControlTerminalMultiplex(') &&
+      text.includes('func (s *Server) handleLegacySharedControlMultiplexFrame(') &&
+      // The client blocks every stream on the ready handshake and settles its
+      // snapshot promise on the echoed request id, so both stay pinned.
+      text.includes('map[string]string{"type": "ready"}, true)') &&
+      text.includes('Kind: "request", RequestID: &requestID}') &&
+      text.includes('func (s *Server) runLegacySharedControlSettingsMethod(') &&
+      text.includes('func (s *Server) startLegacySharedControlClientEvents(') &&
+      text.includes('"type": "reposChanged"') &&
+      text.includes('"type": "worktreesChanged", "repoId": projectID')
   }
 ]
 

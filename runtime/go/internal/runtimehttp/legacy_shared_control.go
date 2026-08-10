@@ -67,6 +67,10 @@ type legacySharedControlSubscription struct {
 	StreamID       uint32
 	Binary         bool
 	Cancel         context.CancelFunc
+	// Why: a multiplex subscription carries many terminals whose stream ids the
+	// client allocates, so its state is shared by pointer — the subscriptions
+	// map stores values and would otherwise copy each mutation away.
+	Multiplex *legacySharedControlMultiplex
 }
 
 type legacySharedControlIncoming struct {
@@ -206,7 +210,7 @@ func (s *Server) serveLegacySharedControl(conn *websocketConn, sharedKey *[32]by
 				return
 			}
 			if message.Frame != nil {
-				s.handleLegacySharedControlBinaryFrame(*message.Frame, device, subscriptions)
+				s.handleLegacySharedControlBinaryFrame(conn, sharedKey, *message.Frame, device, subscriptions)
 				continue
 			}
 			if message.Request == nil {
@@ -316,6 +320,14 @@ func (s *Server) handleLegacySharedControlRequest(ctx context.Context, conn *web
 		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, result, false)
 		return
 	}
+	if result, handled, err := s.runLegacySharedControlSettingsMethod(request.Method, request.Params); handled {
+		if err != nil {
+			s.writeLegacySharedControlError(conn, sharedKey, request.ID, "settings_failed", err.Error())
+			return
+		}
+		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, result, false)
+		return
+	}
 	if result, handled, err := s.runLegacySharedControlAgentTrustMethod(request.Method, request.Params); handled {
 		if err != nil {
 			s.writeLegacySharedControlError(conn, sharedKey, request.ID, "agent_trust_failed", err.Error())
@@ -387,7 +399,7 @@ func (s *Server) handleLegacySharedControlRequest(ctx context.Context, conn *web
 		for _, capability := range status.Capabilities {
 			capabilities = append(capabilities, string(capability))
 		}
-		capabilities = append(capabilities, "browser.screencast.v1")
+		capabilities = append(capabilities, "browser.screencast.v1", "terminal.binary-stream.v1", "terminal.multiplex.v1")
 		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, map[string]interface{}{
 			"version": status.Version, "startedAt": status.StartedAt, "uptimeSeconds": status.UptimeSeconds,
 			"capabilities": capabilities, "unavailableTools": status.UnavailableTools,
@@ -440,7 +452,9 @@ func (s *Server) handleLegacySharedControlRequest(ctx context.Context, conn *web
 		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, map[string]interface{}{"type": "ready", "subscriptionId": subscriptionID, "snapshot": json.RawMessage(s.manager.GetAccountsSnapshot())}, true)
 	case "notifications.subscribe":
 		s.startLegacySharedControlNotifications(conn, sharedKey, device, request, subscriptions)
-	case "accounts.unsubscribe", "notifications.unsubscribe":
+	case "runtime.clientEvents.subscribe":
+		s.startLegacySharedControlClientEvents(conn, sharedKey, request, subscriptions)
+	case "accounts.unsubscribe", "notifications.unsubscribe", "runtime.clientEvents.unsubscribe":
 		var params struct {
 			SubscriptionID string `json:"subscriptionId"`
 		}
@@ -1015,6 +1029,8 @@ func (s *Server) handleLegacySharedControlRequest(ctx context.Context, conn *web
 			bytesWritten++
 		}
 		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, map[string]interface{}{"send": map[string]interface{}{"handle": terminalID, "accepted": true, "bytesWritten": bytesWritten}}, false)
+	case "terminal.multiplex":
+		s.startLegacySharedControlTerminalMultiplex(conn, sharedKey, request, subscriptions)
 	case "terminal.subscribe":
 		terminalID, valid := readLegacySharedControlTerminal(request.Params)
 		if !valid {
@@ -1047,7 +1063,7 @@ func (s *Server) handleLegacySharedControlRequest(ctx context.Context, conn *web
 			"truncated": transcript.Truncated || transcript.Limited,
 		}, true)
 		if binaryStream {
-			s.writeLegacySharedControlTerminalSnapshot(conn, sharedKey, subscription, tail.Chunks, "scrollback", "", 0)
+			s.writeLegacySharedControlTerminalSnapshot(conn, sharedKey, legacySharedControlSnapshotTarget{TerminalID: subscription.TerminalID, StreamID: subscription.StreamID, Kind: "scrollback"}, tail.Chunks)
 		}
 	case "terminal.unsubscribe":
 		var params struct {
@@ -1088,7 +1104,7 @@ func legacySharedControlMobileMethodAllowed(method string) bool {
 		"notifications.subscribe", "notifications.unsubscribe",
 		"session.tabs.list", "session.tabs.listAll", "session.tabs.subscribe",
 		"session.tabs.subscribeAll", "session.tabs.unsubscribe", "session.tabs.unsubscribeAll",
-		"terminal.read", "terminal.list", "terminal.send", "terminal.subscribe", "terminal.unsubscribe",
+		"terminal.read", "terminal.list", "terminal.send", "terminal.subscribe", "terminal.multiplex", "terminal.unsubscribe",
 		"terminal.agentStatus", "terminal.isRunningAgent", "terminal.clearBuffer", "terminal.close", "terminal.updateViewport",
 		"terminal.resolvePane", "terminal.focus", "terminal.create", "terminal.wait", "terminal.resolveActive", "terminal.show", "terminal.inspectProcess", "terminal.stop", "terminal.stopExact", "terminal.split", "terminal.rename", "terminal.setDisplayMode", "terminal.getDisplayMode", "terminal.resizeForClient", "terminal.restoreFit", "session.tabs.activate", "session.tabs.close",
 		"browser.tabList", "browser.tabShow", "browser.tabCurrent", "browser.tabCreate", "browser.tabClose", "browser.profileList", "browser.profileCreate", "browser.profileDelete",
@@ -1330,8 +1346,12 @@ func legacySharedControlBrowserCommandName(method string) string {
 
 func (s *Server) writeLegacySharedControlSubscriptionEvent(conn *websocketConn, sharedKey *[32]byte, subscription legacySharedControlSubscription, event runtimecore.RuntimeEvent) {
 	switch subscription.Kind {
+	case "terminal.multiplex":
+		s.writeLegacySharedControlMultiplexEvent(conn, sharedKey, subscription, event)
 	case "notifications":
 		s.writeLegacySharedControlNotificationEvent(conn, sharedKey, subscription, event)
+	case legacySharedControlClientEventsKind:
+		s.writeLegacySharedControlClientEvent(conn, sharedKey, subscription, event)
 	case "accounts":
 		if event.Topic == "accounts.changed" {
 			_ = s.writeLegacySharedControlSuccess(conn, sharedKey, subscription.RequestID, map[string]interface{}{"type": "snapshot", "snapshot": event.Payload}, true)
@@ -1378,14 +1398,19 @@ func (s *Server) writeLegacySharedControlSubscriptionEvent(conn *websocketConn, 
 				payload, _ := json.Marshal(map[string]interface{}{"cols": session.Cols, "rows": session.Rows, "displayMode": "desktop", "reason": "runtime-resize"})
 				_ = writeLegacySharedControlBinary(conn, sharedKey, terminalStreamFrame{Opcode: terminalStreamResized, StreamID: subscription.StreamID, Seq: uint64(event.Timestamp.UnixNano()), Payload: payload})
 				if tail, err := s.manager.TailSession(subscription.TerminalID, 2000); err == nil {
-					s.writeLegacySharedControlTerminalSnapshot(conn, sharedKey, subscription, tail.Chunks, "resized", "runtime-resize", uint64(event.Timestamp.UnixNano())+1)
+					s.writeLegacySharedControlTerminalSnapshot(conn, sharedKey, legacySharedControlSnapshotTarget{TerminalID: subscription.TerminalID, StreamID: subscription.StreamID, Kind: "resized", Reason: "runtime-resize", StartSeq: uint64(event.Timestamp.UnixNano()) + 1}, tail.Chunks)
 				}
 			}
 		}
 	}
 }
 
-func (s *Server) handleLegacySharedControlBinaryFrame(frame terminalStreamFrame, device runtimecore.LegacySharedControlDevice, subscriptions map[string]legacySharedControlSubscription) {
+func (s *Server) handleLegacySharedControlBinaryFrame(conn *websocketConn, sharedKey *[32]byte, frame terminalStreamFrame, device runtimecore.LegacySharedControlDevice, subscriptions map[string]legacySharedControlSubscription) {
+	// Why: multiplex streams are numbered by the client, so they are matched
+	// first — a single-terminal subscription could hold the same stream id.
+	if s.handleLegacySharedControlMultiplexFrame(conn, sharedKey, frame, device, subscriptions) {
+		return
+	}
 	var subscription *legacySharedControlSubscription
 	var subscriptionKey string
 	for key, candidate := range subscriptions {
@@ -1417,11 +1442,26 @@ func (s *Server) handleLegacySharedControlBinaryFrame(frame terminalStreamFrame,
 	}
 }
 
-func (s *Server) writeLegacySharedControlTerminalSnapshot(conn *websocketConn, sharedKey *[32]byte, subscription legacySharedControlSubscription, chunks []runtimecore.OutputChunk, kind, reason string, startSeq uint64) {
-	status, _ := s.manager.SessionStatus(subscription.TerminalID)
+// legacySharedControlSnapshotTarget names the stream a snapshot is written to.
+// Snapshots are raised both by a single-terminal subscription and by a
+// multiplex stream, which share no subscription record.
+type legacySharedControlSnapshotTarget struct {
+	TerminalID string
+	StreamID   uint32
+	Kind       string
+	Reason     string
+	StartSeq   uint64
+	// Why: a client-requested snapshot must echo its request id so the
+	// multiplexer can settle the right in-flight promise.
+	RequestID *int
+}
+
+func (s *Server) writeLegacySharedControlTerminalSnapshot(conn *websocketConn, sharedKey *[32]byte, target legacySharedControlSnapshotTarget, chunks []runtimecore.OutputChunk) {
+	kind, reason, startSeq := target.Kind, target.Reason, target.StartSeq
+	status, _ := s.manager.SessionStatus(target.TerminalID)
 	data, truncated := legacySharedControlSnapshotBytes(chunks)
 	displayMode := "desktop"
-	if screen, err := s.manager.SessionScreenSnapshot(subscription.TerminalID); err == nil && screen.Alternate {
+	if screen, err := s.manager.SessionScreenSnapshot(target.TerminalID); err == nil && screen.Alternate {
 		// Why: raw TUI history contains cursor rewrites rather than a restorable
 		// frame. Mobile clients need the emulator's final screen in alt mode.
 		data = []byte(screen.ANSI)
@@ -1433,8 +1473,11 @@ func (s *Server) writeLegacySharedControlTerminalSnapshot(conn *websocketConn, s
 	if reason != "" {
 		metadataValue["reason"] = reason
 	}
+	if target.RequestID != nil {
+		metadataValue["requestId"] = *target.RequestID
+	}
 	metadata, _ := json.Marshal(metadataValue)
-	_ = writeLegacySharedControlBinary(conn, sharedKey, terminalStreamFrame{Opcode: terminalStreamSnapshotStart, StreamID: subscription.StreamID, Seq: startSeq, Payload: metadata})
+	_ = writeLegacySharedControlBinary(conn, sharedKey, terminalStreamFrame{Opcode: terminalStreamSnapshotStart, StreamID: target.StreamID, Seq: startSeq, Payload: metadata})
 	seq := startSeq + 1
 	for len(data) > 0 {
 		size := legacySharedControlTerminalStreamChunkBytes
@@ -1448,11 +1491,11 @@ func (s *Server) writeLegacySharedControlTerminalSnapshot(conn *websocketConn, s
 				size = legacySharedControlTerminalStreamChunkBytes
 			}
 		}
-		_ = writeLegacySharedControlBinary(conn, sharedKey, terminalStreamFrame{Opcode: terminalStreamSnapshotChunk, StreamID: subscription.StreamID, Seq: seq, Payload: data[:size]})
+		_ = writeLegacySharedControlBinary(conn, sharedKey, terminalStreamFrame{Opcode: terminalStreamSnapshotChunk, StreamID: target.StreamID, Seq: seq, Payload: data[:size]})
 		seq++
 		data = data[size:]
 	}
-	_ = writeLegacySharedControlBinary(conn, sharedKey, terminalStreamFrame{Opcode: terminalStreamSnapshotEnd, StreamID: subscription.StreamID, Seq: seq})
+	_ = writeLegacySharedControlBinary(conn, sharedKey, terminalStreamFrame{Opcode: terminalStreamSnapshotEnd, StreamID: target.StreamID, Seq: seq})
 }
 
 const (
