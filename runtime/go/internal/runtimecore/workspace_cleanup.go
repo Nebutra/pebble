@@ -108,7 +108,11 @@ func (m *Manager) ScanWorkspaceCleanup(parent context.Context, req WorkspaceClea
 		})
 	}
 	for _, project := range projects {
-		worktrees := cleanupEligibleWorktrees(project, m.ListWorktrees(project.ID), req.WorktreeID, scannedAt)
+		known := m.ListWorktrees(project.ID)
+		if project.LocationKind == "local" {
+			known = withWorktreeGitActivity(known)
+		}
+		worktrees := cleanupEligibleWorktrees(project, known, req.WorktreeID, scannedAt)
 		total += len(worktrees)
 		emit([]WorkspaceCleanupCandidate{})
 		if project.LocationKind != "local" {

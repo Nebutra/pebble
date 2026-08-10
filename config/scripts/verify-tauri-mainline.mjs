@@ -7488,6 +7488,25 @@ const checks = [
       text.includes('t.Setenv("USERPROFILE", home)') &&
       text.includes('"OPENCLAW_STATE_DIR",') &&
       text.includes('home := isolateAiVaultScanHome(t)')
+  },
+  {
+    name: 'Go dates worktree cleanup from reflog entries, not git-restamped file mtimes',
+    file: 'runtime/go/internal/runtimecore/git_worktree_activity.go',
+    expect: (text) =>
+      text.includes('func readNewestReflogEntryAt(reflogPath string) (int64, bool)') &&
+      text.includes('func resolveWorktreeGitDir(worktreePath string) (string, bool)') &&
+      text.includes(
+        'var worktreeGitActivityFiles = []string{"HEAD", "COMMIT_EDITMSG", "ORIG_HEAD"}'
+      ) &&
+      !text.includes('"index"') &&
+      !text.includes('"logs/HEAD"')
+  },
+  {
+    name: 'Go applies the git activity signal to local cleanup scans only',
+    file: 'runtime/go/internal/runtimecore/workspace_cleanup.go',
+    expect: (text) =>
+      text.includes('if project.LocationKind == "local" {') &&
+      text.includes('known = withWorktreeGitActivity(known)')
   }
 ]
 
