@@ -9,8 +9,8 @@ import {
   type GateConfig,
   captureGateSurface,
   runtimeTailContains,
-  terminalText,
   waitFor,
+  waitForShellToExecute,
   writeEvidence,
   writeProgress
 } from './tauri-real-runtime-gate-evidence'
@@ -34,7 +34,10 @@ export async function runTauriRealRuntimeGate(): Promise<void> {
     }
     await writeProgress('renderer-ready')
     const windowLifecycle = await measureWindowLifecycle(config)
-    await waitFor(() => useAppStore.getState().workspaceSessionReady)
+    await waitFor(
+      () => useAppStore.getState().workspaceSessionReady,
+      'the workspace session to become ready'
+    )
     await writeProgress('session-ready')
     normalizeParityRendererState()
     if (
@@ -100,13 +103,16 @@ export async function runTauriRealRuntimeGate(): Promise<void> {
     const ptyId = await waitFor(() => {
       const state = useAppStore.getState()
       return state.tabsByWorktree[worktree.id]?.find((entry) => entry.id === tab.id)?.ptyId || null
-    })
+    }, `the terminal tab ${tab.id} to be assigned a PTY`)
     await writeProgress('pty-created')
-    await waitFor(() => document.querySelector(`[data-pty-id="${CSS.escape(ptyId)}"]`) !== null)
+    await waitFor(
+      () => document.querySelector(`[data-pty-id="${CSS.escape(ptyId)}"]`) !== null,
+      `the terminal pane for PTY ${ptyId} to mount`
+    )
     await writeProgress('terminal-mounted')
     // Why: a mounted xterm can precede shell readiness. Writing during that
     // gap reproduces the lost first command and long input latency regression.
-    await waitFor(() => terminalText(ptyId).includes('repo'))
+    await waitForShellToExecute(ptyId, `PEBBLE_SHELL_READY_${crypto.randomUUID()}`)
     await writeProgress('terminal-shell-ready')
 
     const marker = `PEBBLE_REAL_RUNTIME_${crypto.randomUUID()}`
@@ -118,7 +124,10 @@ export async function runTauriRealRuntimeGate(): Promise<void> {
     if (!commandAccepted) {
       throw new Error('native PTY input queue rejected the gate command')
     }
-    await waitFor(() => runtimeTailContains(ptyId, marker))
+    await waitFor(
+      () => runtimeTailContains(ptyId, marker),
+      `the runtime output tail for PTY ${ptyId} to echo the gate marker`
+    )
     const clearAccepted = await window.api.pty.writeAccepted(ptyId, 'clear\r')
     if (!clearAccepted) {
       throw new Error('native PTY input queue rejected clear')
@@ -137,14 +146,17 @@ export async function runTauriRealRuntimeGate(): Promise<void> {
     await writeProgress('source-control-verified')
     useAppStore.getState().setRightSidebarTab('source-control')
     useAppStore.getState().setRightSidebarOpen(true)
-    await waitFor(() => document.querySelector('[data-parity-surface="source-control"]'))
+    await waitFor(
+      () => document.querySelector('[data-parity-surface="source-control"]'),
+      'the source-control surface to render'
+    )
     await waitFor(() => {
       const text =
         document.querySelector('[data-parity-surface="source-control"]')?.textContent ?? ''
       return ['README.md', 'staged.txt', 'untracked.txt', 'renamed.txt'].every((name) =>
         text.includes(name)
       )
-    })
+    }, 'the source-control surface to list every seeded file')
     const sourceControlCaptureBytes = await captureGateSurface(config, 'source-control')
     const checksEvidence = await verifyProviderBackedChecks(
       config,

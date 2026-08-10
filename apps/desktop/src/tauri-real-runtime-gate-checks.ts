@@ -58,7 +58,9 @@ export async function verifyProviderBackedChecks(
     () =>
       useAppStore
         .getState()
-        .worktreesByRepo[repoId]?.find((candidate) => candidate.id === worktreeId)?.linkedPR === 128
+        .worktreesByRepo[repoId]?.find((candidate) => candidate.id === worktreeId)?.linkedPR ===
+      128,
+    'the worktree store to record the linked GitHub pull request'
   )
   await writeProgress('checks-metadata-linked')
   const nativeReview = await window.api.gh.prForBranch({
@@ -106,8 +108,14 @@ export async function verifyProviderBackedChecks(
   await writeProgress('checks-store-cache-filled')
   useAppStore.getState().setRightSidebarTab('checks')
   useAppStore.getState().setRightSidebarOpen(true)
-  await waitFor(() => document.querySelector('[data-testid="checks-panel"]') !== null)
-  await waitFor(() => document.body.textContent?.includes('Pebble Linux'))
+  await waitFor(
+    () => document.querySelector('[data-testid="checks-panel"]') !== null,
+    'the checks panel to mount for the GitHub provider'
+  )
+  await waitFor(
+    () => document.body.textContent?.includes('Pebble Linux'),
+    'the checks panel to render the GitHub check named Pebble Linux'
+  )
   await writeProgress('checks-github-panel-mounted')
   const checksCaptureBytes = await captureGateSurface(config, 'checks')
 
@@ -116,7 +124,10 @@ export async function verifyProviderBackedChecks(
   if (!gitLabMarkerAccepted) {
     throw new Error('native PTY input queue rejected GitLab marker')
   }
-  await waitFor(() => runtimeTailContains(ptyId, gitLabMarker))
+  await waitFor(
+    () => runtimeTailContains(ptyId, gitLabMarker),
+    `the runtime output tail for PTY ${ptyId} to echo the GitLab marker`
+  )
   await writeProgress('checks-gitlab-marker-ready')
   setGateHostedReviewMeta(repoId, worktreeId, { linkedPR: null, linkedGitLabMR: 9 })
   useAppStore.setState({ hostedReviewCache: {}, prCache: {} })
@@ -125,7 +136,8 @@ export async function verifyProviderBackedChecks(
       useAppStore
         .getState()
         .worktreesByRepo[repoId]?.find((candidate) => candidate.id === worktreeId)
-        ?.linkedGitLabMR === 9
+        ?.linkedGitLabMR === 9,
+    'the worktree store to record the linked GitLab merge request'
   )
   const gitLabReview = await state.fetchHostedReviewForBranch(repoPath, 'main', {
     repoId,
@@ -155,7 +167,10 @@ export async function verifyProviderBackedChecks(
   ) {
     throw new Error('GitLab checks did not survive the product store cache path')
   }
-  await waitFor(() => document.querySelector('[data-testid="checks-panel"]') !== null)
+  await waitFor(
+    () => document.querySelector('[data-testid="checks-panel"]') !== null,
+    'the checks panel to re-mount for the GitLab provider'
+  )
   await writeProgress('checks-gitlab-panel-mounted')
   return {
     checksProviderParsed: true,

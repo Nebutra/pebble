@@ -7539,6 +7539,75 @@ const checks = [
       !text.includes('scripts:\\n  setup: printf setup > setup-ran.txt')
   },
   {
+    name: 'The functional gate spawns Windows npm shims through a shell',
+    file: 'config/scripts/run-tauri-real-runtime-gate.mjs',
+    expect: (text) =>
+      text.includes('function needsWindowsShell(name) {') &&
+      text.includes("return command(name).endsWith('.cmd')") &&
+      // Why: both long-lived npm spawns and every run() call must take the
+      // shell, so count them — reverting one site alone still breaks Windows.
+      text.split("shell: needsWindowsShell('npm')").length === 3 &&
+      text.includes('shell: needsWindowsShell(name)')
+  },
+  {
+    name: 'Terminal evidence spawns Windows pnpm shims through a shell',
+    file: 'config/scripts/run-tauri-terminal-evidence.mjs',
+    expect: (text) =>
+      text.includes('export function requiresShellToSpawn(executable) {') &&
+      text.includes('shell: requiresShellToSpawn(executable)')
+  },
+  {
+    name: 'The functional gate times the Rust build apart from the evidence budget',
+    file: 'config/scripts/run-tauri-real-runtime-gate.mjs',
+    expect: (text) =>
+      text.includes('const GATE_LAUNCH_TIMEOUT_MS = 600_000') &&
+      text.includes('const GATE_EVIDENCE_TIMEOUT_MS = 240_000') &&
+      text.includes('deadline = Date.now() + GATE_EVIDENCE_TIMEOUT_MS') &&
+      text.includes('produced no evidence within') &&
+      !text.includes('const deadline = Date.now() + 240_000')
+  },
+  {
+    name: 'Real runtime gate waits name the condition they timed out on',
+    file: 'apps/desktop/src/tauri-real-runtime-gate-evidence.ts',
+    // Why: `condition` must stay required — tsc then forces every call site to
+    // pass a label, so an unlabelled wait cannot reach CI and report only
+    // "gate timed out" the way the three-week-old macOS failure did.
+    expect: (text) =>
+      text.includes('condition: string') &&
+      !text.includes('condition?: string') &&
+      text.includes('real runtime gate timed out waiting for ${condition}')
+  },
+  {
+    name: 'The gate probes shell readiness with a command, not with the prompt text',
+    files: [
+      'apps/desktop/src/tauri-real-runtime-gate.ts',
+      'apps/desktop/src/tauri-real-runtime-gate-evidence.ts'
+    ],
+    // Why: the old check read the prompt for a working directory, which the Linux
+    // runner's shell prints and the macOS runner's does not — three weeks of a
+    // deterministic red that looked like a product failure.
+    expect: (text) =>
+      text.includes('export async function waitForShellToExecute(') &&
+      text.includes('await window.api.pty.writeAccepted(ptyId, `echo ${marker}\\r`)') &&
+      !text.includes('terminalText')
+  },
+  {
+    name: 'Trusted input evidence waits out a guest that has not attached yet',
+    file: 'apps/desktop/src/tauri-real-runtime-native-input-evidence.ts',
+    // Why: the guest throws "Guest not ready" until its child WebView attaches and
+    // leaves one evaluation unanswered mid-navigation; treating either as fatal
+    // killed the macOS gate the moment the terminal stage stopped failing first.
+    // Only those two messages may be swallowed, and a wall-clock deadline — not an
+    // attempt count — must bound the poll, because one attempt can cost 15s.
+    expect: (text) =>
+      text.includes('async function evaluateWhenGuestAttached(') &&
+      text.includes('TRANSIENT_GUEST_EVALUATION_ERRORS.has(error.message)') &&
+      text.includes("'Guest not ready'") &&
+      text.includes("'browser guest evaluation timed out'") &&
+      text.includes('const deadline = Date.now() + FIXTURE_TIMEOUT_MS') &&
+      !text.includes('attempt < 300')
+  },
+  {
     name: 'The SSH askpass helper classifies the prompt before releasing a credential',
     file: 'runtime/go/cmd/pebble-runtime/main.go',
     expect: (text) =>

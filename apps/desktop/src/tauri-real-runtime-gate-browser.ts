@@ -35,7 +35,8 @@ export async function verifyNativeBrowser(
   await waitFor(
     () =>
       document.querySelector(`[data-tauri-browser-page-webview="${CSS.escape(browserPageId)}"]`) !==
-      null
+      null,
+    `the native browser webview for page ${browserPageId} to mount`
   )
   await writeProgress('browser-webview-mounted')
   const { captureTauriBrowserPageScreenshot, evaluateTauriBrowserPageExpression } =
@@ -45,7 +46,7 @@ export async function verifyNativeBrowser(
       throw browserLoadError
     }
     return captureTauriBrowserPageScreenshot(browserPageId).catch(() => null)
-  })
+  }, `a screenshot of native browser page ${browserPageId}`)
   await writeProgress('browser-screenshot-captured')
   const screenshotBytes = Math.floor((screenshot.data.length * 3) / 4)
   if (screenshot.format !== 'png' || screenshotBytes < 2_000) {
@@ -63,7 +64,7 @@ export async function verifyNativeBrowser(
       } catch {
         return false
       }
-    })
+    }, `native browser page ${browserPageId} to finish navigating to ${url}`)
     const { verifyMacosTrustedBrowserDrag, verifyMacosTrustedBrowserInput } =
       await import('./tauri-real-runtime-native-input-evidence')
     trustedInputEvidence = nativeDragOnly
