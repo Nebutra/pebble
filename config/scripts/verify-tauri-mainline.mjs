@@ -7638,6 +7638,37 @@ const checks = [
       text.includes('eventStreamHeartbeatInterval = 15 * time.Second') &&
       text.includes('const RUNTIME_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15)') &&
       text.includes('read_before_deadline(response.chunk(), STREAM_IDLE_TIMEOUT)')
+  },
+  {
+    name: 'A dropped SSH transport re-arms remote watches instead of forgetting them',
+    files: [
+      'runtime/go/internal/runtimehttp/remote_workspace_watch.go',
+      'apps/desktop/src/tauri-file-watch-remote.ts'
+    ],
+    // Why: both sides ended the watch when the transport errored, which reset the
+    // ref count — a later watch started at one, so a single unwatch tore down a
+    // watch other subscribers still needed — and nothing re-armed, leaving the
+    // worktree dark until something happened to watch it again.
+    expect: (text) =>
+      text.includes('func (r *remoteWorkspaceWatchRegistry) streamUntilReleased(') &&
+      text.includes('func remoteWorkspaceWatchRetryDelay(attempt int) time.Duration') &&
+      text.includes('function scheduleRemoteWatchRearm(state: RemoteWatchState): void') &&
+      text.includes('scheduleRemoteWatchRearm(state)') &&
+      !text.includes('state.closed = true\n          state.unsubscribe = null')
+  },
+  {
+    name: 'Remote watch reconnects back off so a long outage stays bounded',
+    files: [
+      'apps/desktop/src/remote-watch-backoff.ts',
+      'apps/desktop/src/remote-workspace-snapshot-watch.ts'
+    ],
+    // Why: a fixed 2s retry per target meant a host that stayed down spawned one
+    // ssh process per watched target every two seconds, for as long as it was down.
+    expect: (text) =>
+      text.includes('export function remoteWatchRetryDelayMs(attempt: number): number') &&
+      text.includes('const RETRY_MAX_MS = 30_000') &&
+      text.includes('}, remoteWatchRetryDelayMs(attempt))') &&
+      !text.includes('}, 2_000)\n  )')
   }
 ]
 

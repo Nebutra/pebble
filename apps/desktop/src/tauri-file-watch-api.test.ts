@@ -138,6 +138,36 @@ describe('createPebbleFileWatchApi', () => {
     stopEvents()
   })
 
+  // Why: onClose fires when the SSH transport drops, not only on unwatch. The
+  // watch used to be forgotten there, so the worktree never watched again and
+  // the ref count reset — a single later unwatch tore down other panes' watch.
+  it('re-arms a remote worktree watch after the transport drops', async () => {
+    const captured: RuntimeSubscribeCallbacks[] = []
+    runtimeSubscribe.mockImplementation((_args, nextCallbacks) => {
+      captured.push(nextCallbacks)
+      return Promise.resolve({ unsubscribe: vi.fn(), sendBinary: vi.fn() })
+    })
+    vi.useFakeTimers()
+    try {
+      const api = createPebbleFileWatchApi(createBaseFsApi())
+      await api.watchWorktree({ worktreePath: '/remote/repo', connectionId: 'env-1' })
+      expect(runtimeSubscribe).toHaveBeenCalledTimes(1)
+
+      captured[0]?.onClose?.()
+      await vi.advanceTimersByTimeAsync(1_100)
+
+      expect(runtimeSubscribe).toHaveBeenCalledTimes(2)
+
+      await api.unwatchWorktree({ worktreePath: '/remote/repo', connectionId: 'env-1' })
+      captured[1]?.onClose?.()
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(runtimeSubscribe).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('shares one runtime watch across repeated connectionId subscriptions', async () => {
     const unsubscribe = vi.fn()
     runtimeSubscribe.mockResolvedValue({ unsubscribe, sendBinary: vi.fn() })
