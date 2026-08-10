@@ -7811,6 +7811,18 @@ const checks = [
       text.includes('args = append(args, sshIdentityArgs(target)...)') &&
       text.includes('SshTargetNeedsUserPresence(target) {') &&
       !text.includes('"-o", "IdentitiesOnly=yes", "-i", target.IdentityFile')
+  },
+  {
+    name: 'A wedged runtime state lock is detected and survives its own report',
+    // Why: the watchdog is only useful if it cannot be starved by the lock it
+    // watches, so the probe, its own mutex, and the recovery-time emit are
+    // pinned together.
+    file: 'runtime/go/internal/runtimecore/hang_watchdog.go',
+    expect: (text) =>
+      text.includes('hangWatchdogThreshold     = 5 * time.Second') &&
+      text.includes('if m.mu.TryRLock() {') &&
+      text.includes('func (m *Manager) HangEpisodes() []HangEpisode') &&
+      text.includes('m.emit("runtime.hang", episode)')
   }
 ]
 
