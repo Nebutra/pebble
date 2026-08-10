@@ -7565,6 +7565,17 @@ const checks = [
       text.includes('deadline = Date.now() + GATE_EVIDENCE_TIMEOUT_MS') &&
       text.includes('produced no evidence within') &&
       !text.includes('const deadline = Date.now() + 240_000')
+  },
+  {
+    name: 'Real runtime gate waits name the condition they timed out on',
+    file: 'apps/desktop/src/tauri-real-runtime-gate-evidence.ts',
+    // Why: `condition` must stay required — tsc then forces every call site to
+    // pass a label, so an unlabelled wait cannot reach CI and report only
+    // "gate timed out" the way the three-week-old macOS failure did.
+    expect: (text) =>
+      text.includes('condition: string') &&
+      !text.includes('condition?: string') &&
+      text.includes('real runtime gate timed out waiting for ${condition}')
   }
 ]
 

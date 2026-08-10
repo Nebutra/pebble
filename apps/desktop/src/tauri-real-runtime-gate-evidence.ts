@@ -22,7 +22,13 @@ export function writeProgress(stage: string): Promise<boolean> {
   return writeEvidence({ status: 'running', stage })
 }
 
-export async function waitFor<T>(read: () => T | Promise<T>): Promise<NonNullable<T>> {
+// Why: `condition` is required because a bare "gate timed out" told CI nothing
+// about which of the 17 waits hung, which is why a macOS failure went
+// undiagnosed for three weeks. Name what is being waited on, not the step.
+export async function waitFor<T>(
+  read: () => T | Promise<T>,
+  condition: string
+): Promise<NonNullable<T>> {
   const deadline = Date.now() + GATE_TIMEOUT_MS
   while (Date.now() < deadline) {
     const value = await read()
@@ -31,7 +37,7 @@ export async function waitFor<T>(read: () => T | Promise<T>): Promise<NonNullabl
     }
     await new Promise((resolve) => globalThis.setTimeout(resolve, 50))
   }
-  throw new Error('real runtime gate timed out')
+  throw new Error(`real runtime gate timed out waiting for ${condition}`)
 }
 
 export function terminalText(ptyId: string): string {
@@ -48,7 +54,10 @@ export async function runtimeTailContains(ptyId: string, marker: string): Promis
   return tail.chunks.some((chunk) => chunk.content.includes(marker))
 }
 
-export async function captureGateSurface(config: GateConfig, surface: GateSurface): Promise<number> {
+export async function captureGateSurface(
+  config: GateConfig,
+  surface: GateSurface
+): Promise<number> {
   const path = config.screenshotPaths?.[surface]
   if (!path) {
     return 0
@@ -62,7 +71,10 @@ export async function captureGateSurface(config: GateConfig, surface: GateSurfac
   const restoreCanvases = surface === 'browser' ? () => undefined : await materializeCanvases()
   try {
     await writeProgress(`${surface}-capture-ready`)
-    await waitFor(() => invoke<boolean>('functional_gate_capture_ready', { surface }))
+    await waitFor(
+      () => invoke<boolean>('functional_gate_capture_ready', { surface }),
+      `the native window to report the ${surface} surface ready to capture`
+    )
   } finally {
     restoreCanvases()
   }
