@@ -3,6 +3,7 @@ package runtimecore
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -38,15 +39,18 @@ type ClaudeUsageScanResult struct {
 type usageWorktreeRef struct{ RepoID, WorktreeID, Path, DisplayName string }
 
 func (m *Manager) ScanClaudeUsage(ctx context.Context) ClaudeUsageScanResult {
-	files := discoverClaudeUsageFiles()
+	files, filesDropped := discoverClaudeUsageFiles()
 	worktrees := m.usageWorktreeRefs()
 	result := ClaudeUsageScanResult{Turns: []ClaudeUsageAttributedTurn{}, Issues: []string{}}
+	if filesDropped {
+		result.Issues = append(result.Issues, fmt.Sprintf("scan limited to the %d most recent transcripts", usageScanMaxFiles))
+	}
 	type fileResult struct {
 		turns []ClaudeUsageAttributedTurn
 		issue string
 	}
 	jobs := make(chan string)
-	results := make(chan fileResult, len(files))
+	results := make(chan fileResult, usageScanResultBuffer)
 	var workers sync.WaitGroup
 	workerCount := 4
 	if len(files) < workerCount {
@@ -82,26 +86,35 @@ func (m *Manager) ScanClaudeUsage(ctx context.Context) ClaudeUsageScanResult {
 		}
 	}()
 	go func() { workers.Wait(); close(results) }()
+	turnsDropped := false
 	for file := range results {
 		if file.issue != "" {
 			result.Issues = append(result.Issues, file.issue)
 			continue
 		}
 		result.FilesScanned++
-		result.Turns = append(result.Turns, file.turns...)
+		// The channel keeps being drained past the budget so the workers still
+		// finish; only the retained turns are capped.
+		retainable := boundUsageScanTurns(len(result.Turns), len(file.turns))
+		if retainable < len(file.turns) {
+			turnsDropped = true
+		}
+		result.Turns = append(result.Turns, file.turns[:retainable]...)
+	}
+	if turnsDropped {
+		result.Issues = append(result.Issues, fmt.Sprintf("scan retained the first %d turns", usageScanMaxTurns))
 	}
 	sort.Slice(result.Turns, func(i, j int) bool { return result.Turns[i].Timestamp < result.Turns[j].Timestamp })
 	return result
 }
 
-func discoverClaudeUsageFiles() []string {
+func discoverClaudeUsageFiles() ([]string, bool) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return []string{}
+		return []string{}, false
 	}
 	roots := []string{filepath.Join(home, ".claude", "projects"), filepath.Join(home, ".claude", "transcripts")}
-	seen := map[string]bool{}
-	files := []string{}
+	discovery := newUsageScanDiscovery()
 	for _, root := range roots {
 		_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
 			if walkErr != nil {
@@ -110,15 +123,13 @@ func discoverClaudeUsageFiles() []string {
 				}
 				return nil
 			}
-			if entry.Type().IsRegular() && strings.EqualFold(filepath.Ext(entry.Name()), ".jsonl") && !seen[path] {
-				seen[path] = true
-				files = append(files, path)
+			if entry.Type().IsRegular() && strings.EqualFold(filepath.Ext(entry.Name()), ".jsonl") {
+				discovery.add(path, entry)
 			}
 			return nil
 		})
 	}
-	sort.Strings(files)
-	return files
+	return discovery.paths()
 }
 
 func (m *Manager) usageWorktreeRefs() []usageWorktreeRef {
