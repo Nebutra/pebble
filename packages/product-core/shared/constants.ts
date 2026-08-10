@@ -348,6 +348,9 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     // explicit return-to-desktop-size action, no wall-clock guess.
     // See docs/mobile-fit-hold.md.
     mobileAutoRestoreFitMs: null,
+    // Why: no manual address until the user types one — discovery owns the
+    // selection by default.
+    mobilePairingAddress: null,
     // Why: off by default — opt-in cosmetic joke feature. Leaving the default
     // false keeps the overlay unmounted for users who never enable it.
     experimentalPet: false,

@@ -95,6 +95,32 @@ describe('createPebbleMobileApi', () => {
     )
   })
 
+  it('keeps a port the user typed rather than appending the shared-control one', async () => {
+    requestRuntimeJsonMock.mockResolvedValue({
+      deviceId: 'device-1',
+      deviceToken: 'device-token',
+      publicKeyB64: 'public-key',
+      scope: 'runtime'
+    })
+    const api = createPebbleMobileApi({} as PreloadApi['mobile'])
+
+    const result = await api.getRuntimePairingUrl({ address: 'home.example.com:9443' })
+
+    expect(result).toMatchObject({
+      available: true,
+      endpoint: 'ws://home.example.com:9443/v1/shared-control'
+    })
+  })
+
+  it('refuses an address the phone could never dial without rotating the token', async () => {
+    const api = createPebbleMobileApi({} as PreloadApi['mobile'])
+
+    const result = await api.getPairingQR({ address: 'not a host', rotate: true })
+
+    expect(result).toEqual({ available: false })
+    expect(requestRuntimeJsonMock).not.toHaveBeenCalled()
+  })
+
   it('propagates pairing list runtime failures instead of returning fake empty mobile state', async () => {
     requestRuntimeJsonMock.mockRejectedValue(new Error('mobile relay unavailable'))
     const api = createPebbleMobileApi({} as PreloadApi['mobile'])

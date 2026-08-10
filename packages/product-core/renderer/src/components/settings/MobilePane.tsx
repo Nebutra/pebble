@@ -3,10 +3,13 @@ import { toast } from 'sonner'
 import { useAppStore } from '../../store'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { useMobilePairingDevicePolling } from './mobile-pairing-device-polling'
+import type { MobileNetworkInterface } from './mobile-network-interface-selection'
 import {
-  selectRefreshedNetworkAddress,
-  type MobileNetworkInterface
-} from './mobile-network-interface-selection'
+  choosePairingAddress,
+  persistedManualAddress,
+  refreshPairingAddressSelection,
+  type PairingAddressSelection
+} from './mobile-pairing-address-selection'
 import { MobileNetworkInterfaceSection } from './MobileNetworkInterfaceSection'
 import { MobilePairingQrSection } from './MobilePairingQrSection'
 import { MobilePairedDevicesSection, type PairedDevice } from './MobilePairedDevicesSection'
@@ -16,6 +19,7 @@ export { getMobilePaneSearchEntries } from './mobile-pane-search'
 
 export function MobilePane(): React.JSX.Element {
   const autoRestoreFitMs = useAppStore((s) => s.settings?.mobileAutoRestoreFitMs ?? null)
+  const storedPairingAddress = useAppStore((s) => s.settings?.mobilePairingAddress ?? null)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [pairingUrl, setPairingUrl] = useState<string | null>(null)
@@ -24,13 +28,21 @@ export function MobilePane(): React.JSX.Element {
   const [devices, setDevices] = useState<PairedDevice[]>([])
   const [qrEnlarged, setQrEnlarged] = useState(false)
   const [networkInterfaces, setNetworkInterfaces] = useState<MobileNetworkInterface[]>([])
-  const [selectedAddress, setSelectedAddress] = useState<string | undefined>(undefined)
+  const [selection, setSelection] = useState<PairingAddressSelection | null>(null)
+  const selectedAddress = selection?.address
   const [refreshingNetworkInterfaces, setRefreshingNetworkInterfaces] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
   const [deviceCountAtQr, setDeviceCountAtQr] = useState<number | null>(null)
   const devicesRef = useRef<PairedDevice[]>([])
   const codeCopiedResetTimerRef = useRef<number | null>(null)
   const mountedRef = useMountedRef()
+  // Why: a refresh reads both, but neither may become a dependency of
+  // loadNetworkInterfaces — the mount effect would then re-enumerate on every
+  // address change.
+  const selectionRef = useRef<PairingAddressSelection | null>(null)
+  selectionRef.current = selection
+  const storedPairingAddressRef = useRef<string | null>(storedPairingAddress)
+  storedPairingAddressRef.current = storedPairingAddress
 
   const clearCodeCopiedResetTimer = useCallback((): void => {
     if (codeCopiedResetTimerRef.current !== null) {
@@ -58,8 +70,14 @@ export function MobilePane(): React.JSX.Element {
         const result = await window.api.mobile.listNetworkInterfaces()
         if (mountedRef.current) {
           setNetworkInterfaces(result.interfaces)
-          setSelectedAddress((currentAddress) =>
-            selectRefreshedNetworkAddress(currentAddress, result.interfaces)
+          // Why: a manual address is the only way to pair across networks, so a
+          // refresh must not snap it back to whatever the OS enumerated.
+          setSelection(
+            refreshPairingAddressSelection(
+              selectionRef.current,
+              storedPairingAddressRef.current,
+              result.interfaces
+            )
           )
         }
       } catch {
@@ -127,6 +145,18 @@ export function MobilePane(): React.JSX.Element {
     [clearCodeCopiedResetTimer, loadDevices, mountedRef, selectedAddress]
   )
 
+  const handleAddressChange = useCallback(
+    (address: string) => {
+      const next = choosePairingAddress(address, networkInterfaces)
+      setSelection(next)
+      const manualAddress = persistedManualAddress(next)
+      if (manualAddress !== storedPairingAddressRef.current) {
+        void updateSettings({ mobilePairingAddress: manualAddress })
+      }
+    },
+    [networkInterfaces, storedPairingAddressRef, updateSettings]
+  )
+
   useEffect(() => {
     void loadDevices()
     void loadNetworkInterfaces()
@@ -163,7 +193,7 @@ export function MobilePane(): React.JSX.Element {
       <MobileNetworkInterfaceSection
         networkInterfaces={networkInterfaces}
         selectedAddress={selectedAddress}
-        onSelectedAddressChange={setSelectedAddress}
+        onSelectedAddressChange={handleAddressChange}
         refreshingNetworkInterfaces={refreshingNetworkInterfaces}
         onRefreshNetworkInterfaces={() => void loadNetworkInterfaces({ notifyOnError: true })}
         loading={loading}
