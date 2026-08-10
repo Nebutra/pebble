@@ -183,7 +183,9 @@ fn create_intercept_response(
     use windows::Win32::System::Com::{IStream, STREAM_SEEK_SET};
 
     let (stream, status, reason, headers) = match decision {
-        NativeBrowserInterceptDecision::Abort => (
+        // Why: a paused request is answered on the deferral path above, so one
+        // arriving here was never held — fail closed rather than let it through.
+        NativeBrowserInterceptDecision::Pause | NativeBrowserInterceptDecision::Abort => (
             None,
             403,
             "Blocked by Pebble".to_string(),
@@ -230,8 +232,10 @@ fn create_intercept_response(
 
 #[cfg(target_os = "windows")]
 fn read_request_string(
-    read: impl FnOnce(*mut PWSTR) -> windows::core::Result<()>,
+    read: impl FnOnce(*mut windows::core::PWSTR) -> windows::core::Result<()>,
 ) -> windows::core::Result<String> {
+    use windows::core::PWSTR;
+
     let mut value = PWSTR::null();
     read(&mut value)?;
     Ok(webview2_com::take_pwstr(value))

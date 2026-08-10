@@ -7823,6 +7823,21 @@ const checks = [
       text.includes('if m.mu.TryRLock() {') &&
       text.includes('func (m *Manager) HangEpisodes() []HangEpisode') &&
       text.includes('m.emit("runtime.hang", episode)')
+  },
+  {
+    name: 'WebView2 dialog state stays on the UI thread and an unheld pause fails closed',
+    // Why: the pending-dialog registry was a global mutex over !Send COM
+    // interfaces, and the subresource responder silently had no Pause arm.
+    files: [
+      'apps/desktop/src-tauri/src/commands/browser_script_dialog.rs',
+      'apps/desktop/src-tauri/src/commands/browser_subresource_interception_windows.rs'
+    ],
+    expect: (text) =>
+      text.includes('static PENDING_DIALOGS: RefCell<HashMap<usize, PendingDialog>>') &&
+      !text.includes('OnceLock<Mutex<HashMap<usize, PendingDialog>>>') &&
+      text.includes(
+        'NativeBrowserInterceptDecision::Pause | NativeBrowserInterceptDecision::Abort =>'
+      )
   }
 ]
 
