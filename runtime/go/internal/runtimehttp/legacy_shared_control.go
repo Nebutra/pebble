@@ -61,6 +61,7 @@ type legacySharedControlSubscription struct {
 	RequestID      string
 	SubscriptionID string
 	Kind           string
+	DeviceID       string
 	WorktreeID     string
 	TerminalID     string
 	StreamID       uint32
@@ -437,7 +438,9 @@ func (s *Server) handleLegacySharedControlRequest(ctx context.Context, conn *web
 		subscriptionID := "accounts-" + request.ID
 		subscriptions[subscriptionID] = legacySharedControlSubscription{RequestID: request.ID, SubscriptionID: subscriptionID, Kind: "accounts"}
 		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, map[string]interface{}{"type": "ready", "subscriptionId": subscriptionID, "snapshot": json.RawMessage(s.manager.GetAccountsSnapshot())}, true)
-	case "accounts.unsubscribe":
+	case "notifications.subscribe":
+		s.startLegacySharedControlNotifications(conn, sharedKey, device, request, subscriptions)
+	case "accounts.unsubscribe", "notifications.unsubscribe":
 		var params struct {
 			SubscriptionID string `json:"subscriptionId"`
 		}
@@ -1082,6 +1085,7 @@ func (s *Server) handleLegacySharedControlRequest(ctx context.Context, conn *web
 func legacySharedControlMobileMethodAllowed(method string) bool {
 	switch method {
 	case "status.get", "accounts.list", "accounts.subscribe", "accounts.unsubscribe",
+		"notifications.subscribe", "notifications.unsubscribe",
 		"session.tabs.list", "session.tabs.listAll", "session.tabs.subscribe",
 		"session.tabs.subscribeAll", "session.tabs.unsubscribe", "session.tabs.unsubscribeAll",
 		"terminal.read", "terminal.list", "terminal.send", "terminal.subscribe", "terminal.unsubscribe",
@@ -1326,6 +1330,8 @@ func legacySharedControlBrowserCommandName(method string) string {
 
 func (s *Server) writeLegacySharedControlSubscriptionEvent(conn *websocketConn, sharedKey *[32]byte, subscription legacySharedControlSubscription, event runtimecore.RuntimeEvent) {
 	switch subscription.Kind {
+	case "notifications":
+		s.writeLegacySharedControlNotificationEvent(conn, sharedKey, subscription, event)
 	case "accounts":
 		if event.Topic == "accounts.changed" {
 			_ = s.writeLegacySharedControlSuccess(conn, sharedKey, subscription.RequestID, map[string]interface{}{"type": "snapshot", "snapshot": event.Payload}, true)

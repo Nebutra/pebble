@@ -128,6 +128,9 @@ func (m *Manager) RevokeLegacySharedControlDevice(deviceID string) bool {
 			continue
 		}
 		m.legacySharedControl.Devices = append(m.legacySharedControl.Devices[:index], m.legacySharedControl.Devices[index+1:]...)
+		// A revoked device will never collect its backlog, and a re-pair issues a
+		// new id, so its watermark would otherwise sit in the journal forever.
+		m.notifications.forget(deviceID)
 		_ = m.saveLocked()
 		return true
 	}

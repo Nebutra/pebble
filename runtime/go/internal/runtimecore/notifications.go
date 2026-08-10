@@ -26,6 +26,9 @@ func (m *Manager) PublishNotification(event NotificationEvent) error {
 	} else if strings.TrimSpace(event.NotificationID) == "" {
 		return errors.New("notification id is required")
 	}
-	m.emit("notification.dispatched", event)
+	// Why: the journal assigns the sequence before the event is emitted so a live
+	// listener and a reconnecting one identify the same notification, and a drop
+	// on either path is recoverable through the replay.
+	m.emit("notification.dispatched", m.notifications.record(event))
 	return nil
 }

@@ -839,7 +839,9 @@ const checks = [
     expect: (text) =>
       text.includes('case "accounts.subscribe":') &&
       text.includes('Kind: "accounts"') &&
-      text.includes('case "accounts.unsubscribe":') &&
+      // The unsubscribe body is shared with other subscription kinds, so pin the
+      // handled method rather than the shape of the case label.
+      text.includes('"accounts.unsubscribe"') &&
       text.includes('case "accounts":') &&
       text.includes('event.Topic == "accounts.changed"') &&
       text.includes('map[string]string{"type": "end"}')
@@ -7705,6 +7707,33 @@ const checks = [
       text.includes('const RETRY_MAX_MS = 30_000') &&
       text.includes('}, remoteWatchRetryDelayMs(attempt))') &&
       !text.includes('}, 2_000)\n  )')
+  },
+  {
+    name: 'A reconnecting phone is replayed the notifications it missed',
+    file: 'runtime/go/internal/runtimecore/notification_journal.go',
+    expect: (text) =>
+      text.includes(
+        'func (m *Manager) NotificationReplayFor(deviceID string, since *uint64) NotificationReplay'
+      ) &&
+      text.includes(
+        'func (m *Manager) AckNotificationDelivery(deviceID string, sequence uint64)'
+      ) &&
+      text.includes('Truncated bool') &&
+      text.includes('if sequence > j.delivered[deviceID] {')
+  },
+  {
+    name: 'The notification watermark advances only for entries the socket accepted',
+    // Why: the replay is only honest if the phone can reach the subscription, so
+    // the delivery rule and its allowlist entry are pinned together.
+    files: [
+      'runtime/go/internal/runtimehttp/legacy_shared_control_notifications.go',
+      'runtime/go/internal/runtimehttp/legacy_shared_control.go'
+    ],
+    expect: (text) =>
+      text.includes('func deliverLegacySharedControlNotificationReplay(') &&
+      text.includes('if write(entry) != nil {') &&
+      text.includes('acknowledge(entry.Sequence)') &&
+      text.includes('"notifications.subscribe", "notifications.unsubscribe",')
   }
 ]
 
