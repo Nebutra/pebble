@@ -228,7 +228,7 @@ func (m *Manager) startSshPortForward(ctx context.Context, targetID string, forw
 	}
 	sshPath, ok := findSystemSshBinary()
 	if !ok {
-		return errors.New("system ssh binary not found")
+		return ErrSystemSshMissing()
 	}
 	bind := fmt.Sprintf("127.0.0.1:%d:%s:%d", forward.LocalPort, forward.RemoteHost, forward.RemotePort)
 	args := sshTargetArgs(target)

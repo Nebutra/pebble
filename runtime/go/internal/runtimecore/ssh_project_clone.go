@@ -54,7 +54,7 @@ func (m *Manager) streamSshProjectClone(ctx context.Context, hostID string, remo
 	}
 	sshPath, ok := findSystemSshBinary()
 	if !ok {
-		return sshProjectCloneEvent{}, errors.New("system ssh binary not found")
+		return sshProjectCloneEvent{}, ErrSystemSshMissing()
 	}
 	deployment, err := m.deploySshRelayWorker(ctx, sshPath, hostID, target)
 	if err != nil {

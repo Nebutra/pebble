@@ -7772,6 +7772,45 @@ const checks = [
       text.includes('results := make(chan fileResult, usageScanResultBuffer)') &&
       text.includes('boundUsageScanTurns(len(result.Turns), len(file.turns))') &&
       (text.match(/discovery\.add\(path, entry\)/g) ?? []).length === 2
+  },
+  {
+    name: 'A missing or pre-FIDO2 system ssh reports the install step, not a bare not-found',
+    files: [
+      'runtime/go/internal/runtimecore/ssh_system_capabilities.go',
+      'runtime/go/internal/runtimecore/ssh_target.go'
+    ],
+    // Why: nine call sites raised the same bare "system ssh binary not found",
+    // and a FIDO2 target failed as "Permission denied" on an ssh older than 8.2.
+    // `ssh -Q key` is the portable capability probe; version strings are not.
+    expect: (text) =>
+      text.includes(
+        'func DetectSshSystemCapabilities(ctx context.Context) SshSystemCapabilities'
+      ) &&
+      text.includes('exec.CommandContext(probeCtx, path, "-Q", "key")') &&
+      text.includes('"sk-ssh-ed25519@openssh.com"') &&
+      text.includes('"sk-ecdsa-sha2-nistp256@openssh.com"') &&
+      text.includes('func ErrSystemSshMissing() error') &&
+      text.includes('PEBBLE_SYSTEM_SSH_PATH at the ssh executable') &&
+      text.includes('EnsureSshTargetTransport(target, CachedSshSystemCapabilities(ctx))') &&
+      !text.includes('errors.New("system ssh binary not found")')
+  },
+  {
+    name: 'One identity argument builder serves interactive and non-interactive ssh execs',
+    files: [
+      'runtime/go/internal/runtimecore/ssh_identity_args.go',
+      'runtime/go/internal/runtimecore/ssh_text_generation_relay.go',
+      'runtime/go/internal/runtimecore/ssh_agent_hook_bootstrap.go'
+    ],
+    // Why: the non-interactive builder forced IdentitiesOnly and dropped
+    // IdentityAgent, so an agent-held key — how a FIDO2 resident key is offered
+    // — was never presented. A security-key target also needs BatchMode off,
+    // because a touch cannot be answered by a cached secret.
+    expect: (text) =>
+      text.includes('func sshIdentityArgs(target SshTarget) []string') &&
+      text.includes('"-o", "IdentityAgent="+target.IdentityAgent') &&
+      text.includes('args = append(args, sshIdentityArgs(target)...)') &&
+      text.includes('SshTargetNeedsUserPresence(target) {') &&
+      !text.includes('"-o", "IdentitiesOnly=yes", "-i", target.IdentityFile')
   }
 ]
 
