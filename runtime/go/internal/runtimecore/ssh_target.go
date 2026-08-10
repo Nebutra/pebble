@@ -298,13 +298,15 @@ func (m *Manager) ProbeSshTarget(ctx context.Context, id string) (SshProbeResult
 	if !ok {
 		return SshProbeResult{}, ErrNotFound
 	}
+	// Why: a missing binary or an ssh too old for the target's FIDO2 key fails
+	// with an opaque "Permission denied" several seconds later. Name the real
+	// cause up front so the renderer can show the install or upgrade step.
+	if err := EnsureSshTargetTransport(target, CachedSshSystemCapabilities(ctx)); err != nil {
+		return SshProbeResult{Success: false, Status: "error", Error: err.Error()}, nil
+	}
 	sshPath, ok := findSystemSshBinary()
 	if !ok {
-		return SshProbeResult{
-			Success: false,
-			Status:  "error",
-			Error:   "system ssh binary not found",
-		}, nil
+		return SshProbeResult{Success: false, Status: "error", Error: ErrSystemSshMissing().Error()}, nil
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, sshProbeTimeout)
 	defer cancel()

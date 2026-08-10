@@ -87,7 +87,7 @@ func (m *Manager) StreamSshRemoteWorkspace(ctx context.Context, targetID string,
 	}
 	sshPath, ok := findSystemSshBinary()
 	if !ok {
-		return errors.New("system ssh binary not found")
+		return ErrSystemSshMissing()
 	}
 	deployment, err := m.deploySshRelayWorker(ctx, sshPath, targetID, target)
 	if err != nil {

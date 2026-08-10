@@ -109,7 +109,7 @@ func (m *Manager) runSshRelayWorkerWithInputTimeout(ctx context.Context, sshTarg
 	}
 	sshPath, ok := findSystemSshBinary()
 	if !ok {
-		return nil, errors.New("system ssh binary not found")
+		return nil, ErrSystemSshMissing()
 	}
 	relayCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -309,9 +309,7 @@ func sshConnectionArgs(target SshTarget) []string {
 	if target.Port != 0 && target.Port != 22 {
 		args = append(args, "-p", strconv.Itoa(target.Port))
 	}
-	if target.IdentityFile != "" {
-		args = append(args, "-o", "IdentitiesOnly=yes", "-i", target.IdentityFile)
-	}
+	args = append(args, sshIdentityArgs(target)...)
 	if target.ProxyCommand != "" {
 		args = append(args, "-o", "ProxyCommand="+target.ProxyCommand)
 	}

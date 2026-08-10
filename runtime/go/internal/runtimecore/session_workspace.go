@@ -62,7 +62,7 @@ func (m *Manager) resolveSshSessionStartRequest(ctx context.Context, req StartSe
 	}
 	sshPath, found := findSystemSshBinary()
 	if !found {
-		return StartSessionRequest{}, errors.New("system ssh binary not found")
+		return StartSessionRequest{}, ErrSystemSshMissing()
 	}
 	platform, err := m.probeRemoteRelayPlatform(ctx, sshPath, target.ID, target)
 	if err != nil {

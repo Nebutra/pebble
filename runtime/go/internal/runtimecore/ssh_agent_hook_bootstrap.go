@@ -59,7 +59,7 @@ func (m *Manager) BootstrapSshAgentHooks(ctx context.Context, id string, req Ssh
 	}
 	sshPath, found := findSystemSshBinary()
 	if !found {
-		return SshAgentHookBootstrapResult{Status: "error", Error: "system ssh binary not found"}, nil
+		return SshAgentHookBootstrapResult{Status: "error", Error: ErrSystemSshMissing().Error()}, nil
 	}
 	commandCtx, cancel := context.WithTimeout(ctx, sshAgentHookBootstrapTimeout)
 	defer cancel()
@@ -158,15 +158,7 @@ func sshTargetArgs(target SshTarget) []string {
 	if target.Port != 0 && target.Port != 22 {
 		args = append(args, "-p", strconv.Itoa(target.Port))
 	}
-	if target.IdentityFile != "" {
-		args = append(args, "-i", target.IdentityFile)
-		if target.IdentitiesOnly == nil || *target.IdentitiesOnly {
-			args = append(args, "-o", "IdentitiesOnly=yes")
-		}
-	}
-	if target.IdentityAgent != "" {
-		args = append(args, "-o", "IdentityAgent="+target.IdentityAgent)
-	}
+	args = append(args, sshIdentityArgs(target)...)
 	if target.ProxyCommand != "" {
 		args = append(args, "-o", "ProxyCommand="+target.ProxyCommand)
 	}
@@ -190,6 +182,13 @@ func configureSshAskpass(cmd *exec.Cmd, manager *Manager, targetID string) (func
 		secret = password
 	}
 	if !cached || secret == "" {
+		// Why: a FIDO2 key is answered by a touch on the authenticator, not by a
+		// stored secret, so the no-credential path would otherwise leave BatchMode
+		// on and suppress the presence prompt — the target could never connect.
+		// The caller's context deadline still bounds how long the touch may take.
+		if target, ok := manager.GetSshTarget(targetID); ok && SshTargetNeedsUserPresence(target) {
+			enableSshCredentialPrompts(cmd.Args)
+		}
 		cmd.Env = append(os.Environ(), "SSH_ASKPASS=", "SSH_ASKPASS_REQUIRE=never", "DISPLAY=")
 		return func() {}, nil
 	}

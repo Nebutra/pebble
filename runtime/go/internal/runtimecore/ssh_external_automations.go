@@ -41,7 +41,7 @@ func (m *Manager) RunSshExternalAutomation(ctx context.Context, targetID string,
 	}
 	sshPath, found := findSystemSshBinary()
 	if !found {
-		return nil, errors.New("system ssh binary not found")
+		return nil, ErrSystemSshMissing()
 	}
 	commandContext, cancel := context.WithTimeout(ctx, sshExternalAutomationTimeout)
 	defer cancel()
