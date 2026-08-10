@@ -7537,6 +7537,34 @@ const checks = [
       text.includes('return `echo setup> setup-ran.txt`') &&
       text.includes('"scripts:\\n  setup: "+runtimeRPCSetupMarkerCommand()+"\\n"') &&
       !text.includes('scripts:\\n  setup: printf setup > setup-ran.txt')
+  },
+  {
+    name: 'The functional gate spawns Windows npm shims through a shell',
+    file: 'config/scripts/run-tauri-real-runtime-gate.mjs',
+    expect: (text) =>
+      text.includes('function needsWindowsShell(name) {') &&
+      text.includes("return command(name).endsWith('.cmd')") &&
+      // Why: both long-lived npm spawns and every run() call must take the
+      // shell, so count them — reverting one site alone still breaks Windows.
+      text.split("shell: needsWindowsShell('npm')").length === 3 &&
+      text.includes('shell: needsWindowsShell(name)')
+  },
+  {
+    name: 'Terminal evidence spawns Windows pnpm shims through a shell',
+    file: 'config/scripts/run-tauri-terminal-evidence.mjs',
+    expect: (text) =>
+      text.includes('export function requiresShellToSpawn(executable) {') &&
+      text.includes('shell: requiresShellToSpawn(executable)')
+  },
+  {
+    name: 'The functional gate times the Rust build apart from the evidence budget',
+    file: 'config/scripts/run-tauri-real-runtime-gate.mjs',
+    expect: (text) =>
+      text.includes('const GATE_LAUNCH_TIMEOUT_MS = 600_000') &&
+      text.includes('const GATE_EVIDENCE_TIMEOUT_MS = 240_000') &&
+      text.includes('deadline = Date.now() + GATE_EVIDENCE_TIMEOUT_MS') &&
+      text.includes('produced no evidence within') &&
+      !text.includes('const deadline = Date.now() + 240_000')
   }
 ]
 

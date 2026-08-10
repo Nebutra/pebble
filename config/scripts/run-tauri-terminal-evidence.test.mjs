@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   parseArgs,
   rendererUnitArgs,
+  requiresShellToSpawn,
   runTerminalEvidence,
   terminalRendererEvidenceModes
 } from './run-tauri-terminal-evidence.mjs'
@@ -67,6 +68,42 @@ describe('Tauri terminal evidence ownership', () => {
       })
       expect(report.native).toMatchObject({ owner: 'tauri-real-runtime' })
       expect(JSON.parse(readFileSync(output, 'utf8')).schemaVersion).toBe(2)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('spawns a Windows .cmd shim through a shell but leaves real executables alone', () => {
+    expect(requiresShellToSpawn('pnpm.cmd')).toBe(true)
+    expect(requiresShellToSpawn('pnpm')).toBe(false)
+    expect(requiresShellToSpawn('node')).toBe(false)
+  })
+
+  it('passes the shell decision to every spawned process', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'pebble-terminal-evidence-shim-'))
+    const output = join(directory, 'report.json')
+    const evidenceDir = join(directory, 'captures')
+    const spawned = []
+    const spawn = (executable, args, options) => {
+      spawned.push({ executable, shell: options.shell })
+      if (options.env.PEBBLE_REAL_RUNTIME_REPORT_PATH) {
+        writeFileSync(
+          options.env.PEBBLE_REAL_RUNTIME_REPORT_PATH,
+          JSON.stringify({ status: 'passed', durationMs: 10 })
+        )
+      }
+      return { status: 0 }
+    }
+
+    try {
+      runTerminalEvidence(
+        ['--mode', 'perf', '--runs', '1', '--output', output, '--evidence-dir', evidenceDir],
+        spawn
+      )
+      expect(spawned.length).toBeGreaterThan(0)
+      for (const call of spawned) {
+        expect(call.shell).toBe(requiresShellToSpawn(call.executable))
+      }
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

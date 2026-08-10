@@ -143,8 +143,19 @@ export function runTerminalEvidence(argv = process.argv.slice(2), spawn = spawnS
   return report
 }
 
+// Why: since CVE-2024-27980 Node refuses to spawn a .cmd shim without a shell
+// and fails with EINVAL, so naming the shim `pnpm.cmd` is not enough on its own.
+export function requiresShellToSpawn(executable) {
+  return executable.endsWith('.cmd')
+}
+
 function runProcess(spawn, executable, args, env) {
-  const result = spawn(executable, args, { cwd: root, stdio: 'inherit', env })
+  const result = spawn(executable, args, {
+    cwd: root,
+    stdio: 'inherit',
+    env,
+    shell: requiresShellToSpawn(executable)
+  })
   if (result.error) {
     throw result.error
   }

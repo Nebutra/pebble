@@ -22,6 +22,15 @@ import { validateTauriRuntimeScreenshots } from './tauri-real-runtime-screenshot
 // only, because every other platform returns from `command()` before reading it.
 const WINDOWS_SHIM_COMMANDS = new Set(['npm', 'npx', 'pnpm', 'yarn'])
 
+// Why: the same npm script compiles the Rust shell and then launches it, so a
+// cold cargo build used to spend most of the evidence budget before the app
+// existed — the macOS runner reached `terminal-mounted` with 41s of 240s left
+// and the gate blamed the stage it happened to die on. Time the build
+// separately and start the evidence clock at the app's first progress write.
+// These live beside the list above for the same temporal-dead-zone reason.
+const GATE_LAUNCH_TIMEOUT_MS = 600_000
+const GATE_EVIDENCE_TIMEOUT_MS = 240_000
+
 const root = resolve(import.meta.dirname, '../..')
 const desktop = resolve(root, 'apps/desktop')
 const temporary = mkdtempSync(join(tmpdir(), 'pebble-real-runtime-gate-'))
@@ -79,7 +88,8 @@ if (process.env.PEBBLE_REAL_RUNTIME_REUSE_BUILD !== '1') {
 const preview = spawn(command('npm'), ['run', 'preview:optimized:renderer'], {
   cwd: desktop,
   stdio: 'inherit',
-  detached: process.platform !== 'win32'
+  detached: process.platform !== 'win32',
+  shell: needsWindowsShell('npm')
 })
 const browserFixture = await startBrowserFixture()
 let shell = null
@@ -90,6 +100,7 @@ try {
       cwd: desktop,
       stdio: 'inherit',
       detached: process.platform !== 'win32',
+      shell: needsWindowsShell('npm'),
       env: {
         ...process.env,
         PEBBLE_FUNCTIONAL_GATE_REPO_PATH: repo,
@@ -390,7 +401,8 @@ function run(name, args, cwd, extraEnv = {}) {
   const result = spawnSync(command(name), args, {
     cwd,
     stdio: 'inherit',
-    env: { ...process.env, ...extraEnv }
+    env: { ...process.env, ...extraEnv },
+    shell: needsWindowsShell(name)
   })
   // Why: a spawn that never started reports a null status, so reporting only
   // the status hides the actual cause behind "exited with no status".
@@ -438,6 +450,14 @@ function command(name) {
   return WINDOWS_SHIM_COMMANDS.has(name) ? `${name}.cmd` : name
 }
 
+// Why: since CVE-2024-27980 Node refuses to spawn a .cmd shim without a shell
+// and fails with EINVAL, so the .cmd suffix alone is not enough on Windows.
+// Only the shim commands take this path — their args carry no spaces, which
+// `shell: true` would otherwise hand to cmd.exe unquoted.
+function needsWindowsShell(name) {
+  return command(name).endsWith('.cmd')
+}
+
 function findAvailablePort() {
   return new Promise((resolvePort, reject) => {
     const server = createServer()
@@ -481,12 +501,17 @@ async function waitForUrl(url, child) {
 }
 
 async function waitForEvidence(path, child, captureDirectory) {
-  const deadline = Date.now() + 240_000
+  let deadline = Date.now() + GATE_LAUNCH_TIMEOUT_MS
+  let launched = false
   let lastStage = 'not-started'
   const capturedSurfaces = new Set()
   while (Date.now() < deadline) {
     try {
       const evidence = JSON.parse(readFileSync(path, 'utf8'))
+      if (!launched) {
+        launched = true
+        deadline = Date.now() + GATE_EVIDENCE_TIMEOUT_MS
+      }
       lastStage = evidence.stage || evidence.status || lastStage
       const surface = captureDirectory
         ? lastStage.match(/^(terminal|browser|source-control|checks)-capture-ready$/)?.[1]
@@ -504,7 +529,11 @@ async function waitForEvidence(path, child, captureDirectory) {
     }
     await delay(100)
   }
-  throw new Error(`timed out waiting for real runtime evidence after ${lastStage}`)
+  throw new Error(
+    launched
+      ? `timed out waiting for real runtime evidence after ${lastStage}`
+      : `functional Tauri shell produced no evidence within ${GATE_LAUNCH_TIMEOUT_MS}ms of build and launch`
+  )
 }
 
 function captureFunctionalWindow(surface, captureDirectory) {
