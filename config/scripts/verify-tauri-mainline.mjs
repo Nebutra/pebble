@@ -7594,13 +7594,18 @@ const checks = [
   {
     name: 'Trusted input evidence waits out a guest that has not attached yet',
     file: 'apps/desktop/src/tauri-real-runtime-native-input-evidence.ts',
-    // Why: the guest throws "Guest not ready" until its child WebView attaches, and
-    // treating that as fatal killed the macOS gate the moment the terminal stage
-    // stopped failing first. Only that message may be swallowed.
+    // Why: the guest throws "Guest not ready" until its child WebView attaches and
+    // leaves one evaluation unanswered mid-navigation; treating either as fatal
+    // killed the macOS gate the moment the terminal stage stopped failing first.
+    // Only those two messages may be swallowed, and a wall-clock deadline — not an
+    // attempt count — must bound the poll, because one attempt can cost 15s.
     expect: (text) =>
       text.includes('async function evaluateWhenGuestAttached(') &&
-      text.includes("error.message === 'Guest not ready'") &&
-      !text.includes('const response = await evaluateTauriBrowserPageExpression(')
+      text.includes('TRANSIENT_GUEST_EVALUATION_ERRORS.has(error.message)') &&
+      text.includes("'Guest not ready'") &&
+      text.includes("'browser guest evaluation timed out'") &&
+      text.includes('const deadline = Date.now() + FIXTURE_TIMEOUT_MS') &&
+      !text.includes('attempt < 300')
   },
   {
     name: 'The SSH askpass helper classifies the prompt before releasing a credential',

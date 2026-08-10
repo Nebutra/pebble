@@ -1,6 +1,10 @@
 import { evaluateTauriBrowserPageExpression } from '@/components/browser-pane/tauri-browser-page-webview'
 import { queueTauriBrowserInteraction } from './tauri-browser-interaction-rpc'
 
+/// Wall-clock bound for one fixture wait; attempt counts could not bound a poll
+/// whose own guest evaluation takes up to 15s to time out.
+const FIXTURE_TIMEOUT_MS = 30_000
+
 type InputEventRecord = { label: string; type: string; trusted: boolean; key: string | null }
 type FrameEvidence = { clicks: number; inputValue: string; events: InputEventRecord[] }
 type FixtureEvidence = {
@@ -149,7 +153,8 @@ async function waitForFixture(
   let latest: FixtureEvidence | null = null
   // Why: a full-size child WKWebView can throttle timers in its occluded
   // parent; each native evaluation yields without depending on parent timers.
-  for (let attempt = 0; attempt < 300; attempt += 1) {
+  const deadline = Date.now() + FIXTURE_TIMEOUT_MS
+  while (Date.now() < deadline) {
     latest = await readFixture(browserPageId)
     if (latest && predicate(latest)) {
       return latest
@@ -159,7 +164,8 @@ async function waitForFixture(
 }
 
 async function waitForExpression(browserPageId: string, expression: string): Promise<void> {
-  for (let attempt = 0; attempt < 300; attempt += 1) {
+  const deadline = Date.now() + FIXTURE_TIMEOUT_MS
+  while (Date.now() < deadline) {
     if ((await evaluateWhenGuestAttached(browserPageId, expression)) === 'true') {
       return
     }
@@ -167,9 +173,16 @@ async function waitForExpression(browserPageId: string, expression: string): Pro
   throw new Error(`trusted WKWebView fixture expression timed out: ${expression}`)
 }
 
-// Why: the guest throws until its child WebView attaches a native label, and this
-// evidence can start polling first. Only that transient state is tolerated, so a
-// real evaluation error still surfaces instead of spinning into a generic timeout.
+// Why: the guest throws until its child WebView attaches a native label, and a
+// WKWebView committing a frame load leaves one evaluation unanswered. Only those
+// two transient states are tolerated — a real evaluation error still surfaces,
+// and the caller's deadline names the expression instead of reporting a bare
+// "browser guest evaluation timed out" that identifies no stage.
+const TRANSIENT_GUEST_EVALUATION_ERRORS = new Set([
+  'Guest not ready',
+  'browser guest evaluation timed out'
+])
+
 async function evaluateWhenGuestAttached(
   browserPageId: string,
   expression: string
@@ -177,7 +190,7 @@ async function evaluateWhenGuestAttached(
   try {
     return (await evaluateTauriBrowserPageExpression(browserPageId, expression)).result
   } catch (error) {
-    if (error instanceof Error && error.message === 'Guest not ready') {
+    if (error instanceof Error && TRANSIENT_GUEST_EVALUATION_ERRORS.has(error.message)) {
       return null
     }
     throw error
