@@ -88,6 +88,7 @@ type Manager struct {
 	accountsSnapshot        json.RawMessage
 	legacySharedControl     LegacySharedControlState
 	notifications           notificationJournal
+	hangs                   hangWatchdog
 	liveAgentStats          map[string]time.Time
 	subscribers             map[uint64]chan RuntimeEvent
 	nextSubscriber          uint64
@@ -295,6 +296,7 @@ func NewManager(dataDir string, unavailableTools []string) (*Manager, error) {
 			return nil, err
 		}
 	}
+	manager.startHangWatchdog()
 	return manager, nil
 }
 
@@ -4247,6 +4249,7 @@ func (m *Manager) Unsubscribe(id uint64) {
 }
 
 func (m *Manager) Shutdown() {
+	m.hangs.stopWatching()
 	m.mu.RLock()
 	sessions := make([]*processSession, 0, len(m.sessions))
 	for _, session := range m.sessions {
