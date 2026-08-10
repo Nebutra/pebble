@@ -743,23 +743,31 @@ func normalizeProjectLocationKind(locationKind string, defaultLocal bool) (strin
 }
 
 func (m *Manager) CreateWorktree(ctx context.Context, req CreateWorktreeRequest) (Worktree, error) {
+	worktree, _, err := m.createWorktree(ctx, req)
+	return worktree, err
+}
+
+// createWorktree reports whether the returned worktree is new, so callers that
+// run one-shot side effects (the pebble.yaml setup hook) can tell a fresh
+// worktree from the existing one a repeated request resolves to.
+func (m *Manager) createWorktree(ctx context.Context, req CreateWorktreeRequest) (Worktree, bool, error) {
 	if strings.TrimSpace(req.ProjectID) == "" {
-		return Worktree{}, ErrProjectRequired
+		return Worktree{}, false, ErrProjectRequired
 	}
 	m.mu.RLock()
 	project, ok := m.projects[req.ProjectID]
 	m.mu.RUnlock()
 	if !ok {
-		return Worktree{}, ErrNotFound
+		return Worktree{}, false, ErrNotFound
 	}
 	path := strings.TrimSpace(req.Path)
 	if path == "" || !isAbsoluteForHost(path) {
-		return Worktree{}, ErrInvalidPath
+		return Worktree{}, false, ErrInvalidPath
 	}
 	if project.LocationKind == "local" {
 		normalized, err := normalizeLocalPath(path)
 		if err != nil {
-			return Worktree{}, err
+			return Worktree{}, false, err
 		}
 		path = normalized
 	}
@@ -767,7 +775,7 @@ func (m *Manager) CreateWorktree(ctx context.Context, req CreateWorktreeRequest)
 		if project.LocationKind == "ssh" {
 			createdBaseSHA, err := m.createSshGitWorktree(ctx, project, req, path)
 			if err != nil {
-				return Worktree{}, err
+				return Worktree{}, false, err
 			}
 			req.CreatedBaseSHA = createdBaseSHA
 		} else {
@@ -786,7 +794,7 @@ func (m *Manager) CreateWorktree(ctx context.Context, req CreateWorktreeRequest)
 			gitCtx, cancel := context.WithTimeout(ctx, gitWorktreeCommandLimit)
 			defer cancel()
 			if output, err := exec.CommandContext(gitCtx, "git", args...).CombinedOutput(); err != nil {
-				return Worktree{}, errors.New(strings.TrimSpace(string(output)) + ": " + err.Error())
+				return Worktree{}, false, errors.New(strings.TrimSpace(string(output)) + ": " + err.Error())
 			}
 			req.CreatedBaseSHA = createdBaseSHA
 		}
@@ -809,17 +817,17 @@ func (m *Manager) CreateWorktree(ctx context.Context, req CreateWorktreeRequest)
 	for _, existing := range m.worktrees {
 		if existing.ProjectID == project.ID && worktreePathsEqual(project, existing.Path, worktree.Path) {
 			m.mu.Unlock()
-			return existing, nil
+			return existing, false, nil
 		}
 	}
 	m.worktrees[worktree.ID] = worktree
 	err := m.saveLocked()
 	m.mu.Unlock()
 	if err != nil {
-		return Worktree{}, err
+		return Worktree{}, false, err
 	}
 	m.emit("worktree.changed", worktree)
-	return worktree, nil
+	return worktree, true, nil
 }
 
 func (m *Manager) UpdateWorktree(id string, req UpdateWorktreeRequest) (Worktree, error) {

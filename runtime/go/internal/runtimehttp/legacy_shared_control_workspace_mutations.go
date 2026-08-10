@@ -478,14 +478,11 @@ func (s *Server) createLegacySharedControlWorktree(raw json.RawMessage) (interfa
 		provenance = nil
 	}
 	result := runtimeRPCWorktreeCreateResult(created, s.manager.ListWorktreeLineage())
-	setupScript := runtimecore.LoadWorktreeSetupHookScript(created.Path)
-	shouldRunSetup := runHooks || setupDecision == "run"
-	if setupScript != "" && shouldRunSetup {
-		if err := runtimecore.RunWorktreeSetupHookOnHost(context.Background(), project.Path, created.Path); err != nil {
-			result["warning"] = err.Error()
-		}
-	} else if setupScript != "" && setupDecision != "skip" {
-		result["warning"] = "pebble.yaml setup hook skipped; pass setupDecision=run to run it"
+	if warning := s.manager.ApplyWorktreeSetupHook(
+		context.Background(), project.ID, created.Path,
+		runtimecore.WorktreeSetupDecisionFrom(setupDecision, runHooks),
+	); warning != "" {
+		result["warning"] = warning
 	}
 	if strings.TrimSpace(startupCommand) != "" {
 		environment := make([]string, 0, len(startupEnvironment))

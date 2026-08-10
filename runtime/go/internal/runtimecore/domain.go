@@ -323,6 +323,7 @@ type CreateWorktreeRequest struct {
 	ReviewID       string `json:"reviewId,omitempty"`
 	ExecuteGit     bool   `json:"executeGit,omitempty"`
 	SkipCheckout   bool   `json:"skipCheckout,omitempty"`
+	SetupDecision  string `json:"setupDecision,omitempty"`
 }
 
 type UpdateWorktreeRequest struct {
