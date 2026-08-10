@@ -127,3 +127,52 @@ jobs:
           node config/scripts/smoke-packaged-cli.mjs
           --app-dir=apps/desktop/src-tauri/target/release
           --sidecar-dir=apps/desktop/src-tauri/binaries
+
+  # Why: `verify` never set up Go, so nothing gated runtime/go on a pull request —
+  # the only workflows running `go test` were release-time or already chronically
+  # red. This runs separately from `verify` so the Go suite does not extend that
+  # job's critical path.
+  go-tests:
+    name: Go tests ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            packages: ./...
+            flags: -race
+          - os: macos-15
+            platform: macos
+            packages: ./...
+            flags: -race
+          # Why: providercli and the CLI packages stub their subprocesses with
+          # `#!/bin/sh` fixtures that cmd.exe cannot execute, so Windows runs the
+          # packages that actually carry platform-dependent behaviour — worktree
+          # hooks, path handling, and host capability probing. `-race` is omitted
+          # because it needs a CGO toolchain the runner does not reliably have;
+          # Linux and macOS already cover the detector.
+          - os: windows-latest
+            platform: windows
+            packages: ./internal/runtimecore/... ./internal/runtimehttp/... ./internal/hostprobe/...
+            flags: ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: runtime/go/go.mod
+          cache-dependency-path: runtime/go/go.sum
+
+      # Why: bash on every platform so the package list quotes identically; the
+      # tests still spawn their own subprocesses through Go, not through this shell.
+      - name: Test
+        shell: bash
+        working-directory: runtime/go
+        run: go test ${{ matrix.flags }} -timeout 20m ${{ matrix.packages }}

@@ -30,7 +30,7 @@ func TestLegacySharedControlRuntimeScopeClonesAndRemovesRealGitWorktree(t *testi
 	}
 	if err := os.WriteFile(
 		filepath.Join(source, "pebble.yaml"),
-		[]byte("scripts:\n  setup: printf setup > setup-ran.txt\n"),
+		[]byte("scripts:\n  setup: "+runtimeRPCSetupMarkerCommand()+"\n"),
 		0o644,
 	); err != nil {
 		t.Fatal(err)
@@ -115,7 +115,8 @@ func TestLegacySharedControlRuntimeScopeClonesAndRemovesRealGitWorktree(t *testi
 	if _, err := os.Stat(filepath.Join(worktreePath, "docs")); !os.IsNotExist(err) {
 		t.Fatalf("unselected sparse directory was checked out: %v", err)
 	}
-	if output, err := os.ReadFile(filepath.Join(worktreePath, "setup-ran.txt")); err != nil || string(output) != "setup" {
+	// Why: cmd.exe's `echo` appends CRLF, so the marker is compared trimmed.
+	if output, err := os.ReadFile(filepath.Join(worktreePath, "setup-ran.txt")); err != nil || strings.TrimSpace(string(output)) != "setup" {
 		t.Fatalf("setup hook did not run in the worktree: output=%q err=%v", output, err)
 	}
 	startupPath := filepath.Join(worktreePath, "startup-ran.txt")
@@ -159,6 +160,14 @@ func runtimeRPCStartupMarkerCommand() string {
 		return `echo %PEBBLE_TEST_STARTUP%> startup-ran.txt`
 	}
 	return `printf "$PEBBLE_TEST_STARTUP" > startup-ran.txt`
+}
+
+// Why: the setup hook runs through cmd.exe on Windows, which has no `printf`.
+func runtimeRPCSetupMarkerCommand() string {
+	if runtime.GOOS == "windows" {
+		return `echo setup> setup-ran.txt`
+	}
+	return `printf setup > setup-ran.txt`
 }
 
 func stringPointer(value string) *string {
