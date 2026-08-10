@@ -7507,6 +7507,36 @@ const checks = [
     expect: (text) =>
       text.includes('if project.LocationKind == "local" {') &&
       text.includes('known = withWorktreeGitActivity(known)')
+  },
+  {
+    name: 'Pull requests run the Go suite on Linux, macOS, and Windows',
+    file: '.github/workflows/pr.yml',
+    expect: (text) =>
+      text.includes('go-tests:') &&
+      text.includes('go-version-file: runtime/go/go.mod') &&
+      text.includes('run: go test ${{ matrix.flags }} -timeout 20m ${{ matrix.packages }}') &&
+      text.includes('platform: linux') &&
+      text.includes('platform: macos') &&
+      text.includes('platform: windows')
+  },
+  {
+    name: 'Remote directory browsing sorts like the local browser instead of trusting readdir order',
+    file: 'runtime/go/cmd/pebble-relay-worker/directory_listing.go',
+    expect: (text) =>
+      text.includes('sort.Slice(result.Entries, func(i, j int) bool {') &&
+      text.includes('return result.Entries[i].IsDirectory') &&
+      text.includes(
+        'return strings.ToLower(result.Entries[i].Name) < strings.ToLower(result.Entries[j].Name)'
+      )
+  },
+  {
+    name: 'Worktree projection test writes its setup marker with a shell the host actually has',
+    file: 'runtime/go/internal/runtimehttp/runtime_rpc_workspace_projection_test.go',
+    expect: (text) =>
+      text.includes('func runtimeRPCSetupMarkerCommand() string') &&
+      text.includes('return `echo setup> setup-ran.txt`') &&
+      text.includes('"scripts:\\n  setup: "+runtimeRPCSetupMarkerCommand()+"\\n"') &&
+      !text.includes('scripts:\\n  setup: printf setup > setup-ran.txt')
   }
 ]
 

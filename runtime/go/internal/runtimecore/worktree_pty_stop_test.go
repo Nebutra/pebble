@@ -2,9 +2,20 @@ package runtimecore
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
 )
+
+// Why: these tests need any long-lived process to hold a PTY, not a POSIX shell
+// specifically. Skipping on Windows would drop worktree-teardown coverage from
+// the platform whose process-tree kill path differs most from the others.
+func ptyStopTestCommand() []string {
+	if runtime.GOOS == "windows" {
+		return []string{"cmd.exe"}
+	}
+	return []string{"/bin/sh"}
+}
 
 func TestStopSessionsForWorktreeStopsLiveSessions(t *testing.T) {
 	manager, err := NewManager(t.TempDir(), nil)
@@ -26,7 +37,7 @@ func TestStopSessionsForWorktreeStopsLiveSessions(t *testing.T) {
 	manager.mu.Unlock()
 
 	session, err := manager.StartSession(context.Background(), StartSessionRequest{
-		ProjectID: project.ID, WorktreeID: worktreeID, Cwd: childPath, Command: []string{"/bin/sh"},
+		ProjectID: project.ID, WorktreeID: worktreeID, Cwd: childPath, Command: ptyStopTestCommand(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -93,7 +104,7 @@ func TestDeleteWorktreeStopsSessionsBeforeGit(t *testing.T) {
 	manager.mu.Unlock()
 
 	session, err := manager.StartSession(context.Background(), StartSessionRequest{
-		ProjectID: project.ID, WorktreeID: worktreeID, Cwd: childPath, Command: []string{"/bin/sh"},
+		ProjectID: project.ID, WorktreeID: worktreeID, Cwd: childPath, Command: ptyStopTestCommand(),
 	})
 	if err != nil {
 		t.Fatal(err)
