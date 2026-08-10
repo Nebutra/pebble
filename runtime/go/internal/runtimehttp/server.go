@@ -497,6 +497,13 @@ func (s *Server) handleProjectByID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// createdWorktreeResponse embeds the worktree so its fields stay at the top
+// level for clients that predate the setup hook warning.
+type createdWorktreeResponse struct {
+	runtimecore.Worktree
+	Warning string `json:"warning,omitempty"`
+}
+
 func (s *Server) handleWorktrees(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -506,12 +513,12 @@ func (s *Server) handleWorktrees(w http.ResponseWriter, r *http.Request) {
 		if !decodeJSON(w, r, &req) {
 			return
 		}
-		worktree, err := s.manager.CreateWorktree(r.Context(), req)
+		worktree, warning, err := s.manager.CreateWorktreeWithSetupHook(r.Context(), req)
 		if err != nil {
 			writeRuntimeError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusCreated, worktree)
+		writeJSON(w, http.StatusCreated, createdWorktreeResponse{Worktree: worktree, Warning: warning})
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}

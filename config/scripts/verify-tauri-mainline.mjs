@@ -6100,7 +6100,9 @@ const checks = [
     file: 'runtime/go/internal/runtimehttp/legacy_shared_control_workspace_mutations.go',
     expect: (text) =>
       text.includes('ConfigureWorktreeSparseCheckout') &&
-      text.includes('RunWorktreeSetupHookOnHost') &&
+      // The hook itself moved into the shared runtime helper; what this path
+      // still owns is running it after sparse checkout, before startup.
+      text.includes('ApplyWorktreeSetupHook') &&
       text.includes('builtinAgentStartupCommand') &&
       text.includes('StartSession') &&
       text.includes('result["startupTerminal"]')
@@ -7734,6 +7736,22 @@ const checks = [
       text.includes('if write(entry) != nil {') &&
       text.includes('acknowledge(entry.Sequence)') &&
       text.includes('"notifications.subscribe", "notifications.unsubscribe",')
+  },
+  {
+    name: 'Both worktree create transports share one pebble.yaml setup hook rule',
+    // Why: a REST worktree used to skip the hook silently, so the opt-in, the
+    // skipped warning and the REST wiring are pinned to one implementation.
+    files: [
+      'runtime/go/internal/runtimecore/worktree_setup_hook.go',
+      'runtime/go/internal/runtimehttp/server.go'
+    ],
+    expect: (text) =>
+      text.includes('func (m *Manager) ApplyWorktreeSetupHook(') &&
+      text.includes('func WorktreeSetupDecisionFrom(setupDecision string, runHooks bool)') &&
+      text.includes('pebble.yaml setup hook skipped; pass setupDecision=run to run it') &&
+      text.includes('if err != nil || !created {') &&
+      text.includes('CreateWorktreeWithSetupHook(r.Context(), req)') &&
+      text.includes('createdWorktreeResponse{Worktree: worktree, Warning: warning}')
   }
 ]
 
