@@ -9,8 +9,8 @@ import {
   type GateConfig,
   captureGateSurface,
   runtimeTailContains,
-  terminalText,
   waitFor,
+  waitForShellToExecute,
   writeEvidence,
   writeProgress
 } from './tauri-real-runtime-gate-evidence'
@@ -112,10 +112,7 @@ export async function runTauriRealRuntimeGate(): Promise<void> {
     await writeProgress('terminal-mounted')
     // Why: a mounted xterm can precede shell readiness. Writing during that
     // gap reproduces the lost first command and long input latency regression.
-    await waitFor(
-      () => terminalText(ptyId).includes('repo'),
-      `the shell prompt in PTY ${ptyId} to render the working directory`
-    )
+    await waitForShellToExecute(ptyId, `PEBBLE_SHELL_READY_${crypto.randomUUID()}`)
     await writeProgress('terminal-shell-ready')
 
     const marker = `PEBBLE_REAL_RUNTIME_${crypto.randomUUID()}`

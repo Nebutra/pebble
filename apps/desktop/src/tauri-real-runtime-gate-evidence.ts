@@ -11,6 +11,8 @@ export type GateConfig = {
 type RuntimeOutputChunk = { content: string }
 
 export const GATE_TIMEOUT_MS = 30_000
+/// How long one shell-readiness probe waits before it is re-sent.
+const SHELL_PROBE_INTERVAL_MS = 2_000
 
 export function writeEvidence(value: Record<string, unknown>): Promise<boolean> {
   return invoke<boolean>('functional_gate_write_evidence', {
@@ -40,9 +42,24 @@ export async function waitFor<T>(
   throw new Error(`real runtime gate timed out waiting for ${condition}`)
 }
 
-export function terminalText(ptyId: string): string {
-  return (
-    document.querySelector(`[data-pty-id="${CSS.escape(ptyId)}"] .xterm-rows`)?.textContent ?? ''
+// Why: the shell may not be reading stdin yet when xterm mounts, and a write into
+// that gap is silently lost — the regression this wait exists to catch. Probing
+// with a real command is prompt-independent, unlike reading the prompt for a
+// working directory, which only appears where the shell config prints one.
+export async function waitForShellToExecute(ptyId: string, marker: string): Promise<void> {
+  const deadline = Date.now() + GATE_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    await window.api.pty.writeAccepted(ptyId, `echo ${marker}\r`)
+    const probeDeadline = Date.now() + SHELL_PROBE_INTERVAL_MS
+    while (Date.now() < probeDeadline) {
+      if (await runtimeTailContains(ptyId, marker)) {
+        return
+      }
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 50))
+    }
+  }
+  throw new Error(
+    `real runtime gate timed out waiting for the shell in PTY ${ptyId} to execute a command`
   )
 }
 

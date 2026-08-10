@@ -7578,6 +7578,20 @@ const checks = [
       text.includes('real runtime gate timed out waiting for ${condition}')
   },
   {
+    name: 'The gate probes shell readiness with a command, not with the prompt text',
+    files: [
+      'apps/desktop/src/tauri-real-runtime-gate.ts',
+      'apps/desktop/src/tauri-real-runtime-gate-evidence.ts'
+    ],
+    // Why: the old check read the prompt for a working directory, which the Linux
+    // runner's shell prints and the macOS runner's does not — three weeks of a
+    // deterministic red that looked like a product failure.
+    expect: (text) =>
+      text.includes('export async function waitForShellToExecute(') &&
+      text.includes('await window.api.pty.writeAccepted(ptyId, `echo ${marker}\\r`)') &&
+      !text.includes('terminalText')
+  },
+  {
     name: 'The SSH askpass helper classifies the prompt before releasing a credential',
     file: 'runtime/go/cmd/pebble-runtime/main.go',
     expect: (text) =>
