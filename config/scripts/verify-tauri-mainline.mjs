@@ -7592,6 +7592,17 @@ const checks = [
       !text.includes('terminalText')
   },
   {
+    name: 'Trusted input evidence waits out a guest that has not attached yet',
+    file: 'apps/desktop/src/tauri-real-runtime-native-input-evidence.ts',
+    // Why: the guest throws "Guest not ready" until its child WebView attaches, and
+    // treating that as fatal killed the macOS gate the moment the terminal stage
+    // stopped failing first. Only that message may be swallowed.
+    expect: (text) =>
+      text.includes('async function evaluateWhenGuestAttached(') &&
+      text.includes("error.message === 'Guest not ready'") &&
+      !text.includes('const response = await evaluateTauriBrowserPageExpression(')
+  },
+  {
     name: 'The SSH askpass helper classifies the prompt before releasing a credential',
     file: 'runtime/go/cmd/pebble-runtime/main.go',
     expect: (text) =>

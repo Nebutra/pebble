@@ -151,7 +151,7 @@ async function waitForFixture(
   // parent; each native evaluation yields without depending on parent timers.
   for (let attempt = 0; attempt < 300; attempt += 1) {
     latest = await readFixture(browserPageId)
-    if (predicate(latest)) {
+    if (latest && predicate(latest)) {
       return latest
     }
   }
@@ -160,19 +160,39 @@ async function waitForFixture(
 
 async function waitForExpression(browserPageId: string, expression: string): Promise<void> {
   for (let attempt = 0; attempt < 300; attempt += 1) {
-    if ((await evaluateTauriBrowserPageExpression(browserPageId, expression)).result === 'true') {
+    if ((await evaluateWhenGuestAttached(browserPageId, expression)) === 'true') {
       return
     }
   }
   throw new Error(`trusted WKWebView fixture expression timed out: ${expression}`)
 }
 
-async function readFixture(browserPageId: string): Promise<FixtureEvidence> {
-  const response = await evaluateTauriBrowserPageExpression(
+// Why: the guest throws until its child WebView attaches a native label, and this
+// evidence can start polling first. Only that transient state is tolerated, so a
+// real evaluation error still surfaces instead of spinning into a generic timeout.
+async function evaluateWhenGuestAttached(
+  browserPageId: string,
+  expression: string
+): Promise<string | null> {
+  try {
+    return (await evaluateTauriBrowserPageExpression(browserPageId, expression)).result
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Guest not ready') {
+      return null
+    }
+    throw error
+  }
+}
+
+async function readFixture(browserPageId: string): Promise<FixtureEvidence | null> {
+  const result = await evaluateWhenGuestAttached(
     browserPageId,
     'JSON.stringify(globalThis.__pebbleNativeInputEvidence?.()??null)'
   )
-  const parsed = JSON.parse(response.result) as FixtureEvidence | null
+  if (result === null) {
+    return null
+  }
+  const parsed = JSON.parse(result) as FixtureEvidence | null
   if (!parsed || !Array.isArray(parsed.events)) {
     throw new Error('trusted WKWebView fixture returned invalid evidence')
   }
