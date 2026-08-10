@@ -4,6 +4,7 @@ import type { PreloadApi } from '../../../packages/product-core/shared/preload-a
 import type { RuntimeRpcResponse } from '../../../packages/product-core/shared/runtime-rpc-envelope'
 import type { FsChangedPayload } from '../../../packages/product-core/shared/types'
 import { normalizeRuntimePathForComparison } from '../../../packages/product-core/shared/cross-platform-path'
+import { remoteWatchRetryDelayMs } from './remote-watch-backoff'
 import { dispatchFsChangedPayload } from './tauri-file-watch-fs-changed'
 import {
   diffFileWatchSnapshots,
@@ -36,6 +37,8 @@ type RemoteWatchState = {
   pollInFlight: boolean
   snapshot: Map<string, FileWatchSnapshotEntry> | null
   closed: boolean
+  rearmAttempt: number
+  rearmTimer: ReturnType<typeof setTimeout> | null
 }
 
 // Remote (SSH) worktree watching, split out of tauri-file-watch-api.ts. Uses the
@@ -68,7 +71,9 @@ export async function watchRemoteWorktree(args: {
     pollTimer: null,
     pollInFlight: false,
     snapshot: null,
-    closed: false
+    closed: false,
+    rearmAttempt: 0,
+    rearmTimer: null
   }
   remoteWatchStates.set(key, state)
   state.start = startRemoteWorktreeWatch(state).catch((error) => {
@@ -81,10 +86,7 @@ export async function watchRemoteWorktree(args: {
   await state.start
 }
 
-export function unwatchRemoteWorktree(args: {
-  worktreePath: string
-  connectionId?: string
-}): void {
+export function unwatchRemoteWorktree(args: { worktreePath: string; connectionId?: string }): void {
   const connectionId = args.connectionId?.trim()
   if (!connectionId) {
     return
@@ -120,12 +122,16 @@ async function startRemoteWorktreeWatch(state: RemoteWatchState): Promise<void> 
             error: error.message
           })
         },
+        // Why: this fires when the SSH transport drops, not only when the user
+        // unwatches. Forgetting the state there lost the ref count — a later
+        // watch restarted at one, so a single unwatch tore down a watch other
+        // panes still needed — and the worktree never watched again.
         onClose: () => {
-          if (remoteWatchStates.get(state.key) === state) {
-            remoteWatchStates.delete(state.key)
-          }
-          state.closed = true
           state.unsubscribe = null
+          state.remoteSubscriptionId = null
+          if (!state.closed && remoteWatchStates.get(state.key) === state) {
+            scheduleRemoteWatchRearm(state)
+          }
         }
       }
     )
@@ -140,7 +146,10 @@ async function startLegacySshWatch(
   projectId: string,
   worktreeId: string
 ): Promise<void> {
-  state.snapshot = await readLegacySshSnapshot(projectId, worktreeId)
+  // Why: seeding outside the retry made the first failed read reject the whole
+  // watch — during a drop, which is exactly when this fallback has to survive.
+  // An empty seed only means the next successful poll diffs from nothing.
+  state.snapshot = await readLegacySshSnapshot(projectId, worktreeId).catch(() => null)
   const poll = async (): Promise<void> => {
     if (state.closed || state.pollInFlight) {
       return
@@ -173,6 +182,7 @@ function bindRemoteWatchHandle(
   state: RemoteWatchState,
   handle: RuntimeEnvironmentSubscriptionHandle
 ): void {
+  state.rearmAttempt = 0
   state.unsubscribe = handle.unsubscribe
   if (!state.closed && remoteWatchStates.get(state.key) === state) {
     return
@@ -260,6 +270,10 @@ function isRemoteWatchEvent(value: unknown): value is RuntimeFileWatchEvent {
 function closeRemoteWorktreeWatch(state: RemoteWatchState): void {
   state.closed = true
   remoteWatchStates.delete(state.key)
+  if (state.rearmTimer !== null) {
+    globalThis.clearTimeout(state.rearmTimer)
+    state.rearmTimer = null
+  }
   state.unsubscribe?.()
   state.unsubscribe = null
   if (state.pollTimer !== null) {
@@ -281,6 +295,25 @@ function unwatchRemoteRuntimeFileWatch(state: RemoteWatchState): void {
       timeoutMs: 5_000
     })
     .catch(() => {})
+}
+
+function scheduleRemoteWatchRearm(state: RemoteWatchState): void {
+  if (state.rearmTimer !== null) {
+    return
+  }
+  const delay = remoteWatchRetryDelayMs(state.rearmAttempt)
+  state.rearmAttempt += 1
+  state.rearmTimer = globalThis.setTimeout(() => {
+    state.rearmTimer = null
+    if (state.closed || remoteWatchStates.get(state.key) !== state) {
+      return
+    }
+    state.start = startRemoteWorktreeWatch(state).catch(() => {
+      if (!state.closed) {
+        scheduleRemoteWatchRearm(state)
+      }
+    })
+  }, delay)
 }
 
 function getRemoteWatchKey(connectionId: string, worktreePath: string): string {

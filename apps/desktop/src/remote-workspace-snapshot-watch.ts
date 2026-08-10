@@ -3,6 +3,7 @@ import type {
   RemoteWorkspaceSnapshot
 } from '../../../packages/product-core/shared/remote-workspace-types'
 import { ensurePebbleRuntimeProcess, requestRuntimeJson } from './pebble-tauri-runtime-transport'
+import { remoteWatchRetryDelayMs } from './remote-watch-backoff'
 import { subscribeRuntimeEventPush } from './tauri-runtime-event-push'
 import type { RuntimeEventStreamEntry } from './runtime-command-shapes'
 
@@ -17,6 +18,7 @@ const watchedTargets = new Set<string>()
 const retainedWatchTargets = new Set<string>()
 const watchConnectedByTarget = new Map<string, boolean>()
 const watchRetryTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const watchRetryAttempts = new Map<string, number>()
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pushConnected = false
 let pushGeneration = 0
@@ -80,6 +82,7 @@ export async function stopWorkspacePush(): Promise<void> {
     clearTimeout(timer)
   }
   watchRetryTimers.clear()
+  watchRetryAttempts.clear()
   watchConnectedByTarget.clear()
   updatePollingState()
 }
@@ -115,6 +118,7 @@ async function releaseTargetWatch(targetId: string): Promise<void> {
     return
   }
   watchConnectedByTarget.delete(targetId)
+  watchRetryAttempts.delete(targetId)
   await runtimePost('/v1/remote-workspace/watch', {
     targetId,
     enabled: false
@@ -133,7 +137,11 @@ function handleWorkspaceRuntimeEvent(entry: RuntimeEventStreamEntry): void {
         return
       }
       watchConnectedByTarget.set(payload.targetId, payload.connected === true)
-      if (payload.connected !== true) {
+      if (payload.connected === true) {
+        // A live stream proves the host is reachable: the next outage should
+        // retry from the floor rather than inherit this outage's long delay.
+        watchRetryAttempts.delete(payload.targetId)
+      } else {
         scheduleTargetWatchRetry(payload.targetId)
       }
       updatePollingState()
@@ -161,6 +169,8 @@ function scheduleTargetWatchRetry(targetId: string): void {
   if (watchRetryTimers.has(targetId) || listeners.size === 0) {
     return
   }
+  const attempt = watchRetryAttempts.get(targetId) ?? 0
+  watchRetryAttempts.set(targetId, attempt + 1)
   watchRetryTimers.set(
     targetId,
     setTimeout(() => {
@@ -168,7 +178,7 @@ function scheduleTargetWatchRetry(targetId: string): void {
       if (listeners.size > 0 && watchedTargets.has(targetId)) {
         void retainTargetWatch(targetId)
       }
-    }, 2_000)
+    }, remoteWatchRetryDelayMs(attempt))
   )
 }
 
@@ -214,4 +224,5 @@ export async function resetRemoteWorkspaceSnapshotWatch(): Promise<void> {
     clearTimeout(timer)
   }
   watchRetryTimers.clear()
+  watchRetryAttempts.clear()
 }
