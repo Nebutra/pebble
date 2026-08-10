@@ -7520,6 +7520,16 @@ const checks = [
       text.includes('platform: windows')
   },
   {
+    name: 'Remote directory browsing sorts like the local browser instead of trusting readdir order',
+    file: 'runtime/go/cmd/pebble-relay-worker/directory_listing.go',
+    expect: (text) =>
+      text.includes('sort.Slice(result.Entries, func(i, j int) bool {') &&
+      text.includes('return result.Entries[i].IsDirectory') &&
+      text.includes(
+        'return strings.ToLower(result.Entries[i].Name) < strings.ToLower(result.Entries[j].Name)'
+      )
+  },
+  {
     name: 'Worktree projection test writes its setup marker with a shell the host actually has',
     file: 'runtime/go/internal/runtimehttp/runtime_rpc_workspace_projection_test.go',
     expect: (text) =>

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -105,6 +106,16 @@ func listRemoteDirectory(requestedPath, home string) (directoryListingResult, er
 			IsDirectory: isDirectory,
 		})
 	}
+	// Why: (*os.File).ReadDir returns raw directory order, unlike os.ReadDir which
+	// sorts — so a remote browse listed entries in filesystem order while the local
+	// browser (runtimecore ServerDirectoryBrowseResult) sorted them. Same order on
+	// both sides, or the same host looks different over SSH than it does locally.
+	sort.Slice(result.Entries, func(i, j int) bool {
+		if result.Entries[i].IsDirectory != result.Entries[j].IsDirectory {
+			return result.Entries[i].IsDirectory
+		}
+		return strings.ToLower(result.Entries[i].Name) < strings.ToLower(result.Entries[j].Name)
+	})
 	return result, nil
 }
 

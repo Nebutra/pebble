@@ -12,11 +12,19 @@ import (
 
 func TestRunDirectoryListJSONUsesNativePathsAndPreservesSpaces(t *testing.T) {
 	root := t.TempDir()
-	if err := os.Mkdir(filepath.Join(root, "Project One"), 0o755); err != nil {
-		t.Fatal(err)
+	// Why: "zeta dir" and "alpha file.txt" make the ordering contract observable —
+	// with directories first, the directory sorts after the file's initial letter,
+	// and case-insensitivity decides "alpha file.txt" against "README file.md".
+	// Without them the expected order is the same under three different sorts.
+	for _, directory := range []string{"Project One", "zeta dir"} {
+		if err := os.Mkdir(filepath.Join(root, directory), 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := os.WriteFile(filepath.Join(root, "README file.md"), []byte("ok"), 0o644); err != nil {
-		t.Fatal(err)
+	for _, file := range []string{"README file.md", "alpha file.txt"} {
+		if err := os.WriteFile(filepath.Join(root, file), []byte("ok"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	var output bytes.Buffer
 	input, err := json.Marshal(map[string]string{"path": root})
@@ -34,11 +42,19 @@ func TestRunDirectoryListJSONUsesNativePathsAndPreservesSpaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.ResolvedPath != canonicalRoot || len(result.Entries) != 2 {
+	if result.ResolvedPath != canonicalRoot || len(result.Entries) != 4 {
 		t.Fatalf("unexpected listing: %#v", result)
 	}
-	if result.Entries[0].Name != "Project One" || !result.Entries[0].IsDirectory || result.Entries[1].Name != "README file.md" {
-		t.Fatalf("directory entries did not preserve names and kinds: %#v", result.Entries)
+	expected := []directoryListingEntry{
+		{Name: "Project One", IsDirectory: true},
+		{Name: "zeta dir", IsDirectory: true},
+		{Name: "alpha file.txt", IsDirectory: false},
+		{Name: "README file.md", IsDirectory: false},
+	}
+	for index, want := range expected {
+		if result.Entries[index] != want {
+			t.Fatalf("directory entries did not preserve names, kinds, and order: %#v", result.Entries)
+		}
 	}
 }
 
