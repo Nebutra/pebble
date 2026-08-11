@@ -1103,6 +1103,7 @@ type GitStatusEntry struct {
 type GitStatusResult struct {
 	Entries           []GitStatusEntry `json:"entries"`
 	ConflictOperation string           `json:"conflictOperation"`
+	IgnoredPaths      []string         `json:"ignoredPaths,omitempty"`
 }
 
 type GitSubmoduleStatusRequest struct {
