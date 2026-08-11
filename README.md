@@ -232,18 +232,19 @@ Works with **any CLI agent** — if it runs in a terminal, it runs in Pebble.
 ### Desktop — macOS, Windows, Linux
 
 - **[Download from pebble.nebutra.com](https://pebble.nebutra.com/download)**
-- Or grab a build directly: [macOS Universal](https://github.com/nebutra/pebble/releases/latest/download/pebble-macos-universal.dmg) · [Windows (.exe)](https://github.com/nebutra/pebble/releases/latest/download/pebble-windows-x86_64-setup.exe) · [Linux x64 AppImage](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux-x86_64.AppImage) · [Linux arm64 AppImage](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux-aarch64.AppImage) · [All builds](https://github.com/nebutra/pebble/releases/latest)
+- Or grab a build directly: [macOS Universal](https://github.com/nebutra/pebble/releases/latest/download/pebble-macos-universal.dmg) · [Linux x64 (.deb)](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux-x86_64.deb) · [Linux arm64 (.deb)](https://github.com/nebutra/pebble/releases/latest/download/pebble-linux-aarch64.deb) · [All builds](https://github.com/nebutra/pebble/releases/latest)
+- Windows installers are not published yet — that build leg waits on Authenticode signing certificates.
 - Running `pebble serve` on a headless Linux server? See the [headless Linux server guide](docs/reference/headless-linux-server.md).
 
 _Or via a package manager:_
 
 ```bash
-# macOS (Homebrew)
-brew install --cask nebutra/pebble/pebble
-
 # Arch Linux (AUR) — or nebutra-pebble-git to build from source
 yay -S nebutra-pebble-bin
 ```
+
+The Homebrew cask is not live yet: the release job renders it, but the
+`nebutra/homebrew-pebble` tap it publishes to does not exist.
 
 ### Mobile Companion — iOS, Android
 
