@@ -152,3 +152,25 @@ func TestLegacySharedControlSettingsRejectAWronglyTypedValue(t *testing.T) {
 		t.Fatalf("expected a wrongly typed value to be dropped, got %#v", updated)
 	}
 }
+
+func TestLegacySharedControlAnswersSkillsAndStats(t *testing.T) {
+	fixture := startLegacySharedControlClientEventsFixture(t)
+
+	// Why: both clients swallow a failure and substitute an empty result, so a
+	// missing method is indistinguishable from a workspace with nothing in it.
+	// Assert the shape rather than the contents, which depend on the host.
+	skills := fixture.call(t, "skills", "skills.discover", map[string]interface{}{"cwd": fixture.project.Path})
+	if _, present := skills["skills"]; !present {
+		t.Fatalf("expected a skills field, got %#v", skills)
+	}
+	if _, present := skills["sources"]; !present {
+		t.Fatalf("expected a sources field, got %#v", skills)
+	}
+
+	stats := fixture.call(t, "stats", "stats.summary", map[string]interface{}{})
+	for _, field := range []string{"totalAgentsSpawned", "totalPRsCreated", "totalAgentTimeMs"} {
+		if _, present := stats[field]; !present {
+			t.Fatalf("expected %s in the stats summary, got %#v", field, stats)
+		}
+	}
+}
