@@ -120,8 +120,13 @@ jobs:
       # installed org-wide, so it has access to nebutra/homebrew-pebble
       # automatically. GITHUB_TOKEN cannot push cross-repo; a short-lived
       # installation token can.
+      # Why: the tap does not exist yet, and this workflow runs after
+      # publish-release. Without this, a release that shipped correctly would be
+      # reported as failed. Minting the token is the check — it is the exact
+      # credential the push needs, so it also covers a tap the app cannot reach.
       - name: Generate buf0-bot token
         id: app-token
+        continue-on-error: true
         uses: actions/create-github-app-token@v3
         with:
           app-id: 2590194
@@ -129,7 +134,18 @@ jobs:
           owner: nebutra
           repositories: homebrew-pebble
 
+      # Why: skipping silently is how a missing distribution channel stays
+      # missing. Announce it on the run instead.
+      - name: Report an unreachable tap
+        if: steps.app-token.outcome != 'success'
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          echo "::warning::Could not reach nebutra/homebrew-pebble - skipped the cask bump to $VERSION. 'brew install --cask nebutra/pebble/pebble' stays broken until the tap exists."
+          echo "Homebrew cask bump to \`$VERSION\` was skipped: the tap \`nebutra/homebrew-pebble\` is unreachable." >>"$GITHUB_STEP_SUMMARY"
+
       - name: Checkout tap
+        if: steps.app-token.outcome == 'success'
         uses: actions/checkout@v6
         with:
           repository: nebutra/homebrew-pebble
@@ -137,6 +153,7 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Copy cask into tap and open PR
+        if: steps.app-token.outcome == 'success'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ steps.tag.outputs.version }}
