@@ -39,10 +39,41 @@ describe('Tauri release asset gate', () => {
       'latest.json',
       'pebble-linux-aarch64.deb',
       'pebble-linux-x86_64.deb',
-      'pebble-macos-universal.dmg',
-      'pebble-windows-x86_64-setup.exe',
-      'pebble-windows-x86_64.msi'
+      'pebble-macos-universal.dmg'
     ])
+  })
+
+  it('resolves the asset ids a draft manifest addresses its payloads by', async () => {
+    const tag = 'v1.4.27'
+    const release = releaseWithAssets(tag, [
+      ...getRequiredReleaseAssetNames(tag),
+      'pebble-macos-universal.app.tar.gz'
+    ])
+    const latestJson = release.assets.find(({ name }) => name === 'latest.json')
+    const payload = release.assets.find(({ name }) => name === 'pebble-macos-universal.app.tar.gz')
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse([release]))
+        .mockImplementation((url) =>
+          url.endsWith(`/assets/${latestJson.id}`)
+            ? jsonResponse({
+                platforms: {
+                  'darwin-aarch64': {
+                    url: `https://api.github.com/repos/nebutra/pebble/releases/assets/${payload.id}`
+                  }
+                }
+              })
+            : jsonResponse({})
+        )
+    )
+
+    await expect(
+      verifyRequiredReleaseAssets({ repo: 'nebutra/pebble', tag, token: 'token' })
+    ).resolves.toMatchObject({
+      checked: [...getRequiredReleaseAssetNames(tag), 'pebble-macos-universal.app.tar.gz'].sort()
+    })
   })
 
   it('extracts every platform updater payload from latest.json', () => {

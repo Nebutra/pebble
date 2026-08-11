@@ -549,6 +549,10 @@ jobs:
     with:
       ref: refs/tags/${{ needs.cut.outputs.tag }}
 
+  # Why: same reasoning as e2e — the macOS leg cannot open a webview on the
+  # hosted runner ("browser webview is not available"), so it fails on every
+  # release. It stays as release visibility, but publish-release must not
+  # depend on it; asset completeness is gated by verify-release-required-assets.
   terminal-rendering-golden:
     needs: cut
     if: needs.cut.outputs.should_release == 'true'
@@ -744,7 +748,6 @@ jobs:
     needs:
       - cut
       - build-tauri
-      - terminal-rendering-golden
     runs-on: ubuntu-latest
     permissions:
       contents: write
