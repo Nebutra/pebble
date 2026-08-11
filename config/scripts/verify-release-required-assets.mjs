@@ -3,12 +3,13 @@
 import { pathToFileURL } from 'node:url'
 
 const API_VERSION = '2022-11-28'
+// Soft-launch: the Windows installers wait on Authenticode cert secrets, so the
+// release matrix does not build them and requiring them here blocked every
+// publish. Restore both entries together with that build leg.
 const STABLE_DIRECT_DOWNLOAD_ASSETS = [
   'pebble-linux-aarch64.deb',
   'pebble-linux-x86_64.deb',
-  'pebble-macos-universal.dmg',
-  'pebble-windows-x86_64-setup.exe',
-  'pebble-windows-x86_64.msi'
+  'pebble-macos-universal.dmg'
 ]
 
 export function getRequiredReleaseAssetNames() {
@@ -87,6 +88,10 @@ async function fetchAssetText(repo, asset, token) {
 export async function verifyRequiredReleaseAssets({ repo, tag, token }) {
   const release = await fetchRelease(repo, tag, token)
   const assetsByName = new Map(release.assets.map((asset) => [asset.name, asset]))
+  // Why: while the release is still a draft — the only state this gate runs in
+  // — latest.json addresses each payload by asset id rather than by a download
+  // path, so the extracted "name" is a bare id that matches no asset.
+  const assetNamesById = new Map(release.assets.map((asset) => [String(asset.id), asset.name]))
 
   const requiredNames = new Set(getRequiredReleaseAssetNames(tag))
 
@@ -94,7 +99,7 @@ export async function verifyRequiredReleaseAssets({ repo, tag, token }) {
   if (tauriManifestAsset) {
     const manifestText = await fetchAssetText(repo, tauriManifestAsset, token)
     for (const referencedName of extractTauriManifestAssetNames(manifestText)) {
-      requiredNames.add(referencedName)
+      requiredNames.add(assetNamesById.get(referencedName) ?? referencedName)
     }
   }
 
