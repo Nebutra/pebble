@@ -328,6 +328,14 @@ func (s *Server) handleLegacySharedControlRequest(ctx context.Context, conn *web
 		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, result, false)
 		return
 	}
+	if result, handled, err := s.runLegacySharedControlGitMethod(request.Method, request.Params); handled {
+		if err != nil {
+			s.writeLegacySharedControlError(conn, sharedKey, request.ID, "git_failed", err.Error())
+			return
+		}
+		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, result, false)
+		return
+	}
 	if result, handled, err := s.runLegacySharedControlAgentTrustMethod(request.Method, request.Params); handled {
 		if err != nil {
 			s.writeLegacySharedControlError(conn, sharedKey, request.ID, "agent_trust_failed", err.Error())

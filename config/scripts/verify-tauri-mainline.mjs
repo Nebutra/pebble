@@ -7862,6 +7862,26 @@ const checks = [
       text.includes('func (s *Server) startLegacySharedControlClientEvents(') &&
       text.includes('"type": "reposChanged"') &&
       text.includes('"type": "worktreesChanged", "repoId": projectID')
+  },
+  {
+    name: 'Shared control reads git state, and says so only for the methods it implements',
+    // Why: the whole git surface was missing server-side, so a paired client
+    // could not see status or diffs at all. The method table is checked before
+    // the worktree is resolved so an unimplemented mutation still reports
+    // method_not_found rather than blaming the selector it never looked at.
+    files: [
+      'runtime/go/internal/runtimehttp/legacy_shared_control_git.go',
+      'runtime/go/internal/runtimecore/git_worktree_status.go'
+    ],
+    expect: (text) =>
+      text.includes('var legacySharedControlGitReadMethods = map[string]bool{') &&
+      text.includes('if !legacySharedControlGitReadMethods[method] {') &&
+      !text.includes('if !strings.HasPrefix(method, "git.") {') &&
+      text.includes('func (m *Manager) GitWorktreeStatus(') &&
+      // Ignored rows are split out; folding them into entries would render
+      // every ignored file as an untracked change.
+      text.includes('func splitGitIgnoredStatusRows(') &&
+      text.includes('IgnoredPaths:      ignored')
   }
 ]
 
