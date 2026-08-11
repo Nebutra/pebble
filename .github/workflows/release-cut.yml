@@ -509,7 +509,8 @@ jobs:
           {
             echo "## Release E2E Signal"
             echo ""
-            echo "- Terminal rendering golden is release-blocking."
+            echo "- Publishing is gated on the build matrix and verify-release-required-assets."
+            echo "- Terminal rendering golden (linux) is a hard signal; its macOS leg is non-blocking."
             echo "- Full E2E is diagnostic/non-blocking release evidence."
             echo "- Terminal rendering release evidence is diagnostic/non-blocking."
             echo ""
@@ -549,16 +550,18 @@ jobs:
     with:
       ref: refs/tags/${{ needs.cut.outputs.tag }}
 
-  # Why: same reasoning as e2e — the macOS leg cannot open a webview on the
-  # hosted runner ("browser webview is not available"), so it fails on every
-  # release. It stays as release visibility, but publish-release must not
-  # depend on it; asset completeness is gated by verify-release-required-assets.
+  # Why: same reasoning as e2e — publish-release must not depend on this, and
+  # asset completeness is gated by verify-release-required-assets instead.
   terminal-rendering-golden:
     needs: cut
     if: needs.cut.outputs.should_release == 'true'
     name: terminal rendering golden ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    # Why: a leg that cannot pass is not a signal. Keeping the macOS leg red on
+    # every release is what taught everyone to ignore a red release run, while
+    # v1.4.133 through v1.4.135 silently never published. Linux stays hard.
+    continue-on-error: ${{ matrix.soft_fail || false }}
     env:
       NODE_OPTIONS: --max-old-space-size=4096
     strategy:
@@ -567,8 +570,12 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
+          # The real-runtime gate needs a webview the hosted macOS runner does
+          # not provide ("browser webview is not available"). Drop soft_fail
+          # once that gate can open one.
           - os: macos-15
             platform: mac
+            soft_fail: true
           # Why: Windows terminal rendering golden is temporarily disabled on
           # CI while its flaky runner-only failures are investigated.
           # - os: windows-latest
