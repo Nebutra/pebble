@@ -450,6 +450,18 @@ func (s *Server) handleLegacySharedControlRequest(ctx context.Context, conn *web
 		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, map[string]interface{}{
 			"folderWorkspaces": s.manager.ListFolderWorkspaces(),
 		}, false)
+	case "skills.discover":
+		// Why: the client falls back to an empty skill list instead of raising,
+		// so a missing method reads as "this workspace has no skills".
+		var params struct {
+			Cwd string `json:"cwd"`
+		}
+		_ = json.Unmarshal(request.Params, &params)
+		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, s.manager.DiscoverSkills(runtimecore.SkillDiscoveryRequest{Cwd: params.Cwd}), false)
+	case "stats.summary":
+		// Why: same shape of silent failure — the client substitutes zeroes, so
+		// an unanswered call renders as a workspace that never ran an agent.
+		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, s.manager.StatsSummary(), false)
 	case "worktree.lineageList":
 		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, s.manager.ListWorktreeLineage(), false)
 	case "accounts.list":
