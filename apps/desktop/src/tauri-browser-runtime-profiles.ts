@@ -16,6 +16,7 @@ import {
 } from './runtime-bridge'
 import type { RuntimeResourceGetResult } from './runtime-command-shapes'
 import { cancelNativeTauriBrowserDownload } from './tauri-browser-runtime-events'
+import { runtimeTransportFailure } from './runtime-transport-failure'
 
 type RuntimeBrowserProfile = {
   id: string
@@ -208,7 +209,7 @@ async function requestRuntimeJson<T>(
 
 function parseRuntimeResourceResult<T>(result: RuntimeResourceGetResult): T {
   if (result.transport !== 'connected') {
-    throw new Error(result.error ?? `Runtime transport failed: ${result.transport}`)
+    throw runtimeTransportFailure(result)
   }
   if (result.httpStatus !== null && (result.httpStatus < 200 || result.httpStatus > 299)) {
     throw new Error(result.body ?? `Runtime request failed with HTTP ${result.httpStatus}`)

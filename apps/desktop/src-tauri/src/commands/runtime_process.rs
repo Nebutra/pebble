@@ -1,5 +1,6 @@
 use std::env;
 use std::io;
+use std::net::{SocketAddr, TcpListener, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
@@ -93,6 +94,12 @@ pub fn start_runtime_process(
     let executable =
         normalize_text(input.executable.as_str()).unwrap_or_else(default_runtime_executable);
     let listen = normalize_text(input.listen.as_str()).unwrap_or_else(default_listen_address);
+    // Why: spawning onto a taken port produced a runtime that exited on bind
+    // while this call still reported success, so every later request landed on
+    // the foreign listener and surfaced as an opaque transport error.
+    if let Some(occupied) = listen_address_conflict(&listen) {
+        return Err(occupied);
+    }
     let args = runtime_process_args(&input, &listen);
     let bearer_token = normalize_optional_text(input.bearer_token.as_deref());
     let relay_worker_bundle_dir = app
@@ -486,6 +493,28 @@ fn default_listen_address() -> String {
     "127.0.0.1:17777".to_string()
 }
 
+/// Reports why `listen` cannot be bound, naming the address so the operator can
+/// find the holder. A probe that cannot resolve or bind for any other reason is
+/// not treated as a conflict — the runtime itself gives the better diagnosis.
+fn listen_address_conflict(listen: &str) -> Option<String> {
+    let addresses: Vec<SocketAddr> = listen.to_socket_addrs().ok()?.collect();
+    if addresses.is_empty() {
+        return None;
+    }
+    for address in addresses {
+        match TcpListener::bind(address) {
+            Ok(listener) => drop(listener),
+            Err(error) if error.kind() == io::ErrorKind::AddrInUse => {
+                return Some(format!(
+                    "{listen} is already in use, so the bundled runtime cannot start. Another Pebble instance or a manually started pebble-runtime is listening there — stop it, or point that process at a different port."
+                ));
+            }
+            Err(_) => return None,
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -500,6 +529,18 @@ mod tests {
         kill_runtime_child(&mut child).expect("kill child through Zig ABI");
         let status = child.wait().expect("reap test child");
         assert!(!status.success());
+    }
+
+    #[test]
+    fn reports_a_conflict_only_while_the_address_is_held() {
+        let held = TcpListener::bind("127.0.0.1:0").expect("bind probe port");
+        let address = held.local_addr().expect("probe address").to_string();
+
+        let conflict = listen_address_conflict(&address).expect("held address must conflict");
+        assert!(conflict.contains(&address));
+
+        drop(held);
+        assert!(listen_address_conflict(&address).is_none());
     }
 
     #[test]
