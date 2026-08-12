@@ -20,7 +20,10 @@ import { verifyWindowsInnerSignature } from './verify-windows-inner-signature.mj
 const repoRoot = resolve(import.meta.dirname, '../..')
 const desktopRoot = resolve(repoRoot, 'apps/desktop')
 const defaultTargetDir = resolve(desktopRoot, 'src-tauri/target')
-const tauriManifestPath = resolve(desktopRoot, 'src-tauri/Cargo.toml')
+// Why: the verifier is its own package, so building it needs Rust alone. Going
+// through the desktop crate pulled in gdk-sys, native/zig-system, the Go
+// sidecars, and the node_modules resources, and failed on each in turn.
+const updaterVerifierManifestPath = resolve(desktopRoot, 'updater-signature-verifier/Cargo.toml')
 const mainMacosEntitlementsPath = resolve(repoRoot, 'resources/build/entitlements.mac.plist')
 const computerUseMacosEntitlementsPath = resolve(
   repoRoot,
@@ -309,7 +312,7 @@ export function verifyUpdaterSignatureWithRust({ payloadPath, publicKey, signatu
     'run',
     '--quiet',
     '--manifest-path',
-    tauriManifestPath,
+    updaterVerifierManifestPath,
     '--bin',
     'pebble-updater-signature-verifier',
     '--',

@@ -1,0 +1,21 @@
+# Why: this verifier only checks a minisign signature, but it used to live as a
+# secondary [[bin]] inside the Tauri crate. Building it therefore dragged in the
+# whole desktop app build — gdk-sys, native/zig-system, the Go sidecars, and the
+# bundled resources under node_modules — and the release job that runs it failed
+# on each missing prerequisite in turn, every time after the manifest it was
+# checking had already validated. As its own package it needs Rust and nothing
+# else. The desktop crate still builds the same source through an explicit
+# [[bin]], so the app bundle and the release evidence matrix are unchanged.
+[package]
+name = "pebble-updater-signature-verifier"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "pebble-updater-signature-verifier"
+path = "src/main.rs"
+
+[dependencies]
+base64 = "0.22"
+minisign-verify = "0.2.5"
