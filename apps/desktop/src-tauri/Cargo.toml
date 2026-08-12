@@ -8,6 +8,13 @@ default-run = "pebble-desktop-tauri"
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+# Why: the verifier lives in its own package so CI can build it with Rust alone,
+# but the app bundle still ships it. Point at that one source rather than keeping
+# a second copy under src/bin/.
+[[bin]]
+name = "pebble-updater-signature-verifier"
+path = "../updater-signature-verifier/src/main.rs"
+
 [dependencies]
 base64 = "0.22"
 aes = "0.8"
