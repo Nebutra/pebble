@@ -92,7 +92,7 @@ func TestUpdateSessionPlacementMovesLiveSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = manager.StopSession(session.ID) })
+	t.Cleanup(func() { stopSessionForTest(t, manager, session.ID) })
 
 	tabID := "tab-new"
 	leafID := "leaf-new"

@@ -28,7 +28,7 @@ func startDriverLockTestSession(t *testing.T, manager *Manager) Session {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = manager.StopSession(session.ID) })
+	t.Cleanup(func() { stopSessionForTest(t, manager, session.ID) })
 	return session
 }
 

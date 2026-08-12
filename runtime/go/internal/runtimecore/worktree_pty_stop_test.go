@@ -42,7 +42,7 @@ func TestStopSessionsForWorktreeStopsLiveSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = manager.StopSession(session.ID) })
+	t.Cleanup(func() { stopSessionForTest(t, manager, session.ID) })
 
 	if err := manager.StopSessionsForWorktree(context.Background(), worktreeID, false); err != nil {
 		t.Fatalf("expected sessions to stop cleanly: %v", err)

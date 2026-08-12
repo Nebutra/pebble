@@ -1966,21 +1966,13 @@ func TestAgentProfileAndRun(t *testing.T) {
 	if !wait.Satisfied || wait.TimedOut || wait.Status != SessionExited {
 		t.Fatalf("agent session did not finish cleanly: %#v", wait)
 	}
-	tail, err := manager.TailSession(run.SessionID, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	found := false
-	for _, chunk := range tail.Chunks {
-		// Why: Windows ConPTY may prefix a short command with screen-clear and
-		// title sequences; strip only terminal framing before exact comparison.
-		content := strings.TrimRight(ansi.Strip(chunk.Content), "\r\n")
-		if content == "pebble" {
-			found = true
-		}
-	}
+	// Why: Windows ConPTY may prefix a short command with screen-clear and
+	// title sequences; strip only terminal framing before exact comparison.
+	chunks, found := waitForSessionOutputMatch(t, manager, run.SessionID, func(content string) bool {
+		return strings.TrimRight(ansi.Strip(content), "\r\n") == "pebble"
+	})
 	if !found {
-		t.Fatalf("expected agent command output, got %#v", tail.Chunks)
+		t.Fatalf("expected agent command output, got %#v", chunks)
 	}
 	reloaded, err := NewManager(dir, nil)
 	if err != nil {
@@ -3406,5 +3398,31 @@ func TestCloneCancellationSlotIsSingleOwner(t *testing.T) {
 	manager.finishClone()
 	if manager.CancelClone() {
 		t.Fatal("finished clone must clear the cancellation slot")
+	}
+}
+
+// waitForSessionOutputMatch waits for a chunk the caller recognises.
+//
+// Why: a session reaching "exited" is not the same as its output being
+// readable — the process can be reaped before the PTY drain lands in the tail
+// buffer. Asserting straight after the exit wait raced on slow CI runners.
+func waitForSessionOutputMatch(t *testing.T, manager *Manager, sessionID string, matches func(string) bool) ([]OutputChunk, bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	var chunks []OutputChunk
+	for {
+		tail, err := manager.TailSession(sessionID, 10)
+		if err == nil {
+			chunks = tail.Chunks
+			for _, chunk := range chunks {
+				if matches(chunk.Content) {
+					return chunks, true
+				}
+			}
+		}
+		if time.Now().After(deadline) {
+			return chunks, false
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
