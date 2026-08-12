@@ -340,15 +340,22 @@ func TestSessionClearBufferEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		if current := manager.ListSessions()[0]; current.Status == runtimecore.SessionExited {
+	// Why: waiting for the session to exit is not the same as waiting for its
+	// output to be readable — the process can be reaped before the PTY drain
+	// lands in the tail buffer, which raced on slow CI runners. Wait for the
+	// thing actually being asserted.
+	deadline := time.Now().Add(5 * time.Second)
+	var tail runtimecore.TailSessionResponse
+	var tailErr error
+	for {
+		tail, tailErr = manager.TailSession(session.ID, 10)
+		if tailErr == nil && len(tail.Chunks) > 0 {
 			break
 		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected output before clear, tail=%#v err=%v", tail, tailErr)
+		}
 		time.Sleep(20 * time.Millisecond)
-	}
-	if tail, err := manager.TailSession(session.ID, 10); err != nil || len(tail.Chunks) == 0 {
-		t.Fatalf("expected output before clear, tail=%#v err=%v", tail, err)
 	}
 	server := NewServer(manager)
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions/"+session.ID+"/clear-buffer", nil)
@@ -364,9 +371,9 @@ func TestSessionClearBufferEndpoint(t *testing.T) {
 	if cleared.OutputChunks != 0 {
 		t.Fatalf("expected cleared snapshot to report 0 chunks, got %d", cleared.OutputChunks)
 	}
-	tail, err := manager.TailSession(session.ID, 10)
-	if err != nil {
-		t.Fatal(err)
+	tail, tailErr = manager.TailSession(session.ID, 10)
+	if tailErr != nil {
+		t.Fatal(tailErr)
 	}
 	if len(tail.Chunks) != 0 {
 		t.Fatalf("expected cleared tail, got %#v", tail.Chunks)

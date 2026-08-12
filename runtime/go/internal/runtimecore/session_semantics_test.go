@@ -41,7 +41,7 @@ func TestSessionAltScreenActiveFromStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = manager.StopSession(session.ID) })
+	t.Cleanup(func() { stopSessionForTest(t, manager, session.ID) })
 
 	if !waitFor(3*time.Second, func() bool {
 		s, ok := findSession(manager.ListSessions(), session.ID)
@@ -60,7 +60,7 @@ func TestSessionAltScreenActiveFromStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = manager.StopSession(leave.ID) })
+	t.Cleanup(func() { stopSessionForTest(t, manager, leave.ID) })
 
 	// Wait until the stream has been consumed and the final rmcup has flipped
 	// alt-screen back off. Output now flushes byte-immediate (not line-buffered,
@@ -97,7 +97,7 @@ func TestSessionForegroundProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = manager.StopSession(session.ID) })
+	t.Cleanup(func() { stopSessionForTest(t, manager, session.ID) })
 
 	var status Session
 	if !waitFor(4*time.Second, func() bool {
@@ -136,7 +136,7 @@ func TestSessionStatusListPollStaysCheap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _, _ = manager.StopSession(session.ID) })
+	t.Cleanup(func() { stopSessionForTest(t, manager, session.ID) })
 
 	s, ok := findSession(manager.ListSessions(), session.ID)
 	if !ok {
