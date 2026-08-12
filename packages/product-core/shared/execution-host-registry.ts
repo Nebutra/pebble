@@ -90,14 +90,26 @@ function runtimeHealth(
   return compatibility.kind === 'blocked' ? 'blocked' : 'available'
 }
 
+// Why: an unreachable host reconnects forever, and reporting every attempt as
+// "Connecting" is indistinguishable from "about to succeed" — a host that has
+// been down for hours reads exactly like one mid-handshake. The diagnostics
+// already carry the attempt count; once the retries have piled up, say what is
+// actually happening. Sibling of the runtimeHealth fix directly above, where a
+// configured-but-never-connected host used to read "Connected".
+const RUNTIME_RECONNECT_ATTEMPTS_BEFORE_REPORTING_LOSS = 3
+
 function runtimeControlHealth(
   remoteControl: RuntimeStatus['remoteControl'] | null | undefined
 ): ExecutionHostHealth | null {
   switch (remoteControl?.state) {
     case 'awaiting_authenticated':
     case 'awaiting_ready':
-    case 'reconnecting':
       return 'connecting'
+    case 'reconnecting':
+      if (remoteControl.reconnectAttempt < RUNTIME_RECONNECT_ATTEMPTS_BEFORE_REPORTING_LOSS) {
+        return 'connecting'
+      }
+      return remoteControl.lastError ? 'error' : 'disconnected'
     case 'closed':
       return remoteControl.lastError ? 'error' : 'disconnected'
     case 'ready':

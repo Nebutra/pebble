@@ -185,6 +185,80 @@ describe('execution host registry', () => {
     ])
   })
 
+  it('stops calling an unreachable host connecting once the retries pile up', () => {
+    const hosts = buildExecutionHostRegistry({
+      repos: [],
+      settings: { activeRuntimeEnvironmentId: null },
+      runtimeEnvironments: [{ id: 'dev-box', name: 'Dev Box' }],
+      runtimeStatusByEnvironmentId: new Map([
+        [
+          'dev-box',
+          {
+            status: {
+              runtimeId: 'runtime-dev',
+              rendererGraphEpoch: 1,
+              graphStatus: 'ready',
+              authoritativeWindowId: 1,
+              liveTabCount: 0,
+              liveLeafCount: 0,
+              remoteControl: {
+                state: 'reconnecting',
+                pendingRequestCount: 0,
+                subscriptionCount: 0,
+                reconnectAttempt: 6,
+                lastConnectedAt: null,
+                lastClose: { code: 1006, reason: '' },
+                lastError: 'Remote Pebble runtime closed the connection.'
+              }
+            }
+          }
+        ]
+      ])
+    })
+
+    expect(hosts).toMatchObject([
+      { id: 'local', health: 'local' },
+      { id: 'runtime:dev-box', health: 'error' }
+    ])
+  })
+
+  it('reports a silently unreachable host as disconnected rather than connecting', () => {
+    const hosts = buildExecutionHostRegistry({
+      repos: [],
+      settings: { activeRuntimeEnvironmentId: null },
+      runtimeEnvironments: [{ id: 'dev-box', name: 'Dev Box' }],
+      runtimeStatusByEnvironmentId: new Map([
+        [
+          'dev-box',
+          {
+            status: {
+              runtimeId: 'runtime-dev',
+              rendererGraphEpoch: 1,
+              graphStatus: 'ready',
+              authoritativeWindowId: 1,
+              liveTabCount: 0,
+              liveLeafCount: 0,
+              remoteControl: {
+                state: 'reconnecting',
+                pendingRequestCount: 0,
+                subscriptionCount: 0,
+                reconnectAttempt: 6,
+                lastConnectedAt: null,
+                lastClose: { code: 1006, reason: '' },
+                lastError: null
+              }
+            }
+          }
+        ]
+      ])
+    })
+
+    expect(hosts).toMatchObject([
+      { id: 'local', health: 'local' },
+      { id: 'runtime:dev-box', health: 'disconnected' }
+    ])
+  })
+
   it('preserves runtime environment source on runtime hosts', () => {
     const hosts = buildExecutionHostRegistry({
       repos: [],
