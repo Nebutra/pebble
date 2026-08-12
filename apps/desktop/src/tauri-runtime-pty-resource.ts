@@ -6,6 +6,7 @@ import {
   requestRuntimeResourceJson
 } from './runtime-bridge'
 import type { RuntimeResourceGetResult } from './runtime-command-shapes'
+import { runtimeTransportFailure } from './runtime-transport-failure'
 
 export type RuntimeSession = TauriRuntimeAgentSession & {
   id: string
@@ -57,7 +58,7 @@ export async function requestRuntimePtyJson<T>(
 
 function parseRuntimeResourceResult<T>(result: RuntimeResourceGetResult): T {
   if (result.transport !== 'connected') {
-    throw new Error(result.error ?? `Runtime transport failed: ${result.transport}`)
+    throw runtimeTransportFailure(result)
   }
   if (result.httpStatus !== null && (result.httpStatus < 200 || result.httpStatus > 299)) {
     throw new Error(result.body ?? `Runtime request failed with HTTP ${result.httpStatus}`)

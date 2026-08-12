@@ -31,6 +31,7 @@ import {
   subscribeMigrationUnsupported,
   subscribeMigrationUnsupportedClear
 } from './tauri-agent-migration-unsupported'
+import { runtimeTransportFailure } from './runtime-transport-failure'
 
 export type {
   TauriRuntimeAgentSession,
@@ -198,7 +199,7 @@ async function listRuntimeSessions(): Promise<TauriRuntimeAgentSession[]> {
     createRuntimeResourceGetCommand({ path: '/v1/sessions', timeoutMs: 1500 })
   )
   if (result.transport !== 'connected') {
-    throw new Error(result.error ?? `Runtime transport failed: ${result.transport}`)
+    throw runtimeTransportFailure(result)
   }
   if (result.httpStatus !== null && (result.httpStatus < 200 || result.httpStatus > 299)) {
     throw new Error(result.body ?? `Runtime request failed with HTTP ${result.httpStatus}`)
