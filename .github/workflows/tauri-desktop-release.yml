@@ -419,16 +419,23 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version-file: package.json
+          cache: pnpm
 
-      # Why: the manifest check verifies each payload signature by running
-      # `cargo run --bin pebble-updater-signature-verifier`, which compiles the
-      # desktop crate and therefore gdk-sys and native/zig-system. The job only
-      # installed Node, so it failed at "failed to run custom build command for
-      # gdk-sys" after the manifest itself had already validated.
+      # Why: the signature verifier is a bin inside the desktop crate, so
+      # building it drags in the whole app build: gdk-sys, native/zig-system,
+      # the Go sidecars, and the bundled resources that live under node_modules.
+      # Each missing prerequisite failed this job after the manifest itself had
+      # already validated. The verifier is never invoked at runtime — moving it
+      # into its own crate would remove this class of failure outright.
       - uses: dtolnay/rust-toolchain@stable
       - name: Setup Zig
         uses: mlugg/setup-zig@v2
@@ -449,6 +456,12 @@ jobs:
       # the manifest itself had validated, leaving the release stuck as a draft.
       - name: Prepare host Go sidecars for the signature verifier
         run: node apps/desktop/scripts/prepare-go-sidecars.mjs --host-only
+
+      # Why: tauri.conf.json bundles a resource from node_modules
+      # (serve-sim/bin/serve-sim-bin), and tauri-build resolves it before
+      # compiling any bin in the crate.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Verify published signed platform matrix
         env:

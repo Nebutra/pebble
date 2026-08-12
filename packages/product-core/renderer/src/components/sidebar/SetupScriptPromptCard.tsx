@@ -9,7 +9,7 @@ import {
   formatCandidateSource,
   isSetupScriptPromptDismissed,
   ignoresSharedSetupScripts,
-  inspectSetupScriptPromptState,
+  inspectSetupScriptPromptStateUntilSettled,
   type SetupScriptPromptInspection
 } from '@/lib/setup-script-prompt'
 import { checkRuntimeHooks, inspectRuntimeSetupScriptImports } from '@/runtime/runtime-hooks-client'
@@ -75,10 +75,11 @@ function SetupScriptPromptCard(): React.JSX.Element | null {
     setPromptState(null)
 
     async function inspectRepoSetup(): Promise<void> {
-      const nextState = await inspectSetupScriptPromptState({
+      const nextState = await inspectSetupScriptPromptStateUntilSettled({
         repo,
         checkHooks: () => checkRuntimeHooks(settings, repo.id),
-        inspectImports: () => inspectRuntimeSetupScriptImports(settings, repo.id)
+        inspectImports: () => inspectRuntimeSetupScriptImports(settings, repo.id),
+        isCancelled: () => cancelled
       })
       if (!cancelled) {
         setPromptState(nextState)

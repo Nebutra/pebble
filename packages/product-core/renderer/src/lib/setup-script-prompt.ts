@@ -69,6 +69,36 @@ export async function inspectSetupScriptPromptState({
   }
 }
 
+// Why: the renderer mounts before the runtime is listening, so the first
+// inspection of a session can fail on a runtime that is merely still starting.
+// The effect that runs it has no dependency that changes when the runtime comes
+// up, so that transient failure used to latch an error card until the user
+// pressed Retry by hand. `forbidden` is excluded — it is permanent by design.
+const TRANSIENT_INSPECTION_RETRY_DELAYS_MS = [300, 900, 2400]
+
+export async function inspectSetupScriptPromptStateUntilSettled(
+  args: Parameters<typeof inspectSetupScriptPromptState>[0] & {
+    isCancelled?: () => boolean
+    delay?: (ms: number) => Promise<void>
+  }
+): Promise<SetupScriptPromptInspection> {
+  const isCancelled = args.isCancelled ?? (() => false)
+  const delay =
+    args.delay ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+  let inspection = await inspectSetupScriptPromptState(args)
+  for (const waitMs of TRANSIENT_INSPECTION_RETRY_DELAYS_MS) {
+    if (inspection.status !== 'error' || isCancelled()) {
+      return inspection
+    }
+    await delay(waitMs)
+    if (isCancelled()) {
+      return inspection
+    }
+    inspection = await inspectSetupScriptPromptState(args)
+  }
+  return inspection
+}
+
 export function hasEffectiveSetupCommand(repo: Repo, hooksResult: HookCheckResult): boolean {
   const localSetup = repo.hookSettings?.scripts?.setup?.trim()
   const sharedSetup = hooksResult.hooks?.scripts?.setup?.trim()

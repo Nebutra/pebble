@@ -8,6 +8,7 @@ import {
   getSetupScriptPromptDismissalKey,
   ignoresSharedSetupScripts,
   inspectSetupScriptPromptState,
+  inspectSetupScriptPromptStateUntilSettled,
   isSetupScriptPromptDismissed
 } from './setup-script-prompt'
 import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-client'
@@ -214,5 +215,67 @@ describe('setup script prompt inspection', () => {
         setup: 'pnpm install'
       })
     ).toBe('.codex/environments/environment.toml and package.json')
+  })
+})
+
+describe('inspectSetupScriptPromptStateUntilSettled', () => {
+  const repo = { id: 'repo-1', kind: 'git', hookSettings: {} } as unknown as Repo
+
+  it('recovers when the runtime was merely still starting', async () => {
+    // Why: the renderer mounts before the runtime listens. The first check used
+    // to latch an error card that nothing re-ran, even once the runtime was up.
+    let attempt = 0
+    const inspection = await inspectSetupScriptPromptStateUntilSettled({
+      repo,
+      checkHooks: async () => {
+        attempt += 1
+        if (attempt < 3) {
+          throw new Error('runtime transport failed')
+        }
+        return {
+          hasHooks: true,
+          hooks: { scripts: { setup: 'pnpm install' } },
+          mayNeedUpdate: false
+        }
+      },
+      inspectImports: async () => [],
+      delay: async () => {}
+    })
+
+    expect(attempt).toBe(3)
+    expect(inspection.status).toBe('ok')
+  })
+
+  it('gives up and reports the error once the retries are spent', async () => {
+    let attempt = 0
+    const inspection = await inspectSetupScriptPromptStateUntilSettled({
+      repo,
+      checkHooks: async () => {
+        attempt += 1
+        throw new Error('runtime transport failed')
+      },
+      inspectImports: async () => [],
+      delay: async () => {}
+    })
+
+    expect(inspection.status).toBe('error')
+    expect(attempt).toBe(4)
+  })
+
+  it('stops as soon as the effect that started it is cancelled', async () => {
+    let attempt = 0
+    const inspection = await inspectSetupScriptPromptStateUntilSettled({
+      repo,
+      checkHooks: async () => {
+        attempt += 1
+        throw new Error('runtime transport failed')
+      },
+      inspectImports: async () => [],
+      isCancelled: () => attempt >= 2,
+      delay: async () => {}
+    })
+
+    expect(inspection.status).toBe('error')
+    expect(attempt).toBe(2)
   })
 })
