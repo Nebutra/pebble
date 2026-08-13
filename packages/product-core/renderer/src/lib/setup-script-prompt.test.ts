@@ -259,7 +259,7 @@ describe('inspectSetupScriptPromptStateUntilSettled', () => {
     })
 
     expect(inspection.status).toBe('error')
-    expect(attempt).toBe(4)
+    expect(attempt).toBe(6)
   })
 
   it('stops as soon as the effect that started it is cancelled', async () => {

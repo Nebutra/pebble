@@ -74,7 +74,10 @@ export async function inspectSetupScriptPromptState({
 // The effect that runs it has no dependency that changes when the runtime comes
 // up, so that transient failure used to latch an error card until the user
 // pressed Retry by hand. `forbidden` is excluded — it is permanent by design.
-const TRANSIENT_INSPECTION_RETRY_DELAYS_MS = [300, 900, 2400]
+// Measured: on a loaded machine the runtime process only spawned 4s after the
+// window appeared, so a 3.6s budget expired before it was ever listening and the
+// card latched anyway. Cover a slow start instead of guessing low.
+const TRANSIENT_INSPECTION_RETRY_DELAYS_MS = [300, 900, 2400, 5000, 8000]
 
 export async function inspectSetupScriptPromptStateUntilSettled(
   args: Parameters<typeof inspectSetupScriptPromptState>[0] & {
