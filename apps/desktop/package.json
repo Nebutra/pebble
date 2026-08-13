@@ -1,6 +1,6 @@
 {
   "name": "@pebble/desktop",
-  "version": "1.4.136",
+  "version": "1.4.137",
   "private": true,
   "type": "module",
   "scripts": {

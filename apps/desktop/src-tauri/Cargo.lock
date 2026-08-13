@@ -3749,7 +3749,7 @@ dependencies = [
 
 [[package]]
 name = "pebble-desktop-tauri"
-version = "1.4.136"
+version = "1.4.137"
 dependencies = [
  "aes",
  "aes-gcm",

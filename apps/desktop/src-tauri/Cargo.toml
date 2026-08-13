@@ -1,6 +1,6 @@
 [package]
 name = "pebble-desktop-tauri"
-version = "1.4.136"
+version = "1.4.137"
 edition = "2021"
 publish = false
 default-run = "pebble-desktop-tauri"
