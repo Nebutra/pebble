@@ -57,7 +57,16 @@ pub async fn write_runtime_pty_input(
     let sender = input_worker(&worker_key)?;
     match sender.try_send(queued) {
         Ok(()) => Ok(true),
-        Err(mpsc::error::TrySendError::Full(_)) => Ok(false),
+        // Why: a full queue means the worker is behind, not that the key was
+        // meant to be thrown away. Dropping it silently loses what someone
+        // typed, and nothing upstream retries — the batcher resolves and moves
+        // on. Wait for room instead; the worker coalesces everything already
+        // queued into one post, so it drains in a single round trip.
+        Err(mpsc::error::TrySendError::Full(queued)) => sender
+            .send(queued)
+            .await
+            .map(|()| true)
+            .map_err(|error| format!("runtime PTY input queue closed while full: {error}")),
         Err(mpsc::error::TrySendError::Closed(queued)) => {
             remove_input_worker(&worker_key);
             input_worker(&worker_key)?
@@ -158,6 +167,26 @@ fn default_runtime_url() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Why: a full queue used to answer Ok(false) and throw the keystroke away.
+    // Nothing upstream retries, so what someone typed was simply lost.
+    #[tokio::test]
+    async fn a_full_queue_waits_instead_of_losing_what_was_typed() {
+        let (sender, mut receiver) = mpsc::channel::<u8>(1);
+        sender.try_send(1).expect("first slot is free");
+        assert!(matches!(
+            sender.try_send(2),
+            Err(mpsc::error::TrySendError::Full(_))
+        ));
+
+        let queued = tokio::spawn(async move { sender.send(2).await });
+        assert_eq!(receiver.recv().await, Some(1));
+        queued
+            .await
+            .expect("send task joins")
+            .expect("queued once drained");
+        assert_eq!(receiver.recv().await, Some(2));
+    }
 
     #[test]
     fn encodes_session_ids_as_one_path_segment() {
