@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 const persistedStateSchemaVersion = 1
@@ -89,6 +90,9 @@ func (s *fileStore) save(state persistedState) error {
 		return err
 	}
 	dir := filepath.Dir(s.path)
+	// Why: the previous content is the only copy of everything registered. Set
+	// it aside before it is replaced so a day-old state is always recoverable.
+	snapshotStoreForDay(s.path, time.Now())
 	tmpFile, err := os.CreateTemp(dir, ".runtime-state-*.tmp")
 	if err != nil {
 		return err
