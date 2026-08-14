@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   getTerminalWebglAutoDecision,
+  isHarmonyWebShell,
   isLinuxRendererHost,
   resetTerminalWebglAutoDecision
 } from './terminal-webgl-auto-policy'
@@ -92,6 +93,29 @@ describe('terminal WebGL auto policy', () => {
     expect(isLinuxRendererHost('MacIntel', 'Mozilla/5.0 (X11; Linux x86_64)')).toBe(true)
     expect(isLinuxRendererHost('MacIntel', 'Mozilla/5.0 (Macintosh)')).toBe(false)
     expect(isLinuxRendererHost('Linux x86_64', 'Node.js/24')).toBe(false)
+  })
+
+  it('detects Harmony / ArkWeb shells from UA or ?harmony=1', () => {
+    expect(isHarmonyWebShell('Mozilla/5.0 (Phone; OpenHarmony 5.0) ArkWeb/4.1.6.1')).toBe(true)
+    expect(isHarmonyWebShell('Mozilla/5.0 (Macintosh)')).toBe(false)
+    vi.stubGlobal('window', { location: { search: '?pairing=abc&harmony=1' } })
+    expect(isHarmonyWebShell('Mozilla/5.0 (Macintosh)')).toBe(true)
+  })
+
+  it('keeps Harmony WebView auto panes on DOM even when WebGL2 looks available', () => {
+    stubNavigator(
+      'Linux aarch64',
+      'Mozilla/5.0 (Phone; OpenHarmony 5.0) AppleWebKit/537.36 ArkWeb/4.1.6.1'
+    )
+    stubWebglRendererInfo({
+      renderer: 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))',
+      vendor: 'Google'
+    })
+
+    expect(getTerminalWebglAutoDecision()).toMatchObject({
+      allowWebgl: false,
+      reason: 'harmony-webview'
+    })
   })
 
   it('allows non-Linux auto panes to try WebGL without probing renderer identity', () => {

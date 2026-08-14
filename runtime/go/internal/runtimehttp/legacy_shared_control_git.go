@@ -24,6 +24,7 @@ var legacySharedControlGitReadMethods = map[string]bool{
 	"git.history": true, "git.branchCompare": true, "git.commitCompare": true,
 	"git.diff": true, "git.branchDiff": true, "git.commitDiff": true,
 	"git.remoteFileUrl": true, "git.remoteCommitUrl": true,
+	"git.upstreamStatus": true,
 }
 
 func (s *Server) runLegacySharedControlGitMethod(method string, raw json.RawMessage) (interface{}, bool, error) {
@@ -187,6 +188,18 @@ func (s *Server) runLegacySharedControlGitMethod(method string, raw json.RawMess
 			WorktreeID:   worktree.ID,
 			RelativePath: params.RelativePath,
 			Line:         params.Line,
+		}))
+	case "git.upstreamStatus":
+		var params struct {
+			PushTarget runtimecore.GitUpstreamPushHint `json:"pushTarget"`
+		}
+		if err := readLegacySharedControlGitParams(raw, &params); err != nil {
+			return nil, true, err
+		}
+		return legacySharedControlGitResult(s.manager.GitWorktreeUpstreamStatus(ctx, runtimecore.GitWorktreeUpstreamStatusRequest{
+			ProjectID:  worktree.ProjectID,
+			WorktreeID: worktree.ID,
+			PushTarget: params.PushTarget,
 		}))
 	case "git.remoteCommitUrl":
 		var params struct {

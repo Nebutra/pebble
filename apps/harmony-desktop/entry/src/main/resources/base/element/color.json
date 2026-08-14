@@ -1,0 +1,24 @@
+{
+  "color": [
+    {
+      "name": "start_window_background",
+      "value": "#F4F0EA"
+    },
+    {
+      "name": "page_background",
+      "value": "#F4F0EA"
+    },
+    {
+      "name": "status_ok",
+      "value": "#2F6F4E"
+    },
+    {
+      "name": "status_warn",
+      "value": "#9A6B2F"
+    },
+    {
+      "name": "status_error",
+      "value": "#9B3B3B"
+    }
+  ]
+}

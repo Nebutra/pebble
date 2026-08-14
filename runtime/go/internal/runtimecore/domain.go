@@ -8,6 +8,14 @@ import (
 
 const ProtocolVersion = "pebble.runtime.v1"
 
+// Numeric RPC compatibility window. Must match
+// packages/product-core/shared/protocol-version.ts — a missing value is
+// treated as protocol 0 and the web client refuses most runtime RPCs.
+const (
+	RuntimeProtocolVersion            = 3
+	MinCompatibleRuntimeClientVersion = 2
+)
+
 type Capability string
 
 const (

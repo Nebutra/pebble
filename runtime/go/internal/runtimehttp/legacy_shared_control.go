@@ -411,6 +411,13 @@ func (s *Server) handleLegacySharedControlRequest(ctx context.Context, conn *web
 		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, map[string]interface{}{
 			"version": status.Version, "startedAt": status.StartedAt, "uptimeSeconds": status.UptimeSeconds,
 			"capabilities": capabilities, "unavailableTools": status.UnavailableTools,
+			// Why: product-core treats a missing number as protocol 0 and
+			// blocks repo/setup/git calls with "server is too old".
+			"runtimeProtocolVersion":            runtimecore.RuntimeProtocolVersion,
+			"minCompatibleRuntimeClientVersion": runtimecore.MinCompatibleRuntimeClientVersion,
+			"protocolVersion":                   runtimecore.RuntimeProtocolVersion,
+			"minCompatibleMobileVersion":        runtimecore.MinCompatibleRuntimeClientVersion,
+			"deviceScope":                       device.Scope,
 		}, false)
 	case "preflight.check":
 		_ = s.writeLegacySharedControlSuccess(conn, sharedKey, request.ID, runtimecore.DetectHostPreflight(), false)

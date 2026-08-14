@@ -1,0 +1,6 @@
+{
+  "name": "libruntime_spawn.so",
+  "types": "./index.d.ts",
+  "version": "1.0.0",
+  "description": "NAPI bridge to fork/exec pebble-runtime"
+}

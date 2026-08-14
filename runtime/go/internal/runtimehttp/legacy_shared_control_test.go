@@ -812,6 +812,12 @@ func TestLegacySharedControlBrowserScreencastStreamsEncryptedNativeFramesAndCanc
 	if !foundScreencast {
 		t.Fatalf("shared-control status did not advertise screencast: %#v", status)
 	}
+	if statusResult["runtimeProtocolVersion"] != float64(runtimecore.RuntimeProtocolVersion) {
+		t.Fatalf("shared-control status omitted runtime protocol version: %#v", statusResult)
+	}
+	if statusResult["minCompatibleRuntimeClientVersion"] != float64(runtimecore.MinCompatibleRuntimeClientVersion) {
+		t.Fatalf("shared-control status omitted min client protocol: %#v", statusResult)
+	}
 
 	writeEncryptedLegacySharedControlTestFrame(t, rawConn, sharedKey, map[string]interface{}{"id": "cast-1", "deviceToken": pairing.DeviceToken, "method": "browser.screencast", "params": map[string]interface{}{"page": tab.ID, "format": "jpeg", "minFrameIntervalMs": 250}})
 	var startAction runtimecore.ComputerAction

@@ -1,0 +1,11 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "Pebble desktop entry module",
+  "main": "",
+  "author": "nebutra",
+  "license": "MIT",
+  "dependencies": {
+    "libruntime_spawn.so": "file:./src/main/cpp/types/libruntime_spawn"
+  }
+}

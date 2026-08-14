@@ -1,0 +1,32 @@
+// Copy the signingConfigs block into build-profile.json5 after generating material
+// via DevEco auto-sign (preferred) or scripts/generate-debug-signing.sh.
+//
+// DevEco auto-sign is preferred for HarmonyOS NEXT emulator/device installs.
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "signing/pebble-debug.cer",
+          "storePassword": "REPLACE_WITH_BASE64_OR_PLAIN_FROM_DEVECO",
+          "keyAlias": "pebble-debug-key",
+          "keyPassword": "REPLACE_WITH_BASE64_OR_PLAIN_FROM_DEVECO",
+          "profile": "signing/pebble-debug-profile.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "signing/pebble-debug.p12"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "compatibleSdkVersion": "5.0.0(12)",
+        "targetSdkVersion": "6.0.0(20)",
+        "runtimeOS": "HarmonyOS"
+      }
+    ]
+  }
+}

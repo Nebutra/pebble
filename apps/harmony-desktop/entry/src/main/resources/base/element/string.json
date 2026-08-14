@@ -1,0 +1,24 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Pebble desktop entry module"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Pebble AI orchestrator shell"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Pebble"
+    },
+    {
+      "name": "permission_internet_reason",
+      "value": "Pebble connects to the local runtime gateway and optional remote execution hosts."
+    },
+    {
+      "name": "permission_network_info_reason",
+      "value": "Pebble checks network availability before connecting to the runtime."
+    }
+  ]
+}

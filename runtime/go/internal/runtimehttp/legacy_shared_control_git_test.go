@@ -175,6 +175,21 @@ func TestLegacySharedControlGitHistoryAndDiffReadTheRepository(t *testing.T) {
 	}
 }
 
+func TestLegacySharedControlGitUpstreamStatusAnswersALocalRepo(t *testing.T) {
+	fixture := startLegacySharedControlGitFixture(t)
+	response := fixture.call(t, "upstream", "git.upstreamStatus", nil)
+	result, ok := response["result"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("git.upstreamStatus did not answer with a result: %#v", response)
+	}
+	if result["hasUpstream"] != false {
+		t.Fatalf("expected no upstream on the fixture repo, got %#v", result)
+	}
+	if result["ahead"] != float64(0) || result["behind"] != float64(0) {
+		t.Fatalf("expected placeholder ahead/behind zeros, got %#v", result)
+	}
+}
+
 func TestLegacySharedControlGitRejectsAnUnknownWorktree(t *testing.T) {
 	fixture := startLegacySharedControlGitFixture(t)
 	writeEncryptedLegacySharedControlTestFrame(t, fixture.rawConn, fixture.sharedKey, map[string]interface{}{

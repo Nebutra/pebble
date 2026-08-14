@@ -2,6 +2,7 @@ export type TerminalWebglAutoDecision = {
   allowWebgl: boolean
   reason:
     | 'non-linux'
+    | 'harmony-webview'
     | 'linux-wayland'
     | 'linux-hardware-renderer'
     | 'linux-webgl2-unavailable'
@@ -28,6 +29,23 @@ export function isLinuxRendererHost(
     return false
   }
   return platform.includes('Linux') || userAgent.includes('Linux')
+}
+
+export function isHarmonyWebShell(
+  userAgent: string = typeof navigator === 'undefined' ? '' : navigator.userAgent
+): boolean {
+  // Why: ArkWeb can create a WebGL context that never composites, so xterm's
+  // GPU canvas stays blank. ?harmony=1 is injected by the HAP shell.
+  if (typeof window !== 'undefined') {
+    try {
+      if (new URLSearchParams(window.location.search).get('harmony') === '1') {
+        return true
+      }
+    } catch {
+      // unpaired / non-browser tests
+    }
+  }
+  return /OpenHarmony|HarmonyOS|ArkWeb/i.test(userAgent)
 }
 
 function readRendererDisplayServer(): 'wayland' | 'x11' | null {
@@ -73,6 +91,16 @@ function readWebglRendererInfo(): Pick<TerminalWebglAutoDecision, 'renderer' | '
 
 export function getTerminalWebglAutoDecision(): TerminalWebglAutoDecision {
   if (cachedDecision) {
+    return cachedDecision
+  }
+
+  if (isHarmonyWebShell()) {
+    cachedDecision = {
+      allowWebgl: false,
+      reason: 'harmony-webview',
+      renderer: null,
+      vendor: null
+    }
     return cachedDecision
   }
 

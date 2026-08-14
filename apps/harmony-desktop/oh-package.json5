@@ -1,0 +1,8 @@
+{
+  "modelVersion": "5.0.0",
+  "description": "Pebble HarmonyOS PC desktop shell (ArkTS + Web + Go runtime).",
+  "dependencies": {
+  },
+  "devDependencies": {
+  }
+}
