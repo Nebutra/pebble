@@ -7,6 +7,11 @@ vi.mock('./pebble-tauri-runtime-transport', () => ({
   requestRuntimeJson: vi.fn()
 }))
 const request = vi.mocked(requestRuntimeJson)
+// Why: these fixtures pinned a literal day and asserted it fell inside a "30d"
+// range. That is true only until the day is 30 days old — on 2026-08-14 the
+// 2026-07-15 fixture aged out and every desktop build failed at once. Anchor the
+// fixture to the run instead, so it stays inside the window it is asserting on.
+const usageFixtureDay = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
 describe('createPebbleClaudeUsageApi', () => {
   beforeEach(() => request.mockReset())
@@ -24,8 +29,8 @@ describe('createPebbleClaudeUsageApi', () => {
       turns: [
         {
           sessionId: 's1',
-          timestamp: '2026-07-15T10:00:00Z',
-          day: '2026-07-15',
+          timestamp: `${usageFixtureDay}T10:00:00Z`,
+          day: usageFixtureDay,
           model: 'claude-sonnet-4-6',
           projectKey: 'wt-1',
           projectLabel: 'Pebble',
@@ -38,8 +43,8 @@ describe('createPebbleClaudeUsageApi', () => {
         },
         {
           sessionId: 's2',
-          timestamp: '2026-07-15T11:00:00Z',
-          day: '2026-07-15',
+          timestamp: `${usageFixtureDay}T11:00:00Z`,
+          day: usageFixtureDay,
           model: 'claude-haiku-3',
           projectKey: '/outside',
           projectLabel: 'tmp/outside',
@@ -65,7 +70,7 @@ describe('createPebbleClaudeUsageApi', () => {
     })
     expect(snapshot.daily).toEqual([
       {
-        day: '2026-07-15',
+        day: usageFixtureDay,
         inputTokens: 100,
         outputTokens: 20,
         cacheReadTokens: 50,
