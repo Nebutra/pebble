@@ -2,6 +2,10 @@
 import type { PaneManager, ManagedPane } from '@/lib/pane-manager/pane-manager'
 import type { ManagedPaneInternal } from '@/lib/pane-manager/pane-manager-types'
 import type { IBuffer, IDisposable } from '@xterm/xterm'
+import {
+  createTerminalImeCommitBridge,
+  type TerminalImeCommitBridge
+} from './terminal-ime-commit-bridge'
 import { resolveCursorAgentImeAnchor } from '@/lib/pane-manager/terminal-ime-anchor'
 import { detectAgentStatusFromTitle, isClaudeAgent } from '@/lib/agent-status'
 import { resolvePaneTitleDecision } from './terminal-title-evidence'
@@ -2785,7 +2789,7 @@ export function connectPanePty(
     (data) => transport.sendInput(data)
   )
 
-  const onDataDisposable = pane.terminal.onData((data) => {
+  const forwardTerminalInput = (data: string): void => {
     // Why: xterm auto-replies to embedded query sequences (DA1, DECRQM,
     // OSC 10/11, focus, CPR) via onData. When we replay recorded PTY bytes
     // into xterm for scrollback/cold-restore/snapshot, those queries would
@@ -2868,7 +2872,31 @@ export function connectPanePty(
     } else {
       clearPendingTerminalInputIntent()
     }
+  }
+
+  // Why: an IME commit must travel the same path as a keypress, so the replay
+  // guard, the presence lock, and the intent tracking above all still apply to
+  // it. Routing it anywhere else would let composed text past the input lock.
+  let imeCommitBridge: TerminalImeCommitBridge | null = null
+  const onDataDisposable = pane.terminal.onData((data) => {
+    imeCommitBridge?.noteTerminalData()
+    forwardTerminalInput(data)
   })
+  // Why: some hosts expose a textarea that is not a full element. Failing to
+  // attach the bridge must degrade to plain xterm behaviour, never break the
+  // terminal connection itself.
+  if (typeof pane.terminal.textarea?.addEventListener === 'function') {
+    imeCommitBridge = createTerminalImeCommitBridge({
+      textarea: pane.terminal.textarea,
+      onCommit: forwardTerminalInput
+    })
+    const disposeWithoutBridge = onDataDisposable.dispose.bind(onDataDisposable)
+    onDataDisposable.dispose = () => {
+      imeCommitBridge?.dispose()
+      imeCommitBridge = null
+      disposeWithoutBridge()
+    }
+  }
 
   const shouldSuppressDesktopPtyResize = (): boolean => {
     const currentPtyId = transport.getPtyId()
