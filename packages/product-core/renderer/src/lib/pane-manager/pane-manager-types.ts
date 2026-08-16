@@ -134,6 +134,10 @@ export type ManagedPaneInternal = {
   gpuRenderingEnabled: boolean
   webglAttachmentDeferred: boolean
   webglDisabledAfterContextLoss: boolean
+  // Why: a context loss used to pin this pane to DOM for the whole session.
+  // These bound a recovery instead — see terminal-webgl-context-loss-recovery.
+  webglContextLossCount?: number
+  webglLastContextLossAt?: number | null
   // Why: expose complex-output diagnostics without changing renderer choice;
   // auto renderer fallback is reserved for platform or WebGL failures.
   hasComplexScriptOutput: boolean
