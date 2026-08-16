@@ -8,6 +8,11 @@ vi.mock('./pebble-tauri-runtime-transport', () => ({
 }))
 
 const request = vi.mocked(requestRuntimeJson)
+// Why: these fixtures pinned a literal day and asserted it fell inside a "30d"
+// range. That is true only until the day is 30 days old — on 2026-08-14 the
+// 2026-07-15 fixture aged out and every desktop build failed at once. Anchor the
+// fixture to the run instead, so it stays inside the window it is asserting on.
+const usageFixtureDay = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
 describe('createPebbleCodexUsageApi', () => {
   beforeEach(() => request.mockReset())
@@ -25,8 +30,8 @@ describe('createPebbleCodexUsageApi', () => {
       events: [
         {
           sessionId: 's1',
-          timestamp: '2026-07-15T10:00:00Z',
-          day: '2026-07-15',
+          timestamp: `${usageFixtureDay}T10:00:00Z`,
+          day: usageFixtureDay,
           model: 'gpt-5.4',
           projectKey: 'worktree:wt-1',
           projectLabel: 'Pebble',
@@ -41,8 +46,8 @@ describe('createPebbleCodexUsageApi', () => {
         },
         {
           sessionId: 's2',
-          timestamp: '2026-07-15T11:00:00Z',
-          day: '2026-07-15',
+          timestamp: `${usageFixtureDay}T11:00:00Z`,
+          day: usageFixtureDay,
           projectKey: 'cwd:/tmp/outside',
           projectLabel: 'tmp/outside',
           hasInferredPricing: true,
@@ -75,7 +80,7 @@ describe('createPebbleCodexUsageApi', () => {
     expect(snapshot.summary.estimatedCostUsd).toBeCloseTo(0.00046, 8)
     expect(snapshot.daily).toEqual([
       {
-        day: '2026-07-15',
+        day: usageFixtureDay,
         inputTokens: 100,
         cachedInputTokens: 40,
         outputTokens: 20,
@@ -103,8 +108,8 @@ describe('createPebbleCodexUsageApi', () => {
       events: [
         {
           sessionId: 'unknown-model',
-          timestamp: '2026-07-15T10:00:00Z',
-          day: '2026-07-15',
+          timestamp: `${usageFixtureDay}T10:00:00Z`,
+          day: usageFixtureDay,
           projectKey: 'worktree:wt-1',
           projectLabel: 'Pebble',
           worktreeId: 'wt-1',
