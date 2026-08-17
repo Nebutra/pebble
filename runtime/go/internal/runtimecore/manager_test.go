@@ -1974,6 +1974,10 @@ func TestAgentProfileAndRun(t *testing.T) {
 	if !found {
 		t.Fatalf("expected agent command output, got %#v", chunks)
 	}
+	// Why: exiting is not the same as being reaped, and on Windows the child
+	// keeps the project directory until it is. Same gap as the sibling agent-run
+	// test — sweep both rather than pay for this a fourth time.
+	stopSessionForTest(t, manager, run.SessionID)
 	reloaded, err := NewManager(dir, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -2025,6 +2029,12 @@ func TestAgentProfileUpdateDeleteAndRunStop(t *testing.T) {
 	if run.Status != AgentRunStopped {
 		t.Fatalf("agent run was not stopped: %#v", run)
 	}
+	// Why: StopAgentRun returns once the run is marked stopped, not once the PTY
+	// child it spawned has been reaped. On Windows that child still holds the
+	// project directory, so t.TempDir()'s RemoveAll fails with "the process
+	// cannot access the file". The session cleanup helper covers t.Cleanup call
+	// sites; an agent run has none, which is why it kept failing after #149.
+	stopSessionForTest(t, manager, run.SessionID)
 	if _, err := manager.DeleteAgentProfile(profile.ID); err != nil {
 		t.Fatal(err)
 	}
