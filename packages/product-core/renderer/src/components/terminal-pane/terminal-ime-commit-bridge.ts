@@ -14,9 +14,11 @@ export type TerminalImeCommitBridge = {
   dispose: () => void
 }
 
-// Long enough for a compliant helper to emit on the same task, short enough that
-// a real gap is filled before the next keystroke.
-const COMMIT_GRACE_MS = 24
+// Why 250 and not a couple of frames: the cost of waiting too little is a
+// duplicated character, and the cost of waiting too long is an IME commit that
+// lands late on a shell that would otherwise have dropped it entirely. Those are
+// not symmetric, so the grace is generous.
+const COMMIT_GRACE_MS = 250
 
 type CompositionTarget = Pick<
   HTMLTextAreaElement,
