@@ -2,6 +2,7 @@
 import type { PaneManager, ManagedPane } from '@/lib/pane-manager/pane-manager'
 import type { ManagedPaneInternal } from '@/lib/pane-manager/pane-manager-types'
 import type { IBuffer, IDisposable } from '@xterm/xterm'
+import { recordRenderTiming } from './terminal-render-timing'
 import {
   createTerminalImeCommitBridge,
   type TerminalImeCommitBridge
@@ -5250,6 +5251,17 @@ export function connectPanePty(
     }
 
     const dataCallback = (data: string, meta?: PtyDataMeta): void => {
+      // Why: this whole callback runs before anything reaches xterm. Time it so
+      // "the terminal is slow" can be attributed instead of guessed at.
+      const chunkStartedAt = performance.now()
+      try {
+        renderChunk(data, meta)
+      } finally {
+        recordRenderTiming('chunk', performance.now() - chunkStartedAt)
+      }
+    }
+
+    const renderChunk = (data: string, meta?: PtyDataMeta): void => {
       if (data.length > 0) {
         hasReceivedPtyOutput = true
         recordAgentHibernationPaneOutput(cacheKey)

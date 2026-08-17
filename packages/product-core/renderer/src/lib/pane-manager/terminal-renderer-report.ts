@@ -1,4 +1,8 @@
 import {
+  summariseRenderTiming,
+  type RenderTimingSummary
+} from '../../components/terminal-pane/terminal-render-timing'
+import {
   readTerminalRenderingDiagnostics,
   summariseTerminalRenderers,
   type TerminalRendererSummary
@@ -22,14 +26,17 @@ const SAMPLE_INTERVAL_MS = 30_000
 export type TerminalRendererReport = TerminalRendererSummary & {
   recordedAt: string
   userAgent: string
+  /** How long the renderer spends handling one PTY chunk, before xterm sees it. */
+  chunkMs: RenderTimingSummary | null
 }
 
 export function buildTerminalRendererReport(
   summary: TerminalRendererSummary,
   now: Date,
-  userAgent: string
+  userAgent: string,
+  chunkMs: RenderTimingSummary | null = null
 ): TerminalRendererReport {
-  return { ...summary, recordedAt: now.toISOString(), userAgent }
+  return { ...summary, recordedAt: now.toISOString(), userAgent, chunkMs }
 }
 
 /** True when the two reports would tell a reader different things. */
@@ -40,7 +47,12 @@ export function rendererReportChanged(
   if (!previous) {
     return true
   }
+  // Why: timing moves on every sample, so it alone must not trigger a rewrite —
+  // but a materially slower chunk is exactly what this file is for.
+  const timingMoved =
+    Math.round(previous.chunkMs?.p95Ms ?? 0) !== Math.round(next.chunkMs?.p95Ms ?? 0)
   return (
+    timingMoved ||
     previous.paneCount !== next.paneCount ||
     previous.webglPaneCount !== next.webglPaneCount ||
     previous.downgradedByContextLoss !== next.downgradedByContextLoss ||
@@ -64,7 +76,8 @@ export function startTerminalRendererReporting(
     const report = buildTerminalRendererReport(
       summary,
       now(),
-      typeof navigator === 'undefined' ? '' : navigator.userAgent
+      typeof navigator === 'undefined' ? '' : navigator.userAgent,
+      summariseRenderTiming('chunk')
     )
     if (!rendererReportChanged(previous, report)) {
       return
