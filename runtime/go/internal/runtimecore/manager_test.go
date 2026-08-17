@@ -3216,18 +3216,11 @@ func TestSessionRunsCommand(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	tail, err := manager.TailSession(session.ID, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	found := false
-	for _, chunk := range tail.Chunks {
-		if strings.Contains(chunk.Content, "pebble") {
-			found = true
-		}
-	}
+	chunks, found := waitForSessionOutputMatch(t, manager, session.ID, func(content string) bool {
+		return strings.Contains(content, "pebble")
+	})
 	if !found {
-		t.Fatalf("expected command output, got %#v", tail.Chunks)
+		t.Fatalf("expected command output, got %#v", chunks)
 	}
 }
 
@@ -3292,8 +3285,10 @@ func TestClearSessionBufferDropsTail(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	if tail, err := manager.TailSession(session.ID, 10); err != nil || len(tail.Chunks) == 0 {
-		t.Fatalf("expected output before clear, tail=%#v err=%v", tail, err)
+	if _, found := waitForSessionOutputMatch(t, manager, session.ID, func(string) bool {
+		return true
+	}); !found {
+		t.Fatal("expected output before clear")
 	}
 	cleared, err := manager.ClearSessionBuffer(session.ID)
 	if err != nil {
