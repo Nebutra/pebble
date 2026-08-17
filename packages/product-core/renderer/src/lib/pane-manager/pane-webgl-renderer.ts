@@ -1,4 +1,8 @@
 import { WebglAddon } from '@xterm/addon-webgl'
+import {
+  forgetWebglContextLosses,
+  recordWebglContextLoss
+} from './terminal-webgl-context-loss-recovery'
 import type { ManagedPaneInternal } from './pane-manager-types'
 import {
   getTerminalWebglAutoDecision,
@@ -166,11 +170,27 @@ export function attachWebgl(pane: ManagedPaneInternal): void {
       // Recreating WebGL for this pane can loop context loss and leave xterm
       // visually blank, so keep the pane on the DOM renderer until the next
       // rendering resume (worktree foreground / window wake) retries it.
+      // Why: bound the recovery rather than pinning DOM for the session. The
+      // reattach path asks the policy whether the cool-off has passed.
+      const loss = recordWebglContextLoss(
+        {
+          contextLossCount: pane.webglContextLossCount ?? 0,
+          lastContextLossAt: pane.webglLastContextLossAt ?? null
+        },
+        Date.now()
+      )
+      pane.webglContextLossCount = loss.contextLossCount
+      pane.webglLastContextLossAt = loss.lastContextLossAt
       pane.webglDisabledAfterContextLoss = true
       disposeWebgl(pane, { refreshDimensions: true })
     })
     pane.terminal.loadAddon(addon)
     pane.webglAddon = addon
+    // A context that attached cleanly means earlier losses were transient.
+    const cleared = forgetWebglContextLosses()
+    pane.webglContextLossCount = cleared.contextLossCount
+    pane.webglLastContextLossAt = cleared.lastContextLossAt
+    pane.webglDisabledAfterContextLoss = false
     refreshTerminalAfterWebglAttach(pane)
   } catch (err) {
     if (pane.terminalGpuAcceleration === 'auto') {
