@@ -67,15 +67,10 @@ import { createTauriGitRuntimeApi } from './tauri-git-runtime-rpc'
 import { createTauriKeybindingsApi } from './tauri-keybindings-api'
 import { installTauriE2EApi } from './tauri-e2e-api'
 import { nativeRuntimeCall, writeProviderJson } from './pebble-tauri-runtime-provider-io'
-import {
-  createPebbleGitHubApi,
-  createPebbleGitLabApi
-} from './pebble-tauri-provider-api-surface'
+import { createPebbleGitHubApi, createPebbleGitLabApi } from './pebble-tauri-provider-api-surface'
 import { createPebblePreflightApi } from './pebble-tauri-preflight-surface'
-import {
-  createPebbleAppApi,
-  normalizeTauriWorkspaceDirectory
-} from './pebble-tauri-app-surface'
+import { createPebbleAppApi, normalizeTauriWorkspaceDirectory } from './pebble-tauri-app-surface'
+import { startTerminalRendererReporting } from '@/lib/pane-manager/terminal-renderer-report'
 
 type PlatformInfo = ReturnType<PreloadApi['platform']['get']>
 
@@ -106,6 +101,12 @@ export function installPebbleTauriPreloadApi(): void {
   // Why: startup services perform the observable retry/status flow. This early
   // warmup is best-effort and must never become a global unhandled rejection.
   void ensurePebbleRuntimeProcess().catch(() => undefined)
+  // Why: which renderer a terminal ends up on is otherwise unobservable in a
+  // release build, so a "typing is slow" report cannot be told apart from a busy
+  // machine. Record it where it can be read from the app data directory.
+  startTerminalRendererReporting((document, contents) => {
+    void invoke('write_settings_document', { name: document, contents }).catch(() => undefined)
+  })
 
   const api = window.api
   const telemetry = createTauriTelemetryApi()

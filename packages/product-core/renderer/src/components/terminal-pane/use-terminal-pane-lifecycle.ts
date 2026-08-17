@@ -15,6 +15,10 @@ import {
 } from '@/lib/pane-manager/pane-terminal-options'
 import { normalizeDesktopTerminalScrollbackRows } from '../../../../shared/terminal-scrollback-policy'
 import { normalizeTerminalTuiMouseWheelMultiplier } from '@/lib/pane-manager/pane-terminal-mouse-wheel'
+import {
+  registerActivePaneManager,
+  unregisterActivePaneManager
+} from '@/lib/pane-manager/active-pane-manager-registry'
 import { buildWindowsPtyCompatibilityOptions } from '@/lib/pane-manager/windows-pty-compatibility'
 import { buildTerminalKeyboardProtocolOptions } from '@/lib/pane-manager/terminal-keyboard-protocol'
 import { useAppStore } from '@/store'
@@ -1400,6 +1404,9 @@ export function useTerminalPaneLifecycle({
     })
 
     managerRef.current = manager
+    // Why: the settings surface reads the live renderer from here; nothing else
+    // in a release build can report whether a pane fell back to DOM.
+    registerActivePaneManager(manager)
     // Why: E2E tests need to read terminal buffer content, but xterm.js renders
     // to canvas and the accessibility addon is not loaded. Exposing the manager
     // lets tests call serializeAddon.serialize() to read the buffer reliably.
@@ -1687,6 +1694,7 @@ export function useTerminalPaneLifecycle({
       panePtyBindings.clear()
       paneTransports.clear()
       manager.destroy()
+      unregisterActivePaneManager(manager)
       releaseWebviewDragPassthrough?.()
       releaseWebviewDragPassthrough = null
       managerRef.current = null

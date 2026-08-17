@@ -24,6 +24,12 @@ pub const ALLOWED_DOCUMENTS: &[&str] = &[
     "ui",
     "workspace-session",
     "agent-migration-unsupported",
+    // Why: which renderer a terminal pane ended up on was observable nowhere in
+    // a release build — DevTools are compiled out, the webview console is not
+    // forwarded, and breadcrumbs only reach disk during a crash. Writing it here
+    // makes a slow-terminal report diagnosable from the app data directory
+    // instead of requiring someone to read a settings row aloud.
+    "terminal-renderer",
 ];
 
 #[derive(Debug)]

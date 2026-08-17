@@ -6,6 +6,7 @@ import {
   createTerminalImeCommitBridge,
   type TerminalImeCommitBridge
 } from './terminal-ime-commit-bridge'
+import { isHarmonyWebShell } from '@/lib/pane-manager/terminal-webgl-auto-policy'
 import { resolveCursorAgentImeAnchor } from '@/lib/pane-manager/terminal-ime-anchor'
 import { detectAgentStatusFromTitle, isClaudeAgent } from '@/lib/agent-status'
 import { resolvePaneTitleDecision } from './terminal-title-evidence'
@@ -2885,7 +2886,13 @@ export function connectPanePty(
   // Why: some hosts expose a textarea that is not a full element. Failing to
   // attach the bridge must degrade to plain xterm behaviour, never break the
   // terminal connection itself.
-  if (typeof pane.terminal.textarea?.addEventListener === 'function') {
+  // Why: the bridge exists for the HarmonyOS web shell, where a composition can
+  // end without xterm ever emitting it. Everywhere else composition already
+  // works, and arming it there is not free: it commits when xterm has not spoken
+  // within a grace, so on a machine slow enough to miss that window it duplicates
+  // every composed character — which is worse than the problem it solves, and on
+  // a platform that did not have the problem. Restrict it to the shell it is for.
+  if (isHarmonyWebShell() && typeof pane.terminal.textarea?.addEventListener === 'function') {
     imeCommitBridge = createTerminalImeCommitBridge({
       textarea: pane.terminal.textarea,
       onCommit: forwardTerminalInput
