@@ -5,6 +5,7 @@ import {
   SettingsSubsectionHeader
 } from './SettingsFormControls'
 import { SearchableSetting } from './SearchableSetting'
+import { TerminalActiveRendererRow } from './TerminalActiveRendererRow'
 import { translate } from '@/i18n/i18n'
 
 type TerminalRenderingSectionProps = {
@@ -91,6 +92,8 @@ export function TerminalRenderingSection({
             }
           />
         </SearchableSetting>
+
+        <TerminalActiveRendererRow />
       </div>
     </section>
   )
