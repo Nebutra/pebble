@@ -1,4 +1,9 @@
 import {
+  browserRequestFrame,
+  sampleFrameCadence,
+  type FrameCadenceSummary
+} from '../../components/terminal-pane/terminal-frame-cadence'
+import {
   summariseRenderTiming,
   type RenderTimingSummary
 } from '../../components/terminal-pane/terminal-render-timing'
@@ -28,15 +33,18 @@ export type TerminalRendererReport = TerminalRendererSummary & {
   userAgent: string
   /** How long the renderer spends handling one PTY chunk, before xterm sees it. */
   chunkMs: RenderTimingSummary | null
+  /** The gaps between animation frames the page actually receives. */
+  frameMs: FrameCadenceSummary | null
 }
 
 export function buildTerminalRendererReport(
   summary: TerminalRendererSummary,
   now: Date,
   userAgent: string,
-  chunkMs: RenderTimingSummary | null = null
+  chunkMs: RenderTimingSummary | null = null,
+  frameMs: FrameCadenceSummary | null = null
 ): TerminalRendererReport {
-  return { ...summary, recordedAt: now.toISOString(), userAgent, chunkMs }
+  return { ...summary, recordedAt: now.toISOString(), userAgent, chunkMs, frameMs }
 }
 
 /** True when the two reports would tell a reader different things. */
@@ -50,7 +58,8 @@ export function rendererReportChanged(
   // Why: timing moves on every sample, so it alone must not trigger a rewrite —
   // but a materially slower chunk is exactly what this file is for.
   const timingMoved =
-    Math.round(previous.chunkMs?.p95Ms ?? 0) !== Math.round(next.chunkMs?.p95Ms ?? 0)
+    Math.round(previous.chunkMs?.p95Ms ?? 0) !== Math.round(next.chunkMs?.p95Ms ?? 0) ||
+    Math.round(previous.frameMs?.p95Ms ?? 0) !== Math.round(next.frameMs?.p95Ms ?? 0)
   return (
     timingMoved ||
     previous.paneCount !== next.paneCount ||
@@ -66,18 +75,21 @@ export function startTerminalRendererReporting(
 ): () => void {
   let previous: TerminalRendererReport | null = null
 
-  const sample = (): void => {
+  const sample = async (): Promise<void> => {
     const summary = summariseTerminalRenderers(readTerminalRenderingDiagnostics())
     if (summary.paneCount === 0) {
       // Why: a moment with no panes says nothing about the renderer, and would
       // otherwise overwrite the last real observation with an empty one.
       return
     }
+    // Why: a burst, not a standing loop — see terminal-frame-cadence.
+    const frameMs = await sampleFrameCadence(browserRequestFrame)
     const report = buildTerminalRendererReport(
       summary,
       now(),
       typeof navigator === 'undefined' ? '' : navigator.userAgent,
-      summariseRenderTiming('chunk')
+      summariseRenderTiming('chunk'),
+      frameMs
     )
     if (!rendererReportChanged(previous, report)) {
       return
@@ -90,7 +102,7 @@ export function startTerminalRendererReporting(
     }
   }
 
-  sample()
-  const handle = setInterval(sample, SAMPLE_INTERVAL_MS)
+  void sample()
+  const handle = setInterval(() => void sample(), SAMPLE_INTERVAL_MS)
   return () => clearInterval(handle)
 }
