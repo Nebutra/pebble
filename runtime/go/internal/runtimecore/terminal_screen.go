@@ -13,6 +13,8 @@ type terminalScreen struct {
 	mu            sync.Mutex
 	terminal      *vt.Emulator
 	cursorVisible bool
+	closed        chan struct{}
+	closeOnce     sync.Once
 }
 
 type TerminalScreenSnapshot struct {
@@ -26,13 +28,46 @@ func newTerminalScreen(cols, rows int) *terminalScreen {
 	screen := &terminalScreen{
 		terminal:      vt.NewEmulator(cols, rows),
 		cursorVisible: true,
+		closed:        make(chan struct{}),
 	}
 	screen.terminal.SetCallbacks(vt.Callbacks{
 		CursorVisibility: func(visible bool) {
 			screen.cursorVisible = visible
 		},
 	})
+	// Why: the emulator answers terminal queries — OSC 11 for the background
+	// colour, device attributes, and the rest — by writing the reply into an
+	// internal io.Pipe. Nothing ever read that pipe, so the first query from any
+	// full-screen program blocked the writer forever. That write happens inside
+	// Write, on the goroutine draining the PTY, so the session stopped reading
+	// its own output and the program never finished starting.
+	go screen.drainReplies()
 	return screen
+}
+
+// drainReplies keeps the emulator's reply pipe empty. The replies are dropped
+// rather than sent to the program: the client's terminal is the one attached to
+// the session and is what answers it, so forwarding these too would answer every
+// query twice.
+func (s *terminalScreen) drainReplies() {
+	buffer := make([]byte, 256)
+	for {
+		if _, err := s.terminal.Read(buffer); err != nil {
+			return
+		}
+	}
+}
+
+// Close releases the emulator and lets its drain goroutine exit. A session that
+// never closed its screen would leak one goroutine for the life of the process.
+func (s *terminalScreen) Close() {
+	if s == nil || s.terminal == nil {
+		return
+	}
+	s.closeOnce.Do(func() {
+		close(s.closed)
+		_ = s.terminal.Close()
+	})
 }
 
 func (s *terminalScreen) Write(data []byte) {

@@ -279,6 +279,11 @@ func (s *processSession) readStream(stream string, reader io.Reader) {
 			// Stream teardown: drain the coalescer so trailing output is not
 			// stuck behind an emit window that may outlive the session.
 			s.outputEvents.flushNow()
+			if stream == "stdout" {
+				// The PTY is done, so the emulator has nothing left to parse and
+				// its reply drain can stop.
+				s.screen.Close()
+			}
 			return
 		}
 	}
