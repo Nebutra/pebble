@@ -2,6 +2,7 @@ package runtimecore
 
 import (
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 
@@ -58,15 +59,23 @@ func (s *terminalScreen) drainReplies() {
 	}
 }
 
-// Close releases the emulator and lets its drain goroutine exit. A session that
-// never closed its screen would leak one goroutine for the life of the process.
+// Close lets the drain goroutine exit; a session that never closed its screen
+// would leak one goroutine for the life of the process.
+//
+// Why the pipe rather than Emulator.Close: Close also flips an unsynchronised
+// `closed` flag that Read and Write both consult, which the race detector
+// rightly flags against the draining goroutine. Closing the reply pipe on its
+// own ends the blocked Read with EOF and makes any later reply fail instead of
+// block, without touching that flag.
 func (s *terminalScreen) Close() {
 	if s == nil || s.terminal == nil {
 		return
 	}
 	s.closeOnce.Do(func() {
 		close(s.closed)
-		_ = s.terminal.Close()
+		if writer, ok := s.terminal.InputPipe().(*io.PipeWriter); ok {
+			_ = writer.Close()
+		}
 	})
 }
 
