@@ -92,6 +92,7 @@ pub mod renderer_bootstrap_log;
 pub mod renderer_parity_capture;
 pub mod runtime_environments;
 pub mod runtime_event_stream;
+pub mod runtime_prestart;
 pub mod runtime_process;
 pub mod runtime_pty_input;
 pub mod runtime_status;

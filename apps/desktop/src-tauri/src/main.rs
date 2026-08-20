@@ -504,6 +504,10 @@ pub fn run() {
 }
 
 fn configure_native_setup(app: &mut tauri::App) {
+    // Why: the runtime used to wait for the renderer to ask for it, which put its
+    // 81ms start behind 652ms of webview boot. Replay the last known launch here
+    // so the two happen at once.
+    commands::runtime_prestart::begin(app.handle());
     if let Err(error) = commands::native_session_recovery::begin(app.handle()) {
         commands::crash_reports::record_native_startup_failure(
             app.handle(),

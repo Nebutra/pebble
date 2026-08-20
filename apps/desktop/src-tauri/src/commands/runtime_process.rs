@@ -82,11 +82,32 @@ pub fn start_runtime_process(
     input: RuntimeProcessStartCommand,
     state: State<'_, RuntimeProcessState>,
 ) -> Result<RuntimeProcessStatusResult, String> {
+    // Why: remembering what the renderer launched lets the next cold start spawn
+    // the runtime beside the webview instead of behind it, which measured 652ms
+    // of a 1095ms start. Recorded before the attempt so a runtime that is
+    // already running still leaves a record to replay.
+    super::runtime_prestart::remember(
+        &app,
+        &super::runtime_prestart::RuntimePrestartRecord {
+            executable: input.executable.clone(),
+            listen: input.listen.clone(),
+            data_dir: input.data_dir.clone(),
+            bearer_token: input.bearer_token.clone(),
+        },
+    );
+    start_runtime_process_inner(&app, input, &state)
+}
+
+pub fn start_runtime_process_inner(
+    app: &AppHandle,
+    input: RuntimeProcessStartCommand,
+    state: &RuntimeProcessState,
+) -> Result<RuntimeProcessStatusResult, String> {
     let mut process = state
         .process
         .lock()
         .map_err(|_| "runtime process state lock is poisoned".to_string())?;
-    let current = refresh_process_status(&app, &state, &mut process);
+    let current = refresh_process_status(app, state, &mut process);
     if current.running {
         return Err("runtime process is already running".to_string());
     }
