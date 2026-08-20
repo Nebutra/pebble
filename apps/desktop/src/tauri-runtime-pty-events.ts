@@ -111,6 +111,14 @@ async function startRuntimePtyEventDelivery(): Promise<void> {
 
 // A generation counter fences the poll loops: enabling bumps it and starts fresh loops; the
 // old loops see a stale generation and exit, so a reconnect never leaves a duplicate poller.
+/**
+ * Whether terminal output is being polled rather than pushed. The poll backs off
+ * to 250ms, so this being true means every echo can wait that long.
+ */
+export function isRuntimePtyOutputPolling(): boolean {
+  return pollingActive
+}
+
 function setRuntimePtyPolling(active: boolean): void {
   if (active === pollingActive) {
     return
@@ -134,7 +142,7 @@ function handleRuntimePtyOutputEntry(event: RuntimeEventStreamEntry): void {
   if (!output) {
     return
   }
-  emitRuntimePtyData(output.sessionId, output.content)
+  emitRuntimePtyData(output.sessionId, output.content, output.emittedAtMs)
 }
 
 function handleRuntimePtyStatusEntry(event: RuntimeEventStreamEntry): void {
@@ -208,10 +216,10 @@ async function readRuntimeEvents(topic: string): Promise<RuntimeEventStreamEntry
   return result?.transport === 'connected' ? result.events : []
 }
 
-function emitRuntimePtyData(id: string, data: string): void {
+function emitRuntimePtyData(id: string, data: string, emittedAtMs: number | null = null): void {
   const seq = (runtimePtySeqById.get(id) ?? 0) + data.length
   runtimePtySeqById.set(id, seq)
-  enqueueRuntimePtyData({ id, data, seq, rawLength: data.length })
+  enqueueRuntimePtyData({ id, data, seq, rawLength: data.length }, emittedAtMs)
 }
 
 function emitRuntimePtyExit(session: RuntimeSession): void {

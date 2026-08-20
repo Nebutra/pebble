@@ -915,6 +915,22 @@ export type PreloadApi = {
       peakRendererInFlightChars: number
       peakMaxRendererInFlightCharsByPty: number
       ackGatedFlushSkipCount: number
+      /**
+       * How long a chunk took to travel from the moment the runtime read it off
+       * the PTY to the moment this renderer handed it to a listener. Every other
+       * layer has been measured and is fast; this segment never had a number.
+       */
+      deliveryMs: { count: number; p50Ms: number; p95Ms: number; maxMs: number } | null
+      /** Of that, how long the chunk sat in this queue waiting to be flushed. */
+      queueMs: { count: number; p50Ms: number; p95Ms: number; maxMs: number } | null
+      /** Which transport each session's keystrokes actually take. */
+      inputTransports: { socket: number; bridge: number }
+      /**
+       * How terminal output is reaching this renderer. Polling backs off to
+       * 250ms, so `pushConnected: false` means every echo can wait that long —
+       * which no per-layer timing would ever reveal.
+       */
+      outputDelivery: { pushConnected: boolean; polling: boolean }
     }>
     resetRendererDeliveryDebug: () => Promise<void>
     onData: (

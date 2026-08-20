@@ -7,16 +7,20 @@ import { createRuntimePtyInputBatcher } from './runtime-pty-input-batcher'
 import { createTerminalInputTransport } from './terminal-input-transport'
 import { markRuntimeAgentSessionStopped } from './tauri-agent-status-api'
 import { createRuntimePtyManagement } from './tauri-runtime-pty-management'
+import { isRuntimeEventPushConnected } from './tauri-runtime-event-push'
 import {
   addRuntimePtyDataListener,
   addRuntimePtyExitListener,
   addRuntimePtyReplayListener,
-  configureRuntimePtyEventExit
+  configureRuntimePtyEventExit,
+  isRuntimePtyOutputPolling
 } from './tauri-runtime-pty-events'
 import {
   acknowledgeRuntimePtyData,
   forgetRuntimePtyDelivery,
   getRuntimePtyDeliveryDebugSnapshot,
+  reportInputTransports,
+  reportOutputDelivery,
   resetRuntimePtyDeliveryDebug,
   setActiveRuntimeRendererPty,
   setRuntimeRendererPtyVisible
@@ -73,6 +77,11 @@ export function installTauriRuntimePtyApi(): void {
   })
 
   localTerminalStream.start()
+  reportInputTransports(runtimePtyInput.transportCounts)
+  reportOutputDelivery(() => ({
+    pushConnected: isRuntimeEventPushConnected(),
+    polling: isRuntimePtyOutputPolling()
+  }))
 
   const base = window.api.pty
   window.api.pty = {

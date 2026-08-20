@@ -7,6 +7,7 @@ import {
   summariseRenderTiming,
   type RenderTimingSummary
 } from '../../components/terminal-pane/terminal-render-timing'
+import type { PreloadApi } from '../../../../shared/preload-api-types'
 import {
   readTerminalRenderingDiagnostics,
   summariseTerminalRenderers,
@@ -35,16 +36,35 @@ export type TerminalRendererReport = TerminalRendererSummary & {
   chunkMs: RenderTimingSummary | null
   /** The gaps between animation frames the page actually receives. */
   frameMs: FrameCadenceSummary | null
+  /**
+   * The delivery chain between the runtime and this renderer, which is the one
+   * segment of the terminal path that never had a number: how long a chunk
+   * takes to arrive, how much of that is queueing here, and which transport
+   * each session's keystrokes actually take.
+   */
+  delivery: TerminalDeliveryDiagnostics | null
 }
+
+export type TerminalDeliveryDiagnostics = Awaited<
+  ReturnType<PreloadApi['pty']['getRendererDeliveryDebugSnapshot']>
+>
 
 export function buildTerminalRendererReport(
   summary: TerminalRendererSummary,
   now: Date,
   userAgent: string,
   chunkMs: RenderTimingSummary | null = null,
-  frameMs: FrameCadenceSummary | null = null
+  frameMs: FrameCadenceSummary | null = null,
+  delivery: TerminalDeliveryDiagnostics | null = null
 ): TerminalRendererReport {
-  return { ...summary, recordedAt: now.toISOString(), userAgent, chunkMs, frameMs }
+  return {
+    ...summary,
+    recordedAt: now.toISOString(),
+    userAgent,
+    chunkMs,
+    frameMs,
+    delivery
+  }
 }
 
 /** True when the two reports would tell a reader different things. */
@@ -59,7 +79,14 @@ export function rendererReportChanged(
   // but a materially slower chunk is exactly what this file is for.
   const timingMoved =
     Math.round(previous.chunkMs?.p95Ms ?? 0) !== Math.round(next.chunkMs?.p95Ms ?? 0) ||
-    Math.round(previous.frameMs?.p95Ms ?? 0) !== Math.round(next.frameMs?.p95Ms ?? 0)
+    Math.round(previous.frameMs?.p95Ms ?? 0) !== Math.round(next.frameMs?.p95Ms ?? 0) ||
+    Math.round(previous.delivery?.deliveryMs?.p95Ms ?? 0) !==
+      Math.round(next.delivery?.deliveryMs?.p95Ms ?? 0) ||
+    (previous.delivery?.inputTransports.socket ?? 0) !==
+      (next.delivery?.inputTransports.socket ?? 0) ||
+    // Output falling back to polling adds up to 250ms to every keystroke's echo,
+    // so the moment it flips is the most important thing this file can record.
+    previous.delivery?.outputDelivery.pushConnected !== next.delivery?.outputDelivery.pushConnected
   return (
     timingMoved ||
     previous.paneCount !== next.paneCount ||
@@ -67,6 +94,15 @@ export function rendererReportChanged(
     previous.downgradedByContextLoss !== next.downgradedByContextLoss ||
     previous.autoDecisionReason !== next.autoDecisionReason
   )
+}
+
+async function readDeliveryDiagnostics(): Promise<TerminalDeliveryDiagnostics | null> {
+  try {
+    // Absent on hosts that do not run the Tauri PTY bridge (web, tests).
+    return (await window.api?.pty?.getRendererDeliveryDebugSnapshot?.()) ?? null
+  } catch {
+    return null
+  }
 }
 
 export function startTerminalRendererReporting(
@@ -84,12 +120,14 @@ export function startTerminalRendererReporting(
     }
     // Why: a burst, not a standing loop — see terminal-frame-cadence.
     const frameMs = await sampleFrameCadence(browserRequestFrame)
+    const delivery = await readDeliveryDiagnostics()
     const report = buildTerminalRendererReport(
       summary,
       now(),
       typeof navigator === 'undefined' ? '' : navigator.userAgent,
       summariseRenderTiming('chunk'),
-      frameMs
+      frameMs,
+      delivery
     )
     if (!rendererReportChanged(previous, report)) {
       return

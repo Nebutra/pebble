@@ -2609,7 +2609,13 @@ function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
         peakMaxPendingCharsByPty: 0,
         peakRendererInFlightChars: 0,
         peakMaxRendererInFlightCharsByPty: 0,
-        ackGatedFlushSkipCount: 0
+        ackGatedFlushSkipCount: 0,
+        // The web host has no local PTY bridge, so it has no delivery chain of
+        // its own to report on.
+        deliveryMs: null,
+        queueMs: null,
+        inputTransports: { socket: 0, bridge: 0 },
+        outputDelivery: { pushConnected: false, polling: false }
       }),
     resetRendererDeliveryDebug: () => Promise.resolve(),
     onData: () => noopUnsubscribe,

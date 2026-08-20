@@ -2684,6 +2684,17 @@ const checks = [
       text.includes('StatusCode::LOCKED')
   },
   {
+    name: 'The pushed runtime event stream authenticates, so terminal output is never polled',
+    file: 'apps/desktop/src/tauri-runtime-event-push.ts',
+    expect: (text) =>
+      // An unauthenticated /v1/events answers 401, the native task treats any
+      // non-success as a failed connect, and the renderer falls back to polling
+      // terminal output with a backoff that reaches 250ms.
+      text.includes('bearerToken: LOCAL_RUNTIME_BEARER_TOKEN') &&
+      !text.includes('bearerToken: null') &&
+      text.includes('isRuntimeEventPushConnected')
+  },
+  {
     name: 'Terminal input takes the direct runtime socket and keeps the bridge as its fallback',
     file: 'apps/desktop/src/terminal-input-transport.ts',
     expect: (text) =>

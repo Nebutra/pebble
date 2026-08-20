@@ -26,6 +26,12 @@ export type TerminalInputTransport = {
   dispose: () => void
   /** Which transport a session is on, for diagnostics. */
   transportFor: (sessionId: string) => 'socket' | 'bridge'
+  /**
+   * How many sessions are on each transport. A socket that connects but never
+   * carries a keystroke looks identical from outside the process, so this is
+   * the only way to tell the difference without guessing.
+   */
+  transportCounts: () => { socket: number; bridge: number }
 }
 
 export function createTerminalInputTransport(
@@ -96,6 +102,18 @@ export function createTerminalInputTransport(
     },
     transportFor(sessionId) {
       return sessions.get(sessionId)?.onSocket === true ? 'socket' : 'bridge'
+    },
+    transportCounts() {
+      let socket = 0
+      let bridge = 0
+      for (const state of sessions.values()) {
+        if (state.onSocket) {
+          socket += 1
+        } else {
+          bridge += 1
+        }
+      }
+      return { socket, bridge }
     }
   }
 }
