@@ -19,6 +19,9 @@ export type RuntimePtyOutputEvent = {
   // means the event carries only the newest tail and a tail-fetch is needed
   // for a gapless buffer.
   droppedBytes: number
+  // Wall-clock milliseconds at which the runtime emitted this event, or null
+  // when the runtime did not stamp it.
+  emittedAtMs: number | null
 }
 
 export type RuntimeSessionDriverEvent = {
@@ -34,6 +37,7 @@ export type RuntimeBrowserDriverEvent = {
 type RuntimeEventBody = {
   topic?: unknown
   payload?: unknown
+  timestamp?: unknown
 }
 
 export function mapRuntimePtyOutputEntry(
@@ -55,8 +59,21 @@ export function mapRuntimePtyOutputEntry(
     session,
     content,
     coalescedChunks: readCount(payload.coalescedChunks, 1),
-    droppedBytes: readCount(payload.droppedBytes, 0)
+    droppedBytes: readCount(payload.droppedBytes, 0),
+    // The event's own timestamp, not the chunk's. A chunk carries the time its
+    // bytes were read, which the runtime keeps from the first chunk when it
+    // coalesces — measuring from that reports how old the bytes are, not how
+    // long the delivery chain took, and produced readings of minutes.
+    emittedAtMs: readTimestampMs(body.timestamp)
   }
+}
+
+function readTimestampMs(value: unknown): number | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 export function mapRuntimePtyStatusEntry(

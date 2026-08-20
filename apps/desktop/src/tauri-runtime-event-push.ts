@@ -1,5 +1,6 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { LOCAL_RUNTIME_BEARER_TOKEN } from './local-runtime-auth'
 import { DEFAULT_RUNTIME_URL } from './runtime-command-shapes'
 import type { RuntimeEventStreamEntry } from './runtime-command-shapes'
 
@@ -33,6 +34,16 @@ let startPromise: Promise<boolean> | null = null
 // True only while the native SSE stream is connected. `supported` says the pipeline can run;
 // this says it is actually delivering, which is what decides whether polling must be active.
 let pushConnected = false
+
+/**
+ * Whether terminal output is arriving on the pushed stream. When it is not, the
+ * fallback polls with a backoff that reaches 250ms, so every keystroke's echo
+ * can wait a quarter second — indistinguishable from a slow terminal, and
+ * invisible to any per-layer measurement.
+ */
+export function isRuntimeEventPushConnected(): boolean {
+  return pushConnected
+}
 
 /**
  * Registers handlers for pushed runtime events. Returns whether the native push pipeline is
@@ -96,7 +107,12 @@ async function startPushPipeline(): Promise<boolean> {
       setPushConnected(event.payload.connected)
     })
     const result = await invoke<StartResult>('start_runtime_event_stream', {
-      input: { runtimeUrl: DEFAULT_RUNTIME_URL, bearerToken: null },
+      // Why: the runtime rejects an unauthenticated /v1/events with 401, the
+      // native task treats any non-success as a failed connect, and the renderer
+      // then polls terminal output with a backoff that reaches 250ms. Passing no
+      // token made that the permanent state, so every keystroke's echo waited on
+      // the next poll instead of arriving when the shell produced it.
+      input: { runtimeUrl: DEFAULT_RUNTIME_URL, bearerToken: LOCAL_RUNTIME_BEARER_TOKEN },
       onEvent: eventChannel,
       onStatus: statusChannel
     })

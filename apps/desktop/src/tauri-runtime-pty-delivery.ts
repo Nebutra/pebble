@@ -1,7 +1,29 @@
 import type { PreloadApi } from '../../../packages/product-core/shared/preload-api-types'
+import { createLatencyHistogram } from './runtime-pty-latency-histogram'
 
 type PtyData = Parameters<Parameters<PreloadApi['pty']['onData']>[0]>[0]
 type DeliveryListener = (data: PtyData) => void
+
+// Timings are carried beside the queued chunk rather than inside it, so the
+// payload handed to listeners stays exactly what it was.
+type ChunkTiming = { emittedAtMs: number | null; enqueuedAtMs: number }
+
+const deliveryLatency = createLatencyHistogram()
+const queueLatency = createLatencyHistogram()
+let inputTransportReader: (() => { socket: number; bridge: number }) | null = null
+let outputDeliveryReader: (() => { pushConnected: boolean; polling: boolean }) | null = null
+
+/** Lets the event pipeline report whether output is pushed or polled. */
+export function reportOutputDelivery(
+  reader: () => { pushConnected: boolean; polling: boolean }
+): void {
+  outputDeliveryReader = reader
+}
+
+/** Lets the input transport report which path each session's keystrokes take. */
+export function reportInputTransports(reader: () => { socket: number; bridge: number }): void {
+  inputTransportReader = reader
+}
 
 const ACTIVE_IN_FLIGHT_LIMIT = 256 * 1024
 const VISIBLE_IN_FLIGHT_LIMIT = 128 * 1024
@@ -9,6 +31,8 @@ const BACKGROUND_IN_FLIGHT_LIMIT = 32 * 1024
 
 const listeners = new Set<DeliveryListener>()
 const pendingByPty = new Map<string, PtyData[]>()
+// Weak so a dropped queue cannot pin its chunks' timings in memory.
+const timingByChunk = new WeakMap<PtyData, ChunkTiming>()
 const pendingCharsByPty = new Map<string, number>()
 const inFlightCharsByPty = new Map<string, number>()
 const activePtys = new Set<string>()
@@ -27,10 +51,12 @@ export function addRuntimePtyDeliveryListener(listener: DeliveryListener): () =>
   return () => listeners.delete(listener)
 }
 
-export function enqueueRuntimePtyData(data: PtyData): void {
+export function enqueueRuntimePtyData(data: PtyData, emittedAtMs: number | null = null): void {
   const background = visibilityKnownPtys.has(data.id) && !visiblePtys.has(data.id)
   const queue = pendingByPty.get(data.id) ?? []
-  queue.push({ ...data, background })
+  const queued = { ...data, background }
+  queue.push(queued)
+  timingByChunk.set(queued, { emittedAtMs, enqueuedAtMs: Date.now() })
   pendingByPty.set(data.id, queue)
   pendingCharsByPty.set(data.id, (pendingCharsByPty.get(data.id) ?? 0) + data.data.length)
   recordPeaks()
@@ -86,7 +112,11 @@ export function getRuntimePtyDeliveryDebugSnapshot(): Promise<
     peakMaxPendingCharsByPty,
     peakRendererInFlightChars,
     peakMaxRendererInFlightCharsByPty,
-    ackGatedFlushSkipCount
+    ackGatedFlushSkipCount,
+    deliveryMs: deliveryLatency.summarise(),
+    queueMs: queueLatency.summarise(),
+    inputTransports: inputTransportReader?.() ?? { socket: 0, bridge: 0 },
+    outputDelivery: outputDeliveryReader?.() ?? { pushConnected: false, polling: false }
   })
 }
 
@@ -96,6 +126,8 @@ export function resetRuntimePtyDeliveryDebug(): Promise<void> {
   peakRendererInFlightChars = 0
   peakMaxRendererInFlightCharsByPty = 0
   ackGatedFlushSkipCount = 0
+  deliveryLatency.reset()
+  queueLatency.reset()
   recordPeaks()
   return Promise.resolve()
 }
@@ -133,6 +165,7 @@ function flushPendingData(): void {
         pendingCharsByPty.set(id, remaining)
       }
       inFlightCharsByPty.set(id, inFlight + next.data.length)
+      recordChunkLatency(next)
       for (const listener of listeners) {
         listener(next)
       }
@@ -144,6 +177,19 @@ function flushPendingData(): void {
   recordPeaks()
   if (hasImmediatelyDeliverableData()) {
     scheduleFlush()
+  }
+}
+
+function recordChunkLatency(chunk: PtyData): void {
+  const timing = timingByChunk.get(chunk)
+  if (!timing) {
+    return
+  }
+  timingByChunk.delete(chunk)
+  const now = Date.now()
+  queueLatency.record(now - timing.enqueuedAtMs)
+  if (timing.emittedAtMs !== null) {
+    deliveryLatency.record(now - timing.emittedAtMs)
   }
 }
 
