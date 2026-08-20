@@ -16,6 +16,7 @@ import (
 )
 
 const websocketGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+const websocketBinaryOpcode = 0x2
 const maxWebSocketPayloadBytes = 1024 * 1024
 const websocketWriteTimeout = 5 * time.Second
 
@@ -33,6 +34,14 @@ func isWebSocketUpgrade(r *http.Request) bool {
 }
 
 func upgradeWebSocket(w http.ResponseWriter, r *http.Request) (*websocketConn, error) {
+	return upgradeWebSocketWithProtocol(w, r, "")
+}
+
+// upgradeWebSocketWithProtocol accepts one offered subprotocol. Browsers cannot
+// set request headers on a WebSocket, so a subprotocol is the only field a page
+// controls at upgrade — and a browser fails the connection outright when it
+// offered subprotocols and the server selects none.
+func upgradeWebSocketWithProtocol(w http.ResponseWriter, r *http.Request, protocol string) (*websocketConn, error) {
 	if r.Method != http.MethodGet {
 		return nil, errors.New("websocket upgrade requires GET")
 	}
@@ -58,7 +67,13 @@ func upgradeWebSocket(w http.ResponseWriter, r *http.Request) (*websocketConn, e
 	_, _ = fmt.Fprintf(readWriter, "HTTP/1.1 101 Switching Protocols\r\n")
 	_, _ = fmt.Fprintf(readWriter, "Upgrade: websocket\r\n")
 	_, _ = fmt.Fprintf(readWriter, "Connection: Upgrade\r\n")
-	_, _ = fmt.Fprintf(readWriter, "Sec-WebSocket-Accept: %s\r\n\r\n", accept)
+	_, _ = fmt.Fprintf(readWriter, "Sec-WebSocket-Accept: %s\r\n", accept)
+	// Selecting a protocol the client never offered is a protocol violation, so
+	// echo only what was on the wire.
+	if protocol != "" && headerHasToken(r.Header.Get("Sec-WebSocket-Protocol"), protocol) {
+		_, _ = fmt.Fprintf(readWriter, "Sec-WebSocket-Protocol: %s\r\n", protocol)
+	}
+	_, _ = fmt.Fprint(readWriter, "\r\n")
 	if err := readWriter.Flush(); err != nil {
 		_ = conn.Close()
 		return nil, err

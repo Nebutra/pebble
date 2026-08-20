@@ -110,6 +110,11 @@ func (s *Server) authorize(r *http.Request) bool {
 	if r.URL.Path == "/v1/shared-control" && isWebSocketUpgrade(r) {
 		return true
 	}
+	// A browser cannot set an Authorization header on a WebSocket, so the local
+	// terminal stream carries its token as a subprotocol and checks it itself.
+	if r.URL.Path == localTerminalStreamPath && isWebSocketUpgrade(r) {
+		return true
+	}
 	// Hook scripts authenticate with X-Pebble-Agent-Hook-Token inside the
 	// ingest handler; they never hold the runtime bearer token.
 	if strings.HasPrefix(r.URL.Path, "/hook/") {
@@ -124,6 +129,7 @@ func (s *Server) authorize(r *http.Request) bool {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/status", s.handleStatus)
+	s.mux.HandleFunc(localTerminalStreamPath, s.handleLocalTerminalStream)
 	s.mux.HandleFunc("/v1/browser/screencasts/", s.handleBrowserScreencastFrame)
 	s.mux.HandleFunc("/v1/stats/summary", s.handleStatsSummary)
 	s.mux.HandleFunc("/v1/skills/discover", s.handleSkillDiscovery)
