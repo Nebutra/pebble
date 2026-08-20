@@ -2684,6 +2684,35 @@ const checks = [
       text.includes('StatusCode::LOCKED')
   },
   {
+    name: 'Terminal input takes the direct runtime socket and keeps the bridge as its fallback',
+    file: 'apps/desktop/src/terminal-input-transport.ts',
+    expect: (text) =>
+      text.includes('socket.tryWrite(sessionId, data)') &&
+      text.includes('writeThroughBridge') &&
+      // A session may only move to the socket once its last bridge write has
+      // landed, or the two transports reorder characters on screen.
+      text.includes('state.lastBridgeWrite') &&
+      text.includes('void pending.then(')
+  },
+  {
+    name: 'The local terminal socket carries input as binary frames and never streams output twice',
+    file: 'apps/desktop/src/local-terminal-stream.ts',
+    expect: (text) =>
+      text.includes("binaryType = 'arraybuffer'") &&
+      text.includes('LOCAL_TERMINAL_STREAM_TOKEN_PREFIX') &&
+      text.includes('JSON.stringify({ terminal: sessionId, output: false })') &&
+      text.includes('TerminalStreamOpcode.Input')
+  },
+  {
+    name: 'The local terminal stream endpoint is loopback-only and token checked',
+    file: 'runtime/go/internal/runtimehttp/local_terminal_stream.go',
+    expect: (text) =>
+      text.includes('if !requestFromLoopback(r)') &&
+      text.includes('authorizeLocalTerminalStream') &&
+      text.includes('subtle.ConstantTimeCompare') &&
+      text.includes('upgradeWebSocketWithProtocol')
+  },
+  {
     name: 'Tauri runtime PTY input batches printable keys without bridge acknowledgement latency',
     file: 'apps/desktop/src/runtime-pty-input-batcher.ts',
     expect: (text) =>

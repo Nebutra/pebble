@@ -1,6 +1,10 @@
 import type { PreloadApi } from '../../../packages/product-core/shared/preload-api-types'
+import { LOCAL_RUNTIME_BEARER_TOKEN } from './local-runtime-auth'
+import { LOCAL_RUNTIME_ENDPOINT } from './local-runtime-endpoint'
+import { createLocalTerminalStream } from './local-terminal-stream'
 import { writeRuntimePtyInput } from './runtime-bridge'
 import { createRuntimePtyInputBatcher } from './runtime-pty-input-batcher'
+import { createTerminalInputTransport } from './terminal-input-transport'
 import { markRuntimeAgentSessionStopped } from './tauri-agent-status-api'
 import { createRuntimePtyManagement } from './tauri-runtime-pty-management'
 import {
@@ -41,8 +45,21 @@ import {
 
 const runtimePtySizeById = new Map<string, { cols: number; rows: number }>()
 const runtimePtyStatusRequestsById = new Map<string, Promise<RuntimeSession | null>>()
-const runtimePtyInput = createRuntimePtyInputBatcher(sendRuntimePtyInput)
+const runtimePtyInputBridge = createRuntimePtyInputBatcher(sendRuntimePtyInput)
+// Why: typing crossed the app bridge as JSON and then HTTP, once per keystroke.
+// The socket carries the same bytes straight from the page to the runtime; the
+// bridge stays as the fallback whenever the socket is not available.
+const localTerminalStream = createLocalTerminalStream({
+  url: localTerminalStreamUrl(LOCAL_RUNTIME_ENDPOINT.url),
+  token: LOCAL_RUNTIME_BEARER_TOKEN,
+  connect: (url, protocols) => new WebSocket(url, protocols)
+})
+const runtimePtyInput = createTerminalInputTransport(localTerminalStream, runtimePtyInputBridge)
 const runtimePtyManagement = createRuntimePtyManagement(forgetRuntimePtyState)
+
+export function localTerminalStreamUrl(runtimeUrl: string): string {
+  return runtimeUrl.replace(/^http:/, 'ws:')
+}
 
 export function installTauriRuntimePtyApi(): void {
   if (!hasTauriInternals()) {
@@ -54,6 +71,8 @@ export function installTauriRuntimePtyApi(): void {
   configureRuntimePtyEventExit((sessionId) => {
     forgetRuntimePtyState(sessionId)
   })
+
+  localTerminalStream.start()
 
   const base = window.api.pty
   window.api.pty = {
