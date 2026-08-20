@@ -38,7 +38,7 @@
     "typecheck:node": "tsgo --noEmit -p config/tsconfig.node.json",
     "typecheck:cli": "tsgo --noEmit -p config/tsconfig.tc.cli.json",
     "typecheck:web": "tsgo --noEmit -p config/tsconfig.tc.web.json",
-    "typecheck": "tsgo --noEmit -p config/tsconfig.node.json && tsgo --noEmit -p config/tsconfig.tc.cli.json && tsgo --noEmit -p config/tsconfig.tc.web.json",
+    "typecheck": "tsgo --noEmit -p config/tsconfig.node.json && tsgo --noEmit -p config/tsconfig.tc.cli.json && tsgo --noEmit -p config/tsconfig.tc.web.json && pnpm --filter @pebble/desktop typecheck",
     "typecheck:tsc:node": "tsc --noEmit -p config/tsconfig.node.json --composite false",
     "typecheck:tsc:cli": "tsc --noEmit -p config/tsconfig.cli.json --composite false",
     "typecheck:tsc:web": "tsc --noEmit -p config/tsconfig.web.json --composite false",
