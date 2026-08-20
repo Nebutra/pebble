@@ -20,15 +20,19 @@ export const LOCAL_TERMINAL_STREAM_TOKEN_PREFIX = 'pebble.token.'
 const RECONNECT_MIN_DELAY_MS = 250
 const RECONNECT_MAX_DELAY_MS = 5000
 
+// Why the DOM event types rather than looser ones: these are properties holding
+// functions, so their parameters are checked contravariantly, and a handler
+// declared to take `unknown` demands more than WebSocket's own handlers offer —
+// which makes a real WebSocket unassignable to this type.
 export type SocketLike = {
-  binaryType: string
+  binaryType: BinaryType
   readyState: number
   send: (data: ArrayBufferView) => void
   close: () => void
-  onopen: ((event: unknown) => void) | null
-  onclose: ((event: unknown) => void) | null
-  onerror: ((event: unknown) => void) | null
-  onmessage: ((event: { data: unknown }) => void) | null
+  onopen: ((event: Event) => void) | null
+  onclose: ((event: CloseEvent) => void) | null
+  onerror: ((event: Event) => void) | null
+  onmessage: ((event: MessageEvent) => void) | null
 }
 
 export type LocalTerminalStreamOptions = {

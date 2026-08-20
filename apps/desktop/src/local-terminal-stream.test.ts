@@ -12,15 +12,19 @@ import {
   encodeTerminalStreamFrame
 } from './local-terminal-stream-protocol'
 
+// The fake only needs the fields the transport reads, so its events are cast
+// rather than constructed — a real DOM event would carry nothing extra here.
+const fakeEvent = {} as Event
+
 class FakeSocket implements SocketLike {
-  binaryType = ''
+  binaryType: BinaryType = 'blob'
   readyState = 0
   sent: Uint8Array[] = []
   closed = false
-  onopen: ((event: unknown) => void) | null = null
-  onclose: ((event: unknown) => void) | null = null
-  onerror: ((event: unknown) => void) | null = null
-  onmessage: ((event: { data: unknown }) => void) | null = null
+  onopen: ((event: Event) => void) | null = null
+  onclose: ((event: CloseEvent) => void) | null = null
+  onerror: ((event: Event) => void) | null = null
+  onmessage: ((event: MessageEvent) => void) | null = null
 
   constructor(
     readonly url: string,
@@ -37,7 +41,7 @@ class FakeSocket implements SocketLike {
 
   open(): void {
     this.readyState = 1
-    this.onopen?.({})
+    this.onopen?.(fakeEvent)
   }
 
   /** Delivers the runtime's acknowledgement for a stream. */
@@ -49,7 +53,7 @@ class FakeSocket implements SocketLike {
       payload
     })
     const copy = new Uint8Array(frame)
-    this.onmessage?.({ data: copy.buffer })
+    this.onmessage?.({ data: copy.buffer } as MessageEvent)
   }
 
   frames(): ReturnType<typeof decodeTerminalStreamFrame>[] {
@@ -129,7 +133,7 @@ describe('createLocalTerminalStream', () => {
     sockets[0]?.acknowledge(1, 'subscribed')
     expect(stream.isReady('sess-1')).toBe(true)
 
-    sockets[0]?.onclose?.({})
+    sockets[0]?.onclose?.(fakeEvent as CloseEvent)
     expect(stream.isReady('sess-1')).toBe(false)
     expect(stream.tryWrite('sess-1', 'a')).toBe(false)
 
