@@ -15,6 +15,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # Why: the shell-build decision below diffs the PR range. At the
+          # default depth of 1 neither endpoint is in the object store, so the
+          # diff fails and the decision falls open to building every time — the
+          # optimisation would be dead code that still looked alive.
+          fetch-depth: 0
 
       - name: Install native build tools
         run: sudo apt-get update && sudo apt-get install -y build-essential python3 zsh libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
@@ -102,15 +108,71 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Why separate from the shell: tauri's beforeBuildCommand bundles the
+      # renderer, so skipping the shell would also skip that — and a bundling
+      # failure (a bad dynamic import, a missing asset) is invisible to typecheck
+      # and to vitest. It costs 26s against the shell's 643s, so it runs every
+      # time and the expensive half is what gets skipped.
+      - name: Build the renderer bundle
+        run: pnpm --filter @pebble/desktop run build
+
+      # Why: compiling the shell is 643s of a 1062s job — 61% — and only native
+      # sources, their manifests, or the build inputs they embed can change it.
+      # Deciding here keeps every later step's condition identical, so the build
+      # and its toolchain can never disagree about whether to run.
+      #
+      # The decision fails open. An unreadable base, a missing diff, or a path
+      # nobody thought of all resolve to "build" — a gate that skips work it
+      # should have done is the failure this repo already paid for once, when a
+      # typecheck that did not cover apps/desktop let a broken release cut.
+      - name: Decide whether the desktop shell needs building
+        id: shell_build
+        run: |
+          set -u
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          if [ -z "$base" ] || [ -z "$head" ]; then
+            echo "reason=no PR range available" >> "$GITHUB_OUTPUT"
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! changed=$(git diff --name-only "$base" "$head" 2>/dev/null) || [ -z "$changed" ]; then
+            echo "reason=could not read the changed files" >> "$GITHUB_OUTPUT"
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Every path here is a proven input to `tauri build`, not a guess:
+          # updater-signature-verifier is a [[bin]] Cargo compiles from outside
+          # src-tauri; resources/ holds icons and entitlements embedded by
+          # generate_context!; scripts/ runs from beforeBuildCommand; .npmrc and
+          # pnpm-workspace.yaml change module resolution for it.
+          #
+          # The leading "? absorbs git's core.quotePath quoting, which puts a
+          # quote before a non-ASCII path and would otherwise defeat the anchor.
+          if printf '%s\n' "$changed" | grep -qE '^"?(apps/desktop/src-tauri/|apps/desktop/updater-signature-verifier/|apps/desktop/scripts/|native/|runtime/go/|resources/|config/patches/|\.github/workflows/|\.npmrc$|pnpm-workspace\.yaml$|pnpm-lock\.yaml$|package\.json$|apps/desktop/package\.json$)'; then
+            echo "reason=native sources or build inputs changed" >> "$GITHUB_OUTPUT"
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "reason=no native sources or build inputs changed" >> "$GITHUB_OUTPUT"
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          fi
+          printf 'shell build needed: %s\n' "$(grep '^needed=' "$GITHUB_OUTPUT" | tail -1)"
+
       # Why: tauri build.rs compiles native/zig-system; without zig on PATH the
       # shell build fails with "failed to build Zig system library" (os error 2).
       - name: Setup Zig
+        if: steps.shell_build.outputs.needed == 'true'
         uses: mlugg/setup-zig@v2
         with:
           version: 0.16.0
 
       - name: Build Tauri desktop shell
+        if: steps.shell_build.outputs.needed == 'true'
         run: pnpm build:tauri:no-bundle
+
+      - name: Skipped building the desktop shell
+        if: steps.shell_build.outputs.needed != 'true'
+        run: echo "Skipped — ${{ steps.shell_build.outputs.reason }}"
 
       # Why: tests run under system Node.js, so native modules must target the
       # Node ABI regardless of which desktop shell is built later in the job.
@@ -122,7 +184,12 @@ jobs:
 
       # Why: run the native entrypoint and its prepared sidecars from a temp copy
       # so repository-local binaries cannot hide an incomplete Tauri artifact.
+      #
+      # Gated on the same decision as the compile: this is the one step that
+      # consumes target/release, so skipping the build without skipping this
+      # would run it against a binary that was never produced.
       - name: Smoke packaged CLI
+        if: steps.shell_build.outputs.needed == 'true'
         run: >-
           node config/scripts/smoke-packaged-cli.mjs
           --app-dir=apps/desktop/src-tauri/target/release
