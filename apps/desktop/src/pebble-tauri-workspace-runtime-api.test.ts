@@ -3,6 +3,7 @@ import type { PreloadApi } from '../../../packages/product-core/shared/preload-a
 import {
   createPebbleProjectsApi,
   createPebbleReposApi,
+  createPebbleWorktreesApi,
   readRepos,
   readWorktrees
 } from './pebble-tauri-workspace-runtime-api'
@@ -317,5 +318,39 @@ describe('pebble Tauri workspace runtime API', () => {
         updatedAt: Date.parse('2026-07-12T00:00:00Z')
       })
     ])
+  })
+
+  it('gives the git-running worktree calls the budget the runtime actually uses', async () => {
+    // Why: `git worktree add` runs synchronously in the request and the runtime
+    // allows it two minutes. A shorter client deadline does not fail politely —
+    // it drops the socket, the runtime cancels the context, and git is killed
+    // part-way through, leaving a locked worktree the app cannot remove. The
+    // 1500ms default meant for status reads was losing that race outright on a
+    // checkout measured at 0.84-1.25s.
+    // create() reads the repo list and resolves lineage before it posts, so the
+    // transport has to answer those first for the POST to be reached at all.
+    requestRuntimeJsonMock.mockImplementation((path: string) => {
+      if (path === '/v1/projects') {
+        return Promise.resolve([{ id: 'repo-1', path: '/work/pebble', kind: 'git' }])
+      }
+      if (path.startsWith('/v1/worktrees?')) {
+        return Promise.resolve([])
+      }
+      if (path === '/v1/worktrees/lineage') {
+        return Promise.resolve({ worktrees: [] })
+      }
+      return Promise.resolve({ id: 'wt-1', path: '/work/pebble/feature', branch: 'feature' })
+    })
+    const api = createPebbleWorktreesApi({} as PreloadApi['worktrees'])
+
+    await api.create({ repoId: 'repo-1', name: 'feature' } as never).catch(() => undefined)
+
+    const call = requestRuntimeJsonMock.mock.calls.find(
+      ([path, options]) => path === '/v1/worktrees' && options?.method === 'POST'
+    )
+    if (!call) {
+      throw new Error('the worktree create never reached the runtime transport')
+    }
+    expect(call[1].timeoutMs).toBeGreaterThanOrEqual(120_000)
   })
 })

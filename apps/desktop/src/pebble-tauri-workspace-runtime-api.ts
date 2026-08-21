@@ -35,6 +35,12 @@ import {
 } from './pebble-tauri-runtime-transport'
 import { createRuntimeEventStreamCommand, readRuntimeEventStream } from './runtime-bridge'
 import type { RuntimeEventStreamEntry } from './runtime-command-shapes'
+
+// Matches gitWorktreeCommandLimit in runtime/go/internal/runtimecore/manager.go,
+// which is what actually bounds the git command. A client deadline shorter than
+// the server's does not fail politely: it drops the socket, the runtime cancels
+// the request context, and git is killed part-way through.
+const WORKTREE_GIT_TIMEOUT_MS = 2 * 60_000
 import { subscribeRuntimeEventPush } from './tauri-runtime-event-push'
 import {
   decodeRuntimeRemoteBranchConflict,
@@ -589,7 +595,19 @@ async function createRuntimeWorktreeWithStatus(
       branch: args.branchNameOverride ?? args.name,
       base: args.baseBranch ?? '',
       executeGit: true
-    }
+    },
+    // Why: this runs `git worktree add` synchronously in the request, and the
+    // runtime gives that two minutes. Without a matching budget here the call
+    // inherited the 1500ms default meant for status reads — measured against
+    // this repo, checkout takes 0.84-1.25s, so it failed as a coin flip with
+    // "Resource temporarily unavailable (os error 35)", which is the client's
+    // own read deadline surfacing as EAGAIN.
+    //
+    // The failure did more than report badly. Dropping the socket cancels the
+    // request context, which SIGKILLs git mid-checkout and leaves a worktree
+    // registered and `locked` with a partial tree — a state the app cannot
+    // remove afterwards, because its own removal passes a single --force.
+    timeoutMs: WORKTREE_GIT_TIMEOUT_MS
   })
   const initialMetaUpdates: Partial<WorktreeMeta> = {
     ...(args.displayName ? { displayName: args.displayName } : {}),
@@ -915,7 +933,11 @@ async function deleteRuntimeWorktree(
       body: {
         executeGit: true,
         force: options.force === true
-      }
+      },
+      // Why: removal runs git in the request too, so it needs the same budget
+      // as creation. Timing out here abandons a half-removed worktree for the
+      // same reason creation abandoned a half-created one.
+      timeoutMs: WORKTREE_GIT_TIMEOUT_MS
     }
   )
 }
