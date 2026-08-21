@@ -11,6 +11,14 @@ import {
 } from '../../../packages/product-core/shared/execution-host'
 import { ensurePebbleRuntimeProcess, requestRuntimeJson } from './pebble-tauri-runtime-transport'
 
+// Why: the desktop bridge refuses a resource response over a megabyte, and the
+// session list is roughly 2.7KB per session, so the old default of 1000 asked
+// for about 2.9MB and was rejected every time. The panel then sat on its
+// skeletons forever, because the only failure path retried the same oversized
+// request. 200 measured 546KB here — under half the ceiling, with room for
+// transcripts whose previews run longer than this machine's.
+const DEFAULT_SESSION_LIMIT = 200
+
 export function createPebbleAiVaultApi(base: PreloadApi['aiVault']): PreloadApi['aiVault'] {
   const focusListeners = new Set<() => void>()
   window.addEventListener('focus', () => {
@@ -44,7 +52,7 @@ async function listLocalRuntimeSessions(args?: AiVaultListArgs): Promise<AiVault
   // Why: the panel mounts during renderer bootstrap, before the sidecar's
   // fire-and-forget startup is guaranteed to have completed.
   await ensurePebbleRuntimeProcess()
-  const query = new URLSearchParams({ limit: String(args?.limit ?? 1000) })
+  const query = new URLSearchParams({ limit: String(normalizeLimit(args?.limit)) })
   if (args?.executionHostScope) {
     query.set('executionHostScope', args.executionHostScope)
   }
@@ -57,7 +65,16 @@ async function listLocalRuntimeSessions(args?: AiVaultListArgs): Promise<AiVault
       method: 'GET',
       timeoutMs: 30_000
     })
-  } catch {
+  } catch (error) {
+    // Why: the retry exists for a runtime whose listener is still binding, and
+    // that is worth one more attempt. A response the bridge refused for its size
+    // will be refused identically, so retrying it hid the failure behind a panel
+    // that never stopped loading. Surface it instead.
+    if (isResponseTooLarge(error)) {
+      throw new Error(
+        `The session list was too large for the desktop bridge (limit ${normalizeLimit(args?.limit)}). ${getErrorText(error)}`
+      )
+    }
     // A process can be running while its HTTP listener is still binding.
     await waitForRuntimeListener()
     return requestRuntimeJson<AiVaultListResult>(path, {
@@ -65,6 +82,14 @@ async function listLocalRuntimeSessions(args?: AiVaultListArgs): Promise<AiVault
       timeoutMs: 30_000
     })
   }
+}
+
+function getErrorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function isResponseTooLarge(error: unknown): boolean {
+  return /exceeded|too large|payload too/i.test(getErrorText(error))
 }
 
 async function listPairedRuntimeSessions(
@@ -161,7 +186,7 @@ function sessionTimestamp(session: AiVaultListResult['sessions'][number]): numbe
 }
 
 function normalizeLimit(limit: number | undefined): number {
-  return limit && limit > 0 ? Math.floor(limit) : 1000
+  return limit && limit > 0 ? Math.floor(limit) : DEFAULT_SESSION_LIMIT
 }
 
 async function waitForRuntimeListener(): Promise<void> {
