@@ -56,6 +56,33 @@ describe('createPebbleAiVaultApi', () => {
     expect(options).toEqual({ method: 'GET', timeoutMs: 30_000 })
   })
 
+  it('asks for a page the desktop bridge can carry', async () => {
+    // Why: the bridge refuses a resource response over a megabyte. At roughly
+    // 2.7KB per session the old default of 1000 asked for about 2.9MB and was
+    // refused every time.
+    const api = createPebbleAiVaultApi({} as PreloadApi['aiVault'])
+
+    await api.listSessions()
+
+    const [path] = requestRuntimeJsonMock.mock.calls[0]
+    const limit = Number(new URL(path, 'http://runtime.invalid').searchParams.get('limit'))
+    expect(limit).toBeGreaterThan(0)
+    expect(limit).toBeLessThanOrEqual(200)
+  })
+
+  it('reports an oversized response instead of retrying it forever', async () => {
+    // Why: the retry is for a listener still binding. A response refused for its
+    // size is refused identically the second time, so retrying it left the panel
+    // loading with nothing to show and no error to act on.
+    requestRuntimeJsonMock
+      .mockReset()
+      .mockRejectedValue(new Error('resource response exceeded 1048576 bytes'))
+    const api = createPebbleAiVaultApi({} as PreloadApi['aiVault'])
+
+    await expect(api.listSessions()).rejects.toThrow(/too large/i)
+    expect(requestRuntimeJsonMock).toHaveBeenCalledTimes(1)
+  })
+
   it('routes a paired host scan through the encrypted runtime channel', async () => {
     vi.mocked(window.api.runtimeEnvironments.call).mockResolvedValue({
       id: 'request-1',
