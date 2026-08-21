@@ -15,6 +15,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # Why: the shell-build decision below diffs the PR range. At the
+          # default depth of 1 neither endpoint is in the object store, so the
+          # diff fails and the decision falls open to building every time — the
+          # optimisation would be dead code that still looked alive.
+          fetch-depth: 0
 
       - name: Install native build tools
         run: sudo apt-get update && sudo apt-get install -y build-essential python3 zsh libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
@@ -135,7 +141,15 @@ jobs:
             echo "needed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if printf '%s\n' "$changed" | grep -qE '^(apps/desktop/src-tauri/|native/|runtime/go/|\.github/workflows/|pnpm-lock\.yaml$|package\.json$|apps/desktop/package\.json$)'; then
+          # Every path here is a proven input to `tauri build`, not a guess:
+          # updater-signature-verifier is a [[bin]] Cargo compiles from outside
+          # src-tauri; resources/ holds icons and entitlements embedded by
+          # generate_context!; scripts/ runs from beforeBuildCommand; .npmrc and
+          # pnpm-workspace.yaml change module resolution for it.
+          #
+          # The leading "? absorbs git's core.quotePath quoting, which puts a
+          # quote before a non-ASCII path and would otherwise defeat the anchor.
+          if printf '%s\n' "$changed" | grep -qE '^"?(apps/desktop/src-tauri/|apps/desktop/updater-signature-verifier/|apps/desktop/scripts/|native/|runtime/go/|resources/|config/patches/|\.github/workflows/|\.npmrc$|pnpm-workspace\.yaml$|pnpm-lock\.yaml$|package\.json$|apps/desktop/package\.json$)'; then
             echo "reason=native sources or build inputs changed" >> "$GITHUB_OUTPUT"
             echo "needed=true" >> "$GITHUB_OUTPUT"
           else
@@ -170,7 +184,12 @@ jobs:
 
       # Why: run the native entrypoint and its prepared sidecars from a temp copy
       # so repository-local binaries cannot hide an incomplete Tauri artifact.
+      #
+      # Gated on the same decision as the compile: this is the one step that
+      # consumes target/release, so skipping the build without skipping this
+      # would run it against a binary that was never produced.
       - name: Smoke packaged CLI
+        if: steps.shell_build.outputs.needed == 'true'
         run: >-
           node config/scripts/smoke-packaged-cli.mjs
           --app-dir=apps/desktop/src-tauri/target/release
