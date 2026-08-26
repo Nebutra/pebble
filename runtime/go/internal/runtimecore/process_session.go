@@ -14,6 +14,10 @@ import (
 
 const maxSessionChunks = 2048
 
+// How long stop() waits for a killed child to be reaped and its PTY closed.
+// Well under WorktreePtyStopBudget so a sweep over several sessions still fits.
+const sessionStopReapBudget = 2 * time.Second
+
 // Why: the output ring retires chunks by advancing a head index, and only
 // compacts once the retired prefix is worth a single memmove. Compacting on
 // every read instead made each PTY read shift the whole ring.
@@ -246,6 +250,14 @@ func (s *processSession) stop() (Session, error) {
 	s.updatedAt = time.Now().UTC()
 	s.notifyStateChangedLocked()
 	s.mu.Unlock()
+	// Why: killProcess only signals — the OS reaps asynchronously and the PTY
+	// closes in wait()'s cleanup. Returning before that lets the worktree
+	// removal gate see zero live sessions while the child still holds its cwd,
+	// which on Windows fails the delete with "used by another process". Bounded
+	// so a child that ignores the kill cannot wedge teardown.
+	ctx, cancel := context.WithTimeout(context.Background(), sessionStopReapBudget)
+	defer cancel()
+	s.waitForExitHandling(ctx)
 	return s.snapshot(), nil
 }
 
