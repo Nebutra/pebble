@@ -3,6 +3,7 @@ import { applyAgentRowLineage } from '@/components/dashboard/agent-row-lineage'
 import type { TerminalLayoutSnapshot, TerminalTab, TuiAgent } from '../../../../shared/types'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import { buildWorktreeAgentRows } from './worktree-agent-rows'
+import { resolveTitleDerivedAgentType } from './worktree-title-derived-agent-rows'
 
 const LEAF_ID_1 = '77777777-7777-4777-8777-777777777777'
 const LEAF_ID_2 = '88888888-8888-4888-8888-888888888888'
@@ -216,5 +217,44 @@ describe('buildTitleDerivedAgentRows', () => {
     })
 
     expect(rows).toHaveLength(0)
+  })
+})
+
+describe('resolveTitleDerivedAgentType', () => {
+  // Why: Claude Code titles itself "✳ Claude Code" at startup and then
+  // "✳ <task>", where the task is whatever the user asked for. Requiring the
+  // word "claude" hid every running Claude whose task did not happen to mention
+  // it — the reported case was a Chinese task title.
+  it('accepts Claude on its own prefix glyph, whatever the task says', () => {
+    expect(resolveTitleDerivedAgentType('\u2733 Claude Code', 'Claude Code')).toBe('claude')
+    expect(
+      resolveTitleDerivedAgentType('\u2733 继续收敛 pebble 仓库的 issues', 'Claude Code')
+    ).toBe('claude')
+    expect(resolveTitleDerivedAgentType('\u2733 fix the flaky test', 'Claude Code')).toBe('claude')
+  })
+
+  // Why: the guard exists because "." and "*" are not identity — in split panes
+  // they match arbitrary terminal spinners. Only the glyph is being trusted.
+  it('still requires the word for the prefixes any terminal can produce', () => {
+    expect(resolveTitleDerivedAgentType('. building assets', 'Claude Code')).toBeNull()
+    expect(resolveTitleDerivedAgentType('* compiling', 'Claude Code')).toBeNull()
+    expect(resolveTitleDerivedAgentType('. claude is running', 'Claude Code')).toBe('claude')
+  })
+
+  // Why: the glyph is not exclusive — Codex prints it too. The pane's owner is
+  // what separates them, so the same title has to resolve differently depending
+  // on who the pane already belongs to.
+  it('lets the pane owner win over the glyph', () => {
+    const title = '\u2733 refactor split-pane status'
+    expect(resolveTitleDerivedAgentType(title, 'Claude Code')).toBe('claude')
+    expect(resolveTitleDerivedAgentType(title, 'Claude Code', 'claude')).toBe('claude')
+    expect(resolveTitleDerivedAgentType(title, 'Claude Code', 'claude-agent-teams')).toBe('claude')
+    expect(resolveTitleDerivedAgentType(title, 'Claude Code', 'codex')).toBeNull()
+    expect(resolveTitleDerivedAgentType(title, 'Claude Code', 'gemini')).toBeNull()
+  })
+
+  it('leaves every other agent alone', () => {
+    expect(resolveTitleDerivedAgentType('anything at all', 'Grok')).toBe('grok')
+    expect(resolveTitleDerivedAgentType('anything at all', 'Codex')).toBe('codex')
   })
 })

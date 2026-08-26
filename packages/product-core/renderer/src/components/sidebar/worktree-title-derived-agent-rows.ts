@@ -1,5 +1,9 @@
 import type { DashboardAgentRow } from '@/components/dashboard/useDashboardData'
-import { isClaudeManagementTitle } from '@/lib/agent-status'
+import {
+  hasClaudeIdentityPrefix,
+  isClaudeLaunchAgent,
+  isClaudeManagementTitle
+} from '@/lib/agent-status'
 import { classifyTitleActivity, resolveTitleActivityLabel } from '@/lib/pane-agent-evidence'
 import { tabHasLivePty } from '@/lib/tab-has-live-pty'
 import type {
@@ -142,7 +146,9 @@ function buildTitleDerivedAgentRow(args: {
   }
   const paneKey = makePaneKey(args.tab.id, args.leafId)
   const orchestration = args.runtimeAgentOrchestrationByPaneKey?.[paneKey]
-  const agentType = isClaudeAgentsTitle ? 'claude' : resolveTitleDerivedAgentType(title, label)
+  const agentType = isClaudeAgentsTitle
+    ? 'claude'
+    : resolveTitleDerivedAgentType(title, label, args.tab.launchAgent)
   if (!agentType) {
     return null
   }
@@ -173,15 +179,32 @@ function buildTitleDerivedAgentRow(args: {
   }
 }
 
-export function resolveTitleDerivedAgentType(title: string, label: string): AgentType | null {
+export function resolveTitleDerivedAgentType(
+  title: string,
+  label: string,
+  ownerAgentType?: AgentType | null
+): AgentType | null {
   const agentType = TITLE_AGENT_LABEL_TO_TYPE[label] ?? 'unknown'
   if (agentType !== 'claude') {
     return agentType
   }
-  // Why: Claude's task-title spinner heuristic has no provider identity. In
-  // split panes it can match arbitrary terminal spinners, so sidebar rows only
-  // accept Claude when the title itself names Claude.
-  return CLAUDE_AGENT_TOKEN_RE.test(title) ? agentType : null
+  if (CLAUDE_AGENT_TOKEN_RE.test(title)) {
+    return agentType
+  }
+  // Why: Claude titles itself "✳ Claude Code" at startup and then "✳ <task>",
+  // and the task is whatever was asked — the reported case was Chinese with no
+  // "claude" anywhere in it, so requiring the word hid a running Claude from
+  // the sidebar entirely.
+  //
+  // The glyph alone is not enough to say Claude: Codex uses it too, which is
+  // what the Codex-launched case here covers. What separates them is the pane's
+  // own owner. An unclaimed pane running something that titles itself with
+  // Claude's glyph is Claude; a pane already launched as another agent is that
+  // agent, whatever glyph it happens to print. Agent Teams counts as Claude.
+  if (!hasClaudeIdentityPrefix(title)) {
+    return null
+  }
+  return !ownerAgentType || isClaudeLaunchAgent(ownerAgentType) ? agentType : null
 }
 
 /**
@@ -199,7 +222,7 @@ export function resolveAgentTypeFromTerminalTitle(
   const label = resolveTitleActivityLabel(normalizedTitle)
   return label
     ? (resolveCompatibleAgentTypeForOwner(
-        resolveTitleDerivedAgentType(normalizedTitle, label),
+        resolveTitleDerivedAgentType(normalizedTitle, label, ownerAgentType),
         ownerAgentType
       ) ?? null)
     : null
