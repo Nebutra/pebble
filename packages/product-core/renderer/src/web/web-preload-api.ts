@@ -2484,6 +2484,7 @@ function createRateLimitsApi(): NonNullable<Partial<PreloadApi>['rateLimits']> {
     opencodeGo: null,
     kimi: null,
     minimax: null,
+    grok: null,
     minimaxCookieConfigured: false,
     claudeTarget: { runtime: 'host', wslDistro: null },
     codexTarget: { runtime: 'host', wslDistro: null },

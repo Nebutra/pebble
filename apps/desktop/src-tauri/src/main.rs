@@ -198,6 +198,7 @@ pub fn run() {
             commands::minimax_credentials::minimax_credentials_clear_cookie,
             commands::rate_limits::rate_limits_minimax::rate_limits_fetch_minimax,
             commands::rate_limits::rate_limits_gemini::rate_limits_fetch_gemini,
+            commands::rate_limits::rate_limits_grok::rate_limits_fetch_grok,
             commands::rate_limits::rate_limits_consume_codex_reset_credit,
             commands::rate_limits::rate_limits_consume_codex_reset_credit_wsl,
             commands::agent_hooks::agent_hooks_claude_status,

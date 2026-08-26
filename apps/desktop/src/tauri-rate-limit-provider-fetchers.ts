@@ -30,6 +30,7 @@ export function emptyState(): RateLimitState {
     opencodeGo: null,
     kimi: null,
     minimax: null,
+    grok: null,
     minimaxCookieConfigured: false,
     claudeTarget: { ...HOST_TARGET },
     codexTarget: { ...HOST_TARGET },
@@ -87,7 +88,7 @@ export function decorateProvider(limits: ProviderRateLimits): ProviderRateLimits
 }
 
 export function failedProvider(
-  provider: 'claude' | 'codex' | 'gemini' | 'kimi' | 'opencode-go' | 'minimax',
+  provider: ProviderRateLimits['provider'],
   error: unknown
 ): ProviderRateLimits {
   return {
@@ -150,6 +151,14 @@ export async function fetchKimi(): Promise<ProviderRateLimits> {
     return decorateProvider(await invoke<ProviderRateLimits>('rate_limits_fetch_kimi'))
   } catch (error) {
     return failedProvider('kimi', error)
+  }
+}
+
+export async function fetchGrok(): Promise<ProviderRateLimits> {
+  try {
+    return decorateProvider(await invoke<ProviderRateLimits>('rate_limits_fetch_grok'))
+  } catch (error) {
+    return failedProvider('grok', error)
   }
 }
 
