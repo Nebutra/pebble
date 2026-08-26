@@ -11,6 +11,8 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # Why: measured 17-20 minutes; a stuck compile should report inside the hour.
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -101,6 +103,12 @@ jobs:
 
       - name: Verify Tauri desktop mainline contract
         run: pnpm verify:tauri-mainline
+
+      # Why: a job with no ceiling cannot report being stuck, only disappear.
+      # v1.4.149 spent six hours in notarization and the release was missing for
+      # three days with nothing anywhere saying so.
+      - name: Verify workflow timeouts
+        run: node config/scripts/verify-workflow-timeouts.mjs
 
       - name: Verify macOS entitlements
         run: pnpm verify:macos-entitlements

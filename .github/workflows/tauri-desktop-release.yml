@@ -35,6 +35,13 @@ jobs:
   build:
     name: ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
+    # Why: notarization waits on Apple, and when Apple does not answer it waits
+    # silently. v1.4.149 sat in `notarytool` for six hours until the platform's
+    # own ceiling killed the job, and the release was simply missing for three
+    # days with nothing to say so. Successful legs measure 12-47 minutes, so 90
+    # is roughly twice the slowest real build: long enough for a queue, short
+    # enough that a hang is reported the same hour it happens.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -413,6 +420,9 @@ jobs:
     needs: build
     if: github.event_name == 'push' || inputs.upload_to_github_release
     runs-on: ubuntu-22.04
+    # Why: no job here had a ceiling, so any hang burned the platform's six
+    # hours before anyone heard about it. Measured at one minute; ten is generous.
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -445,6 +455,9 @@ jobs:
     name: Verify release artifact evidence matrix
     needs: build
     runs-on: ubuntu-22.04
+    # Why: no job here had a ceiling, so any hang burned the platform's six
+    # hours before anyone heard about it. Measured under a minute; ten is generous.
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v6

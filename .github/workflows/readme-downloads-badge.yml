@@ -22,6 +22,8 @@ jobs:
     # Why: this workflow commits to main, so forks should not create divergent badge commits.
     if: github.repository == 'nebutra/pebble'
     runs-on: ubuntu-latest
+    # Why: a badge refresh is seconds of API calls; an uncapped job can only vanish, not report.
+    timeout-minutes: 10
     steps:
       - name: Checkout main
         uses: actions/checkout@v6

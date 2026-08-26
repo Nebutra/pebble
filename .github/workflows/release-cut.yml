@@ -521,6 +521,8 @@ jobs:
     needs: cut
     if: needs.cut.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    # Why: measured under a minute; a hang here strands a tag with no release.
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
@@ -756,6 +758,8 @@ jobs:
       - cut
       - build-tauri
     runs-on: ubuntu-latest
+    # Why: measured under a minute; this is the step that makes a build reachable.
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:

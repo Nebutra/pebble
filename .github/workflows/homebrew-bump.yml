@@ -35,6 +35,8 @@ on:
 jobs:
   bump-cask:
     runs-on: ubuntu-latest
+    # Why: a tap bump is a few API calls; an uncapped job can only vanish, not report.
+    timeout-minutes: 15
     # Why: only desktop tags have the macOS DMGs this workflow downloads.
     # A mobile tag such as `mobile-v0.0.1` must never rewrite either cask.
     if: >

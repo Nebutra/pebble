@@ -22,6 +22,8 @@ on:
 jobs:
   android-build:
     runs-on: ubuntu-latest
+    # Why: a full mobile build, sized like the desktop one; an uncapped job can only vanish, not report.
+    timeout-minutes: 90
 
     # Why: the "Create GitHub Release" step below uses the default GITHUB_TOKEN
     # to call `gh release create`, which requires contents:write. Without this,
