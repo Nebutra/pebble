@@ -70,17 +70,59 @@ describe('createPebbleAiVaultApi', () => {
     expect(limit).toBeLessThanOrEqual(200)
   })
 
+  // Why: the reported failure. The panel asks for 500 explicitly, so lowering
+  // the module default never reached it — at roughly 2.7KB a session that is
+  // about 1.35MB, over the bridge's ceiling, and the panel showed an error
+  // instead of sessions. Shrinking until it fits beats any fixed number,
+  // because per-session cost is whatever the transcript previews weigh.
+  it('shrinks the page until the bridge accepts it', async () => {
+    const tooBig = new Error('resource response exceeded 1048576 bytes')
+    requestRuntimeJsonMock.mockReset().mockImplementation(async (path: string) => {
+      const limit = Number(new URL(path, 'http://runtime.invalid').searchParams.get('limit'))
+      if (limit > 125) {
+        throw tooBig
+      }
+      return { sessions: [], issues: [], scannedAt: '2026-07-13T00:00:00Z' }
+    })
+    const api = createPebbleAiVaultApi({} as PreloadApi['aiVault'])
+
+    const result = await api.listSessions({ limit: 500 })
+
+    const limits = requestRuntimeJsonMock.mock.calls.map((call) =>
+      Number(new URL(String(call[0]), 'http://runtime.invalid').searchParams.get('limit'))
+    )
+    expect(limits).toEqual([500, 250, 125])
+    // A shorter list that arrives looks exactly like a complete one, so the
+    // reason it is shorter has to travel with it.
+    expect(result.issues.map((issue) => issue.message)).toEqual([
+      expect.stringContaining('Showing the 125 most recent sessions')
+    ])
+  })
+
+  it('leaves a full page unannotated', async () => {
+    const api = createPebbleAiVaultApi({} as PreloadApi['aiVault'])
+
+    const result = await api.listSessions({ limit: 500 })
+
+    expect(result.issues).toEqual([])
+  })
+
   it('reports an oversized response instead of retrying it forever', async () => {
     // Why: the retry is for a listener still binding. A response refused for its
-    // size is refused identically the second time, so retrying it left the panel
-    // loading with nothing to show and no error to act on.
+    // size is refused identically at the same limit, so retrying it unchanged
+    // left the panel loading with nothing to show and no error to act on. It
+    // now shrinks first, and only gives up once even the floor is refused.
     requestRuntimeJsonMock
       .mockReset()
       .mockRejectedValue(new Error('resource response exceeded 1048576 bytes'))
     const api = createPebbleAiVaultApi({} as PreloadApi['aiVault'])
 
-    await expect(api.listSessions()).rejects.toThrow(/too large/i)
-    expect(requestRuntimeJsonMock).toHaveBeenCalledTimes(1)
+    await expect(api.listSessions()).rejects.toThrow(/too large for the desktop bridge even at/i)
+    // 200 -> 100 -> 50 -> 25, then it stops rather than halving forever.
+    const limits = requestRuntimeJsonMock.mock.calls.map((call) =>
+      Number(new URL(String(call[0]), 'http://runtime.invalid').searchParams.get('limit'))
+    )
+    expect(limits).toEqual([200, 100, 50, 25])
   })
 
   it('routes a paired host scan through the encrypted runtime channel', async () => {
