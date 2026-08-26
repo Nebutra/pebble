@@ -30,6 +30,8 @@ jobs:
     # (@MainActor isolation). Xcode 16.x (macos-15) can't even parse it
     # ("unknown attribute 'MainActor'"), so we need Xcode 26.x → macos-26.
     runs-on: macos-26
+    # Why: a full mobile build, and it signs with Apple too; an uncapped job can only vanish, not report.
+    timeout-minutes: 90
 
     defaults:
       run:

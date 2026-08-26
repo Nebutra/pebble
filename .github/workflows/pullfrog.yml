@@ -17,6 +17,8 @@ permissions:
 jobs:
   pullfrog:
     runs-on: ubuntu-latest
+    # Why: an automation job should report rather than linger; an uncapped job can only vanish, not report.
+    timeout-minutes: 30
     permissions:
       id-token: write
       contents: read

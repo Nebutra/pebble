@@ -39,6 +39,8 @@ jobs:
       matrix:
         os: [ubuntu-22.04, windows-latest]
     runs-on: ${{ matrix.os }}
+    # Why: a smoke run that hangs must not outlive its signal; an uncapped job can only vanish, not report.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -112,6 +114,8 @@ jobs:
     # Keep this on manual/scheduled permission-bearing runners instead of PR CI.
     if: github.event_name != 'pull_request'
     runs-on: macos-15
+    # Why: a GUI e2e leg that hangs must not outlive its signal; an uncapped job can only vanish, not report.
+    timeout-minutes: 45
     env:
       PEBBLE_COMPUTER_E2E: '1'
     steps:
@@ -131,6 +135,8 @@ jobs:
   linux:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-22.04
+    # Why: a GUI e2e leg that hangs must not outlive its signal; an uncapped job can only vanish, not report.
+    timeout-minutes: 45
     env:
       PEBBLE_COMPUTER_E2E: '1'
       ACCESSIBILITY_ENABLED: '1'
@@ -157,6 +163,8 @@ jobs:
   windows:
     if: github.event_name != 'pull_request'
     runs-on: windows-latest
+    # Why: a GUI e2e leg that hangs must not outlive its signal; an uncapped job can only vanish, not report.
+    timeout-minutes: 45
     env:
       PEBBLE_COMPUTER_E2E: '1'
     steps:

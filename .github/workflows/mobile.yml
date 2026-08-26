@@ -16,6 +16,8 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # Why: sized like the desktop verify job; an uncapped job can only vanish, not report.
+    timeout-minutes: 45
 
     defaults:
       run:
