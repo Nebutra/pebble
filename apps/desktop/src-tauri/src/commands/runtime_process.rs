@@ -552,16 +552,32 @@ mod tests {
         assert!(!status.success());
     }
 
+    // Why the retry: the release half cannot assume the port stays free. Cargo
+    // runs these tests in parallel threads and several of them bind
+    // 127.0.0.1:0, so a sibling can claim the port this one just dropped and
+    // the probe correctly reports a conflict for a port nobody here is holding.
+    // Each attempt takes a fresh port, so a single unlucky handoff retries
+    // instead of failing, while a genuinely broken probe — one that reports a
+    // conflict for every address — still exhausts the attempts and fails.
     #[test]
     fn reports_a_conflict_only_while_the_address_is_held() {
-        let held = TcpListener::bind("127.0.0.1:0").expect("bind probe port");
-        let address = held.local_addr().expect("probe address").to_string();
+        const ATTEMPTS: usize = 8;
+        for attempt in 1..=ATTEMPTS {
+            let held = TcpListener::bind("127.0.0.1:0").expect("bind probe port");
+            let address = held.local_addr().expect("probe address").to_string();
 
-        let conflict = listen_address_conflict(&address).expect("held address must conflict");
-        assert!(conflict.contains(&address));
+            let conflict = listen_address_conflict(&address).expect("held address must conflict");
+            assert!(conflict.contains(&address));
 
-        drop(held);
-        assert!(listen_address_conflict(&address).is_none());
+            drop(held);
+            if listen_address_conflict(&address).is_none() {
+                return;
+            }
+            assert!(
+                attempt < ATTEMPTS,
+                "every one of {ATTEMPTS} released ports still reported a conflict"
+            );
+        }
     }
 
     #[test]

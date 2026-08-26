@@ -2232,7 +2232,16 @@ export type UpdateStatus =
   // resolves on its own. Reporting it as an error tells the user to retry or
   // download manually when the only correct action is to wait.
   | { state: 'publishing'; userInitiated?: boolean; activeNudgeId?: string }
-  | { state: 'downloading'; percent: number; version: string; activeNudgeId?: string }
+  | {
+      state: 'downloading'
+      percent: number
+      version: string
+      /** Observed throughput, so a stalled download is visible rather than silent. */
+      bytesPerSecond?: number
+      /** Seconds left at the observed throughput. */
+      etaSeconds?: number
+      activeNudgeId?: string
+    }
   | { state: 'downloaded'; version: string; releaseUrl?: string; activeNudgeId?: string }
   | { state: 'error'; message: string; userInitiated?: boolean; activeNudgeId?: string }
 
