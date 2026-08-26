@@ -2,6 +2,7 @@
    renderer surface. Keeping the state machine and its presentation variants together avoids
    scattering tightly coupled update behavior across multiple files. */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { describeDownloadRate, isSlowDownload } from './update-download-rate-label'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { useAppStore } from '../store'
 import { Card } from './ui/card'
@@ -552,6 +553,8 @@ export function UpdateCard() {
         <DownloadingContent
           version={status.version}
           percent={status.percent}
+          bytesPerSecond={status.bytesPerSecond}
+          etaSeconds={status.etaSeconds}
           changelog={changelog}
           prefersReducedMotion={prefersReducedMotion}
           mediaFailed={mediaFailed}
@@ -811,6 +814,8 @@ function SimpleCardContent({
 function DownloadingContent({
   version,
   percent,
+  bytesPerSecond,
+  etaSeconds,
   changelog,
   prefersReducedMotion,
   mediaFailed,
@@ -821,6 +826,8 @@ function DownloadingContent({
 }: {
   version: string
   percent: number
+  bytesPerSecond?: number
+  etaSeconds?: number
   changelog: ChangelogData | null
   prefersReducedMotion: boolean
   mediaFailed: boolean
@@ -830,6 +837,7 @@ function DownloadingContent({
   onCollapse: () => void
 }) {
   const release = changelog?.release
+  const rateLabel = describeDownloadRate({ bytesPerSecond, etaSeconds })
   const showMedia =
     release?.mediaUrl && !mediaFailed && !(prefersReducedMotion && isAnimatedGif(release.mediaUrl))
 
@@ -905,7 +913,16 @@ function DownloadingContent({
         <Progress value={percent} className="h-1.5" />
         <p className="text-xs text-muted-foreground">
           {translate('auto.components.UpdateCard.6e45bfa2e0', 'Downloading...')} {percent}%
+          {rateLabel ? ` · ${rateLabel}` : ''}
         </p>
+        {isSlowDownload(etaSeconds) && (
+          <p className="text-xs text-muted-foreground">
+            {translate(
+              'components.UpdateCard.slowDownload',
+              'This download is unusually slow. A VPN or proxy is the usual cause — it will keep going in the background.'
+            )}
+          </p>
+        )}
       </div>
     </div>
   )

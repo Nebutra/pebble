@@ -175,7 +175,14 @@ describe.runIf(process.platform !== 'win32')('macOS dyld launch probe', () => {
     writeFileSync(staysAlive, '#!/bin/sh\nsleep 1\n')
     chmodSync(staysAlive, 0o755)
 
-    const earlyProbe = macosDyldProbeCommand(earlyExit, 0.05)
+    // Why the windows differ: the probe races the child's exit against a timer,
+    // so each case needs the window that makes its outcome certain rather than
+    // likely. /usr/bin/true exits in about a millisecond, so a generous window
+    // guarantees the exit is seen first — a 50ms one lost that race under load
+    // and reported the process as survived. The stays-alive case wants the
+    // opposite: a short window that a `sleep 1` child always outlives, and a
+    // window that overruns under load only makes it more certain, not less.
+    const earlyProbe = macosDyldProbeCommand(earlyExit, 2)
     expect(() => runArtifactCommand(earlyProbe.command, earlyProbe.args)).toThrow(
       /exited during dyld probe/
     )
