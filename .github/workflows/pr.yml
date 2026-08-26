@@ -144,7 +144,16 @@ jobs:
             echo "needed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if ! changed=$(git diff --name-only "$base" "$head" 2>/dev/null) || [ -z "$changed" ]; then
+          # Three dots, not two: a two-dot diff compares the two tips, so every
+          # commit the base branch gained after this branch was cut shows up
+          # inverted in the list. Practically every PR is behind its base by at
+          # least one commit, which is why this gate reported "build" on every
+          # run since it shipped and the skip branch had never once fired.
+          #
+          # --no-renames so a file moved OUT of a watched directory still lists
+          # its old path; with rename detection only the destination is printed,
+          # and a destination outside every pattern would read as "skip".
+          if ! changed=$(git diff --name-only --no-renames "$base...$head" 2>/dev/null) || [ -z "$changed" ]; then
             echo "reason=could not read the changed files" >> "$GITHUB_OUTPUT"
             echo "needed=true" >> "$GITHUB_OUTPUT"
             exit 0

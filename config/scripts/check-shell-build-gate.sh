@@ -105,11 +105,10 @@ echo
 echo "gaps -- git plumbing that breaks the match:"
 # git quotes non-ASCII paths by default; the leading '\"' defeats the ^ anchor.
 gap "non-ASCII rust source (core.quotePath)" '"apps/desktop/src-tauri/src/\350\276\223\345\205\245.rs"' build
-# git diff --name-only prints only the rename destination.
-# Known limit: a rename whose destination lands outside every pattern. Moving
-# native sources also touches Cargo.toml or build.rs in src-tauri in practice,
-# which is covered — recorded rather than chased.
-gap "native source moved out of native/ (rename)" "packages/zig-system/src/pty.zig" build
+# The workflow now passes --no-renames, so a file moved out of a watched
+# directory still lists its old path and the pattern matches on that.
+check "native source moved out of native/ (--no-renames)" \
+  "$(printf 'native/zig-system/src/pty.zig\npackages/zig-system/src/pty.zig')" build
 
 echo
 echo "safe to skip:"
@@ -118,6 +117,54 @@ check "a renderer unit test" "packages/product-core/renderer/src/x.test.ts" skip
 check "a desktop unit test" "apps/desktop/src/tauri-ai-vault-api.test.ts" skip
 check "readme" "README.md" skip
 check "a go test only" "runtime/go/internal/x_test.go" build
+
+echo
+echo "the diff invocation itself:"
+# Why this section exists: everything above tests the pattern, which was never
+# the broken half. The workflow compared the two branch tips, so every commit
+# the base gained after the branch was cut appeared in the list — inverted —
+# and dragged in native paths the PR never touched. The skip branch had
+# therefore never fired once. Exercise the real git behaviour, not the regex.
+diff_probe=$(mktemp -d)
+(
+  cd "$diff_probe" || exit 1
+  git init -q .
+  git config user.email gate@example.com
+  git config user.name 'Gate Probe'
+  mkdir -p packages apps/desktop/src-tauri
+  echo start > packages/a.ts
+  git add -A && git commit -qm base
+
+  # The branch is cut here, then the base moves on and touches a native path.
+  git branch -q feature
+  echo native > apps/desktop/src-tauri/main.rs
+  git add -A && git commit -qm 'base advances into src-tauri'
+  base=$(git rev-parse HEAD)
+
+  git checkout -q feature
+  echo renderer-only > packages/a.ts
+  git add -A && git commit -qm 'renderer-only change'
+  head=$(git rev-parse HEAD)
+
+  two_dot=$(git diff --name-only "$base" "$head")
+  three_dot=$(git diff --name-only --no-renames "$base...$head")
+  printf '%s\n' "$two_dot" > "$diff_probe/two-dot"
+  printf '%s\n' "$three_dot" > "$diff_probe/three-dot"
+) >/dev/null 2>&1
+
+if grep -qE '^apps/desktop/src-tauri/' "$diff_probe/two-dot"; then
+  printf '  ok    %-52s -> %s\n' "two-dot drags in the base's own commits" "reproduced"
+else
+  printf '  FAIL  %-52s -> %s\n' "two-dot drags in the base's own commits" "not reproduced"
+  fail=1
+fi
+if grep -qE '^apps/desktop/src-tauri/' "$diff_probe/three-dot"; then
+  printf '  FAIL  %-52s -> %s\n' "three-dot lists only the branch's own files" "leaked base commits"
+  fail=1
+else
+  printf '  ok    %-52s -> %s\n' "three-dot lists only the branch's own files" "clean"
+fi
+rm -rf "$diff_probe"
 
 echo
 printf 'gaps: %s   hard failures: %s\n' "$gaps" "$fail"
