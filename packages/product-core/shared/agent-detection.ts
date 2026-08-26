@@ -14,6 +14,13 @@ import {
   titleHasAgentName,
   titleHasAnyLegacyAgentName
 } from './agent-name-token-match'
+import { containsBrailleSpinner } from './braille-spinner-detection'
+import {
+  CLAUDE_IDLE,
+  hasClaudeIdentityPrefix,
+  isClaudeAgent,
+  isClaudeManagementTitle
+} from './claude-title-identity'
 import {
   getPiCompatibleSyntheticAgentLabel,
   getPiCompatibleSyntheticAgentStatus,
@@ -28,12 +35,15 @@ export {
   MAX_OSC_TITLE_CHARS
 } from './osc-title-extraction'
 export { isShellProcess } from './shell-process-detection'
+// Re-exported so the many existing `agent-detection` importers keep working.
+export {
+  hasClaudeIdentityPrefix,
+  isClaudeAgent,
+  isClaudeLaunchAgent,
+  isClaudeManagementTitle
+} from './claude-title-identity'
 
 export type AgentStatus = 'working' | 'permission' | 'idle'
-
-const CLAUDE_IDLE = '\u2733' // ✳ (eight-spoked asterisk — Claude Code idle prefix)
-const CLAUDE_MANAGEMENT_TITLE_RE =
-  /^\s*(?:"(?:.*[\\/])?claude(?:\.(?:exe|cmd|bat|ps1))?"|'(?:.*[\\/])?claude(?:\.(?:exe|cmd|bat|ps1))?'|(?:.*[\\/])?claude(?:\.(?:exe|cmd|bat|ps1))?)\s+agents\s*$/i
 
 const GEMINI_WORKING = '\u2726' // ✦
 const GEMINI_SILENT_WORKING = '\u23F2' // ⏲
@@ -121,16 +131,6 @@ export function isPiTerminalTitle(title: string): boolean {
 
 function isPiAgentTitle(title: string): boolean {
   return isLegacyPiCompatibleTitle(title)
-}
-
-function containsBrailleSpinner(title: string): boolean {
-  for (const char of title) {
-    const codePoint = char.codePointAt(0)
-    if (codePoint !== undefined && codePoint >= 0x2800 && codePoint <= 0x28ff) {
-      return true
-    }
-  }
-  return false
 }
 
 function containsAgentName(title: string): boolean {
@@ -265,52 +265,6 @@ export function normalizeTerminalTitle(title: string): string {
   return title
 }
 
-/**
- * Returns true when the terminal title matches Claude Code's title conventions.
- * Used to scope prompt-cache-timer behavior to Claude sessions only — other
- * agents have different (or no) caching semantics.
- */
-export function isClaudeAgent(title: string): boolean {
-  if (!title || isClaudeManagementTitle(title)) {
-    return false
-  }
-  const lower = title.toLowerCase()
-
-  // Why: Claude Code titles are prefixed with status indicators (✳, ". ", "* ",
-  // braille spinners) followed by the task description. The task text can
-  // legitimately mention other agents, so Claude-specific prefixes must win.
-  if (title.startsWith(`${CLAUDE_IDLE} `) || title === CLAUDE_IDLE) {
-    return true
-  }
-  // Why: ". " (working) and "* " (idle) are Claude Code title conventions.
-  // Other supported agents do not use them, and rejecting titles that mention
-  // another agent in the task text caused false negatives for real Claude tabs.
-  if (title.startsWith('. ') || title.startsWith('* ')) {
-    return true
-  }
-  if (containsBrailleSpinner(title)) {
-    // Why: named non-Claude agents can carry braille spinners too; Claude-only
-    // prompt-cache paths must not fire for those explicit agent titles.
-    return !lower.includes('cursor') && !lower.includes('openclaude')
-  }
-  // Why: permission/action-required Claude titles can omit the usual prefixes.
-  // Token-match so cwd/worktree titles like "claude-scratch" do not become
-  // Claude tabs, while task text that merely mentions Claude still stays out.
-  const trimmedTitle = title.trimStart()
-  if (
-    trimmedTitle.toLowerCase().startsWith('claude') &&
-    titleHasAgentName(trimmedTitle, 'claude')
-  ) {
-    return true
-  }
-
-  return false
-}
-
-export function isClaudeManagementTitle(title: string): boolean {
-  return CLAUDE_MANAGEMENT_TITLE_RE.test(title)
-}
-
 export function getAgentLabel(title: string): string | null {
   if (isClaudeManagementTitle(title)) {
     return null
@@ -441,7 +395,7 @@ export function detectAgentStatusFromTitle(title: string): AgentStatus | null {
 
   // Claude Code uses ✳ prefix for idle — must check before braille/agent-name
   // because the title text is the task description, not "Claude Code".
-  if (title.startsWith(`${CLAUDE_IDLE} `) || title === CLAUDE_IDLE) {
+  if (hasClaudeIdentityPrefix(title)) {
     return 'idle'
   }
 

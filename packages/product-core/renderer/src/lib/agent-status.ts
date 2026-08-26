@@ -17,7 +17,9 @@ export {
   isGeminiTerminalTitle,
   isClaudeAgent,
   isClaudeManagementTitle,
-  getAgentLabel
+  getAgentLabel,
+  hasClaudeIdentityPrefix,
+  isClaudeLaunchAgent
 } from '../../../shared/agent-detection'
 import type { AgentStatus } from '../../../shared/agent-detection'
 import { classifyTitleActivity, resolveTitleActivityLabel } from './pane-agent-evidence'
