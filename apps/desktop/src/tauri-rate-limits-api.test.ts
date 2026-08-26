@@ -46,6 +46,7 @@ function emptyState(): RateLimitState {
     opencodeGo: null,
     kimi: null,
     minimax: null,
+    grok: null,
     minimaxCookieConfigured: false,
     claudeTarget: { runtime: 'host', wslDistro: null },
     codexTarget: { runtime: 'host', wslDistro: null },
@@ -280,7 +281,7 @@ describe('createPebbleRateLimitsApi', () => {
     const api = createPebbleRateLimitsApi(baseApi())
     await api.get()
     await api.get()
-    expect(invokeMock).toHaveBeenCalledTimes(6)
+    expect(invokeMock).toHaveBeenCalledTimes(7)
   })
 
   it('maps a rejected invoke into an error provider entry instead of throwing', async () => {

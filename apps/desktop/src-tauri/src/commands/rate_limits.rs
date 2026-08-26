@@ -21,6 +21,8 @@ use super::agent_accounts::{
 };
 use super::managed_claude_accounts::{read_managed_claude_credentials, validate_wsl_owned_path};
 
+#[path = "rate_limits_grok.rs"]
+pub mod rate_limits_grok;
 #[path = "rate_limits_gemini.rs"]
 pub mod rate_limits_gemini;
 #[path = "rate_limits_minimax.rs"]

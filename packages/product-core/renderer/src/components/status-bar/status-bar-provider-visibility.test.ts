@@ -261,6 +261,32 @@ describe('getVisibleUsageProvider', () => {
   })
 })
 
+// Why: Grok has no Pebble-side setting to switch it on — being signed in to the
+// Grok CLI is the only signal. These pin that a signed-in Grok reaches the bar
+// and a signed-out one stays off it, so the provider can never become a
+// silently-wired no-op.
+describe('grok visibility', () => {
+  const grokUsage = provider('ok', {
+    provider: 'grok',
+    monthly: { usedPercent: 42.5, windowMinutes: 43_200, resetsAt: null, resetDescription: null }
+  })
+
+  it('shows a signed-in Grok without any Pebble setting', () => {
+    expect(hasUsageProviderSettingsForProvider('grok', usageSettings())).toBe(false)
+    expect(getVisibleUsageProvider('grok', grokUsage, usageSettings())).toBe(grokUsage)
+  })
+
+  it('hides Grok when the CLI is not signed in', () => {
+    const signedOut = provider('unavailable', { provider: 'grok' })
+    expect(getVisibleUsageProvider('grok', signedOut, usageSettings())).toBeNull()
+  })
+
+  it('keeps a configured Grok error visible so a failing fetch is not silent', () => {
+    const failing = provider('error', { provider: 'grok', error: 'HTTP 500' })
+    expect(getVisibleUsageProvider('grok', failing, usageSettings())).toBe(failing)
+  })
+})
+
 describe('isUsageEmptyState', () => {
   it('waits for provider snapshots before showing the setup CTA', () => {
     expect(
@@ -271,7 +297,8 @@ describe('isUsageEmptyState', () => {
           gemini: null,
           opencodeGo: null,
           kimi: null,
-          minimax: null
+          minimax: null,
+          grok: null
         },
         usageSettings()
       )
@@ -287,7 +314,8 @@ describe('isUsageEmptyState', () => {
           gemini: provider('unavailable'),
           opencodeGo: provider('unavailable', { provider: 'opencode-go' }),
           kimi: provider('unavailable', { provider: 'kimi' }),
-          minimax: provider('unavailable', { provider: 'minimax' })
+          minimax: provider('unavailable', { provider: 'minimax' }),
+          grok: provider('unavailable', { provider: 'grok' })
         },
         usageSettings()
       )
@@ -303,7 +331,8 @@ describe('isUsageEmptyState', () => {
           gemini: provider('unavailable'),
           opencodeGo: provider('unavailable', { provider: 'opencode-go' }),
           kimi: provider('unavailable', { provider: 'kimi' }),
-          minimax: provider('unavailable', { provider: 'minimax' })
+          minimax: provider('unavailable', { provider: 'minimax' }),
+          grok: provider('unavailable', { provider: 'grok' })
         },
         usageSettings({
           codexManagedAccounts: [
@@ -330,7 +359,8 @@ describe('isUsageEmptyState', () => {
           gemini: null,
           opencodeGo: null,
           kimi: null,
-          minimax: null
+          minimax: null,
+          grok: null
         },
         null
       )
@@ -346,7 +376,8 @@ describe('isUsageEmptyState', () => {
           gemini: provider('unavailable'),
           opencodeGo: provider('unavailable', { provider: 'opencode-go' }),
           kimi: provider('unavailable', { provider: 'kimi' }),
-          minimax: provider('unavailable', { provider: 'minimax' })
+          minimax: provider('unavailable', { provider: 'minimax' }),
+          grok: provider('unavailable', { provider: 'grok' })
         },
         usageSettings()
       )

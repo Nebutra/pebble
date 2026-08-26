@@ -22,6 +22,7 @@ type UsageProviderSnapshots = {
   opencodeGo: ProviderRateLimits | null
   kimi: ProviderRateLimits | null
   minimax: ProviderRateLimits | null
+  grok: ProviderRateLimits | null
 }
 
 type UsageProviderId = ProviderRateLimits['provider']
@@ -140,7 +141,8 @@ export function isUsageEmptyState(
     isProviderSnapshotPending(providers.gemini) ||
     isProviderSnapshotPending(providers.opencodeGo) ||
     isProviderSnapshotPending(providers.kimi) ||
-    isProviderSnapshotPending(providers.minimax)
+    isProviderSnapshotPending(providers.minimax) ||
+    isProviderSnapshotPending(providers.grok)
   ) {
     return false
   }
@@ -151,6 +153,7 @@ export function isUsageEmptyState(
     !isProviderConfigured(providers.gemini) &&
     !isProviderConfigured(providers.opencodeGo) &&
     !isProviderConfigured(providers.kimi) &&
-    !isProviderConfigured(providers.minimax)
+    !isProviderConfigured(providers.minimax) &&
+    !isProviderConfigured(providers.grok)
   )
 }

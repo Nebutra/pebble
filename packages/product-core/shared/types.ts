@@ -3148,6 +3148,7 @@ export type StatusBarItem =
   | 'opencode-go'
   | 'kimi'
   | 'minimax'
+  | 'grok'
   | 'ssh'
   | 'resource-usage'
   | 'ports'

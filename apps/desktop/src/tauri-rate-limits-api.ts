@@ -23,6 +23,7 @@ import {
   failedProvider,
   fetchGemini,
   fetchInactiveClaudeAccount,
+  fetchGrok,
   fetchKimi,
   fetchMiniMax,
   fetchOpenCodeGo,
@@ -94,6 +95,7 @@ export function createPebbleRateLimitsApi(base: RateLimitsApi): RateLimitsApi {
     refreshes.push(fetchOpenCodeGo())
     refreshes.push(fetchMiniMax())
     refreshes.push(fetchGemini())
+    refreshes.push(fetchGrok())
     for (const limits of await Promise.all(refreshes)) {
       const stateKey = limits.provider === 'opencode-go' ? 'opencodeGo' : limits.provider
       state = {
