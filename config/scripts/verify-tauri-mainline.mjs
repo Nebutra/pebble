@@ -7556,12 +7556,19 @@ const checks = [
       text.includes('OutputChunks:     len(s.output) - s.outputHead,')
   },
   {
-    name: 'Go trims the coalesced output window at flush time, not on every PTY read',
+    // Why this changed shape: it used to pin trimToBudgetLocked, which is the
+    // function that threw PTY bytes away. A PTY stream is protocol — a hole in
+    // it truncates an escape sequence and every byte after is misread — so the
+    // window is now split into bounded parts instead. What is worth guarding is
+    // that it stays bounded WITHOUT dropping, so that is what this asserts.
+    name: 'Go splits the coalesced output window into bounded parts without dropping PTY bytes',
     file: 'runtime/go/internal/runtimecore/session_output_events.go',
     expect: (text) =>
-      text.includes('func (e *sessionOutputEmitter) trimToBudgetLocked()') &&
-      text.includes('if len(e.buffer) > 2*e.maxBytes {') &&
-      text.includes('e.buffer = e.buffer[:copy(e.buffer, e.buffer[start:])]')
+      text.includes('func (e *sessionOutputEmitter) drainLocked(wholePartsOnly bool)') &&
+      text.includes('if len(e.buffer) >= e.maxBytes {') &&
+      text.includes('e.buffer = e.buffer[:copy(e.buffer, e.buffer[consumed:])]') &&
+      !text.includes('droppedBytes') &&
+      !text.includes('trimToBudgetLocked')
   },
   {
     name: 'AI Vault scan tests run against an isolated home, not real agent transcripts',

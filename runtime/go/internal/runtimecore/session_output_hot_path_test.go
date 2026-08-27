@@ -14,31 +14,39 @@ func TestSessionOutputEmitterBoundsTheWindowBetweenFlushes(t *testing.T) {
 	recorder := &emitRecorder{}
 	emitter := newTestOutputEmitter(recorder, 16)
 	session := Session{ID: "sess-1"}
-	// Why: trimming is deferred to the flush, so the window itself needs its own
-	// cap or a command dumping megabytes between flushes would retain all of it.
+	// Why the window still needs a cap: a command dumping megabytes between
+	// flushes would otherwise retain all of it. Whole parts are now sent as soon
+	// as they fill, so the retained buffer stays under one part instead of being
+	// trimmed down to one — bounded memory without discarding bytes.
+	var written strings.Builder
 	for range 200 {
 		emitter.append(testOutputChunk("0123456789"), session)
+		written.WriteString("0123456789")
 		emitter.mu.Lock()
 		held := len(emitter.buffer)
 		emitter.mu.Unlock()
-		if held > 2*emitter.maxBytes {
-			t.Fatalf("window grew to %d bytes, past the %d cap", held, 2*emitter.maxBytes)
+		if held > emitter.maxBytes {
+			t.Fatalf("window grew to %d bytes, past the %d cap", held, emitter.maxBytes)
 		}
 	}
 	emitter.flushNow()
 
 	events := recorder.snapshot()
-	if len(events) != 1 {
-		t.Fatalf("expected a single flush, got %d", len(events))
+	var combined strings.Builder
+	for i, event := range events {
+		content := event.payload["chunk"].(OutputChunk).Content
+		if len(content) > 16 {
+			t.Fatalf("event %d is %d bytes, over the budget", i, len(content))
+		}
+		if _, dropped := event.payload["droppedBytes"]; dropped {
+			t.Fatalf("event %d still reports droppedBytes", i)
+		}
+		combined.WriteString(content)
 	}
-	chunk := events[0].payload["chunk"].(OutputChunk)
-	if chunk.Content != "4567890123456789" {
-		t.Fatalf("expected the newest 16-byte tail, got %q", chunk.Content)
-	}
-	// Why: the in-window trims and the flush trim must add up to everything the
-	// payload could not carry, or consumers cannot tell they need to tail-fetch.
-	if dropped := events[0].payload["droppedBytes"].(int); dropped != 200*10-16 {
-		t.Fatalf("dropped %d bytes, want %d", dropped, 200*10-16)
+	// Why every byte and not a tail: this is a terminal's byte stream, and a gap
+	// in it truncates an escape sequence rather than merely losing some text.
+	if combined.String() != written.String() {
+		t.Fatalf("delivered %d bytes of %d", combined.Len(), written.Len())
 	}
 }
 
@@ -46,27 +54,29 @@ func TestSessionOutputEmitterWindowsDoNotLeakIntoEachOther(t *testing.T) {
 	recorder := &emitRecorder{}
 	emitter := newTestOutputEmitter(recorder, 16)
 	session := Session{ID: "sess-1"}
-	// Why: the first window has to overflow, or the reset of the carried drop
-	// count and buffer would go unexercised.
-	emitter.append(testOutputChunk(strings.Repeat("first", 8)), session)
+	// Why the first window has to overflow: the buffer is reused rather than
+	// regrown from nil, so the reset only gets exercised once it has split.
+	first := strings.Repeat("first", 8)
+	emitter.append(testOutputChunk(first), session)
 	emitter.flushNow()
+	firstCount := len(recorder.snapshot())
+	if firstCount < 2 {
+		t.Fatalf("expected the 40-byte window to split, got %d events", firstCount)
+	}
 	emitter.append(testOutputChunk("second"), session)
 	emitter.flushNow()
 
 	events := recorder.snapshot()
-	if len(events) != 2 {
-		t.Fatalf("expected two flushes, got %d", len(events))
+	var firstWindow strings.Builder
+	for _, event := range events[:firstCount] {
+		firstWindow.WriteString(event.payload["chunk"].(OutputChunk).Content)
 	}
-	// Why: the window buffer is reused rather than regrown from nil, so a shorter
-	// window must not expose the bytes a longer one left behind.
-	if content := events[1].payload["chunk"].(OutputChunk).Content; content != "second" {
-		t.Fatalf("second window carried stale bytes: %q", content)
+	if firstWindow.String() != first {
+		t.Fatalf("first window delivered %q, want %q", firstWindow.String(), first)
 	}
-	if dropped, carried := events[1].payload["droppedBytes"]; carried {
-		t.Fatalf("second window inherited the previous window's drop count: %v", dropped)
-	}
-	if dropped := events[0].payload["droppedBytes"].(int); dropped != 8*5-16 {
-		t.Fatalf("first window dropped %d bytes, want %d", dropped, 8*5-16)
+	// Why: a shorter window must not expose the bytes a longer one left behind.
+	if content := events[len(events)-1].payload["chunk"].(OutputChunk).Content; content != "second" {
+		t.Fatalf("second window leaked the first: %q", content)
 	}
 }
 
