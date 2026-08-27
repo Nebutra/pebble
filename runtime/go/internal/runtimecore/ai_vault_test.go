@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -531,14 +532,68 @@ func TestAiVaultScopeMatchesNFDWorkspaceAgainstNFCCwd(t *testing.T) {
 	}
 }
 
-func TestAiVaultScopedSessionsBypassGlobalLimit(t *testing.T) {
+// Why scoped sessions must survive the cap: the scoped pass exists because the
+// global list is recency-capped, so an active workspace whose sessions are all
+// older would otherwise never appear.
+func TestAiVaultScopedSessionsSurviveTheGlobalRecencyCap(t *testing.T) {
 	newer := "2026-07-13T10:00:00Z"
 	older := "2026-07-12T10:00:00Z"
 	global := AiVaultSession{ID: "global", SessionID: "global", UpdatedAt: &newer}
 	scoped := AiVaultSession{ID: "scoped", SessionID: "scoped", UpdatedAt: &older}
 
-	merged := mergeAiVaultSessionsWithoutLimit([]AiVaultSession{global}, []AiVaultSession{scoped})
+	merged := mergeAiVaultSessions([]AiVaultSession{global}, []AiVaultSession{scoped}, 25)
 	if len(merged) != 2 || merged[0].ID != "global" || merged[1].ID != "scoped" {
 		t.Fatalf("unexpected scoped merge: %#v", merged)
+	}
+}
+
+// The reported failure: the merge ignored the limit, so it bounded only the
+// global half. Asking for 1 session returned 171 of them — 636KB — and the
+// desktop bridge refuses anything over a megabyte, so the panel could not be
+// reached at any page size the client asked for.
+func TestAiVaultMergeHoldsTheLimitWhenScopeMatchesMore(t *testing.T) {
+	stamp := func(minute int) *string {
+		value := time.Date(2026, 7, 13, 10, minute, 0, 0, time.UTC).Format(time.RFC3339)
+		return &value
+	}
+	global := make([]AiVaultSession, 0, 40)
+	scoped := make([]AiVaultSession, 0, 40)
+	for i := 0; i < 40; i++ {
+		id := fmt.Sprintf("global-%02d", i)
+		global = append(global, AiVaultSession{ID: id, SessionID: id, UpdatedAt: stamp(i)})
+		scopedID := fmt.Sprintf("scoped-%02d", i)
+		scoped = append(scoped, AiVaultSession{ID: scopedID, SessionID: scopedID, UpdatedAt: stamp(i)})
+	}
+
+	merged := mergeAiVaultSessions(global, scoped, 25)
+
+	if len(merged) != 25 {
+		t.Fatalf("merged %d sessions, want the limit of 25", len(merged))
+	}
+	scopedKept := 0
+	for _, session := range merged {
+		if strings.HasPrefix(session.ID, "scoped-") {
+			scopedKept++
+		}
+	}
+	// Scoped entries take the contested slots — dropping them would undo the
+	// reason the scoped pass exists.
+	if scopedKept != 25 {
+		t.Fatalf("kept %d scoped sessions, want all 25 slots", scopedKept)
+	}
+	for i := 1; i < len(merged); i++ {
+		if aiVaultSessionTime(merged[i-1]).Before(aiVaultSessionTime(merged[i])) {
+			t.Fatal("merged sessions are not newest-first")
+		}
+	}
+}
+
+func TestAiVaultMergeTreatsANonPositiveLimitAsUnbounded(t *testing.T) {
+	newer := "2026-07-13T10:00:00Z"
+	global := AiVaultSession{ID: "global", SessionID: "global", UpdatedAt: &newer}
+	scoped := AiVaultSession{ID: "scoped", SessionID: "scoped", UpdatedAt: &newer}
+
+	if merged := mergeAiVaultSessions([]AiVaultSession{global}, []AiVaultSession{scoped}, 0); len(merged) != 2 {
+		t.Fatalf("merged %d sessions, want both", len(merged))
 	}
 }

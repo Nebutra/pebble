@@ -266,7 +266,7 @@ func ScanLocalAiVaultSessions(req AiVaultListRequest) AiVaultListResult {
 		normalizeAiVaultScopePaths(req.ScopePaths),
 		codexHome,
 	)
-	sessions = mergeAiVaultSessionsWithoutLimit(sessions, scopedSessions)
+	sessions = mergeAiVaultSessions(sessions, scopedSessions, limit)
 	issues = append(issues, scopedIssues...)
 	result := AiVaultListResult{Sessions: sessions, Issues: issues, ScannedAt: time.Now().UTC().Format(time.RFC3339Nano)}
 	RewriteAiVaultExecutionHost(&result, "local", runtime.GOOS)
@@ -333,18 +333,43 @@ func aiVaultSessionInScope(session AiVaultSession, scopePaths []string) bool {
 	return false
 }
 
-func mergeAiVaultSessionsWithoutLimit(primary, scoped []AiVaultSession) []AiVaultSession {
-	byID := make(map[string]AiVaultSession, len(primary)+len(scoped))
-	for _, session := range primary {
-		byID[session.ID] = session
+// mergeAiVaultSessions combines the recency-capped global list with the scoped
+// one and holds the result to limit.
+//
+// Why scoped sessions win the contested slots: the scoped pass exists because
+// the global list is recency-capped, so an active workspace whose sessions are
+// all older would otherwise be invisible. Dropping scoped entries to honour the
+// limit would undo exactly that.
+//
+// Why a limit at all: this used to merge without one, so limit bounded only the
+// global half and the response grew with whatever the scope matched. A caller
+// asking for 1 session could receive 171 — 636KB — and the desktop bridge
+// refuses a response over a megabyte, which made the panel unreachable no
+// matter how small a page it asked for.
+func mergeAiVaultSessions(primary, scoped []AiVaultSession, limit int) []AiVaultSession {
+	ordered := func(sessions []AiVaultSession) []AiVaultSession {
+		sorted := append([]AiVaultSession(nil), sessions...)
+		sort.Slice(sorted, func(i, j int) bool {
+			return aiVaultSessionTime(sorted[i]).After(aiVaultSessionTime(sorted[j]))
+		})
+		return sorted
 	}
-	for _, session := range scoped {
-		byID[session.ID] = session
+	seen := make(map[string]struct{}, len(primary)+len(scoped))
+	result := make([]AiVaultSession, 0, limit)
+	take := func(sessions []AiVaultSession) {
+		for _, session := range sessions {
+			if limit > 0 && len(result) >= limit {
+				return
+			}
+			if _, exists := seen[session.ID]; exists {
+				continue
+			}
+			seen[session.ID] = struct{}{}
+			result = append(result, session)
+		}
 	}
-	result := make([]AiVaultSession, 0, len(byID))
-	for _, session := range byID {
-		result = append(result, session)
-	}
+	take(ordered(scoped))
+	take(ordered(primary))
 	sort.Slice(result, func(i, j int) bool {
 		return aiVaultSessionTime(result[i]).After(aiVaultSessionTime(result[j]))
 	})
