@@ -468,7 +468,11 @@ const checks = [
       text.includes('RewriteAiVaultExecutionHost') &&
       text.includes('mergeAiVaultResults') &&
       text.includes('scanScopedAiVaultCandidates') &&
-      text.includes('mergeAiVaultSessionsWithoutLimit')
+      // Why the arguments and not just the name: the merge used to ignore the
+      // limit, so a caller asking for one session could receive 171 and blow
+      // past the desktop bridge's 1MB ceiling. Pinning the call with `limit`
+      // keeps that from regressing behind a rename.
+      text.includes('mergeAiVaultSessions(sessions, scopedSessions, limit)')
   },
   {
     name: 'Go AI Vault HTTP route preserves host scope and repeated scoped paths',
