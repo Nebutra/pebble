@@ -17,22 +17,28 @@ const (
 )
 
 // sessionOutputEmitter coalesces per-line output chunks into bounded
-// session.output events: at most one event per emit window per session,
-// keeping only the newest maxBytes bytes and counting what it dropped so
-// consumers know to tail-fetch the full buffer instead of trusting the event.
+// session.output events: at most one event per emit window per session, split
+// into consecutive bounded parts when a window carries more than one event's
+// worth.
+//
+// Why split rather than keep the newest tail: this used to drop the oldest
+// bytes past the budget and report the count to consumers. A PTY stream is
+// protocol, not text — a hole truncates an escape sequence, so every byte after
+// it is misread. Characters vanish, the cursor lands in the wrong cell, and
+// whatever the previous frame left there stays on screen. A single 80KB burst
+// lost 49KB that way, and no desktop consumer ever acted on that report.
 type sessionOutputEmitter struct {
 	mu        sync.Mutex
 	emit      func(topic string, payload interface{})
 	emitDelay time.Duration
 	maxBytes  int
 
-	timer        *time.Timer
-	buffer       []byte
-	stream       string
-	chunkCount   int
-	droppedBytes int
-	firstAt      time.Time
-	snapshot     Session
+	timer      *time.Timer
+	buffer     []byte
+	stream     string
+	chunkCount int
+	firstAt    time.Time
+	snapshot   Session
 }
 
 func (e *sessionOutputEmitter) configure(emit func(topic string, payload interface{})) {
@@ -56,27 +62,27 @@ func (e *sessionOutputEmitter) append(chunk OutputChunk, snapshot Session) {
 	e.snapshot = snapshot
 	e.chunkCount++
 	e.buffer = append(e.buffer, chunk.Content...)
-	// Why: the payload only has to be bounded when it is taken, so trimming is
-	// deferred to the flush. Trimming per read copied the whole retained budget
-	// on every read once a command was dumping output; this caps in-window
-	// memory instead and pays one trim per emitted event.
-	if len(e.buffer) > 2*e.maxBytes {
-		e.trimToBudgetLocked()
+	// Why: a window that has already filled at least one event's worth is sent
+	// straight away instead of growing until the timer fires. That keeps
+	// in-window memory bounded the way the old trim did, without the trim's
+	// cost of throwing bytes away.
+	var ready []map[string]interface{}
+	if len(e.buffer) >= e.maxBytes {
+		ready = e.drainLocked(true)
 	}
-	if e.timer == nil {
+	if e.timer == nil && e.chunkCount > 0 {
 		e.timer = time.AfterFunc(e.emitDelay, e.flushTimerFired)
 	}
 	e.mu.Unlock()
+	e.emitAll(ready)
 }
 
 func (e *sessionOutputEmitter) flushTimerFired() {
 	e.mu.Lock()
 	e.timer = nil
-	topic, payload, pending := e.takeLocked()
+	ready := e.drainLocked(false)
 	e.mu.Unlock()
-	if pending {
-		e.emit(topic, payload)
-	}
+	e.emitAll(ready)
 }
 
 // flushNow drains any pending coalesced output synchronously. Called before a
@@ -90,49 +96,65 @@ func (e *sessionOutputEmitter) flushNow() {
 		e.timer.Stop()
 		e.timer = nil
 	}
-	topic, payload, pending := e.takeLocked()
+	ready := e.drainLocked(false)
 	e.mu.Unlock()
-	if pending {
-		e.emit(topic, payload)
+	e.emitAll(ready)
+}
+
+func (e *sessionOutputEmitter) emitAll(events []map[string]interface{}) {
+	// Emitted outside the lock, in order: a terminal replays these bytes in
+	// sequence, so reordering them corrupts the screen exactly as a gap would.
+	for _, payload := range events {
+		e.emit("session.output", payload)
 	}
 }
 
-// trimToBudgetLocked drops the oldest bytes past the payload budget, in place.
-func (e *sessionOutputEmitter) trimToBudgetLocked() {
-	if len(e.buffer) <= e.maxBytes {
-		return
+// drainLocked turns the pending window into consecutive bounded payloads.
+//
+// wholePartsOnly keeps a trailing remainder smaller than the budget in the
+// buffer, so an in-progress window keeps coalescing instead of emitting a
+// short event per read.
+func (e *sessionOutputEmitter) drainLocked(wholePartsOnly bool) []map[string]interface{} {
+	if e.chunkCount == 0 || len(e.buffer) == 0 {
+		return nil
 	}
-	start := len(e.buffer) - e.maxBytes
-	// Why: PTY reads may split a rune, and trimming at the raw byte budget must
-	// not turn the retained newest tail into malformed JSON text.
-	for start < len(e.buffer) && !utf8.RuneStart(e.buffer[start]) {
-		start++
+	events := make([]map[string]interface{}, 0, len(e.buffer)/e.maxBytes+1)
+	consumed := 0
+	for consumed < len(e.buffer) {
+		remaining := len(e.buffer) - consumed
+		if remaining < e.maxBytes && wholePartsOnly {
+			break
+		}
+		end := consumed + min(remaining, e.maxBytes)
+		// Why: PTY reads split runes, and a part boundary must not cut one in
+		// half or the payload is malformed JSON text. Walk back to a rune start;
+		// the bytes stay in the buffer and lead the next part.
+		for end > consumed && end < len(e.buffer) && !utf8.RuneStart(e.buffer[end]) {
+			end--
+		}
+		if end == consumed {
+			// A part-sized run with no rune boundary in it: emit it raw rather
+			// than spin. Losing the split is better than losing the bytes.
+			end = consumed + min(remaining, e.maxBytes)
+		}
+		events = append(events, map[string]interface{}{
+			// Payload keeps the pre-coalescing {session, chunk} shape so the SSE
+			// push bridge and mobile terminal projection consume it unchanged.
+			"session":         e.snapshot,
+			"chunk":           OutputChunk{At: e.firstAt, Stream: e.stream, Content: string(e.buffer[consumed:end])},
+			"coalescedChunks": e.chunkCount,
+		})
+		consumed = end
 	}
-	e.droppedBytes += start
-	e.buffer = e.buffer[:copy(e.buffer, e.buffer[start:])]
-}
-
-func (e *sessionOutputEmitter) takeLocked() (string, map[string]interface{}, bool) {
-	if e.chunkCount == 0 {
-		return "", nil, false
+	if consumed == 0 {
+		return nil
 	}
-	e.trimToBudgetLocked()
-	// Payload keeps the pre-coalescing {session, chunk} shape so the SSE push
-	// bridge and mobile terminal projection consume it unchanged.
-	payload := map[string]interface{}{
-		"session":         e.snapshot,
-		"chunk":           OutputChunk{At: e.firstAt, Stream: e.stream, Content: string(e.buffer)},
-		"coalescedChunks": e.chunkCount,
+	// Why: the payloads copied their bytes above, so the window's buffer can be
+	// reused instead of regrown from nil on every emit.
+	e.buffer = e.buffer[:copy(e.buffer, e.buffer[consumed:])]
+	if len(e.buffer) == 0 {
+		e.chunkCount = 0
+		e.stream = ""
 	}
-	if e.droppedBytes > 0 {
-		payload["droppedBytes"] = e.droppedBytes
-	}
-	// Why: the payload took its own copy above, so the window's buffer can be
-	// reused instead of regrown from nil on every emit. The in-window cap in
-	// append is what keeps that retained capacity bounded.
-	e.buffer = e.buffer[:0]
-	e.chunkCount = 0
-	e.droppedBytes = 0
-	e.stream = ""
-	return "session.output", payload, true
+	return events
 }

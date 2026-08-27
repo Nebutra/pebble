@@ -72,7 +72,10 @@ func TestSessionOutputEmitterCoalescesRapidChunks(t *testing.T) {
 	}
 }
 
-func TestSessionOutputEmitterBoundsPayloadAndCountsDrops(t *testing.T) {
+// Why this replaces a test that asserted a 4-byte drop: bounding the payload
+// is right, throwing the overflow away is not. A PTY stream is protocol, so a
+// hole in it truncates an escape sequence and every byte after it is misread.
+func TestSessionOutputEmitterSplitsPastTheBudgetWithoutLosingBytes(t *testing.T) {
 	recorder := &emitRecorder{}
 	emitter := newTestOutputEmitter(recorder, 16)
 	session := Session{ID: "sess-1"}
@@ -80,37 +83,45 @@ func TestSessionOutputEmitterBoundsPayloadAndCountsDrops(t *testing.T) {
 	emitter.append(testOutputChunk("abcdefghij"), session)
 	emitter.flushNow()
 	events := recorder.snapshot()
-	if len(events) != 1 {
-		t.Fatalf("expected a single flush, got %d", len(events))
+	if len(events) != 2 {
+		t.Fatalf("expected the 20 bytes to split into 2 bounded events, got %d", len(events))
 	}
-	chunk := events[0].payload["chunk"].(OutputChunk)
-	if chunk.Content != "456789abcdefghij" {
-		t.Fatalf("expected newest 16-byte tail, got %q", chunk.Content)
+	var combined strings.Builder
+	for i, event := range events {
+		content := event.payload["chunk"].(OutputChunk).Content
+		if len(content) > 16 {
+			t.Fatalf("event %d is %d bytes, over the 16-byte budget", i, len(content))
+		}
+		if _, dropped := event.payload["droppedBytes"]; dropped {
+			t.Fatalf("event %d still reports droppedBytes", i)
+		}
+		combined.WriteString(content)
 	}
-	if dropped := events[0].payload["droppedBytes"].(int); dropped != 4 {
-		t.Fatalf("expected 4 dropped bytes, got %d", dropped)
+	if combined.String() != "0123456789abcdefghij" {
+		t.Fatalf("delivered %q, want every byte in order", combined.String())
 	}
 }
 
-func TestSessionOutputEmitterBoundsPayloadAtUtf8Boundary(t *testing.T) {
+func TestSessionOutputEmitterSplitsAtAUtf8Boundary(t *testing.T) {
 	recorder := &emitRecorder{}
 	emitter := newTestOutputEmitter(recorder, 8)
 	emitter.append(testOutputChunk("A中文🤖"), Session{ID: "sess-1"})
 	emitter.flushNow()
 
 	events := recorder.snapshot()
-	if len(events) != 1 {
-		t.Fatalf("expected a single flush, got %d", len(events))
+	var combined strings.Builder
+	for i, event := range events {
+		content := event.payload["chunk"].(OutputChunk).Content
+		if !utf8.ValidString(content) {
+			t.Fatalf("part %d is not valid UTF-8: %q", i, content)
+		}
+		if len(content) > 8 {
+			t.Fatalf("part %d is %d bytes, over the 8-byte budget", i, len(content))
+		}
+		combined.WriteString(content)
 	}
-	content := events[0].payload["chunk"].(OutputChunk).Content
-	if !utf8.ValidString(content) {
-		t.Fatalf("bounded output is not valid UTF-8: %q", content)
-	}
-	if content != "文🤖" || len(content) > 8 {
-		t.Fatalf("bounded newest tail = %q (%d bytes), want 文🤖 within 8 bytes", content, len(content))
-	}
-	if dropped := events[0].payload["droppedBytes"].(int); dropped != 4 {
-		t.Fatalf("dropped bytes = %d, want 4 including the split rune", dropped)
+	if combined.String() != "A中文🤖" {
+		t.Fatalf("delivered %q, want the whole burst", combined.String())
 	}
 }
 
