@@ -173,25 +173,41 @@ fn panic_payload_message(payload: &(dyn Any + Send)) -> String {
 }
 
 #[cfg(target_os = "macos")]
-pub fn record_web_content_process_termination(webview: &tauri::Webview) {
-    record_native_webview_process_failure(
+pub fn record_web_content_process_termination(
+    webview: &tauri::Webview,
+    recovery_details: Map<String, Value>,
+) {
+    record_native_webview_process_failure_with_details(
         webview.app_handle().clone(),
         webview.label().to_string(),
         webview.url().ok().map(|value| value.to_string()),
         "web-content-process-terminated".to_string(),
+        recovery_details,
     );
 }
 
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 pub fn record_native_webview_process_failure(
     app: tauri::AppHandle,
     label: String,
     url: Option<String>,
     reason: String,
 ) {
+    record_native_webview_process_failure_with_details(app, label, url, reason, Map::new());
+}
+
+fn record_native_webview_process_failure_with_details(
+    app: tauri::AppHandle,
+    label: String,
+    url: Option<String>,
+    reason: String,
+    details: Map<String, Value>,
+) {
     // Why: WebKit invokes this hook on the UI thread after its content process
     // dies; crash-store I/O must not delay WebView recovery or window input.
     tauri::async_runtime::spawn_blocking(move || {
-        if let Err(error) = record_native_webview_process_failure_blocking(&app, label, url, reason)
+        if let Err(error) =
+            record_native_webview_process_failure_blocking(&app, label, url, reason, details)
         {
             eprintln!("[crash-reporting] failed to record WebView process failure: {error}");
         }
@@ -203,15 +219,15 @@ fn record_native_webview_process_failure_blocking(
     label: String,
     url: Option<String>,
     reason: String,
+    mut details: Map<String, Value>,
 ) -> Result<(), String> {
     let state = app.state::<CrashReportsState>();
     let reason = sanitize_crash_report_string(&reason, MAX_STRING_DETAIL_LENGTH);
-    let key = format!("web-content-process-failed:{label}:{reason}");
+    let key = web_content_failure_dedupe_key(&label, &reason, &details);
     if is_recent_renderer_error_duplicate(&state, &key)? {
         return Ok(());
     }
     let breadcrumbs = lock_state(&state.breadcrumbs)?.clone();
-    let mut details = Map::new();
     details.insert("webview_label".to_string(), Value::String(label.clone()));
     if let Some(url) = url {
         details.insert(
@@ -247,6 +263,18 @@ fn web_content_crash_source(label: &str) -> &'static str {
     } else {
         "renderer"
     }
+}
+
+fn web_content_failure_dedupe_key(
+    label: &str,
+    reason: &str,
+    details: &Map<String, Value>,
+) -> String {
+    let recovery_result = details
+        .get("web_content_recovery_result")
+        .and_then(Value::as_str)
+        .unwrap_or("not-recorded");
+    format!("web-content-process-failed:{label}:{reason}:{recovery_result}")
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1538,6 +1566,25 @@ mod tests {
     fn classifies_main_and_browser_web_content_crashes() {
         assert_eq!(web_content_crash_source("main"), "renderer");
         assert_eq!(web_content_crash_source("browser-page-1"), "child");
+    }
+
+    #[test]
+    fn keeps_recovery_and_rate_limit_failures_distinct_for_deduplication() {
+        let mut recovery = Map::new();
+        recovery.insert(
+            "web_content_recovery_result".to_string(),
+            Value::String("reload-dispatched".to_string()),
+        );
+        let mut rate_limited = Map::new();
+        rate_limited.insert(
+            "web_content_recovery_result".to_string(),
+            Value::String("rate-limited".to_string()),
+        );
+
+        assert_ne!(
+            web_content_failure_dedupe_key("main", "terminated", &recovery),
+            web_content_failure_dedupe_key("main", "terminated", &rate_limited)
+        );
     }
 
     #[test]

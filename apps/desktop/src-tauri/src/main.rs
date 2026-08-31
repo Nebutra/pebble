@@ -45,6 +45,7 @@ pub fn run() {
         .manage(commands::browser_screencast::BrowserScreencastState::default())
         .manage(commands::browser_video_recording::BrowserVideoRecordingState::default())
         .manage(commands::crash_reports::CrashReportsState::default())
+        .manage(commands::web_content_process_recovery::WebContentProcessRecoveryState::default())
         .manage(commands::sentry_reporting::SentryReportingState::default())
         .manage(commands::native_session_recovery::NativeSessionState::default())
         .manage(native_quit::NativeQuitState::default())
@@ -135,7 +136,7 @@ pub fn run() {
         });
     #[cfg(target_os = "macos")]
     let builder = builder.on_web_content_process_terminate(|webview| {
-        commands::crash_reports::record_web_content_process_termination(webview);
+        commands::web_content_process_recovery::recover_after_termination(webview);
     });
     let app = builder
         .on_window_event(|window, event| {

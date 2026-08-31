@@ -212,7 +212,77 @@ Some(args) => dispatch_cli_or_exit_two(args)
 
 ---
 
+## Scenario: macOS WebContent Process Recovery
+
+### 1. Scope / Trigger
+
+- Trigger: changing Tauri's macOS `on_web_content_process_terminate` hook,
+  native crash reporting, or WebView reload behavior.
+
+### 2. Signatures
+
+- Hook: `on_web_content_process_terminate(|webview| recover_after_termination(webview))`.
+- Recovery owner: `web_content_process_recovery::recover_after_termination(&Webview)`.
+- Crash detail fields: `web_content_recovery_action`,
+  `web_content_recovery_attempted`, `web_content_recovery_result`, and
+  `web_content_recovery_throttle_guard`.
+
+### 3. Contracts
+
+- Tauri reports a terminated WKWebView content process but does not reload it.
+- The native hook reloads the affected WebView and records the termination
+  through the existing asynchronous crash journal.
+- Recovery allows two attempts per WebView label in a rolling 60-second window.
+- A busy or poisoned throttle lock must not leave the UI dead; reload proceeds
+  and the report records `web_content_recovery_throttle_guard=unavailable`.
+- Equal recovery results retain normal crash-report deduplication, while a
+  later `rate-limited` result remains distinct from `reload-dispatched`.
+
+### 4. Validation & Error Matrix
+
+- Reload dispatched -> `attempted=true`, result `reload-dispatched`.
+- Tauri dispatcher rejects reload -> result `reload-dispatch-failed` plus a
+  sanitized `web_content_recovery_error`.
+- Third termination inside 60 seconds -> no reload, result `rate-limited`.
+- Throttle state unavailable -> reload, guard `unavailable`.
+
+### 5. Good/Base/Bad Cases
+
+- Good: a one-off WebKit process-group termination reloads the main renderer
+  and the hydrated application becomes usable again.
+- Base: a child browser WebView reloads independently under its own label budget.
+- Bad: the hook only writes a crash record and leaves a permanently blank view.
+- Bad: persistent page failure creates an unbounded native reload loop.
+
+### 6. Tests Required
+
+- Rust unit tests must prove per-label budgeting, window expiry, no reload when
+  limited, dispatch-error details, and distinct recovery-result dedupe keys.
+- `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml recovery` must pass.
+- `pnpm verify:tauri-mainline` must continue to accept the Tauri-only owner.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+.on_web_content_process_terminate(|webview| {
+    crash_reports::record_web_content_process_termination(webview);
+})
+```
+
+#### Correct
+
+```rust
+.on_web_content_process_terminate(|webview| {
+    web_content_process_recovery::recover_after_termination(webview);
+})
+```
+
+---
+
 ## Code Review Checklist
 
 - Confirm the HTML entry remains below the configured desktop Vite root.
 - Confirm failures before React mount still produce a visible error surface.
+- Confirm macOS WebContent termination still performs bounded native recovery.

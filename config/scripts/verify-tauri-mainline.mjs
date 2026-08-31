@@ -5460,11 +5460,21 @@ const checks = [
       text.includes('record_native_process_failure')
   },
   {
-    name: 'Tauri records macOS WebKit content-process termination as a native crash',
+    name: 'Tauri routes macOS WebKit content-process termination through native recovery',
     file: 'apps/desktop/src-tauri/src/main.rs',
     expect: (text) =>
       text.includes('on_web_content_process_terminate') &&
-      text.includes('record_web_content_process_termination(webview)')
+      text.includes('web_content_process_recovery::recover_after_termination(webview)')
+  },
+  {
+    name: 'Tauri reloads terminated WebViews with bounded native crash recovery',
+    file: 'apps/desktop/src-tauri/src/commands/web_content_process_recovery.rs',
+    expect: (text) =>
+      text.includes('const RECOVERY_WINDOW: Duration = Duration::from_secs(60)') &&
+      text.includes('const MAX_RECOVERY_ATTEMPTS: usize = 2') &&
+      text.includes('pub fn recover_after_termination(webview: &tauri::Webview)') &&
+      text.includes('.reload()') &&
+      text.includes('record_web_content_process_termination(webview')
   },
   {
     name: 'Tauri child WebViews record Windows and Linux native process failures',
